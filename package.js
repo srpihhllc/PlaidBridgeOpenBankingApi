@@ -1,5 +1,10 @@
-"scripts": {
-    "start": "node script.js"
+{
+  "name": "PlaidBridgeOpenbankingApi",
+  "version": "1.0.0",
+  "description": "Bank Account Verification and Management API",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
   },
   "dependencies": {
     "axios": "^0.21.1",
@@ -19,17 +24,8 @@
     "util": "^0.12.4",
     "nock": "^13.0.0"
   },
-  "extendedDescription": {
-    "features": [
-      "API Integration (axios)",
-      "CSV Handling",
-      "Statements Retrieval",
-      "Manual Login & Verification"
-    ],
-    "setup": [
-      "Clone the repo.",
-      "Create a `.env` file.",
-      "Install dependencies: `npm install`."
-    ],
-    "usage": "Run: `node script.js`"
-  }
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}
+
