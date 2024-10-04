@@ -4,7 +4,11 @@
   "description": "Bank Account Verification and Management API",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "jest",
+    "lint": "eslint .",
+    "build": "webpack",
+    "deno": "deno run app.ts"
   },
   "dependencies": {
     "axios": "^0.21.1",
@@ -24,8 +28,24 @@
     "util": "^0.12.4",
     "nock": "^13.0.0"
   },
-  "keywords": [],
-  "author": "",
-  "license": "MIT"
+  "keywords": [
+    "banking",
+    "verification",
+    "API",
+    "Plaid",
+    "TrueLayer",
+    "Basiq",
+    "Codat",
+    "financial services"
+  ],
+  "author": "Your Name <your.email@example.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi/issues"
+  }
 }
 
