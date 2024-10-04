@@ -23,7 +23,7 @@ jobs:
 
     - name: Deploy to Heroku
       env:
-        HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        HEROKU_API_KEY: ${{ HRKU-2c21ac95-a8af-4eb1-8d8d-18f2a32b5c9d }}
       run: |
         git remote add heroku https://git.heroku.com/plaidbridgeopenbankingapi.git
         git push heroku main
