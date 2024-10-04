@@ -8,7 +8,9 @@
     "test": "jest",
     "lint": "eslint .",
     "build": "webpack",
-    "deno": "deno run app.ts"
+    "deno": "deno run app.ts",
+    "clean": "rimraf dist",
+    "format": "prettier --write ."
   },
   "dependencies": {
     "axios": "^0.21.1",
@@ -28,6 +30,13 @@
     "util": "^0.12.4",
     "nock": "^13.0.0"
   },
+  "devDependencies": {
+    "eslint": "^7.32.0",
+    "jest": "^27.0.6",
+    "prettier": "^2.3.2",
+    "webpack": "^5.52.0",
+    "rimraf": "^3.0.2"
+  },
   "keywords": [
     "banking",
     "verification",
@@ -36,7 +45,10 @@
     "TrueLayer",
     "Basiq",
     "Codat",
-    "financial services"
+    "financial services",
+    "nodejs",
+    "express",
+    "backend"
   ],
   "author": "Your Name <your.email@example.com>",
   "license": "MIT",
@@ -46,6 +58,10 @@
   },
   "bugs": {
     "url": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi/issues"
+  },
+  "homepage": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi#readme",
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
 
