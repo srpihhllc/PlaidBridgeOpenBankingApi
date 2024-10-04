@@ -1,0 +1,39 @@
+{
+  "name": "plaidbridgeapi",
+  "description": "Bank Account Verification Script",
+  "scripts": {
+    "postdeploy": "npm run setup"
+  },
+  "env": {
+    "API_KEY": {
+      "required": true
+    },
+    "API_SECRET": {
+      "required": true
+    },
+    "ACCOUNT_NUMBER": {
+      "required": true
+    },
+    "PLAID_CLIENT_ID": {
+      "required": true
+    },
+    "PLAID_SECRET": {
+      "required": true
+    },
+    "PLAID_PUBLIC_KEY": {
+      "required": true
+    },
+    "JWT_SECRET": {
+      "required": true
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "standard-1x"
+    }
+  },
+  "addons": [
+    "heroku-postgresql"
+  ]
+}
