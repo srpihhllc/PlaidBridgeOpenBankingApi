@@ -1,5 +1,5 @@
 {
-  "name": "plaidbridgeapi",
+  "name": "plaidbridgopenbankingeapi",
   "description": "Bank Account Verification Script",
   "scripts": {
     "postdeploy": "npm run setup"
@@ -24,6 +24,33 @@
       "required": true
     },
     "JWT_SECRET": {
+      "required": true
+    },
+    "CLIENT_USER_ID": {
+      "required": true
+    },
+    "USER_EMAIL": {
+      "required": true
+    },
+    "USER_PASSWORD": {
+      "required": true
+    },
+    "PORT": {
+      "required": true
+    },
+    "DB_HOST": {
+      "required": true
+    },
+    "DB_PORT": {
+      "required": true
+    },
+    "DB_USER": {
+      "required": true
+    },
+    "DB_PASSWORD": {
+      "required": true
+    },
+    "DB_NAME": {
       "required": true
     }
   },
