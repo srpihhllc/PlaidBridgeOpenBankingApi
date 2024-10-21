@@ -21,7 +21,7 @@
         "express-rate-limit": "^6.3.0",
         "helmet": "^8.0.0",
         "cors": "^2.8.5",
-        "celebrate": "^17.0.0",
+        "celebrate": "^15.0.0",
         "joi": "^17.8.0",
         "jsonwebtoken": "^9.0.0",
         "winston": "^3.8.2",
