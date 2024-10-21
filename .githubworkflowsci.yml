@@ -10,9 +10,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [14, 16]
+strategy:
+  matrix:
+    node-version: [14, 16, 18, 20]
 
     steps:
     - uses: actions/checkout@v2
