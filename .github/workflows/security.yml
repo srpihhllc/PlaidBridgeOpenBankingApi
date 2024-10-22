@@ -1,0 +1,24 @@
+name: Security Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Run Xanitizer
+      uses: xanitizer/runner@v1
+
+    - name: Scan for Secrets
+      uses: security/secrets@v1
+
+    - name: Vulnerability Scanner
+      uses: security/vuln-scan@v1

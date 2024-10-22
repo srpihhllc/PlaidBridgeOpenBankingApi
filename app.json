@@ -1,0 +1,66 @@
+{
+  "name": "plaidbridgopenbankingeapi",
+  "description": "Bank Account Verification Script",
+  "scripts": {
+    "postdeploy": "npm run setup"
+  },
+  "env": {
+    "API_KEY": {
+      "required": true
+    },
+    "API_SECRET": {
+      "required": true
+    },
+    "ACCOUNT_NUMBER": {
+      "required": true
+    },
+    "PLAID_CLIENT_ID": {
+      "required": true
+    },
+    "PLAID_SECRET": {
+      "required": true
+    },
+    "PLAID_PUBLIC_KEY": {
+      "required": true
+    },
+    "JWT_SECRET": {
+      "required": true
+    },
+    "CLIENT_USER_ID": {
+      "required": true
+    },
+    "USER_EMAIL": {
+      "required": true
+    },
+    "USER_PASSWORD": {
+      "required": true
+    },
+    "PORT": {
+      "required": true
+    },
+    "DB_HOST": {
+      "required": true
+    },
+    "DB_PORT": {
+      "required": true
+    },
+    "DB_USER": {
+      "required": true
+    },
+    "DB_PASSWORD": {
+      "required": true
+    },
+    "DB_NAME": {
+      "required": true
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "standard-1x"
+    }
+  },
+  "addons": [
+    "heroku-postgresql"
+  ]
+}
