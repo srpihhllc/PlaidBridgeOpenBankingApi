@@ -61,6 +61,8 @@
     },
     "homepage": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi#readme",
     "engines": {
-        "node": ">=16.9.0 <18.0.0"
+  "node": "16.x"
+}
+
     }
 }
