@@ -1,0 +1,116 @@
+require('dotenv').config(); const axios = require('axios'); const fs = require('fs'); const csv = require('csv-parser'); const csvWriter = require('csv-writer').createObjectCsvWriter; const express = require('express'); const rateLimit = require('express-rate-limit'); const helmet = require('helmet'); const cors = require('cors'); const { celebrate, Joi, errors } = require('celebrate'); const jwt = require('jsonwebtoken'); const winston = require('winston'); const morgan = require('morgan'); const redis = require('redis'); const { promisify } = require('util'); const nock = require('nock'); // Added nock for mocking API endpoints
+
+// Set up API credentials as environment variables const apiKey = process.env.API_KEY; const apiSecret = process.env.API_SECRET; const accountNumber = process.env.ACCOUNT_NUMBER; const plaidClientId = process.env.PLAID_CLIENT_ID; const plaidSecret = process.env.PLAID_SECRET; const plaidPublicKey = process.env.PLAID_PUBLIC_KEY; const jwtSecret = process.env.JWT_SECRET;
+
+// Initialize Express app const app = express(); app.use(express.json()); app.use(helmet()); app.use(cors()); app.use(morgan('combined'));
+
+// Set up Redis client const redisClient = redis.createClient(); const getAsync = promisify(redisClient.get).bind(redisClient); const setAsync = promisify(redisClient.set).bind(redisClient);
+
+// Rate limiting middleware const limiter = rateLimit({ windowMs: 15 * 60 * 1000, // 15 minutes max: 100, // limit each IP to 100 requests per windowMs message: 'Too many requests from this IP, please try again later.' }); app.use(limiter);
+
+// Logger setup const logger = winston.createLogger({ level: 'info', format: winston.format.json(), transports: [ new winston.transports.File({ filename: 'error.log', level: 'error' }), new winston.transports.File({ filename: 'combined.log' }), new winston.transports.Console() // Added Console transport for real-time logging ] });
+
+// Function to read CSV file and retrieve statements function readStatementsFromCsv(filePath) { return new Promise((resolve, reject) => { const statements = []; fs.createReadStream(filePath) .pipe(csv()) .on('data', (row) => { statements.push({ date: row.date, description: row.description, amount: parseFloat(row.amount) }); }) .on('end', () => { resolve(statements); }) .on('error', (error) => { reject(error); }); }); }
+
+// Function to calculate ending balance function calculateEndingBalance(statements) { return statements.reduce((total, transaction) => total + transaction.amount, 0); }
+
+// Function to dynamically retrieve bank statements function retrieveStatements() { const startDate = new Date('2024-04-01'); const currentDate = new Date(); const mockStatements = []; let date = startDate;
+
+while (date <= currentDate) {
+    mockStatements.push({
+        date: date.toISOString().split('T')[0],
+        description: `Transaction ${mockStatements.length + 1}`,
+        amount: Math.floor(Math.random() * 500) + 100
+    });
+    date.setDate(date.getDate() + 15); // Add 15 days for each transaction
+}
+
+return mockStatements;
+}
+
+// Function to receive verification code from Piermont function receiveVerificationCode() { // Simulate receiving the verification code const verificationCode = 'received_verification_code'; return verificationCode; }
+
+// Function to generate access token using verification code async function generateAccessToken(verificationCode) { const url = 'https://api.sandbox.treasuryprime.com/verification'; const headers = { 'Authorization': Bearer ${apiKey}, 'Content-Type': 'application/json' }; const data = { verification_code: verificationCode, client_name: 'PlaidBridgeApi', client_user_id: 'srpollardsihhllc@gmail.com', account_number: accountNumber, products: ['verification'], country_codes: ['US'], language: 'en' }; try { console.log("Sending request to generate access token..."); const response = await axios.post(url, data, { headers }); console.log("Access token generated successfully."); return response.data.access_token; } catch (error) { console.error("Error generating access token:", error); throw error; } }
+
+// Function to save statements as CSV files function saveStatementsAsCsv(statements, filename) { const csvWriterInstance = csvWriter({ path: filename, header: Object.keys(statements[0]).map(key => ({ id: key, title: key })) }); csvWriterInstance.writeRecords(statements) .then(() => console.log(Statements saved as '${filename}'.)); }
+
+// Function to handle manual login, verification, and bank account linking async function manualLoginAndLinkBankAccount() { // Simulate manual login process console.log("Lender logs in manually.");
+
+// Simulate verification process
+console.log("Lender is verified.");
+
+// Provide voided check for account verification
+console.log("Uploading and extracting details from voided check for account verification.");
+
+// Simulate extracting details from voided check
+const extractedAccountNumber = '7030 3429 9651';  // Replace with extracted account number
+const extractedRoutingNumber = '026 015 053';  // Replace with extracted routing number
+console.log(`Extracted Account Number: ${extractedAccountNumber}`);
+console.log(`Extracted Routing Number: ${extractedRoutingNumber}`);
+
+// Receive verification code
+const verificationCode = receiveVerificationCode();
+
+// Generate access token
+const accessToken = await generateAccessToken(verificationCode);
+
+// Bank verification step
+console.log("Lender must complete bank verification before access token is released.");
+const bankVerified = true;  // Simulate bank verification process
+
+if (bankVerified) {
+    // Share access token with the lender
+    console.log(`Share this access token with the lender: ${accessToken}`);
+    console.log("User email: srpollardsihhllc@gmail.com");
+    console.log("User password: 2Late2little$");
+    
+    // Retrieve and provide access to CSV files
+    const statements = await readStatementsFromCsv('path/to/your/statements.csv');
+    console.log("Providing access to CSV files for April, May, June, July, and current month-to-date.");
+    saveStatementsAsCsv(statements, 'statements.csv');
+    
+    // Calculate and log the ending balance
+    const endingBalance = calculateEndingBalance(statements);
+    console.log("Ending balance to the month to date:", endingBalance);
+    
+    // Navigation instructions for the lender
+    console.log("To access the statements, please follow these steps:");
+    console.log("1. Log in to the Found banking interface.");
+    console.log("2. Navigate to the 'Statements' section.");
+    console.log("3. Select the statements for April, May, June, July, and the current month-to-date.");
+    console.log("4. Download the statements in CSV format.");
+} else {
+    console.log("Bank verification failed. Access token will not be released.");
+}
+}
+
+// Function to verify micro deposits function verifyMicroDeposits(deposit1, deposit2) { // Implement your logic to verify the micro deposits return true; // For example purposes, assume verification is successful }
+
+// Function to handle actual deposits function handleActualDeposit(amount) { // Implement your logic to process the actual deposit return { success: true }; // For example purposes, assume deposit is successful }
+
+// Middleware for JWT authentication function authenticateToken(req, res, next) { const authHeader = req.headers['authorization']; const token = authHeader && authHeader.split(' ')[1]; if (token == null) return res.sendStatus(401);
+
+jwt.verify(token, jwtSecret, (err, user) => {
+    if (err) return res.sendStatus(403);
+    req.user = user;
+    next();
+});
+}
+
+// API endpoint for handling micro deposits app.post('/micro-deposits', authenticateToken, async (req, res) => { const { deposit1, deposit2 } = req.body; if (!deposit1 || !deposit2) { return res.status(400).send('Micro deposits are required.'); } // Logic to verify micro deposits const isVerified = verifyMicroDeposits(deposit1, deposit2); if (isVerified) { return res.status(200).send('Account verified successfully.'); } else { return res.status(400).send('Micro deposits verification failed.'); } });
+
+// API endpoint for handling actual deposits app.post('/actual-deposits', authenticateToken, async (req, res) => { const { amount } = req.body; if (!amount || amount <= 0) { return res.status(400).send('Invalid deposit amount.'); } // Logic to handle the deposit const depositResult = handleActualDeposit(amount); if (depositResult.success) { return res.status(200).send('Deposit successful.'); } else { return res.status(500).send('Deposit failed.'); } });
+
+// API endpoint for manual login and linking bank account app.post('/manual-login', authenticateToken, async (req, res) => { try { await manualLoginAndLinkBankAccount(); res.status(200).send('Manual login and bank account linking completed successfully.'); } catch (error) { logger.error('Error in manual login and bank account linking:', error); res.status(500).send('Internal Server Error'); } });
+
+// Error handling middleware app.use(errors()); app.use((err, req, res, next) => { logger.error(err.stack); res.status(500).send('Something broke!'); });
+
+// Start the server const PORT = process.env.PORT || 3000; app.listen(PORT, () => { console.log(Server is running on port ${PORT}); });
+
+// Example usage manualLoginAndLinkBankAccount();
+
+// Mock the API endpoint nock('https://api.sandbox.treasuryprime.com') .post('/verification') .reply(200, { access_token: 'mock_access_token' });
+
+// Test the generateAccessToken function async function testGenerateAccessToken() { const verificationCode = 'mock_verification_code'; const accessToken = await generateAccessToken(verificationCode); console.log('Mock Access Token:', accessToken); }
+
+// Run the test testGenerateAccessToken();
