@@ -1,5 +1,5 @@
 {
-"name": "PlaidBridgeOpenbankingApi",
+  "name": "PlaidBridgeOpenbankingApi",
   "version": "1.0.0",
   "description": "Bank Account Verification and Management API",
   "main": "index.js",
@@ -63,3 +63,4 @@
   "engines": {
     "node": "16.x"
   }
+}
