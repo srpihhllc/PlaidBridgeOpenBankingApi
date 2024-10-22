@@ -1,6 +1,17 @@
 const helmet = require('helmet');
 
-// Custom Middleware to Replace hasOwn
+// Middleware for setting security headers
+app.use(helmet({
+  contentSecurityPolicy: false, // Example of configuration
+  frameguard: {
+    action: 'deny'
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true
+  }
+}));
+
 function normalizeDirectives(rawDirectives) {
   const normalizedDirectives = {};
   for (const rawDirectiveName in rawDirectives) {
@@ -11,14 +22,3 @@ function normalizeDirectives(rawDirectives) {
   return normalizedDirectives;
 }
 
-// Update Helmet usage
-app.use(helmet({
-  contentSecurityPolicy: false, // Example configuration
-  frameguard: {
-    action: 'deny'
-  },
-  hsts: {
-    maxAge: 31536000,
-    includeSubDomains: true
-  }
-}));
