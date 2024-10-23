@@ -1,5 +1,4 @@
 {
-
   "name": "PlaidBridgeOpenbankingApi",
   "version": "1.0.0",
   "description": "Bank Account Verification and Management API",
@@ -22,7 +21,6 @@
     "express-rate-limit": "^6.3.0",
     "helmet": "^8.0.0",
     "cors": "^2.8.5",
-
     "joi": "^17.8.0",
     "jsonwebtoken": "^9.0.0",
     "winston": "^3.8.2",
@@ -35,7 +33,6 @@
     "eslint": "^7.32.0",
     "jest": "^29.7.0",
     "prettier": "^3.3.3",
-
     "rimraf": "^3.0.2"
   },
   "keywords": [
@@ -62,4 +59,7 @@
   },
   "homepage": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi#readme",
   "engines": {
+    "node": ">=14.0.0"
+  }
+}
 
