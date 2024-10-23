@@ -1,5 +1,8 @@
 {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
   "name": "PlaidBridgeOpenbankingApi",
   "version": "1.0.0",
   "description": "Bank Account Verification and Management API",
@@ -22,7 +25,11 @@
     "express-rate-limit": "^6.3.0",
     "helmet": "^8.0.0",
     "cors": "^2.8.5",
+<<<<<<< HEAD
     "celebrate": "^17.0.0",
+=======
+    "celebrate": "^15.0.0",
+>>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
     "joi": "^17.8.0",
     "jsonwebtoken": "^9.0.0",
     "winston": "^3.8.2",
@@ -35,7 +42,11 @@
     "eslint": "^7.32.0",
     "jest": "^29.7.0",
     "prettier": "^3.3.3",
+<<<<<<< HEAD
     "webpack": "^5.52.0",
+=======
+    "webpack": "^4.9.0",
+>>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
     "rimraf": "^3.0.2"
   },
   "keywords": [
@@ -62,6 +73,7 @@
   },
   "homepage": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi#readme",
   "engines": {
+<<<<<<< HEAD
     "node": ">=14.0.0"
   }
 =======
@@ -130,4 +142,8 @@
         "node": ">=14.0.0"
     }
 >>>>>>> 3dc0474b4b3644673335d0cdccede1ecb502cfa5
+=======
+    "node": "16.x"
+  }
+>>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
 }
