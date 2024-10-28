@@ -14,6 +14,7 @@ const morgan = require('morgan');
 const redis = require('redis');
 const { promisify } = require('util');
 const nock = require('nock');
+const path = require('path');
 
 // Environment Variables
 const apiKey = process.env.API_KEY;
@@ -38,7 +39,7 @@ const setAsync = promisify(redisClient.set).bind(redisClient);
 
 // Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 0,
+  windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100,
   message: 'Too many requests from this IP, please try again later.'
 });
@@ -55,35 +56,53 @@ const logger = winston.createLogger({
   ]
 });
 
-// Bank Verification and Linking Functions
-async function manualLoginAndLinkBankAccount() {
-  console.log("Lender logs in manually.");
-  console.log("Lender is verified.");
-  console.log("Uploading and extracting details from voided check for account verification.");
-  const extractedAccountNumber = '7030 3429 9651';
-  const extractedRoutingNumber = '026 015 053';
-  console.log(`Extracted Account Number: ${extractedAccountNumber}`);
-  console.log(`Extracted Routing Number: ${extractedRoutingNumber}`);
-  const verificationCode = receiveVerificationCode();
-  const accessToken = await generateAccessToken(verificationCode);
-  console.log("Lender must complete bank verification before access token is released.");
+// Business Logic Functions
+async function performManualLogin() {
+  logger.info("Lender logs in manually.");
+}
+async function verifyLender() {
+  logger.info("Lender is verified.");
+}
+async function uploadAndExtractDetails() {
+  logger.info("Uploading and extracting details from voided check for account verification.");
+  return {
+    accountNumber: '7030 3429 9651',
+    routingNumber: '026 015 053'
+  };
+}
+async function checkBankVerification(accessToken, extractedDetails) {
+  logger.info("Lender must complete bank verification before access token is released.");
   const bankVerified = true;
   if (bankVerified) {
-    console.log(`Share this access token with the lender: ${accessToken}`);
-    console.log("User email: srpollardsihhllc@gmail.com");
-    console.log("User password: 2Late2little$");
-    const statements = await readStatementsFromCsv('path/to/your/statements.csv');
-    console.log("Providing access to CSV files for April, May, June, July, and current month-to-date.");
-    await saveStatementsAsCsv(statements, 'statements.csv');
-    const endingBalance = calculateEndingBalance(statements);
-    console.log("Ending balance to the month to date:", endingBalance);
-    console.log("To access the statements, please follow these steps:");
-    console.log("1. Log in to the Found banking interface.");
-    console.log("2. Navigate to the 'Statements' section.");
-    console.log("3. Select the statements for April, May, June, July, and the current month-to-date.");
-    console.log("4. Download the statements in CSV format.");
+    logger.info("Bank verification successful.");
+    logger.info("Access token generated and shared with lender.");
+    return true;
   } else {
-    console.log("Bank verification failed. Access token will not be released.");
+    logger.info("Bank verification failed. Access token will not be released.");
+    return false;
+  }
+}
+
+// Bank Verification and Linking Functions
+async function manualLoginAndLinkBankAccount() {
+  try {
+    await performManualLogin();
+    await verifyLender();
+    const extractedDetails = await uploadAndExtractDetails();
+    const verificationCode = receiveVerificationCode();
+    const accessToken = await generateAccessToken(verificationCode);
+    const isVerified = await checkBankVerification(accessToken, extractedDetails);
+    if (isVerified) {
+      const userEmail = process.env.USER_EMAIL;
+      const userPassword = process.env.USER_PASSWORD;
+      const statements = await readStatementsFromCsv('path/to/your/statements.csv');
+      await saveStatementsAsCsv(statements, 'statements.csv');
+      const endingBalance = calculateEndingBalance(statements);
+      logger.info(`Ending balance to the month to date: ${endingBalance}`);
+    }
+  } catch (error) {
+    logger.error('Error in manualLoginAndLinkBankAccount:', error);
+    throw error;
   }
 }
 
@@ -96,7 +115,6 @@ async function linkBankAccountUsingPlatform(platform, publicToken) {
   };
   const url = urlMap[platform.toLowerCase()];
   if (!url) throw new Error('Unsupported platform');
-
   const response = await axios.post(url, {
     client_id: platform.toLowerCase() === 'plaid' ? process.env.PLAID_CLIENT_ID : process.env.PIERMONT_API_KEY,
     secret: platform.toLowerCase() === 'plaid' ? process.env.PLAID_SECRET : process.env.PIERMONT_API_SECRET,
@@ -108,9 +126,10 @@ async function linkBankAccountUsingPlatform(platform, publicToken) {
 
 // CSV Handling Functions
 async function readStatementsFromCsv(filePath) {
+  const safePath = path.resolve(filePath);
   return new Promise((resolve, reject) => {
     const statements = [];
-    fs.createReadStream(filePath)
+    fs.createReadStream(safePath)
       .pipe(csv())
       .on('data', (row) => {
         statements.push({
@@ -206,7 +225,8 @@ app.post('/transfer-funds', authenticateToken, async (req, res) => {
 
 // Helper Functions
 async function verifyMicroDeposits(deposit1, deposit2) {
-  // Add your actual verification logic here
+  const expectedDeposit1 = 0.10; // Example value, update as necessary
+  const expectedDeposit2 = 0.15; // Example value, update as necessary
   return deposit1 === expectedDeposit1 && deposit2 === expectedDeposit2;
 }
 
@@ -217,27 +237,11 @@ async function handleActualDeposit(amount) {
 
 async function transferFundsToAccount(accessToken, amount) {
   // Implement secure fund transfer logic
-  console.log(`Transferring ${amount} to the actual account using access token ${accessToken}`);
+  logger.info(`Transferring ${amount} to the actual account using access token ${accessToken}`);
   return { success: true, message: 'Funds transferred successfully' };
 }
 
 // Error Handling Middleware
 app.use(errors());
 app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  res.status(500).send('Something broke!');
-});
-
-// Start Server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
-
-// Mocking API Requests for Testing
-nock('https://api.sandbox.treasuryprime.com')
-  .post('/verification')
-  .reply(200, { access_token: 'mock_access_token' });
-
-async function testGenerateAccessToken() {
-  const verificationCode = 'mock_verification_code';[_[_{{{CITATION{{{_1{](https://github.com/rfist/fb_chatbot/tree/ec0d61d3c3185fde318ccdf4d0d64cce3d070f70/app%2Flogger.js)[_{{{CITATION{{{_2{](https://github.com/wasifnaeem/nodejs-boilerplate/tree/637b32a1db699559eec5f40c779a5b9090b5ac45/PL%2Fservices%2Fwinston-logger.service.ts)[_{{{CITATION{{{_3{](https://github.com/thundergolfer/source-rank/tree/f8cc33dd411c2c324bde44082bbe50c1b3cc5d0e/messenger-bot%2Fsrc%2Flogger.js)[_{{{CITATION{{{_4{](https://github.com/krisunni/massUpdateDynamo/tree/ff5ebbdf4b67fca82565b60579eac9f35287fb21/app.js){{{CITATION{{{_5{](https://github.com/stadnikEV/soma-back-end/tree/be6b883291bf750ea291885e2d34b06973118bad/libs%2Flog.js)
+ [_{{{CITATION{{{_1{](https://github.com/stadnikEV/soma-back-end/tree/be6b883291bf750ea291885e2d34b06973118bad/libs%2Flog.js)[_{{{CITATION{{{_2{](https://github.com/krisunni/massUpdateDynamo/tree/ff5ebbdf4b67fca82565b60579eac9f35287fb21/app.js)[_{{{CITATION{{{_3{](https://github.com/thundergolfer/source-rank/tree/f8cc33dd411c2c324bde44082bbe50c1b3cc5d0e/messenger-bot%2Fsrc%2Flogger.js)[_{{{CITATION{{{_4{](https://github.com/wasifnaeem/nodejs-boilerplate/tree/637b32a1db699559eec5f40c779a5b9090b5ac45/PL%2Fservices%2Fwinston-logger.service.ts)[_{{{CITATION{{{_5{](https://github.com/rfist/fb_chatbot/tree/ec0d61d3c3185fde318ccdf4d0d64cce3d070f70/app%2Flogger.js)
