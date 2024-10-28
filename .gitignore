@@ -69,7 +69,7 @@ dist/
 
 # Editors and OS artifacts
 *~
-.DS_STORE
+.DS_Store
 *.swp
 
 # Byte-compiled python files
