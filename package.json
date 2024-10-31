@@ -1,27 +1,27 @@
 {
-  "name": "plaid-bridge-open-banking-api",
+  "name": "plaidbridgeopenbankingapi",
   "version": "1.0.0",
-  "description": "A project for Plaid Bridge Open Banking API",
-  "main": "dist/index.js",
+  "description": "A secure API for bank account verification and transaction processing.",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js",
-    "build": "tsc",
-    "lint": "eslint . --ext .ts,.js",
-    "format": "prettier --write ."
+    "start": "node index.js",
+    "update-ts-configs": "node scripts/update-ts-configs.js"
   },
-  "author": "Your Name",
-  "license": "ISC",
   "dependencies": {
     "express": "^4.17.1",
-    "mongoose": "^5.10.9"
-  },
-  "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.0.0",
-    "@typescript-eslint/parser": "^4.0.0",
-    "eslint": "^7.0.0",
-    "eslint-config-prettier": "^8.0.0",
-    "eslint-plugin-prettier": "^4.0.0",
-    "prettier": "^2.0.0",
-    "typescript": "^4.0.0"
+    "dotenv": "^10.0.0",
+    "axios": "^0.21.1",
+    "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
+    "helmet": "^4.6.0",
+    "cors": "^2.8.5",
+    "celebrate": "^14.0.0",
+    "jsonwebtoken": "^8.5.1",
+    "winston": "^3.3.3",
+    "morgan": "^1.10.0",
+    "redis": "^3.1.2",
+    "util": "^0.12.3",
+    "nock": "^13.0.11",
+    "path": "^0.12.7"
   }
 }
