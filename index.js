@@ -1,8 +1,11 @@
+const express = require('express');
 const helmet = require('helmet');
+const app = express();
+const port = process.env.PORT || 3000;
 
-// Middleware for setting security headers
+// Use Helmet to set security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // Example of configuration
+  contentSecurityPolicy: false,
   frameguard: {
     action: 'deny'
   },
@@ -12,6 +15,7 @@ app.use(helmet({
   }
 }));
 
+// Middleware function
 function normalizeDirectives(rawDirectives) {
   const normalizedDirectives = {};
   for (const rawDirectiveName in rawDirectives) {
@@ -21,4 +25,15 @@ function normalizeDirectives(rawDirectives) {
   }
   return normalizedDirectives;
 }
+
+// Sample route
+app.get('/', (req, res) => {
+  res.send('Hello, world!');
+});
+
+// Start the server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
+
 
