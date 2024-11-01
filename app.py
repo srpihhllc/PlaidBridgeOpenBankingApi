@@ -9,6 +9,7 @@ import os
 import jwt
 from functools import wraps
 import requests
+import pdfplumber
 
 app = Flask(__name__)
 CORS(app)
@@ -39,7 +40,6 @@ def authenticate_token(f):
 # Business Logic Functions
 def perform_manual_login(username, password):
     logger.info("Lender logs in manually.")
-    # Simulate login logic
     if username == os.getenv('MOCK_USERNAME') and password == os.getenv('MOCK_PASSWORD'):
         return True
     return False
@@ -196,6 +196,34 @@ def open_banking():
     except Exception as e:
         logger.error(f"Error integrating Open Banking API: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
+
+# PDF Handling Functions
+def parse_pdf(file_path):
+    statements = []
+    with pdfplumber.open(file_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            for line in text.split('\n'):
+                parts = line.split()
+                if len(parts) >= 3:
+                    date, description, amount = parts[0], " ".join(parts[1:-1]), parts[-1]
+                    statements.append({'date': date, 'description': description, 'amount': amount})
+    return statements
+
+@app.route('/upload-pdf', methods=['POST'])
+def upload_pdf():
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'message': 'No selected file'}), 400
+    if file and file.filename.endswith('.pdf'):
+        file_path = os.path.join('uploads', file.filename)
+        file.save(file_path)
+        statements = parse_pdf(file_path)
+        save_statements_as_csv(statements, 'statements.csv')
+        return jsonify({'message': 'File processed successfully', 'statements': statements}), 200
+    return jsonify({'message': 'Invalid file format'}), 400
 
 if __name__ == '__main__':
     app.run(port=3000)
