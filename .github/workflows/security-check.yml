@@ -10,17 +10,20 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Setup Node.js environment
-      uses: actions/setup-node@v4.0.4
+    - name: Setup Python environment
+      uses: actions/setup-python@v2
       with:
-        always-auth: false
-        node-version: '14.x' # Specify the Node.js version
-        architecture: 'x64' # Specify the architecture
-        
+        python-version: '3.x' # Specify the Python version
+
+    - name: Install dependencies
+      run: |
+        pip install poetry
+        poetry install
+
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
       with:
-        languages: javascript
+        languages: python
 
     - name: Perform CodeQL analysis
       uses: github/codeql-action/analyze@v2
