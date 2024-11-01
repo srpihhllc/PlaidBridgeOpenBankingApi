@@ -8,6 +8,7 @@ import csv
 import os
 import jwt
 from functools import wraps
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -36,8 +37,12 @@ def authenticate_token(f):
     return decorated
 
 # Business Logic Functions
-def perform_manual_login():
+def perform_manual_login(username, password):
     logger.info("Lender logs in manually.")
+    # Simulate login logic
+    if username == os.getenv('MOCK_USERNAME') and password == os.getenv('MOCK_PASSWORD'):
+        return True
+    return False
 
 def verify_lender():
     logger.info("Lender is verified.")
@@ -56,10 +61,10 @@ def check_bank_verification(access_token, extracted_details):
         logger.info("Bank verification failed. Access token will not be released.")
         return False
 
-# Core Function
-def manual_login_and_link_bank_account():
+def manual_login_and_link_bank_account(username, password):
     try:
-        perform_manual_login()
+        if not perform_manual_login(username, password):
+            return {'error': 'Invalid credentials'}
         verify_lender()
         extracted_details = upload_and_extract_details()
         verification_code = receive_verification_code()
@@ -81,8 +86,11 @@ def manual_login_and_link_bank_account():
 @authenticate_token
 def manual_login():
     try:
-        result = manual_login_and_link_bank_account()
-        return jsonify(result), 200
+        data = request.get_json()
+        username = data.get('username')
+        password = data.get('password')
+        result = manual_login_and_link_bank_account(username, password)
+        return jsonify(result), 200 if 'error' not in result else 403
     except Exception as e:
         logger.error(f"Error in manual login and bank account linking: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
@@ -126,6 +134,10 @@ def handle_actual_deposit(amount):
 def transfer_funds_to_account(access_token, amount):
     logger.info(f"Transferring {amount} to the actual account using access token {access_token}")
     return {'success': True, 'message': 'Funds transferred successfully'}
+
+def integrate_open_banking_api(api_url, payload):
+    response = requests.post(api_url, json=payload)
+    return response.json()
 
 @app.route('/micro-deposits', methods=['POST'])
 @authenticate_token
@@ -172,5 +184,19 @@ def transfer_funds():
         logger.error(f"Error transferring funds: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
+@app.route('/open-banking', methods=['POST'])
+@authenticate_token
+def open_banking():
+    try:
+        data = request.get_json()
+        api_url = data.get('api_url')
+        payload = data.get('payload')
+        result = integrate_open_banking_api(api_url, payload)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error integrating Open Banking API: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
 if __name__ == '__main__':
     app.run(port=3000)
+
