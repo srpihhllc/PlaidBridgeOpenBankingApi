@@ -1,3 +1,10 @@
 Flask
+Flask-Limiter
+Flask-CORS
+redis
+PyJWT
+requests
+pdfplumber
 gunicorn
 python-dotenv
+
