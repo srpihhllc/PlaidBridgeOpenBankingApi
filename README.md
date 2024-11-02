@@ -30,7 +30,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Redis client configuration
-redis_client = redis.StrictRedis(host='localhost', port=6379, decode_responses=True)
+redis_url = os.getenv('REDIS_URL')
+redis_client = redis.from_url(redis_url)
+
+# Environment Variables
+MOCK_USERNAME = os.getenv('MOCK_USERNAME', 'srpollardsihhllc@gmail.com')
+MOCK_PASSWORD = os.getenv('MOCK_PASSWORD', 'your_2Late2little$')
+USER_EMAIL = os.getenv('USER_EMAIL', 'your_srpollardsihhllc@gmail.com')
+USER_PASSWORD = os.getenv('USER_PASSWORD', 'your_skeeMdralloP1$t')
+JWT_SECRET = os.getenv('JWT_SECRET', 'your_wiwmU1jZdt+uWOsmoaywjCVXgxaAZbBuOY7HqQt2ydY=')
 
 # Authentication Middleware
 def authenticate_token(f):
@@ -50,7 +58,7 @@ def authenticate_token(f):
 # Business Logic Functions
 def perform_manual_login(username, password):
     logger.info("Lender logs in manually.")
-    if username == os.getenv('MOCK_USERNAME') and password == os.getenv('MOCK_PASSWORD'):
+    if username == MOCK_USERNAME and password == MOCK_PASSWORD:
         return True
     return False
 
@@ -81,8 +89,6 @@ def manual_login_and_link_bank_account(username, password):
         access_token = generate_access_token(verification_code)
         is_verified = check_bank_verification(access_token, extracted_details)
         if is_verified:
-            user_email = os.getenv('USER_EMAIL')
-            user_password = os.getenv('USER_PASSWORD')
             statements = read_statements_from_csv('path/to/your/statements.csv')
             save_statements_as_csv(statements, 'statements.csv')
             ending_balance = calculate_ending_balance(statements)
@@ -237,3 +243,4 @@ def upload_pdf():
 
 if __name__ == '__main__':
     app.run(port=3000)
+
