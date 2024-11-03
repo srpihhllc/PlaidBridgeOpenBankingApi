@@ -128,7 +128,7 @@ def read_statements_from_csv(file_path):
 def save_statements_as_csv(statements, file_path):
     try:
         keys = statements[0].keys()
-        with open(file_path, mode='w', newline='') as file):
+        with open(file_path, mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             writer.writerows(statements)
