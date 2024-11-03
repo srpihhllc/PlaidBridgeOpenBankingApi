@@ -11,22 +11,28 @@ from functools import wraps
 import requests
 import pdfplumber
 from dotenv import load_dotenv
+from limits.storage import RedisStorage
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
-limiter = Limiter(key_func=get_remote_address)
+
+# Redis client configuration
+redis_url = os.getenv('REDIS_URL')
+redis_client = redis.from_url(redis_url)
+
+# Configure Flask-Limiter to use Redis
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri=redis_url
+)
 limiter.init_app(app)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Redis client configuration
-redis_url = os.getenv('REDIS_URL')
-redis_client = redis.from_url(redis_url)
 
 # Environment Variables
 MOCK_USERNAME = os.getenv('MOCK_USERNAME', 'srpollardsihhllc@gmail.com')
