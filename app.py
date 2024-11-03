@@ -244,7 +244,7 @@ def upload_pdf():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'message': 'No selected file'}), 400
-    if file and file.filename.endswith('.pdf')):
+    if file and file.filename.endswith('.pdf'):
         file_path = os.path.join('uploads', file.filename)
         file.save(file_path)
         statements = parse_pdf(file_path)
@@ -258,5 +258,4 @@ def home():
 
 if __name__ == '__main__':
     app.run(port=int(os.getenv('PORT', 3000)))
-
 
