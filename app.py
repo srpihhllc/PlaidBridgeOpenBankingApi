@@ -13,7 +13,8 @@ import pdfplumber
 
 app = Flask(__name__)
 CORS(app)
-limiter = Limiter(app, key_func=get_remote_address)
+limiter = Limiter(key_func=get_remote_address)
+limiter.init_app(app)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -117,7 +118,7 @@ def read_statements_from_csv(file_path):
 def save_statements_as_csv(statements, file_path):
     try:
         keys = statements[0].keys()
-        with open(file_path, mode='w', newline='') as file:
+        with open(file_path, mode='w', newline='') as file):
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             writer.writerows(statements)
