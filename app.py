@@ -12,6 +12,7 @@ import requests
 import pdfplumber
 from dotenv import load_dotenv
 from limits.storage import RedisStorage
+import datetime
 
 # Load environment variables from .env file
 load_dotenv()
@@ -56,6 +57,14 @@ def authenticate_token(f):
         return f(*args, **kwargs)
     return decorated
 
+# Generate JWT Token
+def generate_jwt_token(user_id):
+    payload = {
+        'user_id': user_id,
+        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=1)
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
+
 # Business Logic Functions
 def perform_manual_login(username, password):
     logger.info("Lender logs in manually.")
@@ -88,13 +97,14 @@ def manual_login_and_link_bank_account(username, password):
         extracted_details = upload_and_extract_details()
         verification_code = receive_verification_code()
         access_token = generate_access_token(verification_code)
+        jwt_token = generate_jwt_token(username)
         is_verified = check_bank_verification(access_token, extracted_details)
         if is_verified:
             statements = read_statements_from_csv('path/to/your/statements.csv')
             save_statements_as_csv(statements, 'statements.csv')
             ending_balance = calculate_ending_balance(statements)
             logger.info(f"Ending balance to the month to date: {ending_balance}")
-            return {"accessToken": access_token, "message": "Success"}
+            return {"accessToken": access_token, "jwtToken": jwt_token, "message": "Success"}
     except Exception as error:
         logger.error(f"Error in manual_login_and_link_bank_account: {error}")
         raise error
@@ -234,7 +244,7 @@ def upload_pdf():
     file = request.files['file']
     if file.filename == '':
         return jsonify({'message': 'No selected file'}), 400
-    if file and file.filename.endswith('.pdf'):
+    if file and file.filename.endswith('.pdf')):
         file_path = os.path.join('uploads', file.filename)
         file.save(file_path)
         statements = parse_pdf(file_path)
