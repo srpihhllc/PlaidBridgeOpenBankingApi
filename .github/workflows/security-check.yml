@@ -13,7 +13,7 @@ jobs:
     - name: Setup Python environment
       uses: actions/setup-python@v2
       with:
-        python-version: '3.x' # Specify the Python version
+        python-version: '3.13' # Specify the Python version
 
     - name: Install dependencies
       run: |
@@ -27,3 +27,4 @@ jobs:
 
     - name: Perform CodeQL analysis
       uses: github/codeql-action/analyze@v2
+
