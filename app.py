@@ -10,6 +10,10 @@ import jwt
 from functools import wraps
 import requests
 import pdfplumber
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -233,6 +237,6 @@ def upload_pdf():
     return jsonify({'message': 'Invalid file format'}), 400
 
 if __name__ == '__main__':
-    app.run(port=3000)
+    app.run(port=int(os.getenv('PORT', 3000)))
 
 
