@@ -236,6 +236,10 @@ def upload_pdf():
         return jsonify({'message': 'File processed successfully', 'statements': statements}), 200
     return jsonify({'message': 'Invalid file format'}), 400
 
+@app.route('/')
+def home():
+    return 'Welcome to the PlaidBridgeOpenBankingApi!'
+
 if __name__ == '__main__':
     app.run(port=int(os.getenv('PORT', 3000)))
 
