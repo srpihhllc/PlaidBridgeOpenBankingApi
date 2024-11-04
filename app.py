@@ -9,10 +9,10 @@ import os
 import jwt
 from functools import wraps
 import requests
-import pdfplumber
 from dotenv import load_dotenv
 from limits.storage import RedisStorage
 import datetime
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Load environment variables from .env file
 load_dotenv()
@@ -35,12 +35,19 @@ limiter.init_app(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Root Endpoint
+@app.route('/')
+def index():
+    return "Welcome to the Flask Banking API!"
+
 # Environment Variables
 MOCK_USERNAME = os.getenv('MOCK_USERNAME', 'srpollardsihhllc@gmail.com')
 MOCK_PASSWORD = os.getenv('MOCK_PASSWORD', 'your_2Late2little$')
 USER_EMAIL = os.getenv('USER_EMAIL', 'your_srpollardsihhllc@gmail.com')
 USER_PASSWORD = os.getenv('USER_PASSWORD', 'your_skeeMdralloP1$t')
 JWT_SECRET = os.getenv('JWT_SECRET', 'your_wiwmU1jZdt+uWOsmoaywjCVXgxaAZbBuOY7HqQt2ydY=')
+TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
+TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')
 
 # Authentication Middleware
 def authenticate_token(f):
@@ -65,6 +72,19 @@ def generate_jwt_token(user_id):
     }
     return jwt.encode(payload, JWT_SECRET, algorithm='HS256')
 
+# Refresh JWT Token
+@app.route('/refresh-token', methods=['POST'])
+@authenticate_token
+def refresh_token():
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        new_token = generate_jwt_token(user_id)
+        return jsonify({'jwtToken': new_token}), 200
+    except Exception as e:
+        logger.error(f"Error in refreshing token: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
 # Business Logic Functions
 def perform_manual_login(username, password):
     logger.info("Lender logs in manually.")
@@ -72,8 +92,15 @@ def perform_manual_login(username, password):
         return True
     return False
 
-def verify_lender():
+def verify_lender(lender_id):
+    # Implement lender verification logic
     logger.info("Lender is verified.")
+    return True
+
+def verify_borrower(borrower_id):
+    # Implement borrower verification logic
+    logger.info("Borrower is verified.")
+    return True
 
 def upload_and_extract_details():
     logger.info("Uploading and extracting details from voided check for account verification.")
@@ -93,10 +120,10 @@ def manual_login_and_link_bank_account(username, password):
     try:
         if not perform_manual_login(username, password):
             return {'error': 'Invalid credentials'}
-        verify_lender()
+        verify_lender(username)
         extracted_details = upload_and_extract_details()
-        verification_code = receive_verification_code()
-        access_token = generate_access_token(verification_code)
+        verification_code = '123456'  # Mock verification code
+        access_token = generate_jwt_token(username)
         jwt_token = generate_jwt_token(username)
         is_verified = check_bank_verification(access_token, extracted_details)
         if is_verified:
@@ -104,7 +131,9 @@ def manual_login_and_link_bank_account(username, password):
             save_statements_as_csv(statements, 'statements.csv')
             ending_balance = calculate_ending_balance(statements)
             logger.info(f"Ending balance to the month to date: {ending_balance}")
-            return {"accessToken": access_token, "jwtToken": jwt_token, "message": "Success"}
+            # Refresh JWT token after linking
+            new_jwt_token = generate_jwt_token(username)
+            return {"accessToken": access_token, "jwtToken": new_jwt_token, "message": "Success"}
     except Exception as error:
         logger.error(f"Error in manual_login_and_link_bank_account: {error}")
         raise error
@@ -166,96 +195,123 @@ def integrate_open_banking_api(api_url, payload):
     response = requests.post(api_url, json=payload)
     return response.json()
 
-@app.route('/micro-deposits', methods=['POST'])
-@authenticate_token
-def micro_deposits():
-    try:
-        deposit1 = float(request.json.get('deposit1'))
-        deposit2 = float(request.json.get('deposit2'))
-        if not deposit1 or not deposit2:
-            return jsonify({'message': 'Micro deposits are required.'}), 400
-        if verify_micro_deposits(deposit1, deposit2):
-            return jsonify({'message': 'Account verified successfully.'}), 200
-        else:
-            return jsonify({'message': 'Micro deposits verification failed.'}), 400
-    except Exception as e:
-        logger.error(f"Error verifying micro deposits: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+# Treasury Prime Integration Functions
+def get_treasury_prime_account_details(account_id):
+    url = f"{TREASURY_PRIME_API_URL}/accounts/{account_id}"
+    headers = {
+        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
+        'Content-Type': 'application/json',
+    }
+    response = requests.get(url, headers=headers)
+    return response.json()
 
-@app.route('/actual-deposits', methods=['POST'])
-@authenticate_token
-def actual_deposits():
-    try:
-        amount = float(request.json.get('amount'))
-        if amount <= 0:
-            return jsonify({'message': 'Invalid deposit amount.'}), 400
-        if handle_actual_deposit(amount)['success']:
-            return jsonify({'message': 'Deposit successful.'}), 200
-        else:
-            return jsonify({'message': 'Deposit failed.'}), 500
-    except Exception as e:
-        logger.error(f"Error handling actual deposit: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+def create_treasury_prime_account(account_data):
+    url = f"{TREASURY_PRIME_API_URL}/accounts"
+    headers = {
+        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
+        'Content-Type': 'application/json',
+    }
+    response = requests.post(url, headers=headers, json=account_data)
+    return response.json()
 
-@app.route('/transfer-funds', methods=['POST'])
-@authenticate_token
-def transfer_funds():
-    try:
-        access_token = request.json.get('accessToken')
-        amount = float(request.json.get('amount'))
-        if not access_token or amount <= 0:
-            return jsonify({'message': 'Access token and valid amount are required.'}), 400
-        result = transfer_funds_to_account(access_token, amount)
-        return jsonify({'message': result['message']}), 200 if result['success'] else 500
-    except Exception as e:
-        logger.error(f"Error transferring funds: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
+# Recurring Payments
+scheduler = BackgroundScheduler()
+scheduler.start()
 
-@app.route('/open-banking', methods=['POST'])
+@app.route('/setup-recurring-payment', methods=['POST'])
 @authenticate_token
-def open_banking():
+def setup_recurring_payment():
     try:
         data = request.get_json()
-        api_url = data.get('api_url')
-        payload = data.get('payload')
-        result = integrate_open_banking_api(api_url, payload)
-        return jsonify(result), 200
+        lender_id = data.get('lender_id')
+        borrower_id = data.get('borrower_id')
+        amount = data.get('amount')
+        frequency = data.get('frequency')  # 'weekly' or 'monthly'
+        start_date = data.get('start_date')  # e.g., '2023-10-01'
+
+        # Schedule the recurring payment
+        if frequency == 'weekly':
+            scheduler.add_job(process_recurring_payment, 'interval', weeks=1, start_date=start_date, args=[lender_id, borrower_id, amount])
+        elif frequency == 'monthly':
+            scheduler.add_job(process_recurring_payment, 'interval', weeks=4, start_date=start_date, args=[lender_id, borrower_id, amount])
+        else:
+            return jsonify({'error': 'Invalid frequency'}), 400
+
+        return jsonify({'message': 'Recurring payment setup successfully'}), 200
     except Exception as e:
-        logger.error(f"Error integrating Open Banking API: {e}")
+        logger.error(f"Error in setting up recurring payment: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
-# PDF Handling Functions
-def parse_pdf(file_path):
-    statements = []
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            for line in text.split('\n'):
-                parts = line.split()
-                if len(parts) >= 3:
-                    date, description, amount = parts[0], " ".join(parts[1:-1]), parts[-1]
-                    statements.append({'date': date, 'description': description, 'amount': amount})
-    return statements
+def process_recurring_payment(lender_id, borrower_id, amount):
+    try:
+        # Verify lender and borrower
+        if verify_lender(lender_id) and verify_borrower(borrower_id):
+            # Place the transaction into the original account
+            if place_transaction(lender_id, borrower_id, amount):
+                record_transaction({'lender_id': lender_id, 'borrower_id': borrower_id, 'amount': amount})
+                logger.info(f"Recurring payment processed: {amount} from borrower {borrower_id} to lender {lender_id}")
+            else:
+                logger.error(f"Failed to place recurring payment: {amount} from borrower {borrower_id} to lender {lender_id}")
+        else:
+            logger.error(f"Verification failed for recurring payment: {amount} from borrower {borrower_id} to lender {lender_id}")
+    except Exception as e:
+        logger.error(f"Error in processing recurring payment: {e}")
 
-@app.route('/upload-pdf', methods=['POST'])
-def upload_pdf():
-    if 'file' not in request.files:
-        return jsonify({'message': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'message': 'No selected file'}), 400
-    if file and file.filename.endswith('.pdf'):
-        file_path = os.path.join('uploads', file.filename)
-        file.save(file_path)
-        statements = parse_pdf(file_path)
-        save_statements_as_csv(statements, 'statements.csv')
-        return jsonify({'message': 'File processed successfully', 'statements': statements}), 200
-    return jsonify({'message': 'Invalid file format'}), 400
+@app.route('/complete-transaction', methods=['POST'])
+@authenticate_token
+def complete_transaction():
+    try:
+        data = request.get_json()
+        lender_id = data.get('lender_id')
+        borrower_id = data.get('borrower_id')
+        amount = data.get('amount')
+        # Verify lender and borrower
+        if verify_lender(lender_id) and verify_borrower(borrower_id):
+            # Place the transaction into the original account
+            if place_transaction(lender_id, borrower_id, amount):
+                record_transaction({'lender_id': lender_id, 'borrower_id': borrower_id, 'amount': amount})
+                return jsonify({'message': 'Transaction completed successfully'}), 200
+            else:
+                return jsonify({'error': 'Transaction placement failed'}), 403
+        else:
+            return jsonify({'error': 'Verification failed'}), 403
+    except Exception as e:
+        logger.error(f"Error in completing transaction: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
 
-@app.route('/')
-def home():
-    return 'Welcome to the PlaidBridgeOpenBankingApi!'
+def place_transaction(lender_id, borrower_id, amount):
+    # Implement logic to place the transaction into the original account
+    logger.info(f"Placing transaction from lender {lender_id} to borrower {borrower_id} with amount {amount}")
+    return True
+
+def record_transaction(transaction_details):
+    # Record the transaction details
+    logger.info(f"Transaction recorded: {transaction_details}")
+    # Save to database or file
+
+@app.route('/repay-loan', methods=['POST'])
+@authenticate_token
+def repay_loan():
+    try:
+        data = request.get_json()
+        borrower_id = data.get('borrower_id')
+        amount = data.get('amount')
+        # Process loan repayment
+        if process_loan_repayment(borrower_id, amount):
+            return jsonify({'message': 'Loan repayment successful'}), 200
+        else:
+            return jsonify({'error': 'Loan repayment failed'}), 403
+    except Exception as e:
+        logger.error(f"Error in loan repayment: {e}")
+        return jsonify({'error': 'Internal Server Error'}), 500
+
+def process_loan_repayment(borrower_id, amount):
+    # Implement loan repayment logic
+    logger.info(f"Loan repayment processed for borrower {borrower_id} with amount {amount}")
+    return True
 
 if __name__ == '__main__':
-    app.run(port=int(os.getenv('PORT', 3000)))
+    app.run(debug=True)
 
+# Code Citations
+# Include any code citations or references here.
