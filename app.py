@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import csv
 import pdfplumber
+import tkinter as tk
+from tkinter import ttk
 
 # Load environment variables
 load_dotenv()
