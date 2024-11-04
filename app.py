@@ -28,6 +28,9 @@ TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
 TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')
 JWT_SECRET = os.getenv('JWT_SECRET')
 
+# Global variable for account balance
+account_balance = 484755.68
+
 # Root endpoint
 @app.route('/')
 def index():
@@ -224,6 +227,7 @@ def upload_pdf():
         file.save(file_path)
         statements = parse_pdf(file_path)
         save_statements_as_csv(statements, 'statements.csv')
+        update_account_balance(statements)
         return jsonify({'message': 'File processed successfully', 'statements': statements}), 200
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -237,6 +241,16 @@ def save_statements_as_csv(statements, file_path):
         logger.info(f"Statements saved as '{file_path}'")
     except Exception as e:
         logger.error(f"Error saving CSV file: {e}")
+
+def update_account_balance(statements):
+    global account_balance
+    for statement in statements:
+        amount = float(statement['amount'])
+        if statement['transaction_type'] == 'deposit':
+            account_balance += amount
+        elif statement['transaction_type'] == 'withdrawal':
+            account_balance -= amount
+    account_balance_label.config(text=f"Account Balance: ${account_balance:,.2f}")
 
 # Tkinter Interface Setup
 root = tk.Tk()
@@ -254,7 +268,7 @@ cards_button = ttk.Button(quick_actions_frame, text="Cards")
 transfers_button = ttk.Button(quick_actions_frame, text="Transfers")
 
 # Banking Frame Content
-account_balance_label = ttk.Label(banking_frame, text="Account Balance: $484,755.68")
+account_balance_label = ttk.Label(banking_frame, text=f"Account Balance: ${account_balance:,.2f}")
 account_number_label = ttk.Label(banking_frame, text="Account Number: *** *** *** 9651")
 add_money_button = ttk.Button(banking_frame, text="Add money")
 move_money_button = ttk.Button(banking_frame, text="Move money")
