@@ -27,5 +27,30 @@
 
     <h2>Usage</h2>
     <pre><code>node script.js</code></pre>
+
+    <h2>Interactive Features</h2>
+    <form action="{{ url_for('link_bank_account') }}" method="post">
+        <h3>Link Bank Account</h3>
+        <label for="account_number">Account Number:</label>
+        <input type="text" id="account_number" name="account_number" required>
+        <label for="routing_number">Routing Number:</label>
+        <input type="text" id="routing_number" name="routing_number" required>
+        <button type="submit">Link Account</button>
+    </form>
+
+    <form action="{{ url_for('transfer_funds') }}" method="post">
+        <h3>Transfer Funds</h3>
+        <label for="amount">Amount:</label>
+        <input type="number" id="amount" name="amount" required>
+        <label for="access_token">Access Token:</label>
+        <input type="text" id="access_token" name="access_token" required>
+        <button type="submit">Transfer</button>
+    </form>
+
+    <form action="{{ url_for('upload_pdf') }}" method="post" enctype="multipart/form-data">
+        <h3>Upload PDF</h3>
+        <input type="file" name="file" accept=".pdf" required>
+        <button type="submit">Upload</button>
+    </form>
 </body>
 </html>
