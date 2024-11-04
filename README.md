@@ -25,6 +25,8 @@ A Python project integrating with Plaid’s API to support Open Banking function
       USER_EMAIL=your_srpollardsihhllc@gmail.com
       USER_PASSWORD=your_skeeMdralloP1$t
       JWT_SECRET=your_wiwmU1jZdt+uWOsmoaywjCVXgxaAZbBuOY7HqQt2ydY=
+      TREASURY_PRIME_API_KEY=your_treasury_prime_api_key
+      TREASURY_PRIME_API_URL=https://api.treasuryprime.com/v1  # Example URL, replace with actual if different
       ```
 
 ## Running the Application
