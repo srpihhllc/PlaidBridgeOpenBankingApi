@@ -10,8 +10,6 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import csv
 import pdfplumber
-import tkinter as tk
-from tkinter import ttk
 
 # Load environment variables
 load_dotenv()
@@ -27,9 +25,6 @@ logger = logging.getLogger(__name__)
 TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
 TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')
 JWT_SECRET = os.getenv('JWT_SECRET')
-
-# Global variable for account balance
-account_balance = 484755.68
 
 # Root endpoint
 @app.route('/')
@@ -367,3 +362,6 @@ root.mainloop()
 
 if __name__ == '__main__':
     app.run(port=int(os.getenv('PORT', 3000)))
+
+
+
