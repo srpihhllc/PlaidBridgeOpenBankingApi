@@ -1,17 +1,19 @@
+# Code Citations
+# This application uses code and libraries from various sources. 
+# Please refer to the README.md for detailed information on code usage and attributions.
+
 import os
 import requests
 import logging
 import datetime
 import jwt
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, render_template, redirect, url_for, send_file
 from flask_cors import CORS
 from functools import wraps
 from dotenv import load_dotenv
 from apscheduler.schedulers.background import BackgroundScheduler
 import csv
 import pdfplumber
-import tkinter as tk
-from tkinter import ttk
 
 # Load environment variables
 load_dotenv()
@@ -28,10 +30,13 @@ TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
 TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')
 JWT_SECRET = os.getenv('JWT_SECRET')
 
+# Global variable for account balance
+account_balance = 8258.32
+
 # Root endpoint
 @app.route('/')
 def index():
-    return "Welcome to PlaidBridgeOpenBankingApi!"
+    return render_template('index.html', account_balance=account_balance)
 
 # Authentication middleware
 def authenticate_token(f):
@@ -77,22 +82,6 @@ def link_bank_account():
             return jsonify({'error': 'Failed to link bank account'}), response.status_code
     except Exception as e:
         logger.error(f"Error in linking bank account: {e}")
-        return jsonify({'error': 'Internal Server Error'}), 500
-
-# Receive micro deposits
-@app.route('/receive-micro-deposits', methods=['POST'])
-@authenticate_token
-def receive_micro_deposits():
-    try:
-        data = request.get_json()
-        deposit1 = float(data.get('deposit1'))
-        deposit2 = float(data.get('deposit2'))
-        if verify_micro_deposits(deposit1, deposit2):
-            return jsonify({'message': 'Micro deposits verified successfully'}), 200
-        else:
-            return jsonify({'error': 'Micro deposits verification failed'}), 403
-    except Exception as e:
-        logger.error(f"Error in receiving micro deposits: {e}")
         return jsonify({'error': 'Internal Server Error'}), 500
 
 # Transfer funds
@@ -247,120 +236,6 @@ def update_account_balance(statements):
             account_balance += amount
         elif statement['transaction_type'] == 'withdrawal':
             account_balance -= amount
-    account_balance_label.config(text=f"Account Balance: ${account_balance:,.2f}")
-
-# Tkinter Interface Setup
-root = tk.Tk()
-root.title("PlaidBridgeOpenBankingApi Interface")
-
-# Set up frames for different sections
-quick_actions_frame = ttk.Frame(root)
-banking_frame = ttk.Frame(root)
-wallets_frame = ttk.Frame(root)
-
-# Quick Actions Frame Content
-quick_actions_label = ttk.Label(quick_actions_frame, text="QUICK ACTIONS")
-banking_button = ttk.Button(quick_actions_frame, text="Banking")
-cards_button = ttk.Button(quick_actions_frame, text="Cards")
-transfers_button = ttk.Button(quick_actions_frame, text="Transfers")
-
-# Banking Frame Content
-account_balance_label = ttk.Label(banking_frame, text=f"Account Balance: ${account_balance:,.2f}")
-account_number_label = ttk.Label(banking_frame, text="Account Number: *** *** *** 9651")
-add_money_button = ttk.Button(banking_frame, text="Add money")
-move_money_button = ttk.Button(banking_frame, text="Move money")
-
-# Wallets Frame Content
-primary_wallet_label = ttk.Label(wallets_frame, text="Primary\n$8,258.32")
-business_wallet_label = ttk.Label(wallets_frame, text="Business\n$0.00")
-
-# API endpoint URLs (change these to match your actual endpoints)
-BASE_URL = "http://localhost:3000"
-LINK_BANK_ACCOUNT_URL = f"{BASE_URL}/link-bank-account"
-RECEIVE_MICRO_DEPOSITS_URL = f"{BASE_URL}/receive-micro-deposits"
-TRANSFER_FUNDS_URL = f"{BASE_URL}/transfer-funds"
-SETUP_RECURRING_PAYMENT_URL = f"{BASE_URL}/setup-recurring-payment"
-DOWNLOAD_STATEMENTS_URL = f"{BASE_URL}/download-statements"
-
-def link_bank_account():
-    data = {
-        "account_number": "123456789",
-        "routing_number": "987654321"
-    }
-    response = requests.post(LINK_BANK_ACCOUNT_URL, json=data)
-    if response.status_code == 200:
-        print("Bank account linked successfully")
-    else:
-        print("Failed to link bank account")
-
-def receive_micro_deposits():
-    data = {
-        "deposit1": 0.10,
-        "deposit2": 0.15
-    }
-    response = requests.post(RECEIVE_MICRO_DEPOSITS_URL, json=data)
-    if response.status_code == 200:
-        print("Micro deposits verified successfully")
-    else:
-        print("Failed to verify micro deposits")
-
-def transfer_funds():
-    data = {
-        "amount": 1000.00,
-        "accessToken": "your_access_token"
-    }
-    response = requests.post(TRANSFER_FUNDS_URL, json=data)
-    if response.status_code == 200:
-        print("Funds transferred successfully")
-    else:
-        print("Failed to transfer funds")
-
-def setup_recurring_payment():
-    data = {
-        "lender_id": "lender123",
-        "borrower_id": "borrower456",
-        "amount": 500.00,
-        "frequency": "weekly",
-        "start_date": "2023-10-01"
-    }
-    response = requests.post(SETUP_RECURRING_PAYMENT_URL, json=data)
-    if response.status_code == 200:
-        print("Recurring payment setup successfully")
-    else:
-        print("Failed to setup recurring payment")
-
-def download_statements():
-    response = requests.get(DOWNLOAD_STATEMENTS_URL)
-    if response.status_code == 200:
-        with open("statements.csv", "wb") as f:
-            f.write(response.content)
-        print("Statements downloaded successfully")
-    else:
-        print("Failed to download statements")
-
-# Bind buttons to functions
-add_money_button.config(command=link_bank_account)
-move_money_button.config(command=transfer_funds)
-
-# Layout all frames and widgets using grid or pack method (grid used here for example)
-quick_actions_frame.grid(row=0, column=0, padx=10, pady=10)
-quick_actions_label.grid(row=0, column=0, padx=5, pady=5)
-banking_button.grid(row=1, column=0, padx=5, pady=5)
-cards_button.grid(row=2, column=0, padx=5, pady=5)
-transfers_button.grid(row=3, column=0, padx=5, pady=5)
-
-banking_frame.grid(row=0, column=1, padx=10, pady=10)
-account_balance_label.grid(row=0, column=0, padx=5, pady=5)
-account_number_label.grid(row=1, column=0, padx=5, pady=5)
-add_money_button.grid(row=2, column=0, padx=5, pady=5)
-move_money_button.grid(row=3, column=0, padx=5, pady=5)
-
-wallets_frame.grid(row=1, column=1, padx=10, pady=10)
-primary_wallet_label.grid(row=0, column=0, padx=5, pady=5)
-business_wallet_label.grid(row=1, column=0, padx=5, pady=5)
-
-# Run the Tkinter main loop
-root.mainloop()
 
 if __name__ == '__main__':
     app.run(port=int(os.getenv('PORT', 3000)))
