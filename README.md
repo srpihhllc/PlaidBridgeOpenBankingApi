@@ -35,7 +35,7 @@ TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')
 JWT_SECRET = os.getenv('JWT_SECRET')
 
 # Global variable for account balance
-account_balance = 8258.32
+account_balance = 848583.68
 
 # Root endpoint
 @app.route('/')
