@@ -192,7 +192,7 @@ def parse_pdf(file_path):
                         description = " ".join(parts[1:-1])
                         amount = parts[-1]
                         # Determine if the amount is a deposit or withdrawal
-                        if amount startswith('-'):
+                        if amount.startswith('-'):
                             transaction_type = 'withdrawal'
                         else:
                             transaction_type = 'deposit'
