@@ -1,6 +1,6 @@
 # Proprietary License
 # All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
-# © [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr] [2024]
+# © [Your Company/Name] [Year]
 
 # Code Citations
 # This application uses code and libraries from various sources. 
