@@ -1,3 +1,10 @@
+# Proprietary License
+# All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
+# © [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
+
+# Code Citations
+# This application uses code and libraries from various sources. 
+# Please refer to the README.md for detailed information on code usage and attributions.
 import os
 import csv
 import pdfplumber
