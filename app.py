@@ -1,19 +1,16 @@
-# Proprietary License
-# All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
-# © [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
-
-# Code Citations
-# This application uses code and libraries from various sources. 
-# Please refer to the README.md for detailed information on code usage and attributions.
-
 import os
 import csv
 import pdfplumber
 import logging
+import requests
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
-from markupsafe import escape  # Updated import
+from markupsafe import escape
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -21,20 +18,20 @@ app = Flask(__name__)
 if not os.path.exists('statements'):
     os.makedirs('statements')
 
-# Global variable for account balance
-account_balance = 848583.68
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global variable for account balance
+account_balance = 848583.68
+
 @app.route('/')
 def index():
+    account_balance = get_account_balance()
     return render_template('index.html', account_balance=account_balance)
 
 @app.route('/upload-pdf', methods=['POST'])
 def upload_pdf():
-    global account_balance
     if 'file' not in request.files:
         logger.error("No file part in the request")
         return jsonify({'message': 'No file part'}), 400
@@ -94,21 +91,17 @@ def parse_pdf(file_path):
                             date = parts[0]
                             description = " ".join(parts[1:-1])
                             amount = parts[-1]
-                            # Determine if the amount is a deposit or withdrawal
-                            if amount.startswith('-'):
-                                transaction_type = 'withdrawal'
-                            else:
-                                transaction_type = 'deposit'
+                            transaction_type = 'withdrawal' if amount.startswith('-') else 'deposit'
                             statements.append({
                                 'date': date,
                                 'description': description,
                                 'amount': amount,
                                 'transaction_type': transaction_type
                             })
-        return statements
     except Exception as e:
         logger.error(f"Error parsing PDF: {e}")
         raise
+    return statements
 
 def correct_discrepancies(statements):
     corrected_statements = []
@@ -117,8 +110,7 @@ def correct_discrepancies(statements):
             amount = float(statement['amount'])
             corrected_statements.append(statement)
         except ValueError:
-            # Handle misprints or miscalculations
-            statement['amount'] = '0.00'  # Set to zero or some default value
+            statement['amount'] = '0.00'
             corrected_statements.append(statement)
     return corrected_statements
 
@@ -139,13 +131,11 @@ def generate_pdf_from_csv(csv_file_path, pdf_file_path):
         pdf = FPDF()
         pdf.add_page()
         pdf.set_font("Arial", size=12)
-        
         with open(csv_file_path, newline='') as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 line = f"{row['date']} {row['description']} {row['amount']} {row['transaction_type']}"
                 pdf.cell(200, 10, txt=line, ln=True)
-        
         pdf.output(pdf_file_path)
         logger.info(f"PDF generated as '{pdf_file_path}'")
     except Exception as e:
@@ -153,14 +143,50 @@ def generate_pdf_from_csv(csv_file_path, pdf_file_path):
         raise
 
 def update_account_balance(statements):
-    global account_balance
+    account_balance = get_account_balance()
     for statement in statements:
         amount = float(statement['amount'])
         if statement['transaction_type'] == 'deposit':
             account_balance += amount
         elif statement['transaction_type'] == 'withdrawal':
             account_balance -= amount
+    set_account_balance(account_balance)
     logger.info(f"Account balance updated: {account_balance}")
 
+def get_account_balance():
+    # This function should retrieve the account balance from a persistent storage
+    # For simplicity, we are using a global variable here
+    return account_balance
+
+def set_account_balance(balance):
+    # This function should save the account balance to a persistent storage
+    # For simplicity, we are using a global variable here
+    global account_balance
+    account_balance = balance
+
+def integrate_with_piermont_treasury_prime():
+    try:
+        response = requests.post(
+            os.getenv('PIERMONT_TREASURY_PRIME_API_URL'),
+            headers={
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {os.getenv("PIERMONT_TREASURY_PRIME_ACCESS_TOKEN")}'
+            },
+            json={
+                'client_id': os.getenv('PIERMONT_TREASURY_PRIME_CLIENT_ID'),
+                'secret': os.getenv('PIERMONT_TREASURY_PRIME_SECRET')
+            }
+        )
+        if response.status_code == 200:
+            logger.info('Successfully integrated with Piermont Treasury Prime')
+            return response.json()
+        else:
+            logger.error('Failed to integrate with Piermont Treasury Prime')
+            return None
+    except Exception as e:
+        logger.error(f"Error integrating with Piermont Treasury Prime: {e}")
+        return None
+
 if __name__ == '__main__':
+    integrate_with_piermont_treasury_prime()
     app.run(port=3000)
