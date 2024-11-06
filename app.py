@@ -10,69 +10,29 @@ import os
 import csv
 import pdfplumber
 import logging
-import requests
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
-from plaid import Client
-from dotenv import load_dotenv
-from flask_limiter import Limiter
-from flask_cors import CORS
-import redis
-import jwt
-from apscheduler.schedulers.background import BackgroundScheduler
-
-# Load environment variables from .env file
-load_dotenv()
+from markupsafe import escape  # Updated import
 
 app = Flask(__name__)
 
 # Ensure the statements directory exists
-app.config['UPLOAD_FOLDER'] = 'statements'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
-
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
+if not os.path.exists('statements'):
+    os.makedirs('statements')
 
 # Global variable for account balance
 account_balance = 848583.68
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-logger.debug("Starting application")
-
-# Initialize Flask-Limiter
-limiter = Limiter(app)
-
-# Enable CORS
-CORS(app)
-
-# Initialize Redis
-redis_client = redis.StrictRedis(host=os.getenv('REDIS_HOST', 'localhost'), port=os.getenv('REDIS_PORT', 6379), db=0)
-
-# Plaid API configuration
-PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
-PLAID_SECRET = os.getenv('PLAID_SECRET')
-PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')  # Use 'sandbox' for testing
-
-# Initialize Plaid client
-plaid_client = Client(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
-
-# Treasury Prime API configuration
-TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
-TREASURY_PRIME_API_URL = 'https://api.treasuryprime.com'
 
 @app.route('/')
 def index():
     return render_template('index.html', account_balance=account_balance)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
-
 @app.route('/upload-pdf', methods=['POST'])
-@limiter.limit("5 per minute")
 def upload_pdf():
     global account_balance
     if 'file' not in request.files:
@@ -82,32 +42,29 @@ def upload_pdf():
     if file.filename == '':
         logger.error("No selected file")
         return jsonify({'message': 'No selected file'}), 400
-    if file and allowed_file(file.filename):
+    if file and file.filename.endswith('.pdf'):
         filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file_path = os.path.join('statements', filename)
         file.save(file_path)
         try:
             statements = parse_pdf(file_path)
             corrected_statements = correct_discrepancies(statements)
             csv_filename = filename.replace('.pdf', '.csv')
-            csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+            csv_file_path = os.path.join('statements', csv_filename)
             save_statements_as_csv(corrected_statements, csv_file_path)
             update_account_balance(corrected_statements)
             logger.info(f"File processed successfully: {filename}")
             return jsonify({'message': 'File processed successfully', 'csv_file': csv_filename}), 200
-        except pdfplumber.PDFSyntaxError as e:
-            logger.error(f"PDF syntax error: {e}")
-            return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
+            return jsonify({'message': 'Error processing file'}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
 @app.route('/statements/<filename>')
 def download_statement(filename):
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+        return send_from_directory('statements', filename)
     except Exception as e:
         logger.error(f"Error downloading file: {e}")
         return jsonify({'message': 'Error downloading file'}), 500
@@ -115,60 +72,45 @@ def download_statement(filename):
 @app.route('/generate-pdf/<csv_filename>', methods=['GET'])
 def generate_pdf(csv_filename):
     try:
-        csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+        csv_file_path = os.path.join('statements', csv_filename)
         pdf_filename = csv_filename.replace('.csv', '.pdf')
-        pdf_file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+        pdf_file_path = os.path.join('statements', pdf_filename)
         generate_pdf_from_csv(csv_file_path, pdf_file_path)
-        return send_from_directory(app.config['UPLOAD_FOLDER'], pdf_filename)
+        return send_from_directory('statements', pdf_filename)
     except Exception as e:
         logger.error(f"Error generating PDF: {e}")
         return jsonify({'message': 'Error generating PDF'}), 500
 
 def parse_pdf(file_path):
-    """
-    Parse the PDF file to extract statements.
-    """
     statements = []
     try:
         with pdfplumber.open(file_path) as pdf:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
-                    statements.extend(parse_page(text))
-        logger.info(f"Parsed {len(statements)} statements from PDF")
+                    for line in text.split('\n'):
+                        parts = line.split()
+                        if len(parts) >= 3:
+                            date = parts[0]
+                            description = " ".join(parts[1:-1])
+                            amount = parts[-1]
+                            # Determine if the amount is a deposit or withdrawal
+                            if amount.startswith('-'):
+                                transaction_type = 'withdrawal'
+                            else:
+                                transaction_type = 'deposit'
+                            statements.append({
+                                'date': date,
+                                'description': description,
+                                'amount': amount,
+                                'transaction_type': transaction_type
+                            })
         return statements
     except Exception as e:
         logger.error(f"Error parsing PDF: {e}")
         raise
 
-def parse_page(text):
-    """
-    Parse a single page of text to extract statements.
-    """
-    statements = []
-    for line in text.split('\n'):
-        parts = line.split()
-        if len(parts) >= 3:
-            date = parts[0]
-            description = " ".join(parts[1:-1])
-            amount = parts[-1]
-            # Determine if the amount is a deposit or withdrawal
-            if amount.startswith('-'):
-                transaction_type = 'withdrawal'
-            else:
-                transaction_type = 'deposit'
-            statements.append({
-                'date': date,
-                'description': description,
-                'amount': amount,
-                'transaction_type': transaction_type
-            })
-    return statements
-
 def correct_discrepancies(statements):
-    """
-    Correct discrepancies in the statements.
-    """
     corrected_statements = []
     for statement in statements:
         try:
@@ -181,9 +123,6 @@ def correct_discrepancies(statements):
     return corrected_statements
 
 def save_statements_as_csv(statements, file_path):
-    """
-    Save the statements as a CSV file.
-    """
     try:
         keys = statements[0].keys()
         with open(file_path, mode='w', newline='') as file:
@@ -196,9 +135,6 @@ def save_statements_as_csv(statements, file_path):
         raise
 
 def generate_pdf_from_csv(csv_file_path, pdf_file_path):
-    """
-    Generate a PDF file from a CSV file.
-    """
     try:
         pdf = FPDF()
         pdf.add_page()
@@ -217,9 +153,6 @@ def generate_pdf_from_csv(csv_file_path, pdf_file_path):
         raise
 
 def update_account_balance(statements):
-    """
-    Update the global account balance based on the statements.
-    """
     global account_balance
     for statement in statements:
         amount = float(statement['amount'])
@@ -228,76 +161,6 @@ def update_account_balance(statements):
         elif statement['transaction_type'] == 'withdrawal':
             account_balance -= amount
     logger.info(f"Account balance updated: {account_balance}")
-
-# Plaid API integration
-def create_plaid_link_token():
-    try:
-        response = plaid_client.LinkToken.create({
-            'user': {
-                'client_user_id': 'unique_user_id'
-            },
-            'client_name': 'PlaidBridgeOpenBankingAPI',
-            'products': ['auth'],
-            'country_codes': ['US'],
-            'language': 'en',
-            'redirect_uri': 'https://yourapp.com/oauth-return',
-        })
-        return response['link_token']
-    except Exception as e:
-        logger.error(f"Error creating Plaid link token: {e}")
-        raise
-
-def exchange_plaid_public_token(public_token):
-    try:
-        response = plaid_client.Item.public_token.exchange(public_token)
-        return response['access_token']
-    except Exception as e:
-        logger.error(f"Error exchanging Plaid public token: {e}")
-        raise
-
-# Treasury Prime API integration
-def verify_treasury_prime_account(account_id):
-    headers = {
-        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
-        'Content-Type': 'application/json'
-    }
-    try:
-        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error verifying Treasury Prime account: {e}")
-        raise
-
-@app.route('/create-link-token', methods=['GET'])
-def create_link_token():
-    try:
-        link_token = create_plaid_link_token()
-        return jsonify({'link_token': link_token}), 200
-    except Exception as e:
-        return jsonify({'message': f'Error creating link token: {str(e)}'}), 500
-
-@app.route('/exchange-public-token', methods=['POST'])
-def exchange_public_token():
-    public_token = request.json.get('public_token')
-    if not public_token:
-        return jsonify({'message': 'Public token is required'}), 400
-    try:
-        access_token = exchange_plaid_public_token(public_token)
-        return jsonify({'access_token': access_token}), 200
-    except Exception as e:
-        return jsonify({'message': f'Error exchanging public token: {str(e)}'}), 500
-
-@app.route('/verify-account', methods=['POST'])
-def verify_account():
-    account_id = request.json.get('account_id')
-    if not account_id:
-        return jsonify({'message': 'Account ID is required'}), 400
-    try:
-        account_info = verify_treasury_prime_account(account_id)
-        return jsonify({'account_info': account_info}), 200
-    except Exception as e:
-        return jsonify({'message': f'Error verifying account: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(port=3000)
