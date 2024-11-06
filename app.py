@@ -3,6 +3,7 @@ import csv
 import pdfplumber
 import logging
 import requests
+import sqlite3
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
@@ -22,8 +23,25 @@ if not os.path.exists('statements'):
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Global variable for account balance
-account_balance = 848583.68
+# Initialize database
+def init_db():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS account_balance (
+            id INTEGER PRIMARY KEY,
+            balance REAL NOT NULL
+        )
+    ''')
+    cursor.execute('''
+        INSERT INTO account_balance (id, balance)
+        SELECT 1, 848583.68
+        WHERE NOT EXISTS (SELECT 1 FROM account_balance WHERE id = 1)
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 @app.route('/')
 def index():
@@ -154,15 +172,19 @@ def update_account_balance(statements):
     logger.info(f"Account balance updated: {account_balance}")
 
 def get_account_balance():
-    # This function should retrieve the account balance from a persistent storage
-    # For simplicity, we are using a global variable here
-    return account_balance
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT balance FROM account_balance WHERE id = 1')
+    balance = cursor.fetchone()[0]
+    conn.close()
+    return balance
 
 def set_account_balance(balance):
-    # This function should save the account balance to a persistent storage
-    # For simplicity, we are using a global variable here
-    global account_balance
-    account_balance = balance
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('UPDATE account_balance SET balance = ? WHERE id = 1', (balance,))
+    conn.commit()
+    conn.close()
 
 def integrate_with_piermont_treasury_prime():
     try:
