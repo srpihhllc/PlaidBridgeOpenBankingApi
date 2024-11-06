@@ -16,6 +16,11 @@ from werkzeug.utils import secure_filename
 from fpdf import FPDF
 from plaid import Client
 from dotenv import load_dotenv
+from flask_limiter import Limiter
+from flask_cors import CORS
+import redis
+import jwt
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Load environment variables from .env file
 load_dotenv()
@@ -38,6 +43,15 @@ logger = logging.getLogger(__name__)
 
 logger.debug("Starting application")
 
+# Initialize Flask-Limiter
+limiter = Limiter(app)
+
+# Enable CORS
+CORS(app)
+
+# Initialize Redis
+redis_client = redis.StrictRedis(host=os.getenv('REDIS_HOST', 'localhost'), port=os.getenv('REDIS_PORT', 6379), db=0)
+
 # Plaid API configuration
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
@@ -58,6 +72,7 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
 @app.route('/upload-pdf', methods=['POST'])
+@limiter.limit("5 per minute")
 def upload_pdf():
     global account_balance
     if 'file' not in request.files:
