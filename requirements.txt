@@ -1,14 +1,106 @@
-Flask==1.1.2
-Flask-Limiter==1.4
-Flask-CORS==3.0.10
-redis==3.5.3
-PyJWT==2.1.0
-requests==2.25.1
-pdfplumber==0.5.28
-gunicorn==20.1.0
-python-dotenv==0.19.0
-apscheduler==3.7.0
-Werkzeug==1.0.1
-Jinja2==2.11.3
-MarkupSafe==1.1.1
-itsdangerous==1.1.0
+To push your changes to the Heroku repository, follow these steps:
+
+1. **Ensure Dependencies are Listed in `requirements.txt`**:
+   - Create a `requirements.txt` file in your project directory if it doesn't already exist.
+   - Add the required dependencies to the `requirements.txt` file:
+
+```
+Flask
+jinja2
+```
+
+2. **Create or Edit `app.py`**:
+   - Ensure your `app.py` file contains the following content:
+
+```python
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from jinja2.utils import escape
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "Hello, World!"
+
+# Add your other routes and logic here
+
+if __name__ == "__main__":
+    app.run()
+```
+
+3. **Commit Your Changes**:
+   - Add and commit your changes to your local Git repository:
+
+```sh
+git add app.py requirements.txt
+git commit -m "Add Flask app and requirements"
+```
+
+4. **Push Changes to GitHub** (if applicable):
+   - Push your changes to your remote repository on GitHub:
+
+```sh
+git push origin PlaidBridgeOpenBankingApi
+```
+
+5. **Push Changes to Heroku**:
+   - Push your changes to Heroku:
+
+```sh
+git push heroku PlaidBridgeOpenBankingApi:main
+```
+
+6. **Monitor Heroku Logs**:
+   - Use the following command to monitor the Heroku logs and ensure the application is running correctly:
+
+```sh
+heroku logs --tail --app plaidbridgeopenbankingapi
+```
+
+### Example Commands
+
+Here’s a summary of the commands you need to run:
+
+1. **Create `requirements.txt`**:
+   - Create a file named `requirements.txt` and add the following content:
+
+```
+Flask
+jinja2
+```
+
+2. **Ensure `app.py` is Correct**:
+   - Ensure your `app.py` file contains the correct code:
+
+```python
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from jinja2.utils import escape
+
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return "Hello, World!"
+
+# Add your other routes and logic here
+
+if __name__ == "__main__":
+    app.run()
+```
+
+3. **Commit and Push Changes**:
+
+```sh
+git add app.py requirements.txt
+git commit -m "Add Flask app and requirements"
+git push origin PlaidBridgeOpenBankingApi
+git push heroku PlaidBridgeOpenBankingApi:main
+```
+
+4. **Monitor Heroku Logs**:
+
+```sh
+heroku logs --tail --app plaidbridgeopenbankingapi
+```
+
+By following these steps, you will ensure that your Flask application is correctly set up and running on Heroku.
