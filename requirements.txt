@@ -7,7 +7,7 @@ To push your changes to the Heroku repository, follow these steps:
 ```
 Flask
 jinja2
-```
+fpdf
 
 2. **Create or Edit `app.py`**:
    - Ensure your `app.py` file contains the following content:
