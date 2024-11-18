@@ -4,8 +4,6 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.country_code import CountryCode
 from plaid.model.products import Products
-from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
-from plaid.model.accounts_get_request import AccountsGetRequest
 from plaid import ApiClient, Configuration
 import os
 import logging
@@ -59,35 +57,7 @@ def create_link_token():
         logger.error(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/exchange_public_token', methods=['POST'])
-def exchange_public_token():
-    try:
-        public_token = request.json['public_token']
-        exchange_request = ItemPublicTokenExchangeRequest(public_token=public_token)
-        logger.info(f"Exchange Request: {exchange_request}")
-        response = client.item_public_token_exchange(exchange_request)
-        access_token = response['access_token']
-        return jsonify({'access_token': access_token})
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/accounts', methods=['POST'])
-def get_accounts():
-    try:
-        access_token = request.json['access_token']
-        accounts_request = AccountsGetRequest(access_token=access_token)
-        logger.info(f"Accounts Request: {accounts_request}")
-        response = client.accounts_get(accounts_request)
-        accounts_data = response.to_dict()
-        # Add account_balance to the response
-        accounts_data['account_balance'] = 848583.68
-        return jsonify(accounts_data)
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
-
 if __name__ == '__main__':
     app.run(debug=True)
-           
+       
        
