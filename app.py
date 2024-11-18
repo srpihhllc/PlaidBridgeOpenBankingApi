@@ -21,7 +21,7 @@ def create_link_token():
                 'client_user_id': 'unique_user_id'
             },
             'client_name': 'PlaidBridgeOpenBankingAPI',
-            'products': ['auth'],
+            'products': ['auth'],  # Removed 'payment' product
             'country_codes': ['US'],
             'language': 'en'
         })
@@ -50,4 +50,4 @@ def get_accounts():
 
 if __name__ == '__main__':
     app.run(debug=True)
-      
+       
