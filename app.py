@@ -51,7 +51,7 @@ def exchange_public_token():
     except Exception as e:
         logger.error(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
-       
-       
+    
