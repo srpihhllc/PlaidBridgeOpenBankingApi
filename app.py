@@ -1,5 +1,12 @@
 from flask import Flask, render_template, request, jsonify
-import plaid
+from plaid.api import plaid_api
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+from plaid.model.country_code import CountryCode
+from plaid.model.products import Products
+from plaid.model.item_public_token_exchange_request import ItemPublicTokenExchangeRequest
+from plaid.model.accounts_get_request import AccountsGetRequest
+from plaid import ApiClient, Configuration
 import os
 import logging
 
@@ -10,9 +17,15 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize the Plaid client
-client = plaid.Client(client_id=os.getenv('PLAID_CLIENT_ID'),
-                      secret=os.getenv('PLAID_SECRET'),
-                      environment=os.getenv('PLAID_ENV', 'sandbox'))
+configuration = Configuration(
+    host=Configuration.Host.SANDBOX,
+    api_key={
+        'clientId': os.getenv('PLAID_CLIENT_ID'),
+        'secret': os.getenv('PLAID_SECRET')
+    }
+)
+api_client = ApiClient(configuration)
+client = plaid_api.PlaidApi(api_client)
 
 @app.route('/')
 def index():
@@ -21,49 +34,41 @@ def index():
 @app.route('/create_link_token', methods=['POST'])
 def create_link_token():
     try:
-        response = client.LinkToken.create({
-            'user': {
-                'client_user_id': 'unique_user_id'
-            },
-            'client_name': 'PlaidBridgeOpenBankingAPI',
-            'products': ['auth'],  # Removed 'payment' product
-            'country_codes': ['US'],
-            'language': 'en'
-        })
-        return jsonify(response)
-    except plaid.errors.PlaidError as e:
-        logger.error(f"PlaidError: {e}")
-        return jsonify({'error': str(e)}), 400
+        request = LinkTokenCreateRequest(
+            user=LinkTokenCreateRequestUser(client_user_id='unique_user_id'),
+            client_name='PlaidBridgeOpenBankingAPI',
+            products=[Products('auth')],
+            country_codes=[CountryCode('US')],
+            language='en'
+        )
+        response = client.link_token_create(request)
+        return jsonify(response.to_dict())
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return jsonify({'error': 'An unexpected error occurred'}), 500
+        logger.error(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/exchange_public_token', methods=['POST'])
 def exchange_public_token():
     try:
         public_token = request.json['public_token']
-        response = client.Item.public_token.exchange(public_token)
+        exchange_request = ItemPublicTokenExchangeRequest(public_token=public_token)
+        response = client.item_public_token_exchange(exchange_request)
         access_token = response['access_token']
         return jsonify({'access_token': access_token})
-    except plaid.errors.PlaidError as e:
-        logger.error(f"PlaidError: {e}")
-        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return jsonify({'error': 'An unexpected error occurred'}), 500
+        logger.error(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/accounts', methods=['POST'])
 def get_accounts():
     try:
         access_token = request.json['access_token']
-        response = client.Accounts.get(access_token)
-        return jsonify(response)
-    except plaid.errors.PlaidError as e:
-        logger.error(f"PlaidError: {e}")
-        return jsonify({'error': str(e)}), 400
+        accounts_request = AccountsGetRequest(access_token=access_token)
+        response = client.accounts_get(accounts_request)
+        return jsonify(response.to_dict())
     except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        return jsonify({'error': 'An unexpected error occurred'}), 500
+        logger.error(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
