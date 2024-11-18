@@ -40,23 +40,17 @@ client = plaid_api.PlaidApi(api_client)
 def index():
     return render_template('index.html')
 
-@app.route('/create_link_token', methods=['POST'])
-def create_link_token():
+@app.route('/exchange-public-token', methods=['POST'])
+def exchange_public_token():
+    public_token = request.json.get('public_token')
+    if not public_token:
+        return jsonify({'message': 'Public token is required'}), 400
     try:
-        request_data = LinkTokenCreateRequest(
-            user=LinkTokenCreateRequestUser(client_user_id='unique_user_id'),
-            client_name='PlaidBridgeOpenBankingAPI',
-            products=[Products('auth')],
-            country_codes=[CountryCode('US')],
-            language='en'
-        )
-        logger.info(f"Request Data: {request_data}")
-        response = client.link_token_create(request_data)
+        response = client.item_public_token_exchange(public_token)
         return jsonify(response.to_dict())
     except Exception as e:
         logger.error(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
-
 if __name__ == '__main__':
     app.run(debug=True)
        
