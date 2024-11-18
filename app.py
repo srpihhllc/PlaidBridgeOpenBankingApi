@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 # Determine the Plaid environment
 plaid_env = os.getenv('PLAID_ENV', 'sandbox')
 if plaid_env == 'sandbox':
-    host = Configuration.Host.SANDBOX
+    host = 'https://sandbox.plaid.com'
 elif plaid_env == 'development':
-    host = Configuration.Host.DEVELOPMENT
+    host = 'https://development.plaid.com'
 elif plaid_env == 'production':
-    host = Configuration.Host.PRODUCTION
+    host = 'https://production.plaid.com'
 else:
     raise ValueError(f"Invalid PLAID_ENV value: {plaid_env}")
 
@@ -79,12 +79,15 @@ def get_accounts():
         accounts_request = AccountsGetRequest(access_token=access_token)
         logger.info(f"Accounts Request: {accounts_request}")
         response = client.accounts_get(accounts_request)
-        return jsonify(response.to_dict())
+        accounts_data = response.to_dict()
+        # Add account_balance to the response
+        accounts_data['account_balance'] = 848583.68
+        return jsonify(accounts_data)
     except Exception as e:
         logger.error(f"Error: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
-
+   
        
