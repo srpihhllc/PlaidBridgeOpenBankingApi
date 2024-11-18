@@ -1,8 +1,13 @@
 from flask import Flask, render_template, request, jsonify
 import plaid
 import os
+import logging
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize the Plaid client
 client = plaid.Client(client_id=os.getenv('PLAID_CLIENT_ID'),
@@ -27,7 +32,11 @@ def create_link_token():
         })
         return jsonify(response)
     except plaid.errors.PlaidError as e:
+        logger.error(f"PlaidError: {e}")
         return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
 
 @app.route('/exchange_public_token', methods=['POST'])
 def exchange_public_token():
@@ -37,7 +46,11 @@ def exchange_public_token():
         access_token = response['access_token']
         return jsonify({'access_token': access_token})
     except plaid.errors.PlaidError as e:
+        logger.error(f"PlaidError: {e}")
         return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
 
 @app.route('/accounts', methods=['POST'])
 def get_accounts():
@@ -46,7 +59,11 @@ def get_accounts():
         response = client.Accounts.get(access_token)
         return jsonify(response)
     except plaid.errors.PlaidError as e:
+        logger.error(f"PlaidError: {e}")
         return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        return jsonify({'error': 'An unexpected error occurred'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
