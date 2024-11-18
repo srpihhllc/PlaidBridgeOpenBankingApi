@@ -16,9 +16,20 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Determine the Plaid environment
+plaid_env = os.getenv('PLAID_ENV', 'sandbox')
+if plaid_env == 'sandbox':
+    host = Configuration.Host.SANDBOX
+elif plaid_env == 'development':
+    host = Configuration.Host.DEVELOPMENT
+elif plaid_env == 'production':
+    host = Configuration.Host.PRODUCTION
+else:
+    raise ValueError(f"Invalid PLAID_ENV value: {plaid_env}")
+
 # Initialize the Plaid client
 configuration = Configuration(
-    host=Configuration.Host.SANDBOX,
+    host=host,
     api_key={
         'clientId': os.getenv('PLAID_CLIENT_ID'),
         'secret': os.getenv('PLAID_SECRET')
@@ -34,14 +45,15 @@ def index():
 @app.route('/create_link_token', methods=['POST'])
 def create_link_token():
     try:
-        request = LinkTokenCreateRequest(
+        request_data = LinkTokenCreateRequest(
             user=LinkTokenCreateRequestUser(client_user_id='unique_user_id'),
             client_name='PlaidBridgeOpenBankingAPI',
             products=[Products('auth')],
             country_codes=[CountryCode('US')],
             language='en'
         )
-        response = client.link_token_create(request)
+        logger.info(f"Request Data: {request_data}")
+        response = client.link_token_create(request_data)
         return jsonify(response.to_dict())
     except Exception as e:
         logger.error(f"Error: {e}")
@@ -52,6 +64,7 @@ def exchange_public_token():
     try:
         public_token = request.json['public_token']
         exchange_request = ItemPublicTokenExchangeRequest(public_token=public_token)
+        logger.info(f"Exchange Request: {exchange_request}")
         response = client.item_public_token_exchange(exchange_request)
         access_token = response['access_token']
         return jsonify({'access_token': access_token})
@@ -64,6 +77,7 @@ def get_accounts():
     try:
         access_token = request.json['access_token']
         accounts_request = AccountsGetRequest(access_token=access_token)
+        logger.info(f"Accounts Request: {accounts_request}")
         response = client.accounts_get(accounts_request)
         return jsonify(response.to_dict())
     except Exception as e:
@@ -72,5 +86,5 @@ def get_accounts():
 
 if __name__ == '__main__':
     app.run(debug=True)
-   
+
        
