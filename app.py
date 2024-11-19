@@ -38,6 +38,10 @@ configuration = Configuration(
 api_client = ApiClient(configuration)
 client = plaid_api.PlaidApi(api_client)
 
+@app.route('/')
+def index():
+    return jsonify({'message': 'Welcome to the Plaid Bridge Open Banking API'})
+
 @app.route('/create-link-token', methods=['POST'])
 def create_link_token():
     """
