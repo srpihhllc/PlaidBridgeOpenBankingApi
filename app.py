@@ -7,6 +7,7 @@ from plaid.model.products import Products
 from plaid import ApiClient, Configuration
 import os
 import logging
+import re
 
 app = Flask(__name__)
 
@@ -43,15 +44,15 @@ def index():
 @app.route('/exchange-public-token', methods=['POST'])
 def exchange_public_token():
     public_token = request.json.get('public_token')
-    if not public_token:
-        return jsonify({'message': 'Public token is required'}), 400
+    if not public_token or not re.match(r'^[a-zA-Z0-9-_]+$', public_token):
+        return jsonify({'message': 'Invalid public token'}), 400
     try:
-        response = client.item_public_token_exchange(public_token)
+        response = client.item_public_token_exchange({'public_token': public_token})
         return jsonify(response.to_dict())
     except Exception as e:
         logger.error(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An error occurred while exchanging the public token'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
-    
+        
