@@ -50,11 +50,12 @@ def create_payment():
         amount = request.json.get("amount")
         account_id = request.json.get("account_id")
         recipient_id = request.json.get("recipient_id")
-        
+
         headers = {"Content-Type": "application/json"}
         data = {
             "access_token": access_token,
             "amount": {"currency": "USD", "value": amount},
+            "ach_class": "ppd",
             "account_id": account_id,
             "recipient_id": recipient_id
         }
