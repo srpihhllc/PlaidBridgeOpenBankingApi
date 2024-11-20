@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
@@ -40,36 +40,17 @@ client = plaid_api.PlaidApi(api_client)
 
 @app.route('/')
 def index():
-    return jsonify({'message': 'Welcome to the Plaid Bridge Open Banking API'})
+    return render_template('index.html')
 
-@app.route('/create-link-token', methods=['POST'])
+@app.route('/create-link-token', methods=['GET'])
 def create_link_token():
-    """
-    Creates a link token.
-
-    Returns:
-        link_token (str): The generated link token.
-    """
     try:
-        # Get request data
-        request_data = request.json
+        request_data = {
+            "client_user_id": "unique_user_id",
+            "products": ["auth"],
+            "country_codes": ["US"]
+        }
 
-        # Validate request data
-        required_fields = ['client_user_id', 'products', 'country_codes']
-        if not all(field in request_data for field in required_fields):
-            return jsonify({'error': 'Invalid request data'}), 400
-
-        # Validate products and country codes
-        valid_products = {'auth', 'transactions', 'identity', 'assets', 'liabilities', 'income'}
-        valid_country_codes = {'US', 'CA', 'GB', 'FR', 'ES', 'NL', 'IE'}
-
-        if not set(request_data['products']).issubset(valid_products):
-            return jsonify({'error': 'Invalid products'}), 400
-
-        if not set(request_data['country_codes']).issubset(valid_country_codes):
-            return jsonify({'error': 'Invalid country codes'}), 400
-
-        # Create link token request
         link_token_request = LinkTokenCreateRequest(
             user=LinkTokenCreateRequestUser(
                 client_user_id=request_data['client_user_id']
@@ -80,7 +61,6 @@ def create_link_token():
             language='en'
         )
 
-        # Create link token
         response = client.link_token_create(link_token_request)
         link_token = response.link_token
 
@@ -89,5 +69,33 @@ def create_link_token():
         logger.error(f"Error: {e}")
         return jsonify({'error': 'Failed to generate link token'}), 500
 
+@app.route('/exchange-public-token', methods=['POST'])
+def exchange_public_token():
+    public_token = request.json.get('public_token')
+    try:
+        response = client.item_public_token_exchange({'public_token': public_token})
+        access_token = response['access_token']
+        item_id = response['item_id']
+        return jsonify({'access_token': access_token, 'item_id': item_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/verify-account', methods=['POST'])
+def verify_account():
+    account_id = request.json.get('account_id')
+    # Implement your account verification logic here
+    # For example, you might use the access token to fetch account details
+    # and verify the account ID
+    try:
+        # Placeholder response for demonstration purposes
+        account_info = {
+            'account_id': account_id,
+            'verified': True
+        }
+        return jsonify({'account_info': account_info})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True)
+      
