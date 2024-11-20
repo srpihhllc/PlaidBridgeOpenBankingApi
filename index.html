@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plaid Link Integration</title>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+</head>
+<body>
+    <h1>Plaid Link Integration</h1>
+    <button id="link-button">Connect a bank account</button>
+
+    <script>
+        document.getElementById('link-button').onclick = function() {
+            fetch('/create-link-token', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                var handler = Plaid.create({
+                    token: data.link_token, // Use the link_token from the server
+                    onSuccess: function(public_token, metadata) {
+                        // Send the public_token to your server
+                        console.log('Public Token: ' + public_token);
+                        console.log('Metadata: ', metadata);
+                        fetch('/exchange-public-token', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ public_token: public_token })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('Access Token: ' + data.access_token);
+                            console.log('Item ID: ' + data.item_id);
+                        })
+                        .catch(error => console.error('Error:', error));
+                    },
+                    onExit: function(err, metadata) {
+                        // The user exited the Link flow.
+                        if (err != null) {
+                            // The user encountered a Plaid API error prior to exiting.
+                            console.error('Error: ', err);
+                        }
+                        console.log('Metadata: ', metadata);
+                    }
+                });
+                handler.open();
+            })
+            .catch(error => console.error('Error:', error));
+        };
+    </script>
+</body>
+</html>
