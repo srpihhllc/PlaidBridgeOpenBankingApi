@@ -65,5 +65,12 @@ def create_payment():
         logging.error(e)
         return jsonify({"error": str(e)}), 500
 
+# Simple Hello World route
+@app.route('/')
+def hello():
+    return 'Hello, World!'
+
 if __name__ == "__main__":
     app.run(debug=True)
+          
+      
