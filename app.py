@@ -9,21 +9,27 @@ app = Flask(__name__)
 PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
 PLAID_SECRET = os.getenv("PLAID_SECRET")
 PLAID_BASE_URL = "https://sandbox.plaid.com"
+PORT = int(os.environ.get("PORT", 5000))
 
 # Logging
 logging.basicConfig(level=logging.DEBUG)
 
-# Debug route to verify environment variables
+# Validate environment variables
+if not PLAID_CLIENT_ID or not PLAID_SECRET:
+    logging.error("PLAID_CLIENT_ID and PLAID_SECRET must be set")
+    exit(1)
+
 @app.route("/debug_env", methods=["GET"])
-def debug_env():
+def debug_env() -> dict:
+    """Verify environment variables."""
     return jsonify({
         "PLAID_CLIENT_ID": PLAID_CLIENT_ID,
-        "PLAID_SECRET": PLAID_SECRET
+        "PLAID_SECRET": "*****"
     })
 
-# Create Link token
 @app.route("/create_link_token", methods=["POST"])
-def create_link_token():
+def create_link_token() -> dict:
+    """Create Plaid link token."""
     try:
         headers = {"Content-Type": "application/json"}
         data = {
@@ -42,27 +48,16 @@ def create_link_token():
         logging.error(f"Error creating link token: {e}")
         return jsonify({"error": str(e)}), 500
 
-# Create payment
 @app.route("/create_payment", methods=["POST"])
-def create_payment():
+def create_payment() -> dict:
+    """Create payment."""
     try:
-        access_token = request.json.get("access_token")
-        amount = request.json.get("amount")
-        account_id = request.json.get("account_id")
-        recipient_id = request.json.get("recipient_id")
-
-        # Validate required parameters
-        if not all([access_token, amount, account_id, recipient_id]):
+        data = request.json
+        required_fields = ["access_token", "amount", "account_id", "recipient_id"]
+        if not all(field in data for field in required_fields):
             return jsonify({"error": "Missing required parameters"}), 400
 
         headers = {"Content-Type": "application/json"}
-        data = {
-            "access_token": access_token,
-            "amount": {"currency": "USD", "value": amount},
-            "ach_class": "ppd",
-            "account_id": account_id,
-            "recipient_id": recipient_id
-        }
         response = requests.post(f"{PLAID_BASE_URL}/payment_initiation/payment/create", headers=headers, json=data)
         response.raise_for_status()
         return jsonify(response.json())
@@ -73,14 +68,13 @@ def create_payment():
         logging.error(f"Unexpected error: {e}")
         return jsonify({"error": "An unexpected error occurred"}), 500
 
-# Simple Hello World route
 @app.route('/')
-def hello():
+def hello() -> str:
+    """Simple Hello World route."""
     return 'Hello, World!'
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=PORT)
   
           
        
