@@ -1,79 +1,89 @@
-from flask import Flask, request, jsonify
-import requests
+from flask import Flask, render_template, request, jsonify
+from plaid.api import plaid_api
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
+from plaid.model.country_code import CountryCode
+from plaid.model.products import Products
+from plaid import ApiClient, Configuration
 import os
 import logging
 
+# Ensure the pay.plaidbridgeopenbankingapi module is installed
+# pip install pay.plaidbridgeopenbankingapi
+
+import pay.plaidbridgeopenbankingapi
+
 app = Flask(__name__)
 
-# Configuration
-PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
-PLAID_SECRET = os.getenv("PLAID_SECRET")
-PLAID_BASE_URL = "https://sandbox.plaid.com"
-PORT = int(os.environ.get("PORT", 5000))
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Logging
-logging.basicConfig(level=logging.DEBUG)
+# Determine the Plaid environment
+plaid_env = os.getenv('PLAID_ENV', 'sandbox')
+if plaid_env == 'sandbox':
+    host = 'https://sandbox.plaid.com'
+elif plaid_env == 'development':
+    host = 'https://development.plaid.com'
+elif plaid_env == 'production':
+    host = 'https://production.plaid.com'
+else:
+    raise ValueError(f"Invalid PLAID_ENV value: {plaid_env}")
 
-# Validate environment variables
-if not PLAID_CLIENT_ID or not PLAID_SECRET:
-    logging.error("PLAID_CLIENT_ID and PLAID_SECRET must be set")
-    exit(1)
-
-@app.route("/debug_env", methods=["GET"])
-def debug_env() -> dict:
-    """Verify environment variables."""
-    return jsonify({
-        "PLAID_CLIENT_ID": PLAID_CLIENT_ID,
-        "PLAID_SECRET": "*****"
-    })
-
-@app.route("/create_link_token", methods=["POST"])
-def create_link_token() -> dict:
-    """Create Plaid link token."""
-    try:
-        headers = {"Content-Type": "application/json"}
-        data = {
-            "client_id": PLAID_CLIENT_ID,
-            "secret": PLAID_SECRET,
-            "user": {"client_user_id": "unique_user_id"},
-            "client_name": "Plaid Test App",
-            "products": ["auth"],
-            "country_codes": ["US"],
-            "language": "en"
-        }
-        response = requests.post(f"{PLAID_BASE_URL}/link/token/create", headers=headers, json=data)
-        response.raise_for_status()
-        return jsonify(response.json())
-    except requests.RequestException as e:
-        logging.error(f"Error creating link token: {e}")
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/create_payment", methods=["POST"])
-def create_payment() -> dict:
-    """Create payment."""
-    try:
-        data = request.json
-        required_fields = ["access_token", "amount", "account_id", "recipient_id"]
-        if not all(field in data for field in required_fields):
-            return jsonify({"error": "Missing required parameters"}), 400
-
-        headers = {"Content-Type": "application/json"}
-        response = requests.post(f"{PLAID_BASE_URL}/payment_initiation/payment/create", headers=headers, json=data)
-        response.raise_for_status()
-        return jsonify(response.json())
-    except requests.RequestException as e:
-        logging.error(f"Error creating payment: {e}")
-        return jsonify({"error": str(e)}), 500
-    except Exception as e:
-        logging.error(f"Unexpected error: {e}")
-        return jsonify({"error": "An unexpected error occurred"}), 500
+# Initialize the Plaid client
+configuration = Configuration(
+    host=host,
+    api_key={
+        'clientId': os.getenv('PLAID_CLIENT_ID'),
+        'secret': os.getenv('PLAID_SECRET')
+    }
+)
+api_client = ApiClient(configuration)
+client = plaid_api.PlaidApi(api_client)
 
 @app.route('/')
-def hello() -> str:
-    """Simple Hello World route."""
-    return 'Hello, World!'
+def index():
+    return render_template('index.html')
 
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=PORT)
-       
-      
+@app.route('/exchange-public-token', methods=['POST'])
+def exchange_public_token():
+    public_token = request.json.get('public_token')
+    if not public_token:
+        return jsonify({'message': 'Public token is required'}), 400
+    try:
+        response = client.item_public_token_exchange({'public_token': public_token})
+        return jsonify(response.to_dict())
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/create-link-token', methods=['POST'])
+def create_link_token():
+    try:
+        request_data = LinkTokenCreateRequest(
+            user=LinkTokenCreateRequestUser(client_user_id='unique_user_id'),
+            client_name='PlaidBridgeOpenBankingAPI',
+            products=[Products('auth')],
+            country_codes=[CountryCode('US')],
+            language='en'
+        )
+        logger.info(f"Request Data: {request_data}")
+        response = client.link_token_create(request_data)
+        return jsonify(response.to_dict())
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/make-payment', methods=['POST'])
+def make_payment():
+    payment_data = request.json
+    try:
+        # Assuming pay.plaidbridgeopenbankingapi is a module or service you have
+        response = pay.plaidbridgeopenbankingapi.process_payment(payment_data)
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True)
