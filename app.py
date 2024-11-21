@@ -39,7 +39,7 @@ def create_link_token():
         response.raise_for_status()
         return jsonify(response.json())
     except requests.RequestException as e:
-        logging.error(e)
+        logging.error(f"Error creating link token: {e}")
         return jsonify({"error": str(e)}), 500
 
 # Create payment
@@ -50,6 +50,10 @@ def create_payment():
         amount = request.json.get("amount")
         account_id = request.json.get("account_id")
         recipient_id = request.json.get("recipient_id")
+
+        # Validate required parameters
+        if not all([access_token, amount, account_id, recipient_id]):
+            return jsonify({"error": "Missing required parameters"}), 400
 
         headers = {"Content-Type": "application/json"}
         data = {
@@ -63,8 +67,11 @@ def create_payment():
         response.raise_for_status()
         return jsonify(response.json())
     except requests.RequestException as e:
-        logging.error(e)
+        logging.error(f"Error creating payment: {e}")
         return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        logging.error(f"Unexpected error: {e}")
+        return jsonify({"error": "An unexpected error occurred"}), 500
 
 # Simple Hello World route
 @app.route('/')
@@ -74,6 +81,7 @@ def hello():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
+  
           
        
       
