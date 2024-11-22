@@ -1,5 +1,10 @@
 import requests
 import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 # Constant values
 BASE_URL_SANDBOX = "https://sandbox.plaid.com"
@@ -55,7 +60,11 @@ class PlaidBridgeOpenBankingAPI:
             response = requests.post(endpoint, headers=headers, json=payment_request)
             response.raise_for_status()
             return response.json()
+        except requests.HTTPError as e:
+            logger.error(f"HTTP error occurred: {e}")
+            raise Exception(f"Payment processing failed: {e}")
         except requests.RequestException as e:
+            logger.error(f"Request exception occurred: {e}")
             raise Exception(f"Payment processing failed: {e}")
 
 # Initialize PlaidBridgeOpenBankingAPI instance
@@ -64,4 +73,9 @@ def get_plaid_bridge_api():
     client_id = os.getenv("PLAID_CLIENT_ID")
     secret = os.getenv("PLAID_SECRET")
 
+    if not client_id or not secret:
+        raise ValueError("PLAID_CLIENT_ID and PLAID_SECRET must be set in environment variables")
+
     return PlaidBridgeOpenBankingAPI(base_url, client_id, secret)
+        
+
