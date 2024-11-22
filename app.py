@@ -4,14 +4,12 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.country_code import CountryCode
 from plaid.model.products import Products
+from plaid.model.payment_initiation_payment_create_request import PaymentInitiationPaymentCreateRequest
+from plaid.model.payment_initiation_payment_token_create_request import PaymentInitiationPaymentTokenCreateRequest
 from plaid import ApiClient, Configuration
 import os
 import logging
-
-# Ensure the pay.plaidbridgeopenbankingapi module is installed
-# pip install pay.plaidbridgeopenbankingapi
-
-import pay.plaidbridgeopenbankingapi
+from pay import get_plaid_bridge_api  # Assuming the module is named 'pay'
 
 app = Flask(__name__)
 
@@ -53,9 +51,12 @@ def exchange_public_token():
     try:
         response = client.item_public_token_exchange({'public_token': public_token})
         return jsonify(response.to_dict())
+    except plaid.ApiException as e:
+        logger.error(f"Plaid API Error: {e}")
+        return jsonify({'error': 'An error occurred while exchanging the public token'}), e.status
     except Exception as e:
         logger.error(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 @app.route('/create-link-token', methods=['POST'])
 def create_link_token():
@@ -70,22 +71,52 @@ def create_link_token():
         logger.info(f"Request Data: {request_data}")
         response = client.link_token_create(request_data)
         return jsonify(response.to_dict())
+    except plaid.ApiException as e:
+        logger.error(f"Plaid API Error: {e}")
+        return jsonify({'error': 'An error occurred while creating the link token'}), e.status
     except Exception as e:
         logger.error(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error occurred'}), 500
+
+@app.route('/create-payment-token', methods=['POST'])
+def create_payment_token():
+    try:
+        payment_request = PaymentInitiationPaymentCreateRequest(
+            recipient_id=request.json.get('recipient_id'),
+            reference=request.json.get('reference'),
+            amount={
+                'currency': 'USD',
+                'value': request.json.get('amount')
+            }
+        )
+        payment_response = client.payment_initiation_payment_create(payment_request)
+        payment_id = payment_response['payment_id']
+
+        token_request = PaymentInitiationPaymentTokenCreateRequest(payment_id=payment_id)
+        token_response = client.payment_initiation_payment_token_create(token_request)
+        return jsonify(token_response.to_dict())
+    except plaid.ApiException as e:
+        logger.error(f"Plaid API Error: {e}")
+        return jsonify({'error': 'An error occurred while creating the payment token'}), e.status
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({'error': 'An internal error occurred'}), 500
 
 @app.route('/make-payment', methods=['POST'])
 def make_payment():
-    payment_data = request.json
     try:
-        # Assuming pay.plaidbridgeopenbankingapi is a module or service you have
-        response = pay.plaidbridgeopenbankingapi.process_payment(payment_data)
+        payment_data = request.json
+        plaid_api = get_plaid_bridge_api()
+        response = plaid_api.process_payment(payment_data)
         return jsonify(response)
+    except ValueError as e:
+        logger.error(f"Validation Error: {e}")
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
         logger.error(f"Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An error occurred while processing the payment'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
-   
 
+           
