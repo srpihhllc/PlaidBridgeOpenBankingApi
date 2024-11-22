@@ -77,5 +77,5 @@ def get_plaid_bridge_api():
         raise ValueError("PLAID_CLIENT_ID and PLAID_SECRET must be set in environment variables")
 
     return PlaidBridgeOpenBankingAPI(base_url, client_id, secret)
-        
-
+            
+      
