@@ -9,12 +9,12 @@ from plaid.model.payment_initiation_payment_token_create_request import PaymentI
 from plaid import ApiClient, Configuration
 import os
 import logging
-from pay import get_plaid_bridge_api  # Assuming the module is named 'pay'
+from plaid_bridge_open_banking_api import get_plaid_bridge_api
 
 app = Flask(__name__)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Determine the Plaid environment
@@ -119,4 +119,5 @@ def make_payment():
 if __name__ == '__main__':
     app.run(debug=True)
 
-           
+                
+        
