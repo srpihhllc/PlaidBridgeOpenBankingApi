@@ -1,4 +1,3 @@
-web: gunicorn app:app
-
+web: gunicorn --worker-class=gthread --workers=4 --timeout=500 app:app
 
 
