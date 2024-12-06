@@ -1,30 +1,55 @@
-name: Security Check
+name: CodeQL
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1' # Runs every Monday at 00:00 UTC
 
 jobs:
-  security:
+  analyze:
+    name: Analyze
     runs-on: ubuntu-latest
+
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
+        # Learn more: https://docs.github.com/en/code-security/codeql/codeql-supported-languages-and-frameworks
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Setup Python environment
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.13' # Specify the Python version
-
-    - name: Install dependencies
-      run: |
-        pip install poetry
-        poetry install
-
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
       with:
-        languages: python
+        languages: ${{ matrix.language }}
 
-    - name: Perform CodeQL analysis
+    - name: Autobuild
+      run: |
+        if [[ "${{ matrix.language }}" == "python" ]]; then
+          pip install -r requirements.txt
+        fi
+
+    - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
+      with:
+        output: ../results
+        upload: always
+        cleanup-level: brutal
+        add-snippets: false
+        skip-queries: false
+        checkout_path: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi
+        upload-database: true
+        wait-for-processing: true
 
