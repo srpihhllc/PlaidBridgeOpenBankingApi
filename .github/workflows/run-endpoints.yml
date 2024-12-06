@@ -40,4 +40,4 @@ jobs:
           curl -X POST http://127.0.0.1:5000/exchange-public-token -H "Content-Type: application/json" -d '{"public_token": "sample_token"}'
           curl -X POST http://127.0.0.1:5000/create-link-token
           curl -X POST http://127.0.0.1:5000/create-payment-token -H "Content-Type: application/json" -d '{"public_token": "sample_token", "recipient_id": "sample_recipient", "reference": "sample_reference", "amount": 100}'
-          curl -X POST http://127.0.0.1:5000/make-payment -H "Content-Type: application/json" -d '{"public_token": "sample_token", "recipient_id": "sample_recipient", "reference": "sample_reference", "amount": 100}'
+          curl -X POST http://127.0.0.1:5000/make-payment -H "Content-Type: application/json" -d '{"public_token": "sample_token", "recipient_id": "sample_recipient", "reference": "sample_reference", "amount": 100}
