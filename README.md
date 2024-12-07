@@ -153,8 +153,8 @@ def verify_lender():
             response = client.auth_get(request)
         elif platform == 'truelayer':
             response = verify_truelayer(access_token)
-        elif platform == 'basio':
-            response = verify_basio(access_token)
+        elif platform == 'basiq':
+            response = verify_basiq(access_token)
         elif platform == 'codat':
             response = verify_codat(access_token)
         else:
@@ -173,10 +173,10 @@ def verify_truelayer(access_token: str) -> Dict:
     # Implement TrueLayer verification logic here
     return {'status': 'success', 'message': 'TrueLayer verification successful'}
 
-def verify_basio(access_token: str) -> Dict:
-    """Verify lender information using Basio."""
-    # Implement Basio verification logic here
-    return {'status': 'success', 'message': 'Basio verification successful'}
+def verify_basiq(access_token: str) -> Dict:
+    """Verify lender information using Basiq."""
+    # Implement Basiq verification logic here
+    return {'status': 'success', 'message': 'Basiq verification successful'}
 
 def verify_codat(access_token: str) -> Dict:
     """Verify lender information using Codat."""
