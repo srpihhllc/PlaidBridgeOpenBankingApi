@@ -5,6 +5,25 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 © [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
 
 
+### Explanation
+
+- **Overview**: Provides a brief description of the project and its purpose.
+- **Setup**: Detailed steps for setting up the project locally, including prerequisites, installation, and running the application.
+- **Usage**: Lists the available endpoints with descriptions and example request bodies.
+- **Deployment**: Instructions for deploying the application to GoDaddy, including setting up the hosting environment, uploading files, configuring environment variables, installing dependencies, and starting the application.
+- **License**: Information about the project's license.
+
+This `README.md` file is designed to be user-friendly, providing clear and concise instructions for users to set up, use, and deploy the application.
+### Explanation
+
+- **Overview**: Provides a brief description of the project and its purpose.
+- **Setup**: Detailed steps for setting up the project locally, including prerequisites, installation, and running the application.
+- **Usage**: Lists the available endpoints with descriptions and example request bodies.
+- **Deployment**: Instructions for deploying the application to GoDaddy, including setting up the hosting environment, uploading files, configuring environment variables, installing dependencies, and starting the application.
+- **License**: Information about the project's license.
+
+This `README.md` file is designed to be user-friendly, providing clear and concise instructions for users to set up, use, and deploy the application.
+
 from flask import Flask, render_template, request, jsonify
 from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
