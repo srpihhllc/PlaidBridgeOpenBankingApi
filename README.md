@@ -4,6 +4,12 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 
 © [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
 
+Proprietary License
+
+All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
+
+© [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
+
 from flask import Flask, render_template, request, jsonify
 from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
