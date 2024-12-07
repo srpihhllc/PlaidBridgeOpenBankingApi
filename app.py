@@ -3,11 +3,12 @@ import csv
 import pdfplumber
 import logging
 import requests
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 from plaid import Client
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -39,7 +40,10 @@ plaid_client = Client(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environmen
 
 # Treasury Prime API configuration
 TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
-TREASURY_PRIME_API_URL = 'https://api.treasuryprime.com'
+TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')  # Read from environment
+
+if TREASURY_PRIME_API_URL is None:
+    raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
 
 @app.route('/')
 def index():
@@ -227,21 +231,5 @@ def verify_treasury_prime_account(account_id):
     }
     try:
         response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error verifying Treasury Prime account: {e}")
-        raise
-
-@app.route('/create-link-token', methods=['GET'])
-def create_link_token():
-    try:
-        link_token = create_plaid_link_token()
-        return jsonify({'link_token': link_token}), 200
-    except Exception as e:
-        return jsonify({'message': f'Error creating link token: {str(e)}'}), 500
-
-@app.route('/exchange-public-token', methods=['POST'])
-def exchange_public_token():
-    public_token = request.json.get('public_token')
+        response.raise_for
 
