@@ -4,25 +4,16 @@ from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import LinkTokenCreateRequestUser
 from plaid.model.country_code import CountryCode
 from plaid.model.products import Products
-from plaid.model.payment_initiation_payment_create_request import PaymentInitiationPaymentCreateRequest
-from plaid.model.payment_initiation_payment_token_create_request import PaymentInitiationPaymentTokenCreateRequest
-from plaid.model.accounts_get_request import AccountsGetRequest
-from plaid.model.auth_get_request import AuthGetRequest
-from plaid.model.transfer_authorization_create_request import TransferAuthorizationCreateRequest
-from plaid.model.transfer_create_request import TransferCreateRequest
-from plaid.model.transfer_create_response import TransferCreateResponse
-from plaid import ApiClient, Configuration
+from plaid.model.accounts_balance_get_request import AccountsBalanceGetRequest
+from plaid.model.transactions_get_request import TransactionsGetRequest
+from plaid.model.transactions_get_request_options import TransactionsGetRequestOptions
+from plaid.model.date_range import DateRange
+from datetime import datetime, timedelta
 import os
 import logging
-from werkzeug.utils import secure_filename
-import pdfplumber
-from typing import Dict
-from datetime import datetime, timedelta
-import threading
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default_secret_key')
-app.config['UPLOAD_FOLDER'] = 'uploads'
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -46,7 +37,7 @@ configuration = Configuration(
 api_client = ApiClient(configuration)
 client = plaid_api.PlaidApi(api_client)
 
-def validate_request_data(data: Dict, required_fields: list) -> bool:
+def validate_request_data(data, required_fields):
     """Validate the request data."""
     return all(field in data for field in required_fields)
 
@@ -93,92 +84,48 @@ def create_link_token():
         logger.error(f"Error: {e}")
         return jsonify({'error': 'An internal error occurred'}), 500
 
-@app.route('/create-payment-token', methods=['POST'])
-def create_payment_token():
-    """Create a payment token."""
+@app.route('/get-account-balances', methods=['POST'])
+def get_account_balances():
+    """Retrieve account balances."""
     data = request.json
-    if not validate_request_data(data, ['public_token', 'recipient_id', 'reference', 'amount']):
+    if not data or 'access_token' not in data:
         return jsonify({'message': 'Invalid request data'}), 400
     
+    access_token = data.get('access_token')
     try:
-        payment_request = PaymentInitiationPaymentCreateRequest(
-            recipient_id=data.get('recipient_id'),
-            reference=data.get('reference'),
-            amount={
-                'currency': 'USD',
-                'value': data.get('amount')
-            }
+        request = AccountsBalanceGetRequest(access_token=access_token)
+        response = client.accounts_balance_get(request)
+        return jsonify(response.to_dict())
+    except plaid.ApiException as e:
+        logger.error(f"Plaid API Error: {e}")
+        return jsonify({'error': 'An error occurred while retrieving account balances'}), e.status
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        return jsonify({'error': 'An internal error occurred'}), 500
+
+@app.route('/get-transactions', methods=['POST'])
+def get_transactions():
+    """Retrieve transactions for the past 6 months."""
+    data = request.json
+    if not data or 'access_token' not in data:
+        return jsonify({'message': 'Invalid request data'}), 400
+    
+    access_token = data.get('access_token')
+    end_date = datetime.now().date()
+    start_date = end_date - timedelta(days=180)  # 6 months ago
+    try:
+        options = TransactionsGetRequestOptions()
+        request = TransactionsGetRequest(
+            access_token=access_token,
+            start_date=start_date,
+            end_date=end_date,
+            options=options
         )
-        payment_response = client.payment_initiation_payment_create(payment_request)
-        payment_id = payment_response['payment_id']
-
-        token_request = PaymentInitiationPaymentTokenCreateRequest(payment_id=payment_id)
-        token_response = client.payment_initiation_payment_token_create(token_request)
-        return jsonify(token_response.to_dict())
-    except plaid.ApiException as e:
-        logger.error(f"Plaid API Error: {e}")
-        return jsonify({'error': 'An error occurred while creating the payment token'}), e.status
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return jsonify({'error': 'An internal error occurred'}), 500
-
-@app.route('/make-payment', methods=['POST'])
-def make_payment():
-    """Make a payment."""
-    data = request.json
-    if not validate_request_data(data, ['public_token', 'recipient_id', 'reference', 'amount']):
-        return jsonify({'message': 'Invalid request data'}), 400
-    
-    try:
-        payment_data = {
-            'recipient_id': data.get('recipient_id'),
-            'reference': data.get('reference'),
-            'amount': data.get('amount')
-        }
-        plaid_api = get_plaid_bridge_api()
-        response = plaid_api.process_payment(payment_data)
-        return jsonify(response)
-    except ValueError as e:
-        logger.error(f"Validation Error: {e}")
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return jsonify({'error': 'An internal error occurred'}), 500
-
-@app.route('/verify-account', methods=['POST'])
-def verify_account():
-    """Verify account information."""
-    data = request.json
-    if not data or 'access_token' not in data:
-        return jsonify({'message': 'Invalid request data'}), 400
-    
-    access_token = data.get('access_token')
-    try:
-        request = AuthGetRequest(access_token=access_token)
-        response = client.auth_get(request)
+        response = client.transactions_get(request)
         return jsonify(response.to_dict())
     except plaid.ApiException as e:
         logger.error(f"Plaid API Error: {e}")
-        return jsonify({'error': 'An error occurred while verifying the account'}), e.status
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return jsonify({'error': 'An internal error occurred'}), 500
-
-@app.route('/get-account-info', methods=['POST'])
-def get_account_info():
-    """Get account information."""
-    data = request.json
-    if not data or 'access_token' not in data:
-        return jsonify({'message': 'Invalid request data'}), 400
-    
-    access_token = data.get('access_token')
-    try:
-        request = AccountsGetRequest(access_token=access_token)
-        response = client.accounts_get(request)
-        return jsonify(response.to_dict())
-    except plaid.ApiException as e:
-        logger.error(f"Plaid API Error: {e}")
-        return jsonify({'error': 'An error occurred while retrieving account information'}), e.status
+        return jsonify({'error': 'An error occurred while retrieving transactions'}), e.status
     except Exception as e:
         logger.error(f"Error: {e}")
         return jsonify({'error': 'An internal error occurred'}), 500
@@ -198,11 +145,11 @@ def verify_lender():
             request = AuthGetRequest(access_token=access_token)
             response = client.auth_get(request)
         elif platform == 'truelayer':
-            # Implement TrueLayer verification logic here
             response = verify_truelayer(access_token)
         elif platform == 'basio':
-            # Implement Basio verification logic here
             response = verify_basio(access_token)
+        elif platform == 'codat':
+            response = verify_codat(access_token)
         else:
             return jsonify({'message': 'Unsupported platform'}), 400
         
@@ -217,21 +164,23 @@ def verify_lender():
 def verify_truelayer(access_token: str) -> Dict:
     """Verify lender information using TrueLayer."""
     # Implement TrueLayer verification logic here
-    # This is a placeholder function
     return {'status': 'success', 'message': 'TrueLayer verification successful'}
 
 def verify_basio(access_token: str) -> Dict:
     """Verify lender information using Basio."""
     # Implement Basio verification logic here
-    # This is a placeholder function
     return {'status': 'success', 'message': 'Basio verification successful'}
+
+def verify_codat(access_token: str) -> Dict:
+    """Verify lender information using Codat."""
+    # Implement Codat verification logic here
+    return {'status': 'success', 'message': 'Codat verification successful'}
 
 @app.route('/webhook/plaid', methods=['POST'])
 def plaid_webhook():
     """Handle Plaid webhooks."""
     data = request.json
     logger.info(f"Received Plaid webhook: {data}")
-    # Process the webhook data
     return jsonify({'status': 'received'}), 200
 
 @app.route('/webhook/treasuryprime', methods=['POST'])
@@ -239,116 +188,7 @@ def treasury_prime_webhook():
     """Handle Treasury Prime webhooks."""
     data = request.json
     logger.info(f"Received Treasury Prime webhook: {data}")
-    # Process the webhook data
     return jsonify({'status': 'received'}), 200
-
-@app.route('/upload-statement', methods=['POST'])
-def upload_statement():
-    """Upload and verify PDF statements."""
-    if 'file' not in request.files:
-        return jsonify({'message': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'message': 'No selected file'}), 400
-    if file and file.filename.endswith('.pdf'):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        # Process the PDF file
-        with pdfplumber.open(filepath) as pdf:
-            text = ''
-            for page in pdf.pages:
-                text += page.extract_text()
-            # Here you can implement logic to verify the statement
-            logger.info(f"Extracted text from PDF: {text}")
-        return jsonify({'message': 'File uploaded and processed successfully'}), 200
-    else:
-        return jsonify({'message': 'Invalid file type'}), 400
-
-@app.route('/initiate-transfer', methods=['POST'])
-def initiate_transfer():
-    """Initiate a transfer between accounts."""
-    data = request.json
-    if not validate_request_data(data, ['access_token', 'amount', 'from_account_id', 'to_account_id']):
-        return jsonify({'message': 'Invalid request data'}), 400
-    
-    access_token = data.get('access_token')
-    amount = data.get('amount')
-    from_account_id = data.get('from_account_id')
-    to_account_id = data.get('to_account_id')
-    
-    try:
-        # Create a transfer authorization
-        auth_request = TransferAuthorizationCreateRequest(
-            access_token=access_token,
-            amount=amount,
-            from_account_id=from_account_id,
-            to_account_id=to_account_id
-        )
-        auth_response = client.transfer_authorization_create(auth_request)
-        
-        # Create the transfer
-        transfer_request = TransferCreateRequest(
-            authorization_id=auth_response.authorization.id,
-            amount=amount,
-            from_account_id=from_account_id,
-            to_account_id=to_account_id
-        )
-        transfer_response = client.transfer_create(transfer_request)
-        return jsonify(transfer_response.to_dict())
-    except plaid.ApiException as e:
-        logger.error(f"Plaid API Error: {e}")
-        return jsonify({'error': 'An error occurred while initiating the transfer'}), e.status
-    except Exception as e:
-        logger.error(f"Error: {e}")
-        return jsonify({'error': 'An internal error occurred'}), 500
-
-def schedule_notifications(lender_id: str, payment_date: datetime):
-    """Schedule notifications for lenders."""
-    def send_notification(lender_id: str, message: str):
-        # Implement the logic to send notification to the lender
-        logger.info(f"Notification to lender {lender_id}: {message}")
-
-    # Schedule 48-hour notification
-    notification_48_hours = payment_date - timedelta(hours=48)
-    threading.Timer((notification_48_hours - datetime.now()).total_seconds(), send_notification, args=[lender_id, "48-hour payment reminder"]).start()
-
-    # Schedule day-of-payment notification
-    notification_day_of = payment_date
-    threading.Timer((notification_day_of - datetime.now()).total_seconds(), send_notification, args=[lender_id, "Payment due today"]).start()
-
-@app.route('/schedule-payment', methods=['POST'])
-def schedule_payment():
-    """Schedule a payment and notifications for lenders."""
-    data = request.json
-    if not validate_request_data(data, ['lender_id', 'payment_date']):
-        return jsonify({'message': 'Invalid request data'}), 400
-    
-    lender_id = data.get('lender_id')
-    payment_date = datetime.strptime(data.get('payment_date'), '%Y-%m-%d %H:%M:%S')
-    
-    schedule_notifications(lender_id, payment_date)
-    return jsonify({'message': 'Payment and notifications scheduled successfully'}), 200
-
-@app.route('/check-delinquency', methods=['POST'])
-def check_delinquency():
-    """Check if the borrower is delinquent and stop transactions if necessary."""
-    data = request.json
-    if not validate_request_data(data, ['borrower_id', 'lender_id']):
-        return jsonify({'message': 'Invalid request data'}), 400
-    
-    borrower_id = data.get('borrower_id')
-    lender_id = data.get('lender_id')
-    
-    # Implement logic to check if the borrower is delinquent
-    is_delinquent = False  # Placeholder for actual delinquency check
-    
-    if is_delinquent:
-        # Implement logic to stop transactions
-        logger.info(f"Transactions stopped for borrower {borrower_id} due to delinquency")
-        return jsonify({'message': 'Borrower is delinquent. Transactions stopped.'}), 200
-    else:
-        return jsonify({'message': 'Borrower is not delinquent.'}), 200
 
 if __name__ == '__main__':
     from waitress import serve
