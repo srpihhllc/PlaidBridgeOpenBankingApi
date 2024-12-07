@@ -4,3 +4,4 @@ plaid-python==8.1.0
 gunicorn==20.1.0
 pdfplumber==0.5.28
 waitress==2.0.0
+fpdf==1.7.2
