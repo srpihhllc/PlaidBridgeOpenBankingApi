@@ -37,6 +37,7 @@ from plaid.model.date_range import DateRange
 from datetime import datetime, timedelta
 import os
 import logging
+import requests
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default_secret_key')
@@ -62,6 +63,15 @@ configuration = Configuration(
 )
 api_client = ApiClient(configuration)
 client = plaid_api.PlaidApi(api_client)
+
+# Treasury Prime URLs
+treasury_prime_env = os.getenv('TREASURY_PRIME_ENV', 'sandbox')
+if treasury_prime_env == 'sandbox':
+    treasury_prime_url = 'https://api.sandbox.treasuryprime.com'
+elif treasury_prime_env == 'production':
+    treasury_prime_url = 'https://api.treasuryprime.com'
+else:
+    raise ValueError(f"Invalid TREASURY_PRIME_ENV value: {treasury_prime_env}")
 
 def validate_request_data(data, required_fields):
     """Validate the request data."""
@@ -216,9 +226,27 @@ def treasury_prime_webhook():
     logger.info(f"Received Treasury Prime webhook: {data}")
     return jsonify({'status': 'received'}), 200
 
+@app.route('/treasuryprime/account-balance', methods=['POST'])
+def treasury_prime_account_balance():
+    """Retrieve account balance from Treasury Prime."""
+    data = request.json
+    if not data or 'account_id' not in data:
+        return jsonify({'message': 'Invalid request data'}), 400
+    
+    account_id = data.get('account_id')
+    try:
+        response = requests.get(f"{treasury_prime_url}/accounts/{account_id}/balance", headers={
+            'Authorization': f"Bearer {os.getenv('TREASURY_PRIME_API_KEY')}"
+        })
+        response.raise_for_status()
+        return jsonify(response.json())
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error integrating with Treasury Prime: {e}")
+        return jsonify({'error': 'An error occurred while retrieving account balance from Treasury Prime'}), 500
+
 if __name__ == '__main__':
     from waitress import serve
-    serve(app, host='0.0.0.0', port=5000)
+    serve(app, host='0.0.0.0', port=3000)
 
    
        
