@@ -7,7 +7,7 @@ venv/
 ENV/
 .DS_Store
 .vscode/
-
+uploads/
 
 
 
