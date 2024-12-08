@@ -241,10 +241,5 @@ def verify_treasury_prime_account(account_id):
 
 @app.route('/micro-deposits', methods=['POST'])
 def micro_deposits():
-    data = request.json
-    account_id = data.get('account_id')
-    amount = data.get('amount')
-    
-    if not account_id or not amount:
-        return jsonify({'message': 'Account ID and amount
+
 
