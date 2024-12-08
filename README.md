@@ -1,3 +1,11 @@
+"""
+Proprietary License
+
+All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
+
+© [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
+"""
+
 import os
 import csv
 import pdfplumber
@@ -239,14 +247,7 @@ def verify_treasury_prime_account(account_id):
 
 # Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
 
-@app.route('/micro-deposits', methods=['POST'])
-def micro_deposits():
-    data = request.json
-    account_id = data.get('account_id')
-    amount = data.get('amount')
-    
-    if not account_id or not amount:
-        return jsonify({'message': 'Account ID and amount
+@app.route
 
    
        
