@@ -1,6 +1,15 @@
 from flask import Flask, render_template
 from dotenv import load_dotenv
 import os
+import csv
+import pdfplumber
+import logging
+import requests
+from flask import request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
+from fpdf import FPDF
+from plaid import Client
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 
@@ -9,39 +18,6 @@ load_dotenv()
 
 # Get the PORT from environment variables
 port = int(os.getenv("PORT", 3000))
-
-@app.route("/")
-def hello_world():
-    return render_template("index.html", title="Hello PlaidBridgeOpenBankingApi")
-
-if __name__ == "__main__":
-    # Run the app on the specified port
-    app.run(host="0.0.0.0", port=port)
-
-"""
-Proprietary License
-
-All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
-
-© [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
-"""
-
-import os
-import csv
-import pdfplumber
-import logging
-import requests
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
-from fpdf import FPDF
-from plaid import Client
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
-
-# Load environment variables from .env file
-load_dotenv()
-
-app = Flask(__name__)
 
 # Ensure the statements directory exists
 app.config['UPLOAD_FOLDER'] = 'statements'
@@ -72,6 +48,10 @@ TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')  # Read from enviro
 
 if TREASURY_PRIME_API_URL is None:
     raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
+
+@app.route("/")
+def hello_world():
+    return render_template("index.html", title="Hello PlaidBridgeOpenBankingApi")
 
 @app.route('/')
 def index():
@@ -251,7 +231,6 @@ def exchange_plaid_public_token(public_token):
         logger.error(f"Error exchanging Plaid public token: {e}")
         raise
 
-
 # Treasury Prime API integration
 def verify_treasury_prime_account(account_id):
     headers = {
@@ -272,5 +251,17 @@ def verify_treasury_prime_account(account_id):
 def your_function():
     # Your function implementation here
     pass
+
+if __name__ == "__main__":
+    # Run the app on the specified port
+    app.run(host="0.0.0.0", port=port)
+
+"""
+Proprietary License
+
+All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
+
+© [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
+"""
 
 
