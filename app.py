@@ -1,10 +1,23 @@
 from flask import Flask, render_template
+from dotenv import load_dotenv
+import os
 
 app = Flask(__name__)
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Get the PORT from environment variables
+port = int(os.getenv("PORT", 3000))
+
 @app.route("/")
 def hello_world():
-    return render_template("index.html", title="Hello")
+    return render_template("index.html", title="Hello PlaidBridgeOpenBankingApi")
+
+if __name__ == "__main__":
+    # Run the app on the specified port
+    app.run(host="0.0.0.0", port=port)
+
 """
 Proprietary License
 
