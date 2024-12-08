@@ -8,7 +8,10 @@ import requests
 from flask import request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
-from plaid import Client
+from plaid.api import plaid_api
+from plaid.model import *
+from plaid.configuration import Configuration
+from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -35,12 +38,15 @@ logger = logging.getLogger(__name__)
 logger.debug("Starting application")
 
 # Plaid API configuration
-PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
-PLAID_SECRET = os.getenv('PLAID_SECRET')
-PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')  # Use 'sandbox' for testing
-
-# Initialize Plaid client
-plaid_client = Client(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
+configuration = Configuration(
+    host="https://sandbox.plaid.com",
+    api_key={
+        'clientId': os.getenv('PLAID_CLIENT_ID'),
+        'secret': os.getenv('PLAID_SECRET')
+    }
+)
+api_client = ApiClient(configuration)
+plaid_client = plaid_api.PlaidApi(api_client)
 
 # Treasury Prime API configuration
 TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
@@ -253,7 +259,6 @@ def your_function():
     pass
 
 if __name__ == "__main__":
-    # Run the app on the specified port
     app.run(host="0.0.0.0", port=port)
 
 """
