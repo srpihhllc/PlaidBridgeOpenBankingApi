@@ -1,16 +1,9 @@
-Proprietary License
-
-All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
-
-© [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
-
-
 import os
 import csv
 import pdfplumber
 import logging
 import requests
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 from plaid import Client
@@ -238,7 +231,22 @@ def verify_treasury_prime_account(account_id):
     }
     try:
         response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
-        response.raise_for
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error verifying Treasury Prime account: {e}")
+        raise
+
+# Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
+
+@app.route('/micro-deposits', methods=['POST'])
+def micro_deposits():
+    data = request.json
+    account_id = data.get('account_id')
+    amount = data.get('amount')
+    
+    if not account_id or not amount:
+        return jsonify({'message': 'Account ID and amount
 
    
        
