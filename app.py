@@ -1,3 +1,10 @@
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello_world():
+    return render_template("index.html", title="Hello")
 """
 Proprietary License
 
@@ -231,6 +238,7 @@ def exchange_plaid_public_token(public_token):
         logger.error(f"Error exchanging Plaid public token: {e}")
         raise
 
+
 # Treasury Prime API integration
 def verify_treasury_prime_account(account_id):
     headers = {
@@ -247,6 +255,9 @@ def verify_treasury_prime_account(account_id):
 
 # Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
 
-@app.route
+@app.route('/your_route', methods=['GET', 'POST'])
+def your_function():
+    # Your function implementation here
+    pass
 
 
