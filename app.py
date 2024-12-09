@@ -1,11 +1,10 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask_socketio import SocketIO, emit
 from dotenv import load_dotenv
 import os
 import csv
 import pdfplumber
 import logging
-import requests
-from flask import request, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 from fpdf import FPDF
 from plaid.api import plaid_api
@@ -15,6 +14,7 @@ from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -57,14 +57,10 @@ if TREASURY_PRIME_API_URL is None:
 
 @app.route("/")
 def hello_world():
-    return render_template("index.html", title="Hello PlaidBridgeOpenBankingApi")
-
-@app.route('/')
-def index():
-    return render_template('index.html', account_balance=account_balance)
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
+    return jsonify({
+        'account_balance': account_balance,
+        'statements': []
+    })
 
 @app.route('/upload-pdf', methods=['POST'])
 def upload_pdf():
@@ -88,6 +84,7 @@ def upload_pdf():
             save_statements_as_csv(corrected_statements, csv_file_path)
             update_account_balance(corrected_statements)
             logger.info(f"File processed successfully: {filename}")
+            socketio.emit('update', {'account_balance': account_balance, 'statements': corrected_statements})
             return jsonify({'message': 'File processed successfully', 'csv_file': csv_filename}), 200
         except pdfplumber.PDFSyntaxError as e:
             logger.error(f"PDF syntax error: {e}")
@@ -117,6 +114,9 @@ def generate_pdf(csv_filename):
     except Exception as e:
         logger.error(f"Error generating PDF: {e}")
         return jsonify({'message': 'Error generating PDF'}), 500
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
 def parse_pdf(file_path):
     """Parse the PDF file to extract statements."""
@@ -259,14 +259,7 @@ def your_function():
     pass
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port)
 
-"""
-Proprietary License
-
-All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
-
-© [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
-"""
 
 
