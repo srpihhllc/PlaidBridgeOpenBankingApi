@@ -138,8 +138,9 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 ## [app.py](http://_vscodecontentref_/4)
 
 ```python
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
 from flask_socketio import SocketIO, emit
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from dotenv import load_dotenv
 import os
 import csv
@@ -154,6 +155,7 @@ from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
 socketio = SocketIO(app)
 
 # Load environment variables from .env file
@@ -195,14 +197,87 @@ TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')  # Read from enviro
 if TREASURY_PRIME_API_URL is None:
     raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
 
-@app.route("/")
-def hello_world():
-    return jsonify({
-        'account_balance': account_balance,
-        'statements': []
-    })
+# Flask-Login configuration
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User(user_id)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user_id = request.form['user_id']
+        user = User(user_id)
+        login_user(user)
+        return redirect(url_for('home'))
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/')
+@login_required
+def home():
+    return render_template('index.html')
+
+@app.route("/link-account")
+@login_required
+def link_account():
+    return render_template('link_account.html')
+
+@app.route("/account-info")
+@login_required
+def account_info():
+    # Mock data for account information
+    statements = [
+        {'date': '2023-01-01', 'description': 'Deposit', 'amount': '1000.00'},
+        {'date': '2023-01-02', 'description': 'Withdrawal', 'amount': '-500.00'}
+    ]
+    return render_template('account_info.html', account_balance=account_balance, statements=statements)
+
+@app.route('/create_link_token', methods=['GET'])
+@login_required
+def create_link_token():
+    try:
+        response = plaid_client.LinkToken.create({
+            'user': {
+                'client_user_id': 'unique_user_id'
+            },
+            'client_name': 'PlaidBridgeOpenBankingAPI',
+            'products': ['auth'],
+            'country_codes': ['US'],
+            'language': 'en',
+            'redirect_uri': 'https://yourapp.com/oauth-return',
+        })
+        return jsonify({'link_token': response['link_token']})
+    except Exception as e:
+        logger.error(f"Error creating Plaid link token: {e}")
+        return jsonify({'message': 'Error creating link token'}), 500
+
+@app.route('/exchange_public_token', methods=['POST'])
+@login_required
+def exchange_public_token():
+    data = request.json
+    try:
+        response = plaid_client.Item.public_token.exchange(data['public_token'])
+        access_token = response['access_token']
+        return jsonify({'access_token': access_token})
+    except Exception as e:
+        logger.error(f"Error exchanging Plaid public token: {e}")
+        return jsonify({'message': 'Error exchanging public token'}), 500
 
 @app.route('/upload-pdf', methods=['POST'])
+@login_required
 def upload_pdf():
     global account_balance
     if 'file' not in request.files:
@@ -236,6 +311,7 @@ def upload_pdf():
     return jsonify({'message': 'Invalid file format'}), 400
 
 @app.route('/statements/<filename>')
+@login_required
 def download_statement(filename):
     try:
         return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
@@ -244,6 +320,7 @@ def download_statement(filename):
         return jsonify({'message': 'Error downloading file'}), 500
 
 @app.route('/generate-pdf/<csv_filename>', methods=['GET'])
+@login_required
 def generate_pdf(csv_filename):
     try:
         csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
@@ -397,6 +474,40 @@ def verify_treasury_prime_account(account_id):
 def your_function():
     # Your function implementation here
     pass
+
+# Todo app routes
+@app.route('/todos', methods=['GET'])
+@login_required
+def get_todos():
+    # Fetch todos from the database or mock data
+    todos = [
+        {'id': 1, 'title': 'Buy groceries', 'completed': False},
+        {'id': 2, 'title': 'Read a book', 'completed': True}
+    ]
+    return render_template('todos.html', todos=todos)
+
+@app.route('/todos', methods=['POST'])
+@login_required
+def add_todo():
+    # Add a new todo item
+    title = request.form['title']
+    # Save the new todo to the database or mock data
+    return redirect(url_for('get_todos'))
+
+@app.route('/todos/<int:todo_id>', methods=['POST'])
+@login_required
+def update_todo(todo_id):
+    # Update the todo item
+    completed = request.form['completed'] == 'true'
+    # Update the todo in the database or mock data
+    return redirect(url_for('get_todos'))
+
+@app.route('/todos/<int:todo_id>/delete', methods=['POST'])
+@login_required
+def delete_todo(todo_id):
+    # Delete the todo item
+    # Remove the todo from the database or mock data
+    return redirect(url_for('get_todos'))
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=port)
