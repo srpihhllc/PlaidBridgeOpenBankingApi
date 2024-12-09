@@ -384,10 +384,10 @@ def verify_treasury_prime_account(account_id):
         'Content-Type': 'application/json'
     }
     try:
-        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
+        response = request.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except request.exceptions.RequestException as e:
         logger.error(f"Error verifying Treasury Prime account: {e}")
         raise
 
@@ -400,7 +400,6 @@ def your_function():
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=port)
-
 
 
 
