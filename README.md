@@ -1,273 +1,139 @@
-from flask import Flask, render_template
-from dotenv import load_dotenv
-import os
-import csv
-import pdfplumber
-import logging
-import requests
-from flask import request, jsonify, send_from_directory
-from werkzeug.utils import secure_filename
-from fpdf import FPDF
-from plaid.api import plaid_api
-from plaid.model import *
-from plaid.configuration import Configuration
-from plaid.api_client import ApiClient
-from datetime import datetime, timedelta
+# PlaidBridgeOpenBankingAPI
 
-app = Flask(__name__)
+## Overview
 
-# Load environment variables from .env file
-load_dotenv()
+This project is a user-friendly web application that allows users to upload PDF statements, parse them, and generate CSV and PDF files. It integrates with the Plaid API for financial data and Treasury Prime API for account verification.
 
-# Get the PORT from environment variables
-port = int(os.getenv("PORT", 3000))
+## Prerequisites
 
-# Ensure the statements directory exists
-app.config['UPLOAD_FOLDER'] = 'statements'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
+Ensure you have the following installed locally:
 
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
+- [Python 3.8+](https://www.python.org/downloads/)
+- [Node.js with npm (18.17.1+)](https://nodejs.org/)
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+- [Azure Functions Core Tools (4+)](https://docs.microsoft.com/azure/azure-functions/functions-run-local)
 
-# Global variable for account balance
-account_balance = 848583.68
+## Setup and Run Locally
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.debug("Starting application")
+### Backend (Flask API)
 
-# Plaid API configuration
-configuration = Configuration(
-    host="https://sandbox.plaid.com",
-    api_key={
-        'clientId': os.getenv('PLAID_CLIENT_ID'),
-        'secret': os.getenv('PLAID_SECRET')
-    }
-)
-api_client = ApiClient(configuration)
-plaid_client = plaid_api.PlaidApi(api_client)
+1. **Clone the repository:**
 
-# Treasury Prime API configuration
-TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
-TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')  # Read from environment
+    ```sh
+    git clone https://github.com/your-repo/plaidbridgeopenbankingapi.git
+    cd plaidbridgeopenbankingapi
+    ```
 
-if TREASURY_PRIME_API_URL is None:
-    raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
+2. **Set up the environment variables:**
 
-@app.route("/")
-def hello_world():
-    return render_template("index.html", title="Hello PlaidBridgeOpenBankingApi")
+    Create a `.env` file in the root directory with the following content:
 
-@app.route('/')
-def index():
-    return render_template('index.html', account_balance=account_balance)
+    ```env
+    PORT=3000
+    PLAID_CLIENT_ID=your_plaid_client_id
+    PLAID_SECRET=your_plaid_secret
+    TREASURY_PRIME_API_KEY=your_treasury_prime_api_key
+    TREASURY_PRIME_API_URL=your_treasury_prime_api_url
+    ```
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
+3. **Install dependencies:**
 
-@app.route('/upload-pdf', methods=['POST'])
-def upload_pdf():
-    global account_balance
-    if 'file' not in request.files:
-        logger.error("No file part in the request")
-        return jsonify({'message': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '':
-        logger.error("No selected file")
-        return jsonify({'message': 'No selected file'}), 400
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        try:
-            statements = parse_pdf(file_path)
-            corrected_statements = correct_discrepancies(statements)
-            csv_filename = filename.replace('.pdf', '.csv')
-            csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
-            save_statements_as_csv(corrected_statements, csv_file_path)
-            update_account_balance(corrected_statements)
-            logger.info(f"File processed successfully: {filename}")
-            return jsonify({'message': 'File processed successfully', 'csv_file': csv_filename}), 200
-        except pdfplumber.PDFSyntaxError as e:
-            logger.error(f"PDF syntax error: {e}")
-            return jsonify({'message': 'PDF syntax error'}), 500
-        except Exception as e:
-            logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
-    logger.error("Invalid file format")
-    return jsonify({'message': 'Invalid file format'}), 400
+    ```sh
+    pip install -r requirements.txt
+    ```
 
-@app.route('/statements/<filename>')
-def download_statement(filename):
-    try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except Exception as e:
-        logger.error(f"Error downloading file: {e}")
-        return jsonify({'message': 'Error downloading file'}), 500
+4. **Run the Flask API:**
 
-@app.route('/generate-pdf/<csv_filename>', methods=['GET'])
-def generate_pdf(csv_filename):
-    try:
-        csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
-        pdf_filename = csv_filename.replace('.csv', '.pdf')
-        pdf_file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
-        generate_pdf_from_csv(csv_file_path, pdf_file_path)
-        return send_from_directory(app.config['UPLOAD_FOLDER'], pdf_filename)
-    except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
-        return jsonify({'message': 'Error generating PDF'}), 500
+    ```sh
+    python app.py
+    ```
 
-def parse_pdf(file_path):
-    """Parse the PDF file to extract statements."""
-    statements = []
-    try:
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    statements.extend(parse_page(text))
-        logger.info(f"Parsed {len(statements)} statements from PDF")
-        return statements
-    except Exception as e:
-        logger.error(f"Error parsing PDF: {e}")
-        raise
+    The API will be available at [http://localhost:3000](http://localhost:3000).
 
-def parse_page(text):
-    """Parse a single page of text to extract statements."""
-    statements = []
-    for line in text.split('\n'):
-        parts = line.split()
-        if len(parts) >= 3:
-            date = parts[0]
-            description = " ".join(parts[1:-1])
-            amount = parts[-1]
-            # Determine if the amount is a deposit or withdrawal
-            if amount.startswith('-'):
-                transaction_type = 'withdrawal'
-            else:
-                transaction_type = 'deposit'
-            statements.append({
-                'date': date,
-                'description': description,
-                'amount': amount,
-                'transaction_type': transaction_type
-            })
-    return statements
+### Frontend (React App)
 
-def correct_discrepancies(statements):
-    """Correct discrepancies in the statements."""
-    corrected_statements = []
-    for statement in statements:
-        try:
-            amount = float(statement['amount'])
-            corrected_statements.append(statement)
-        except ValueError:
-            # Handle misprints or miscalculations
-            statement['amount'] = '0.00'  # Set to zero or some default value
-            corrected_statements.append(statement)
-    return corrected_statements
+1. **Navigate to the frontend directory:**
 
-def save_statements_as_csv(statements, file_path):
-    """Save the statements as a CSV file."""
-    try:
-        keys = statements[0].keys()
-        with open(file_path, mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=keys)
-            writer.writeheader()
-            writer.writerows(statements)
-        logger.info(f"Statements saved as '{file_path}'")
-    except Exception as e:
-        logger.error(f"Error saving CSV file: {e}")
-        raise
+    ```sh
+    cd src/web
+    ```
 
-def generate_pdf_from_csv(csv_file_path, pdf_file_path):
-    """Generate a PDF file from a CSV file."""
-    try:
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
+2. **Set up the environment variables:**
 
-        with open(csv_file_path, newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                line = f"{row['date']} {row['description']} {row['amount']} {row['transaction_type']}"
-                pdf.cell(200, 10, txt=line, ln=True)
+    Create a `.env` file in the  directory with the following content:
 
-        pdf.output(pdf_file_path)
-        logger.info(f"PDF generated as '{pdf_file_path}'")
-    except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
-        raise
+    ```env
+    REACT_APP_API_BASE_URL=http://localhost:3000
+    ```
 
-def update_account_balance(statements):
-    """Update the global account balance based on the statements."""
-    global account_balance
-    for statement in statements:
-        amount = float(statement['amount'])
-        if statement['transaction_type'] == 'deposit':
-            account_balance += amount
-        elif statement['transaction_type'] == 'withdrawal':
-            account_balance -= amount
-    logger.info(f"Account balance updated: {account_balance}")
+3. **Install dependencies:**
 
-# Plaid API integration
-def create_plaid_link_token():
-    try:
-        response = plaid_client.LinkToken.create({
-            'user': {
-                'client_user_id': 'unique_user_id'
-            },
-            'client_name': 'PlaidBridgeOpenBankingAPI',
-            'products': ['auth'],
-            'country_codes': ['US'],
-            'language': 'en',
-            'redirect_uri': 'https://yourapp.com/oauth-return',
-        })
-        return response['link_token']
-    except Exception as e:
-        logger.error(f"Error creating Plaid link token: {e}")
-        raise
+    ```sh
+    npm install
+    ```
 
-def exchange_plaid_public_token(public_token):
-    try:
-        response = plaid_client.Item.public_token.exchange(public_token)
-        return response['access_token']
-    except Exception as e:
-        logger.error(f"Error exchanging Plaid public token: {e}")
-        raise
+4. **Run the React app:**
 
-# Treasury Prime API integration
-def verify_treasury_prime_account(account_id):
-    headers = {
-        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
-        'Content-Type': 'application/json'
-    }
-    try:
-        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error verifying Treasury Prime account: {e}")
-        raise
+    ```sh
+    npm start
+    ```
 
-# Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
+    Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
-@app.route('/your_route', methods=['GET', 'POST'])
-def your_function():
-    # Your function implementation here
-    pass
+## Deploy to Azure
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=port)
+### Backend (Flask API)
 
-"""
+1. **Log in to Azure:**
+
+    ```sh
+    az login
+    ```
+
+2. **Create an Azure Function App:**
+
+    ```sh
+    az functionapp create --resource-group your-resource-group --consumption-plan-location your-location --runtime python --functions-version 3 --name your-function-app-name --storage-account your-storage-account
+    ```
+
+3. **Deploy the Flask API to Azure Functions:**
+
+    ```sh
+    func azure functionapp publish your-function-app-name
+    ```
+
+### Frontend (React App)
+
+1. **Deploy the React app to Azure Static Web Apps:**
+
+    Follow the [Azure Static Web Apps documentation](https://docs.microsoft.com/en-us/azure/static-web-apps/getting-started?tabs=react) to deploy your React app.
+
+## API Endpoints
+
+- **`GET /`**: Render the index page.
+- **`POST /upload-pdf`**: Upload and process a PDF file.
+- **`GET /statements/<filename>`**: Download a processed statement.
+- **`GET /generate-pdf/<csv_filename>`**: Generate a PDF from a CSV file.
+
+## Learn More
+
+You can learn more in the [Flask documentation](https://flask.palletsprojects.com/en/2.0.x/).
+
+To learn React, check out the [React documentation](https://reactjs.org/).
+
+## Contributing
+
+This project welcomes contributions and suggestions. Most contributions require you to agree to a Contributor License Agreement (CLA) declaring that you have the right to, and actually do, grant us the rights to use your contribution. For details, visit https://cla.microsoft.com.
+
+This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+
+## License
+
 Proprietary License
 
 All rights reserved. Unauthorized copying, distribution, or modification of this software is strictly prohibited.
 
 © [Sir Pollards Internal Holistic Healing LLC/Terence Pollard Sr.] [2024]
-"""
 
    
        
