@@ -168,7 +168,7 @@ port = int(os.getenv("PORT", 3000))
 app.config['UPLOAD_FOLDER'] = 'statements'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
 
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
+if not os.path.exists(app.config['UPLOAD_FOLDER'])):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # Global variable for account balance
@@ -511,7 +511,6 @@ def delete_todo(todo_id):
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=port)
-
 
 
    
