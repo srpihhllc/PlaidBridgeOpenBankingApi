@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for, abort
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from dotenv import load_dotenv
@@ -203,6 +203,10 @@ def generate_pdf(csv_filename):
         logger.error(f"Error generating PDF: {e}")
         return jsonify({'message': 'Error generating PDF'}), 500
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
@@ -260,7 +264,7 @@ def save_statements_as_csv(statements, file_path):
     """Save the statements as a CSV file."""
     try:
         keys = statements[0].keys()
-        with open(file_path, mode='w', newline='') as file:
+        with open(file_path, mode='w', newline='') as file):
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             writer.writerows(statements)
@@ -379,6 +383,10 @@ def delete_todo(todo_id):
     # Delete the todo item
     # Remove the todo from the database or mock data
     return redirect(url_for('get_todos'))
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=port)
