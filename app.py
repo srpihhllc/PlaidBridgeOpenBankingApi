@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for, abort
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from dotenv import load_dotenv
@@ -144,7 +144,7 @@ def upload_pdf():
         logger.error("No file part in the request")
         return jsonify({'message': 'No file part'}), 400
     file = request.files['file']
-    if file.filename == '':
+    if file.filename == '': 
         logger.error("No selected file")
         return jsonify({'message': 'No selected file'}), 400
     if file and allowed_file(file.filename):
@@ -166,7 +166,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -183,9 +183,20 @@ def download_statement(filename):
 @login_required
 def generate_pdf(csv_filename):
     try:
-        csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+        base_path = app.config['UPLOAD_FOLDER']
+        
+        # Normalize and validate csv_filename
+        csv_file_path = os.path.normpath(os.path.join(base_path, csv_filename))
+        if not csv_file_path.startswith(base_path):
+            raise Exception("Invalid file path for CSV file")
+
         pdf_filename = csv_filename.replace('.csv', '.pdf')
-        pdf_file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+        
+        # Normalize and validate pdf_filename
+        pdf_file_path = os.path.normpath(os.path.join(base_path, pdf_filename))
+        if not pdf_file_path.startswith(base_path):
+            raise Exception("Invalid file path for PDF file")
+
         generate_pdf_from_csv(csv_file_path, pdf_file_path)
         return send_from_directory(app.config['UPLOAD_FOLDER'], pdf_filename)
     except Exception as e:
