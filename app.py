@@ -1,6 +1,33 @@
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort
-from flask_socketio import SocketIO, emit
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from flask import Flask, jsonify, render_template, request, send_from_directory, redirect, url_for, abort
+from flask import Flask
+# filepath: /path/to/app.py
+from flask import Flask
+from flask_socketio import SocketIO # type: ignore
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+# ...existing code...
+
+if __name__ == '__main__':
+    socketio.run(app)
+
+app = Flask(__name__)
+socketio = SocketIO(app)
+
+# ...existing code...
+
+if __name__ == '__main__':
+    socketio.run(app)
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user # type: ignore
+
+# ...existing code...
+
+# Initialize the LoginManager
+login_manager = LoginManager()
+login_manager.init_app(app)
+
+# ...existing code...
 from dotenv import load_dotenv
 import os
 import csv
@@ -28,7 +55,7 @@ port = int(os.getenv("PORT", 3000))
 app.config['UPLOAD_FOLDER'] = 'statements'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
 
-if not os.path.exists(app.config['UPLOAD_FOLDER'])):
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
 # Global variable for account balance
@@ -166,7 +193,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -264,7 +291,7 @@ def save_statements_as_csv(statements, file_path):
     """Save the statements as a CSV file."""
     try:
         keys = statements[0].keys()
-        with open(file_path, mode='w', newline='') as file):
+        with open(file_path, mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             writer.writerows(statements)
