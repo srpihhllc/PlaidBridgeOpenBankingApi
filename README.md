@@ -138,36 +138,9 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 ## [app.py](http://_vscodecontentref_/4)
 
 ```python
-from flask import Flask, jsonify, render_template, request, send_from_directory, redirect, url_for, abort
-from flask import Flask
-# filepath: /path/to/app.py
-from flask import Flask
-from flask_socketio import SocketIO # type: ignore
-
-app = Flask(__name__)
-socketio = SocketIO(app)
-
-# ...existing code...
-
-if __name__ == '__main__':
-    socketio.run(app)
-
-app = Flask(__name__)
-socketio = SocketIO(app)
-
-# ...existing code...
-
-if __name__ == '__main__':
-    socketio.run(app)
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user # type: ignore
-
-# ...existing code...
-
-# Initialize the LoginManager
-login_manager = LoginManager()
-login_manager.init_app(app)
-
-# ...existing code...
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+from flask_socketio import SocketIO, emit
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 import os
 import csv
@@ -180,6 +153,7 @@ from plaid.model import *
 from plaid.configuration import Configuration
 from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
+from werkzeug.utils import safe_str_cmp  # Updated import
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
@@ -189,7 +163,7 @@ socketio = SocketIO(app)
 load_dotenv()
 
 # Get the PORT from environment variables
-port = int(os.getenv("PORT", 3000))
+port = int(os.getenv("PORT", 8000))
 
 # Ensure the statements directory exists
 app.config['UPLOAD_FOLDER'] = 'statements'
@@ -333,7 +307,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -556,8 +530,7 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=port)
-
+    socketio.run(app, host="0.0.0.0", port=8000)
 
    
        
