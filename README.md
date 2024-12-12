@@ -307,7 +307,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
