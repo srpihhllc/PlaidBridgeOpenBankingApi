@@ -138,22 +138,23 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 ## [app.py](http://_vscodecontentref_/4)
 
 ```python
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template # type: ignore
-from flask_socketio import SocketIO, emit # type: ignore
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user # type: ignore
-from dotenv import load_dotenv # type: ignore
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+from flask_socketio import SocketIO, emit
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from dotenv import load_dotenv
 import os
 import csv
-import pdfplumber # type: ignore
+import pdfplumber
 import logging
-from werkzeug.utils import secure_filename # type: ignore
-from fpdf import FPDF # type: ignore
-from plaid.api import plaid_api # type: ignore
-from plaid.model import * # type: ignore
-from plaid.configuration import Configuration # type: ignore
-from plaid.api_client import ApiClient # type: ignore
+from werkzeug.utils import secure_filename
+from fpdf import FPDF
+from plaid.api import plaid_api
+from plaid.model import *
+from plaid.configuration import Configuration
+from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
-from werkzeug.utils import safe_str_cmp  # type: ignore # Updated import
+from werkzeug.utils import safe_str_cmp
+from pymongo import MongoClient
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
@@ -197,6 +198,11 @@ TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')  # Read from enviro
 
 if TREASURY_PRIME_API_URL is None:
     raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
+
+# MongoDB configuration
+mongo_client = MongoClient(os.getenv('COSMOS_DB_CONNECTION_STRING'))
+db = mongo_client['plaidbridgeopenbankingapi-database']
+todos_collection = db['todos']
 
 # Flask-Login configuration
 login_manager = LoginManager()
@@ -495,34 +501,27 @@ def your_function():
 @app.route('/todos', methods=['GET'])
 @login_required
 def get_todos():
-    # Fetch todos from the database or mock data
-    todos = [
-        {'id': 1, 'title': 'Buy groceries', 'completed': False},
-        {'id': 2, 'title': 'Read a book', 'completed': True}
-    ]
+    todos = list(todos_collection.find())
     return render_template('todos.html', todos=todos)
 
 @app.route('/todos', methods=['POST'])
 @login_required
 def add_todo():
-    # Add a new todo item
     title = request.form['title']
-    # Save the new todo to the database or mock data
+    todos_collection.insert_one({'title': title, 'completed': False})
     return redirect(url_for('get_todos'))
 
 @app.route('/todos/<int:todo_id>', methods=['POST'])
 @login_required
 def update_todo(todo_id):
-    # Update the todo item
     completed = request.form['completed'] == 'true'
-    # Update the todo in the database or mock data
+    todos_collection.update_one({'_id': todo_id}, {'$set': {'completed': completed}})
     return redirect(url_for('get_todos'))
 
 @app.route('/todos/<int:todo_id>/delete', methods=['POST'])
 @login_required
 def delete_todo(todo_id):
-    # Delete the todo item
-    # Remove the todo from the database or mock data
+    todos_collection.delete_one({'_id': todo_id})
     return redirect(url_for('get_todos'))
 
 @app.route('/health', methods=['GET'])
@@ -530,8 +529,7 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8000)
-   
+    socketio.run(app, host="0.0.0.0", port=8000)   
        
         
 
