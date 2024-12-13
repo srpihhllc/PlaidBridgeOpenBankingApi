@@ -31,17 +31,15 @@ jobs:
     - name: Start Flask application
       run: |
         nohup python app.py &
-        sleep 30
 
     - name: Wait for Flask application to start
       run: |
         for i in {1..10}; do
-          curl http://0.0.0.0:5000 && break || sleep 5
+          curl http://0.0.0.0:8000/health && break || sleep 5
         done
 
     - name: Run curl commands
       run: |
-        curl -X POST http://0.0.0.0:5000/exchange-public-token -H "Content-Type: application/json" -d '{"public_token": "sample_token"}'
-        curl -X POST http://0.0.0.0:5000/create-link-token
-        curl -X POST http://0.0.0.0:5000/create-payment-token -H "Content-Type: application/json" -d '{"public_token": "sample_token", "recipient_id": "sample_recipient", "reference": "sample_reference", "amount": "sample_amount"}'
-        curl -X POST http://0.0.0.0:5000/make-payment -H "Content-Type: application/json" -d '{"public_token": "sample_token", "recipient_id": "sample_recipient", "reference": "sample_reference", "amount": "sample_amount"}'
+        curl -X POST http://0.0.0.0:8000/exchange_public_token -H "Content-Type: application/json" -d '{"public_token": "sample_token"}'
+        curl -X GET http://0.0.0.0:8000/create_link_token
+        curl -X POST http://0.0.0.0:8000/upload-pdf -F 'file=@sample.pdf'
