@@ -20,8 +20,12 @@ steps:
     python -m unittest discover
   displayName: 'Run tests'
 
+- script: |
+    zip -r release.zip .
+  displayName: 'Package application'
+
 - task: AzureWebApp@1
   inputs:
-    azureSubscription: '<Azure Service Connection>'
-    appName: '<App Service Name>'
-    package: $(System.DefaultWorkingDirectory)/**/*.zip
+    azureSubscription: '<Azure Service Connection>'  # Replace with your Azure service connection name
+    appName: '<App Service Name>'  # Replace with your Azure App Service name
+    package: $(System.DefaultWorkingDirectory)/release.zip
