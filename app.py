@@ -1,4 +1,4 @@
- from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
@@ -389,7 +389,7 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8000)  
+    socketio.run(app, host="0.0.0.0", port=8000) 
        
         
 
