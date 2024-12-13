@@ -1,5 +1,6 @@
 version: 2
 updates:
+  # Configuration for npm dependencies
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -9,3 +10,14 @@ updates:
     ignore:
       - dependency-name: "axios"
         versions: ["< 1.6.0"]
+
+  # Configuration for Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    commit-message:
+      prefix: "deps"
+    ignore:
+      - dependency-name: "some-python-package"
+        versions: ["< 2.0.0"]
