@@ -138,7 +138,7 @@ All rights reserved. Unauthorized copying, distribution, or modification of this
 ## [app.py](http://_vscodecontentref_/4)
 
 ```python
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+  from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
@@ -153,7 +153,6 @@ from plaid.model import *
 from plaid.configuration import Configuration
 from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
-from werkzeug.utils import safe_str_cmp
 from pymongo import MongoClient
 
 app = Flask(__name__)
@@ -529,8 +528,7 @@ def health_check():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=8000)       
-        
+    socketio.run(app, host="0.0.0.0", port=port)      
 
                 
   
