@@ -1,0 +1,42 @@
+name: Azure Functions Setup
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  setup-azure-functions:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Extract Azure Functions Core Tools
+      run: |
+        mkdir -p azure-functions-core-tools
+        unzip azure-functions-core-tools~ce09aa563a25c35a5aee788e7d2f67628c0f188a.zip -d azure-functions-core-tools
+
+    - name: Add Azure Functions Core Tools to PATH
+      run: echo "$(pwd)/azure-functions-core-tools" >> $GITHUB_PATH
+
+    - name: Verify Azure Functions Core Tools installation
+      run: func --version
+
+    - name: Start Azure Functions
+      run: |
+        func start
