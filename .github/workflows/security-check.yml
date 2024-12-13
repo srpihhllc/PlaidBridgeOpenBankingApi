@@ -43,13 +43,4 @@ jobs:
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2
-      with:
-        output: ../results
-        upload: always
-        cleanup-level: brutal
-        add-snippets: false
-        skip-queries: false
-        checkout_path: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi
-        upload-database: true
-        wait-for-processing: true
 
