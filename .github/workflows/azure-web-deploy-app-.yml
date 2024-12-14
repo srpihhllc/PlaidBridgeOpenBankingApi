@@ -1,4 +1,4 @@
-name: Azure Web App CI/CD
+name: Azure Static Web App CI/CD
 
 on:
   push:
@@ -21,23 +21,27 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.8'
+          python-version: '3.9'  # Use Python 3.9 or higher to avoid compatibility issues
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Archive production-ready build files
-        run: zip -r release.zip .
+      - name: Build the app
+        run: |
+          # Add your build commands here if needed
+          echo "Build step"
 
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
         with:
-          app-name: 'PlaidBridgeOpenBankingApi'  # Replace with your Azure Web App name
-          slot-name: 'production'
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: './release.zip'
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "/"
+          api_location: "api"
+          output_location: "build"
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
