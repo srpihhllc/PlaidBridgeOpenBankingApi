@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+ from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
@@ -14,6 +14,7 @@ from plaid.configuration import Configuration
 from plaid.api_client import ApiClient
 from datetime import datetime, timedelta
 from pymongo import MongoClient
+import requests
 
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
@@ -23,7 +24,7 @@ socketio = SocketIO(app)
 load_dotenv()
 
 # Get the PORT from environment variables
-port = int(os.getenv("PORT", 8000))
+port = int(os.getenv("PORT", 3000))
 
 # Ensure the statements directory exists
 app.config['UPLOAD_FOLDER'] = 'statements'
@@ -52,8 +53,13 @@ api_client = ApiClient(configuration)
 plaid_client = plaid_api.PlaidApi(api_client)
 
 # Treasury Prime API configuration
-TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
-TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_API_URL')  # Read from environment
+treasury_prime_env = os.getenv('TREASURY_PRIME_ENV', 'sandbox')
+if treasury_prime_env == 'production':
+    TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_PRODUCTION_API_KEY')
+    TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_PRODUCTION_API_URL')
+else:
+    TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_SANDBOX_API_KEY')
+    TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_SANDBOX_API_URL')
 
 if TREASURY_PRIME_API_URL is None:
     raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
@@ -172,7 +178,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -342,10 +348,10 @@ def verify_treasury_prime_account(account_id):
         'Content-Type': 'application/json'
     }
     try:
-        response = request.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
+        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
         response.raise_for_status()
         return response.json()
-    except request.exceptions.RequestException as e:
+    except requests.exceptions.RequestException as e:
         logger.error(f"Error verifying Treasury Prime account: {e}")
         raise
 
@@ -374,7 +380,7 @@ def add_todo():
 @login_required
 def update_todo(todo_id):
     completed = request.form['completed'] == 'true'
-    todos_collection.update_one({'_id': todo_id}, {'$set': {'completed': completed}})
+    todos_collection.update_one({'_id': todo_id}, {'$set': {'completed': completed}}) 
     return redirect(url_for('get_todos'))
 
 @app.route('/todos/<int:todo_id>/delete', methods=['POST'])
@@ -383,12 +389,12 @@ def delete_todo(todo_id):
     todos_collection.delete_one({'_id': todo_id})
     return redirect(url_for('get_todos'))
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy"}), 200
-
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=port)      
+    if os.getenv('FLASK_ENV') == 'production':
+        from waitress import serve
+        serve(app, host="0.0.0.0", port=port)
+    else:
+        socketio.run(app, host="0.0.0.0", port=port)     
 
                 
   
