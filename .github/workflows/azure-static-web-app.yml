@@ -1,4 +1,4 @@
-name: Build and deploy Python app to Azure Web App - PlaidBridgeOpenBankingApi
+name: Build and deploy Python app to Azure Static Web App - PlaidBridgeOpenBankingApi
 
 on:
   push:
