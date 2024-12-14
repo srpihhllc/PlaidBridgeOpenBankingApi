@@ -21,14 +21,15 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.9'  # Use Python 3.9 or another supported version
 
       - name: Cache pip
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: ${{ runner.os }}-pip-
+          restore-keys: |
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -36,7 +37,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build the app
-        run: echo "Build step"
+        run: |
+          # Add your build commands here if needed
+          echo "Build step"
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
@@ -47,7 +50,6 @@ jobs:
           app_location: "/"
           api_location: "api"
           output_location: "build"
-          skip_deploy_on_missing_secrets: true
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
