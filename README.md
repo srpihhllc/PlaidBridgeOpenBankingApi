@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, render_template
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
@@ -16,12 +16,12 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import requests
 
+# Load environment variables from .env file
+load_dotenv()
+
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
 socketio = SocketIO(app)
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Get the PORT from environment variables
 port = int(os.getenv("PORT", 3000))
@@ -112,8 +112,8 @@ def link_account():
 def account_info():
     # Mock data for account information
     statements = [
-        {'date': '2023-01-01', 'description': 'Deposit', 'amount': '1000.00'},
-        {'date': '2023-01-02', 'description': 'Withdrawal', 'amount': '-500.00'}
+        {'date': '2024-01-01', 'description': 'Deposit', 'amount': '1577.56'},
+        {'date': '2023-01-02', 'description': 'Withdrawal', 'amount': '-550.38'}
     ]
     return render_template('account_info.html', account_balance=account_balance, statements=statements)
 
@@ -178,7 +178,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -394,7 +394,7 @@ if __name__ == "__main__":
         from waitress import serve
         serve(app, host="0.0.0.0", port=port)
     else:
-        socketio.run(app, host="0.0.0.0", port=port)    
+        socketio.run(app, host="0.0.0.0", port=port)   
                 
   
        
