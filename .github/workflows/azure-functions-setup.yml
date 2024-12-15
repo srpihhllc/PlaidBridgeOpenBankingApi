@@ -14,20 +14,12 @@ jobs:
     name: Build and Deploy Job
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v2
         with:
-          python-version: '3.9'  # Use Python 3.9 or another supported version
-
-      - name: Cache pip
-        uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
@@ -36,8 +28,7 @@ jobs:
 
       - name: Build the app
         run: |
-          # Add your build commands here if needed
-          echo "Build step"
+          python -m compileall .
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
@@ -48,3 +39,10 @@ jobs:
           app_location: "/"
           api_location: "api"
           output_location: "build"
+
+      - name: Azure Functions Deploy
+        uses: Azure/functions-action@v1
+        with:
+          app-name: "PlaidBridgeOpenBankingApi"
+          package: "."
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
