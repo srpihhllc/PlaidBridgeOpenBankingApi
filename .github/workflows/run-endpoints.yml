@@ -1,45 +1,44 @@
 name: Run Endpoints
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  run-endpoints:
+  test-endpoints:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.12'
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
 
-    - name: Cache dependencies
-      uses: actions/cache@v2
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      - name: Start server
+        run: |
+          nohup python app.py &
+        env:
+          FLASK_ENV: development
 
-    - name: Start Flask application
-      run: |
-        nohup python app.py &
+      - name: Wait for server to start
+        run: sleep 10
 
-    - name: Wait for Flask application to start
-      run: |
-        for i in {1..10}; do
-          curl http://0.0.0.0:8000/health && break || sleep 5
-        done
+      - name: Test create_link_token endpoint
+        run: curl -X GET http://0.0.0.0:8000/create_link_token
 
-    - name: Run curl commands
-      run: |
-        curl -X POST http://0.0.0.0:8000/exchange_public_token -H "Content-Type: application/json" -d '{"public_token": "sample_token"}'
-        curl -X GET http://0.0.0.0:8000/create_link_token
-        curl -X POST http://0.0.0.0:8000/upload-pdf -F 'file=@sample.pdf'
+      - name: Test exchange_public_token endpoint
+        run: curl -X POST http://0.0.0.0:8000/exchange_public_token -H "Content-Type: application/json" -d '{"public_token": "sample_token"}'
+
+      - name: Test upload_pdf endpoint
+        run: curl -X POST http://0.0.0.0:8000/upload-pdf -F 'file=@sample.pdf'
