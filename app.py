@@ -390,7 +390,11 @@ def delete_todo(todo_id):
     return redirect(url_for('get_todos'))
 
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=port)
+    if os.getenv('FLASK_ENV') == 'production':
+        from waitress import serve
+        serve(app, host="0.0.0.0", port=port)
+    else:
+        socketio.run(app, host="0.0.0.0", port=port)
        
         
 
