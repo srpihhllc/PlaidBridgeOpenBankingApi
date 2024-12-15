@@ -1,12 +1,4 @@
 {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
-=======
-
->>>>>>> 203aa2270a5664baec5a1bae50720f2ff31c077f
   "name": "PlaidBridgeOpenbankingApi",
   "version": "1.0.0",
   "description": "Bank Account Verification and Management API",
@@ -29,15 +21,7 @@
     "express-rate-limit": "^6.3.0",
     "helmet": "^8.0.0",
     "cors": "^2.8.5",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "celebrate": "^17.0.0",
-=======
-    "celebrate": "^15.0.0",
->>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
-=======
-
->>>>>>> 203aa2270a5664baec5a1bae50720f2ff31c077f
     "joi": "^17.8.0",
     "jsonwebtoken": "^9.0.0",
     "winston": "^3.8.2",
@@ -50,15 +34,7 @@
     "eslint": "^7.32.0",
     "jest": "^29.7.0",
     "prettier": "^3.3.3",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "webpack": "^5.52.0",
-=======
-    "webpack": "^4.9.0",
->>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
-=======
-
->>>>>>> 203aa2270a5664baec5a1bae50720f2ff31c077f
     "rimraf": "^3.0.2"
   },
   "keywords": [
@@ -85,81 +61,6 @@
   },
   "homepage": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi#readme",
   "engines": {
-<<<<<<< HEAD
-<<<<<<< HEAD
     "node": ">=14.0.0"
   }
-=======
-    "name": "PlaidBridgeOpenbankingApi",
-    "version": "1.0.0",
-    "description": "Bank Account Verification and Management API",
-    "main": "index.js",
-    "scripts": {
-        "start": "node index.js",
-        "test": "jest",
-        "lint": "eslint .",
-        "build": "webpack",
-        "deno": "deno run app.ts",
-        "clean": "rimraf dist",
-        "format": "prettier --write ."
-    },
-    "dependencies": {
-        "axios": "^0.21.1",
-        "dotenv": "^16.4.5",
-        "csv-parser": "^3.0.0",
-        "csv-writer": "^1.6.0",
-        "express": "^4.18.2",
-        "express-rate-limit": "^6.3.0",
-        "helmet": "^8.0.0",
-        "cors": "^2.8.5",
-        "celebrate": "^15.0.0",
-        "joi": "^17.8.0",
-        "jsonwebtoken": "^9.0.0",
-        "winston": "^3.8.2",
-        "morgan": "^1.10.0",
-        "redis": "^4.6.6",
-        "util": "^0.12.4",
-        "nock": "^13.0.0"
-    },
-    "devDependencies": {
-        "eslint": "^7.32.0",
-        "jest": "^29.7.0",
-        "prettier": "^3.3.3",
-        "webpack": "^5.52.0",
-        "rimraf": "^3.0.2"
-    },
-    "keywords": [
-        "banking",
-        "verification",
-        "API",
-        "Plaid",
-        "TrueLayer",
-        "Basiq",
-        "Codat",
-        "financial services",
-        "nodejs",
-        "express",
-        "backend"
-    ],
-    "author": "SRPIHHLLC <srpollardsihhllc@gmail.com>",
-    "license": "Proprietary License",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi.git"
-    },
-    "bugs": {
-        "url": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi/issues"
-    },
-    "homepage": "https://github.com/srpihhllc/PlaidBridgeOpenBankingApi#readme",
-    "engines": {
-        "node": ">=14.0.0"
-    }
->>>>>>> 3dc0474b4b3644673335d0cdccede1ecb502cfa5
-=======
-    "node": "16.x"
-  }
->>>>>>> a2996ca52938c9c9a7d0d5436a7b0c13d9b517da
 }
-=======
-
->>>>>>> 203aa2270a5664baec5a1bae50720f2ff31c077f
