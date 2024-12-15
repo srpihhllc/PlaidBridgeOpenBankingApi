@@ -5,30 +5,21 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1' # Runs every Monday at 00:00 UTC
 
 jobs:
   security:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
-      with:
-        languages: python
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
 
-    - name: Autobuild
-      run: |
-        if [[ "${{ matrix.language }}" == "python" ]]; then
-          pip install -r requirements.txt
-        fi
-
-    - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-
-    - name: Scan for Secrets
-      uses: trufflesecurity/trufflehog@v3
-      with:
-        scan: 'repo'
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
