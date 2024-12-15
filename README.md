@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, render_template
 from flask_socketio import SocketIO, emit
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
