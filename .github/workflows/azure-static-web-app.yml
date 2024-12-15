@@ -3,11 +3,11 @@ name: Azure Static Web App CI/CD
 on:
   push:
     branches:
-      - main
+      - PlaidBridgeOpenBankingApi
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches:
-      - main
+      - PlaidBridgeOpenBankingApi
 
 jobs:
   build_and_deploy_job:
@@ -21,15 +21,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'  # Use Python 3.9 or another supported version
+          python-version: '3.9'
 
       - name: Cache pip
         uses: actions/cache@v3
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          restore-keys: ${{ runner.os }}-pip-
 
       - name: Install dependencies
         run: |
@@ -37,9 +36,14 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build the app
-        run: |
-          # Add your build commands here if needed
-          echo "Build step"
+        run: echo "Build step"
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
