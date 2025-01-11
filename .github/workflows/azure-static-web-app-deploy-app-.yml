@@ -18,18 +18,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          node-version: '16'
+          python-version: '3.12'
 
       - name: Install dependencies
         run: |
-          npm install
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Build the app
         run: |
-          npm run build
+          python -m compileall .
 
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
