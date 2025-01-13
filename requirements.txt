@@ -1,5 +1,5 @@
 Flask==2.2.5
-requests==2.32.0
+requests==2.31.0
 plaid-python==8.1.0
 gunicorn==22.0.0
 pdfplumber==0.5.28
