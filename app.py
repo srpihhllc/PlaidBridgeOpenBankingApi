@@ -19,7 +19,6 @@ import requests
 # Load environment variables from .env file
 load_dotenv()
 
-# Flask application setup
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
 socketio = SocketIO(app)
@@ -83,7 +82,6 @@ class User(UserMixin):
 def load_user(user_id):
     return User(user_id)
 
-# Routes for user authentication
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -99,7 +97,6 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
-# Main application routes
 @app.route('/')
 @login_required
 def home():
@@ -120,7 +117,6 @@ def account_info():
     ]
     return render_template('account_info.html', account_balance=account_balance, statements=statements)
 
-# Plaid API routes
 @app.route('/create_link_token', methods=['GET'])
 @login_required
 def create_link_token():
@@ -133,7 +129,7 @@ def create_link_token():
             'products': ['auth'],
             'country_codes': ['US'],
             'language': 'en',
-            'redirect_uri': 'https://yourapp.com/oauth-return',  # Replace with your actual redirect URL
+            'redirect_uri': 'https://yourapp.com/oauth-return',
         })
         return jsonify({'link_token': response['link_token']})
     except Exception as e:
@@ -152,20 +148,6 @@ def exchange_public_token():
         logger.error(f"Error exchanging Plaid public token: {e}")
         return jsonify({'message': 'Error exchanging public token'}), 500
 
-@app.route('/oauth-return', methods=['GET'])
-def oauth_return():
-    public_token = request.args.get('public_token')
-    if public_token:
-        try:
-            response = plaid_client.Item.public_token.exchange(public_token)
-            access_token = response['access_token']
-            return jsonify({'access_token': access_token})
-        except Exception as e:
-            logger.error(f"Error exchanging Plaid public token: {e}")
-            return jsonify({'message': 'Error exchanging public token'}), 500
-    return jsonify({'message': 'No public token provided'}), 400
-
-# File upload and processing routes
 @app.route('/upload-pdf', methods=['POST'])
 @login_required
 def upload_pdf():
@@ -196,7 +178,7 @@ def upload_pdf():
             return jsonify({'message': 'PDF syntax error'}), 500
         except Exception as e:
             logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}')}), 500
+            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
     logger.error("Invalid file format")
     return jsonify({'message': 'Invalid file format'}), 400
 
@@ -237,7 +219,6 @@ def generate_pdf(csv_filename):
 def health_check():
     return jsonify({"status": "healthy"}), 200
 
-# Utility functions
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
@@ -334,6 +315,32 @@ def update_account_balance(statements):
             account_balance -= amount
     logger.info(f"Account balance updated: {account_balance}")
 
+# Plaid API integration
+def create_plaid_link_token():
+    try:
+        response = plaid_client.LinkToken.create({
+            'user': {
+                'client_user_id': 'unique_user_id'
+            },
+            'client_name': 'PlaidBridgeOpenBankingAPI',
+            'products': ['auth'],
+            'country_codes': ['US'],
+            'language': 'en',
+            'redirect_uri': 'https://yourapp.com/oauth-return',
+        })
+        return response['link_token']
+    except Exception as e:
+        logger.error(f"Error creating Plaid link token: {e}")
+        raise
+
+def exchange_plaid_public_token(public_token):
+    try:
+        response = plaid_client.Item.public_token.exchange(public_token)
+        return response['access_token']
+    except Exception as e:
+        logger.error(f"Error exchanging Plaid public token: {e}")
+        raise
+
 # Treasury Prime API integration
 def verify_treasury_prime_account(account_id):
     headers = {
@@ -349,6 +356,7 @@ def verify_treasury_prime_account(account_id):
         raise
 
 # Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
+
 @app.route('/your_route', methods=['GET', 'POST'])
 def your_function():
     # Your function implementation here
@@ -381,7 +389,6 @@ def delete_todo(todo_id):
     todos_collection.delete_one({'_id': todo_id})
     return redirect(url_for('get_todos'))
 
-# Main entry point
 if __name__ == "__main__":
     if os.getenv('FLASK_ENV') == 'production':
         from waitress import serve
