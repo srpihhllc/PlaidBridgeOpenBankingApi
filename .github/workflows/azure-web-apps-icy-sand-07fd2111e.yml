@@ -28,43 +28,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Set environment variables
+      - name: Run tests
         run: |
-          echo "PLAID_CLIENT_ID=${{ secrets.PLAID_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "PLAID_SECRET=${{ secrets.PLAID_SECRET }}" >> $GITHUB_ENV
-          echo "PLAID_ENV=${{ secrets.PLAID_ENV }}" >> $GITHUB_ENV
-          echo "TREASURY_PRIME_SANDBOX_API_KEY=${{ secrets.TREASURY_PRIME_SANDBOX_API_KEY }}" >> $GITHUB_ENV
-          echo "TREASURY_PRIME_PRODUCTION_API_KEY=${{ secrets.TREASURY_PRIME_PRODUCTION_API_KEY }}" >> $GITHUB_ENV
-          echo "TREASURY_PRIME_SANDBOX_API_URL=${{ secrets.TREASURY_PRIME_SANDBOX_API_URL }}" >> $GITHUB_ENV
-          echo "TREASURY_PRIME_PRODUCTION_API_URL=${{ secrets.TREASURY_PRIME_PRODUCTION_API_URL }}" >> $GITHUB_ENV
-          echo "TREASURY_PRIME_ENV=${{ secrets.TREASURY_PRIME_ENV }}" >> $GITHUB_ENV
-          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
-          echo "ACCOUNT_NUMBER=${{ secrets.ACCOUNT_NUMBER }}" >> $GITHUB_ENV
-          echo "PLAID_PUBLIC_KEY=${{ secrets.PLAID_PUBLIC_KEY }}" >> $GITHUB_ENV
-          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
-          echo "CLIENT_USER_ID=${{ secrets.CLIENT_USER_ID }}" >> $GITHUB_ENV
-          echo "USER_EMAIL=${{ secrets.USER_EMAIL }}" >> $GITHUB_ENV
-          echo "USER_PASSWORD=${{ secrets.USER_PASSWORD }}" >> $GITHUB_ENV
-          echo "PORT=${{ secrets.PORT }}" >> $GITHUB_ENV
-          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
-          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $GITHUB_ENV
-          echo "MOCK_USERNAME=${{ secrets.MOCK_USERNAME }}" >> $GITHUB_ENV
-          echo "MOCK_PASSWORD=${{ secrets.MOCK_PASSWORD }}" >> $GITHUB_ENV
-          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
-          echo "REDIS_URL=${{ secrets.REDIS_URL }}" >> $GITHUB_ENV
-          echo "COSMOS_DB_CONNECTION_STRING=${{ secrets.COSMOS_DB_CONNECTION_STRING }}" >> $GITHUB_ENV
-          echo "FLASK_ENV=${{ secrets.FLASK_ENV }}" >> $GITHUB_ENV
+          python -m unittest discover -s . -p "test_*.py"
 
-      - name: Build the app
-        run: |
-          python -m compileall .
-
-      - name: Deploy to Azure Web Apps
-        uses: Azure/web-apps-deploy@v1
+      - name: Login to Azure
+        uses: azure/login@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "/"
-          api_location: "api"
-          output_location: "build"
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        uses: Azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          slot-name: 'production'
+          package: $(System.DefaultWorkingDirectory)/release.zip
