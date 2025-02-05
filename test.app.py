@@ -1,7 +1,12 @@
 import unittest
 import os
 import json
-from app import app, parse_pdf, correct_discrepancies, save_statements_as_csv, generate_pdf_from_csv, update_account_balance
+from app import app, parse_pdf, correct_discrepancies, save_statements_as_csv, generate_pdf_from_csv, update_account_balance, account_balance
+from flask_login import UserMixin, login_user
+
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
 
 class FlaskAppTests(unittest.TestCase):
 
@@ -9,10 +14,30 @@ class FlaskAppTests(unittest.TestCase):
         self.app = app.test_client()
         self.app.testing = True
 
+    def login(self):
+        with self.app:
+            user = User(id='testuser')
+            login_user(user)
+
     def test_index(self):
+        self.login()
         response = self.app.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'account_balance', response.data)
+
+    def test_login(self):
+        response = self.app.post('/login', data=dict(user_id='testuser'))
+        self.assertEqual(response.status_code, 302)  # Redirect to home
+
+    def test_logout(self):
+        self.login()
+        response = self.app.get('/logout')
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+
+    def test_health_check(self):
+        response = self.app.get('/health')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'healthy', response.data)
 
     def test_upload_pdf_no_file(self):
         response = self.app.post('/upload-pdf', data={})
@@ -59,7 +84,7 @@ class FlaskAppTests(unittest.TestCase):
         os.remove('test_statements.pdf')
 
     def test_update_account_balance(self):
-        initial_balance = 848583.68
+        initial_balance = account_balance
         statements = [
             {'date': '2023-01-01', 'description': 'Test', 'amount': '100.00', 'transaction_type': 'deposit'},
             {'date': '2023-01-02', 'description': 'Test', 'amount': '-50.00', 'transaction_type': 'withdrawal'}
