@@ -57,7 +57,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python -m unittest discover -s . -p "test*.py"
+          python -m unittest discover -s . -p "test_*.py"
 
       - name: Login to Azure
         uses: azure/login@v1
