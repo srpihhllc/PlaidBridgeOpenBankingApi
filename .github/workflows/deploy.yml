@@ -11,10 +11,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: '3.12'
 
@@ -33,4 +33,4 @@ jobs:
         app-name: 'PlaidBridgeOpenBankingApi'  # Replace with your Azure Web App name
         slot-name: 'production'
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: $(System.DefaultWorkingDirectory)/release.zip
+        package: release.zip
