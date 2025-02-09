@@ -1,30 +1,27 @@
-name: Security Check
+name: CodeQL
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1' # Runs every Monday at 00:00 UTC
 
 jobs:
-  security:
-    runs-on: ubuntu-latest
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Python environment
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.13' # Specify the Python version
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
 
-    - name: Install dependencies
-      run: |
-        pip install poetry
-        poetry install
-
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@v2
-      with:
-        languages: python
-
-    - name: Perform CodeQL analysis
-      uses: github/codeql-action/analyze@v2
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
 
