@@ -55,16 +55,18 @@ jobs:
           echo "COSMOS_DB_CONNECTION_STRING=${{ secrets.COSMOS_DB_CONNECTION_STRING }}" >> $GITHUB_ENV
           echo "FLASK_ENV=${{ secrets.FLASK_ENV }}" >> $GITHUB_ENV
 
-      - name: Build the app
+      - name: Run tests
         run: |
-          python -m compileall .
+          python -m unittest discover -s . -p "test_*.py"
 
-      - name: Deploy to Azure Web Apps
-        uses: Azure/web-apps-deploy@v1
+      - name: Login to Azure
+        uses: azure/login@v1
         with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: "/"
-          api_location: "api"
-          output_location: "build"
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        uses: Azure/webapps-deploy@v2
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          slot-name: 'production'
+          package: $(System.DefaultWorkingDirectory)/release.zip
