@@ -1,0 +1,73 @@
+name: Build and deploy Python app to Azure Web App - PlaidBridgeOpenBankingApi
+
+on:
+  push:
+    branches:
+      - PlaidBridgeOpenBankingApi
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - PlaidBridgeOpenBankingApi
+
+jobs:
+  build_and_deploy_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-22.04
+    name: Build and Deploy Job
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set environment variables
+        run: |
+          echo "PLAID_CLIENT_ID=${{ secrets.PLAID_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "PLAID_SECRET=${{ secrets.PLAID_SECRET }}" >> $GITHUB_ENV
+          echo "PLAID_ENV=${{ secrets.PLAID_ENV }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_SANDBOX_API_KEY=${{ secrets.TREASURY_PRIME_SANDBOX_API_KEY }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_PRODUCTION_API_KEY=${{ secrets.TREASURY_PRIME_PRODUCTION_API_KEY }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_SANDBOX_API_URL=${{ secrets.TREASURY_PRIME_SANDBOX_API_URL }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_PRODUCTION_API_URL=${{ secrets.TREASURY_PRIME_PRODUCTION_API_URL }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_ENV=${{ secrets.TREASURY_PRIME_ENV }}" >> $GITHUB_ENV
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
+          echo "ACCOUNT_NUMBER=${{ secrets.ACCOUNT_NUMBER }}" >> $GITHUB_ENV
+          echo "PLAID_PUBLIC_KEY=${{ secrets.PLAID_PUBLIC_KEY }}" >> $GITHUB_ENV
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+          echo "CLIENT_USER_ID=${{ secrets.CLIENT_USER_ID }}" >> $GITHUB_ENV
+          echo "USER_EMAIL=${{ secrets.USER_EMAIL }}" >> $GITHUB_ENV
+          echo "USER_PASSWORD=${{ secrets.USER_PASSWORD }}" >> $GITHUB_ENV
+          echo "PORT=${{ secrets.PORT }}" >> $GITHUB_ENV
+          echo "DB_HOST=${{ secrets.DB_HOST }}" >> $GITHUB_ENV
+          echo "DB_PORT=${{ secrets.DB_PORT }}" >> $GITHUB_ENV
+          echo "MOCK_USERNAME=${{ secrets.MOCK_USERNAME }}" >> $GITHUB_ENV
+          echo "MOCK_PASSWORD=${{ secrets.MOCK_PASSWORD }}" >> $GITHUB_ENV
+          echo "DB_NAME=${{ secrets.DB_NAME }}" >> $GITHUB_ENV
+          echo "REDIS_URL=${{ secrets.REDIS_URL }}" >> $GITHUB_ENV
+          echo "COSMOS_DB_CONNECTION_STRING=${{ secrets.COSMOS_DB_CONNECTION_STRING }}" >> $GITHUB_ENV
+          echo "FLASK_ENV=${{ secrets.FLASK_ENV }}" >> $GITHUB_ENV
+
+      - name: Build the app
+        run: |
+          python -m compileall .
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "PlaidBridgeOpenBankingApi"
+          slot-name: "production"
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+

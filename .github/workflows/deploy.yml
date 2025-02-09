@@ -1,4 +1,4 @@
-name: Deploy to Heroku
+name: Deploy
 
 on:
   push:
@@ -6,24 +6,31 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
+    - name: Set up Python
+      uses: actions/setup-python@v4
       with:
-        node-version: '14'
+        python-version: '3.12'
 
     - name: Install dependencies
-      run: npm install
-
-    - name: Deploy to Heroku
-      env:
-        HEROKU_API_KEY: ${{ HRKU-2c21ac95-a8af-4eb1-8d8d-18f2a32b5c9d }}
       run: |
-        git remote add heroku https://git.heroku.com/plaidbridgeopenbankingapi.git
-        git push heroku main
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Package application
+      run: |
+        zip -r release.zip .
+
+    - name: Deploy to Azure
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'PlaidBridgeOpenBankingApi'  # Replace with your Azure Web App name
+        slot-name: 'production'
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: release.zip

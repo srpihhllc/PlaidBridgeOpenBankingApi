@@ -1,11 +1,11 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
+  - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "daily"
+      interval: "weekly"
     commit-message:
       prefix: "deps"
     ignore:
-      - dependency-name: "axios"
-        versions: ["< 1.6.0"]
+      - dependency-name: "some-dependency"
+        versions: ["1.0.0"]
