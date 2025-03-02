@@ -1,36 +1,45 @@
-name: Deploy
+name: Deploy to Azure
 
-on:
-  push:
-    branches:
-      - main
+on: [push]
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Setup Python
+      uses: actions/setup-python@v2
       with:
-        python-version: '3.12'
+        python-version: '3.12'  # Replace '3.x' with the specific version required by your repo, if any
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        python -m venv venv
+        . venv/bin/activate
         pip install -r requirements.txt
 
-    - name: Package application
-      run: |
-        zip -r release.zip .
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Deploy to Azure
+    - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'PlaidBridgeOpenBankingApi'  # Replace with your Azure Web App name
-        slot-name: 'production'
-        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-        package: release.zip
+        app-name: "PlaidBridgeOpenBankingApi"
+        slot-name: "production"
+        package: .
+        publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+
+    - name: Start Application
+      run: |
+        python app.py
+      env:
+        FLASK_ENV: production
+        PORT: 3000
