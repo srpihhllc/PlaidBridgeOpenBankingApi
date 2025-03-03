@@ -1,8 +1,6 @@
-# PlaidBridgeOpenBankingApi/example_module.py
-
 class ExampleClass:
     def __init__(self):
-        self.name = "Example"
+        pass
 
-    def greet(self):
-        return f"Hello, {self.name}!"
+    def example_method(self):
+        return "Hello, World!"
