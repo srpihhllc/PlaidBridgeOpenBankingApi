@@ -6,6 +6,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
@@ -13,7 +17,7 @@ jobs:
     - name: Setup Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.12'  # Replace '3.x' with the specific version required by your repo, if any
+        python-version: '3.12'
 
     - name: Install dependencies
       run: |
@@ -43,3 +47,4 @@ jobs:
       env:
         FLASK_ENV: production
         PORT: 3000
+
