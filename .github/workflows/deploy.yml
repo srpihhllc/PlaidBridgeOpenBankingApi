@@ -1,61 +1,58 @@
 name: Deploy to Azure
 
-on: [push]
+on:
+  push
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-
     permissions:
       id-token: write
       contents: read
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Setup Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.12'
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
 
-    - name: Install dependencies
-      run: |
-        python -m venv venv
-        . venv/bin/activate
-        pip install -r requirements.txt
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          . venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-    - name: Azure Login
-      uses: azure/login@v1
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Zip artifact for deployment
-      run: zip -r release.zip ./*
+      - name: Zip artifact for deployment
+        run: zip -r release.zip ./*
 
-    - name: Upload artifact for deployment jobs
-      uses: actions/upload-artifact@v4
-      with:
-        name: deployment-artifact
-        path: release.zip
+      - name: Upload artifact for deployment
+        uses: actions/upload-artifact@v4  # Updated to v4
+        with:
+          name: deployment-artifact
+          path: release.zip
 
-    - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
-      with:
-        app-name: "PlaidBridgeOpenBankingApi"
-        slot-name: "production"
-        package: release.zip
-        publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: "PlaidBridgeOpenBankingApi"
+          slot-name: "production"
+          package: release.zip
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
 
-    - name: Start Application
-      run: |
-        python app.py
-      env:
-        FLASK_ENV: production
-        PORT: 3000
+      - name: Start Application
+        run: |
+          python app.py
+        env:
+          FLASK_ENV: production
+          PORT: 3000
 
 
 
