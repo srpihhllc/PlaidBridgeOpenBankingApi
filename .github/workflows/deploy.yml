@@ -33,12 +33,21 @@ jobs:
         client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Zip artifact for deployment
+      run: zip -r release.zip ./*
+
+    - name: Upload artifact for deployment jobs
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-artifact
+        path: release.zip
+
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
         app-name: "PlaidBridgeOpenBankingApi"
         slot-name: "production"
-        package: .
+        package: release.zip
         publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
 
     - name: Start Application
@@ -47,5 +56,6 @@ jobs:
       env:
         FLASK_ENV: production
         PORT: 3000
+
 
 
