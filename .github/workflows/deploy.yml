@@ -1,58 +1,41 @@
-name: Deploy to Azure
+name: Build and Deploy Container to Azure
 
 on:
-  push
+  push:
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
     steps:
+      # Step 1: Checkout Code
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m venv venv
-          . venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Azure Login
+      # Step 2: Log in to Azure
+      - name: Log in to Azure
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Zip artifact for deployment
-        run: zip -r release.zip ./*
+      # Step 3: Build Docker Image with GitHub
+      - name: Build Docker Image
+        run: docker build . -t newlevelplayingfield.azurecr.io/plaidbridgeopenbankingapi:latest
 
-      - name: Upload artifact for deployment
-        uses: actions/upload-artifact@v4  # Updated to v4
-        with:
-          name: deployment-artifact
-          path: release.zip
-
-      - name: Deploy to Azure Web App
-        uses: azure/webapps-deploy@v2
-        with:
-          app-name: "PlaidBridgeOpenBankingApi"
-          slot-name: "production"
-          package: release.zip
-          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
-
-      - name: Start Application
+      # Step 4: Push Docker Image to Azure Container Registry (ACR)
+      - name: Push Docker Image
         run: |
-          python app.py
-        env:
-          FLASK_ENV: production
-          PORT: 3000
+          docker login newlevelplayingfield.azurecr.io -u ${{ secrets.ACR_USERNAME }} --password-stdin
+          docker push newlevelplayingfield.azurecr.io/plaidbridgeopenbankingapi:latest
+
+      # Optional Step 5: Deploy to Azure Kubernetes Service (AKS)
+      - name: Deploy to Azure Kubernetes Service
+        uses: azure/k8s-deploy@v3
+        with:
+          manifests: ./k8s/deployment.yaml
+          images: newlevelplayingfield.azurecr.io/plaidbridgeopenbankingapi:latest
+
 
 
 
