@@ -1,0 +1,48 @@
+name: Trigger auto deployment for flask-app
+
+# When this action will be executed
+on:
+  # Automatically trigger it when detected changes in repo
+  push:
+    branches: 
+      [ PlaidBridgeOpenBankingApi ]
+    paths:
+    - '**'
+    - '.github/workflows/flask-app-AutoDeployTrigger-69a53014-962a-4e10-af55-2360fc24b3bb.yml'
+
+  # Allow manual trigger 
+  workflow_dispatch:      
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions: 
+      id-token: write #This is required for requesting the OIDC JWT Token
+      contents: read #Required when GH token is used to authenticate with private repo
+
+    steps:
+      - name: Checkout to the branch
+        uses: actions/checkout@v2
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.FLASKAPP_AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.FLASKAPP_AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.FLASKAPP_AZURE_SUBSCRIPTION_ID }}
+
+      - name: Build and push container image to registry
+        uses: azure/container-apps-deploy-action@v2
+        with:
+          appSourcePath: ${{ github.workspace }}Dockerfile/PlaidBridgeAPI_Dockerfile
+          _dockerfilePathKey_: _dockerfilePath_
+          registryUrl: plaidbridgeregistry.azurecr.io
+          registryUsername: ${{ secrets.FLASKAPP_REGISTRY_USERNAME }}
+          registryPassword: ${{ secrets.FLASKAPP_REGISTRY_PASSWORD }}
+          containerAppName: flask-app
+          resourceGroup: PlaidBridgeResouceGroup
+          imageToBuild: plaidbridgeregistry.azurecr.io/flask-app:${{ github.sha }}
+          _buildArgumentsKey_: |
+            _buildArgumentsValues_
+
+
