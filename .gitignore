@@ -1,13 +1,35 @@
+# Python-specific
 __pycache__/
 *.py[cod]
-.env
+*.egg-info
+instance/
+
+# Virtual environments
 .venv
 env/
 venv/
 ENV/
+
+# Flask
+/instance/
+/logs/ #  added explicitly
+
+# Uploads - VERY IMPORTANT: MATCH YOUR app.py UPLOAD_FOLDER
+statements/  # Changed from uploads/ to statements/
+
+# Docker
+.dockerenv
+.env
+docker-compose.override.yml
+docker-compose.yml
+/tmp/
+
+# OS-specific
 .DS_Store
+Thumbs.db
+
+# VS Code - (optional, but good practice)
 .vscode/
-uploads/
 
 
 
