@@ -2,7 +2,7 @@ Flask==2.2.5
 requests>=2.32.0
 plaid-python==29.1.0  # Updated to the latest version
 gunicorn>=23.0.0
-pdfplumber==0.5.28
+pdfplumber==0.11.6
 waitress>=3.0.1
 fpdf==1.7.2
 Flask-SocketIO==5.1.1
