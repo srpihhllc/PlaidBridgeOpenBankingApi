@@ -1,6 +1,6 @@
-
 version: 2
 updates:
+  # Keep Python dependencies up to date
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -16,18 +16,19 @@ updates:
     ignore:
       - dependency-name: "A"
         versions: ["2.0.0"]
-  - package-ecosystem: "pip"
+      - dependency-name: "B"
+        versions: ["1.0.1"]
+
+  # Keep npm dependencies up to date with customized configuration
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
     labels:
-      - "dependencies"
-      - "security"
-    commit-message:
-      prefix: "chore(deps)"
-      include: true
-    rebase-strategy: "auto"
-    ignore:
-      - dependency-name: "B"
-        versions: ["1.0.1"]
+      - "npm dependencies"
+      - "triage-board"
+    reviewers:
+      - "my-org/team-name"
+      - "octocat"
+    assignees:
+      - "user-name"
