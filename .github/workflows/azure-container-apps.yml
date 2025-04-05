@@ -17,11 +17,11 @@ jobs:
     steps:
       # Step 1: Checkout code
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       # Step 2: Set up Python
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.12'
 
@@ -61,7 +61,7 @@ jobs:
 
       # Step 5: Azure Login
       - name: Azure Login
-        uses: azure/login@v1
+        uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
@@ -84,4 +84,5 @@ jobs:
         run: |
           az containerapp update --name plaidbridgeopenbankingapi \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
-            --image ${{ secrets.ACR_LOGIN_SERVER }}/plaidbridgeopenbankingapi:${{ github.sha }}
+            --image ${{ secrets.ACR_LOGIN_SERVER }}/plaidbridgeopenbankingapi:${{ github.sha }} \
+            --target-port 5000
