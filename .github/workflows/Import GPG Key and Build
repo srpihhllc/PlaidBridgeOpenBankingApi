@@ -1,0 +1,14 @@
+name: Import GPG Key and Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Import GPG Key
+        run: |
+          echo "${{ secrets.GPG_KEY_SECRET }}" | gpg --import
