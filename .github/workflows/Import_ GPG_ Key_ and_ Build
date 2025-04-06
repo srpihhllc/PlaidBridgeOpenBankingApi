@@ -1,0 +1,35 @@
+name: Import GPG Key and Build
+
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Import GPG Key
+        run: |
+          echo "${{ secrets.GPG_KEY_SECRET }}" | gpg --import
+
+      - name: Set up MongoDB connection
+        run: |
+          echo "MongoDB connection string: ${{ secrets.MONGODB_CONNECTION_STRING }}"
+          # Replace the line above with the actual command to use the connection string in your build process
+
+      # Add additional steps for your build process here
+      # For example, if you're using Python, you might include:
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest
