@@ -1,116 +1,281 @@
-require('dotenv').config(); const axios = require('axios'); const fs = require('fs'); const csv = require('csv-parser'); const csvWriter = require('csv-writer').createObjectCsvWriter; const express = require('express'); const rateLimit = require('express-rate-limit'); const helmet = require('helmet'); const cors = require('cors'); const { celebrate, Joi, errors } = require('celebrate'); const jwt = require('jsonwebtoken'); const winston = require('winston'); const morgan = require('morgan'); const redis = require('redis'); const { promisify } = require('util'); const nock = require('nock'); // Added nock for mocking API endpoints
+import os
+import csv
+import pdfplumber
+import logging
+import requests
+from flask import Flask, render_template, request, jsonify, send_from_directory
+from werkzeug.utils import secure_filename
+from fpdf import FPDF
+from plaid import Client
+from dotenv import load_dotenv
 
-// Set up API credentials as environment variables const apiKey = process.env.API_KEY; const apiSecret = process.env.API_SECRET; const accountNumber = process.env.ACCOUNT_NUMBER; const plaidClientId = process.env.PLAID_CLIENT_ID; const plaidSecret = process.env.PLAID_SECRET; const plaidPublicKey = process.env.PLAID_PUBLIC_KEY; const jwtSecret = process.env.JWT_SECRET;
+# Load environment variables from .env file
+load_dotenv()
 
-// Initialize Express app const app = express(); app.use(express.json()); app.use(helmet()); app.use(cors()); app.use(morgan('combined'));
+app = Flask(__name__)
 
-// Set up Redis client const redisClient = redis.createClient(); const getAsync = promisify(redisClient.get).bind(redisClient); const setAsync = promisify(redisClient.set).bind(redisClient);
+# Ensure the statements directory exists
+app.config['UPLOAD_FOLDER'] = 'statements'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
 
-// Rate limiting middleware const limiter = rateLimit({ windowMs: 15 * 60 * 1000, // 15 minutes max: 100, // limit each IP to 100 requests per windowMs message: 'Too many requests from this IP, please try again later.' }); app.use(limiter);
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
-// Logger setup const logger = winston.createLogger({ level: 'info', format: winston.format.json(), transports: [ new winston.transports.File({ filename: 'error.log', level: 'error' }), new winston.transports.File({ filename: 'combined.log' }), new winston.transports.Console() // Added Console transport for real-time logging ] });
+# Global variable for account balance
+account_balance = 848583.68
 
-// Function to read CSV file and retrieve statements function readStatementsFromCsv(filePath) { return new Promise((resolve, reject) => { const statements = []; fs.createReadStream(filePath) .pipe(csv()) .on('data', (row) => { statements.push({ date: row.date, description: row.description, amount: parseFloat(row.amount) }); }) .on('end', () => { resolve(statements); }) .on('error', (error) => { reject(error); }); }); }
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-// Function to calculate ending balance function calculateEndingBalance(statements) { return statements.reduce((total, transaction) => total + transaction.amount, 0); }
+logger.debug("Starting application")
 
-// Function to dynamically retrieve bank statements function retrieveStatements() { const startDate = new Date('2024-04-01'); const currentDate = new Date(); const mockStatements = []; let date = startDate;
+# Plaid API configuration
+PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
+PLAID_SECRET = os.getenv('PLAID_SECRET')
+PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')  # Use 'sandbox' for testing
 
-while (date <= currentDate) {
-    mockStatements.push({
-        date: date.toISOString().split('T')[0],
-        description: `Transaction ${mockStatements.length + 1}`,
-        amount: Math.floor(Math.random() * 500) + 100
-    });
-    date.setDate(date.getDate() + 15); // Add 15 days for each transaction
-}
+# Initialize Plaid client
+plaid_client = Client(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
 
-return mockStatements;
-}
+# Treasury Prime API configuration
+TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_API_KEY')
+TREASURY_PRIME_API_URL = 'https://api.treasuryprime.com'
 
-// Function to receive verification code from Piermont function receiveVerificationCode() { // Simulate receiving the verification code const verificationCode = 'received_verification_code'; return verificationCode; }
+@app.route('/')
+def index():
+    return render_template('index.html', account_balance=account_balance)
 
-// Function to generate access token using verification code async function generateAccessToken(verificationCode) { const url = 'https://api.sandbox.treasuryprime.com/verification'; const headers = { 'Authorization': Bearer ${apiKey}, 'Content-Type': 'application/json' }; const data = { verification_code: verificationCode, client_name: 'PlaidBridgeApi', client_user_id: 'srpollardsihhllc@gmail.com', account_number: accountNumber, products: ['verification'], country_codes: ['US'], language: 'en' }; try { console.log("Sending request to generate access token..."); const response = await axios.post(url, data, { headers }); console.log("Access token generated successfully."); return response.data.access_token; } catch (error) { console.error("Error generating access token:", error); throw error; } }
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
-// Function to save statements as CSV files function saveStatementsAsCsv(statements, filename) { const csvWriterInstance = csvWriter({ path: filename, header: Object.keys(statements[0]).map(key => ({ id: key, title: key })) }); csvWriterInstance.writeRecords(statements) .then(() => console.log(Statements saved as '${filename}'.)); }
+@app.route('/upload-pdf', methods=['POST'])
+def upload_pdf():
+    global account_balance
+    if 'file' not in request.files:
+        logger.error("No file part in the request")
+        return jsonify({'message': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        logger.error("No selected file")
+        return jsonify({'message': 'No selected file'}), 400
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        try:
+            statements = parse_pdf(file_path)
+            corrected_statements = correct_discrepancies(statements)
+            csv_filename = filename.replace('.pdf', '.csv')
+            csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+            save_statements_as_csv(corrected_statements, csv_file_path)
+            update_account_balance(corrected_statements)
+            logger.info(f"File processed successfully: {filename}")
+            return jsonify({'message': 'File processed successfully', 'csv_file': csv_filename}), 200
+        except pdfplumber.PDFSyntaxError as e:
+            logger.error(f"PDF syntax error: {e}")
+            return jsonify({'message': 'PDF syntax error'}), 500
+        except Exception as e:
+            logger.error(f"Error processing file: {e}")
+            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
+    logger.error("Invalid file format")
+    return jsonify({'message': 'Invalid file format'}), 400
 
-// Function to handle manual login, verification, and bank account linking async function manualLoginAndLinkBankAccount() { // Simulate manual login process console.log("Lender logs in manually.");
+@app.route('/statements/<filename>')
+def download_statement(filename):
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        logger.error(f"Error downloading file: {e}")
+        return jsonify({'message': 'Error downloading file'}), 500
 
-// Simulate verification process
-console.log("Lender is verified.");
+@app.route('/generate-pdf/<csv_filename>', methods=['GET'])
+def generate_pdf(csv_filename):
+    try:
+        csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+        pdf_filename = csv_filename.replace('.csv', '.pdf')
+        pdf_file_path = os.path.join(app.config['UPLOAD_FOLDER'], pdf_filename)
+        generate_pdf_from_csv(csv_file_path, pdf_file_path)
+        return send_from_directory(app.config['UPLOAD_FOLDER'], pdf_filename)
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        return jsonify({'message': 'Error generating PDF'}), 500
 
-// Provide voided check for account verification
-console.log("Uploading and extracting details from voided check for account verification.");
+def parse_pdf(file_path):
+    """
+    Parse the PDF file to extract statements.
+    """
+    statements = []
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    statements.extend(parse_page(text))
+        logger.info(f"Parsed {len(statements)} statements from PDF")
+        return statements
+    except Exception as e:
+        logger.error(f"Error parsing PDF: {e}")
+        raise
 
-// Simulate extracting details from voided check
-const extractedAccountNumber = '7030 3429 9651';  // Replace with extracted account number
-const extractedRoutingNumber = '026 015 053';  // Replace with extracted routing number
-console.log(`Extracted Account Number: ${extractedAccountNumber}`);
-console.log(`Extracted Routing Number: ${extractedRoutingNumber}`);
+def parse_page(text):
+    """
+    Parse a single page of text to extract statements.
+    """
+    statements = []
+    for line in text.split('\n'):
+        parts = line.split()
+        if len(parts) >= 3:
+            date = parts[0]
+            description = " ".join(parts[1:-1])
+            amount = parts[-1]
+            # Determine if the amount is a deposit or withdrawal
+            if amount.startswith('-'):
+                transaction_type = 'withdrawal'
+            else:
+                transaction_type = 'deposit'
+            statements.append({
+                'date': date,
+                'description': description,
+                'amount': amount,
+                'transaction_type': transaction_type
+            })
+    return statements
 
-// Receive verification code
-const verificationCode = receiveVerificationCode();
+def correct_discrepancies(statements):
+    """
+    Correct discrepancies in the statements.
+    """
+    corrected_statements = []
+    for statement in statements:
+        try:
+            amount = float(statement['amount'])
+            corrected_statements.append(statement)
+        except ValueError:
+            # Handle misprints or miscalculations
+            statement['amount'] = '0.00'  # Set to zero or some default value
+            corrected_statements.append(statement)
+    return corrected_statements
 
-// Generate access token
-const accessToken = await generateAccessToken(verificationCode);
+def save_statements_as_csv(statements, file_path):
+    """
+    Save the statements as a CSV file.
+    """
+    try:
+        keys = statements[0].keys()
+        with open(file_path, mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(statements)
+        logger.info(f"Statements saved as '{file_path}'")
+    except Exception as e:
+        logger.error(f"Error saving CSV file: {e}")
+        raise
 
-// Bank verification step
-console.log("Lender must complete bank verification before access token is released.");
-const bankVerified = true;  // Simulate bank verification process
+def generate_pdf_from_csv(csv_file_path, pdf_file_path):
+    """
+    Generate a PDF file from a CSV file.
+    """
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+        
+        with open(csv_file_path, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                line = f"{row['date']} {row['description']} {row['amount']} {row['transaction_type']}"
+                pdf.cell(200, 10, txt=line, ln=True)
+        
+        pdf.output(pdf_file_path)
+        logger.info(f"PDF generated as '{pdf_file_path}'")
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        raise
 
-if (bankVerified) {
-    // Share access token with the lender
-    console.log(`Share this access token with the lender: ${accessToken}`);
-    console.log("User email: srpollardsihhllc@gmail.com");
-    console.log("User password: 2Late2little$");
-    
-    // Retrieve and provide access to CSV files
-    const statements = await readStatementsFromCsv('path/to/your/statements.csv');
-    console.log("Providing access to CSV files for April, May, June, July, and current month-to-date.");
-    saveStatementsAsCsv(statements, 'statements.csv');
-    
-    // Calculate and log the ending balance
-    const endingBalance = calculateEndingBalance(statements);
-    console.log("Ending balance to the month to date:", endingBalance);
-    
-    // Navigation instructions for the lender
-    console.log("To access the statements, please follow these steps:");
-    console.log("1. Log in to the Found banking interface.");
-    console.log("2. Navigate to the 'Statements' section.");
-    console.log("3. Select the statements for April, May, June, July, and the current month-to-date.");
-    console.log("4. Download the statements in CSV format.");
-} else {
-    console.log("Bank verification failed. Access token will not be released.");
-}
-}
+def update_account_balance(statements):
+    """
+    Update the global account balance based on the statements.
+    """
+    global account_balance
+    for statement in statements:
+        amount = float(statement['amount'])
+        if statement['transaction_type'] == 'deposit':
+            account_balance += amount
+        elif statement['transaction_type'] == 'withdrawal':
+            account_balance -= amount
+    logger.info(f"Account balance updated: {account_balance}")
 
-// Function to verify micro deposits function verifyMicroDeposits(deposit1, deposit2) { // Implement your logic to verify the micro deposits return true; // For example purposes, assume verification is successful }
+# Plaid API integration
+def create_plaid_link_token():
+    try:
+        response = plaid_client.LinkToken.create({
+            'user': {
+                'client_user_id': 'unique_user_id'
+            },
+            'client_name': 'PlaidBridgeOpenBankingAPI',
+            'products': ['auth'],
+            'country_codes': ['US'],
+            'language': 'en',
+            'redirect_uri': 'https://yourapp.com/oauth-return',
+        })
+        return response['link_token']
+    except Exception as e:
+        logger.error(f"Error creating Plaid link token: {e}")
+        raise
 
-// Function to handle actual deposits function handleActualDeposit(amount) { // Implement your logic to process the actual deposit return { success: true }; // For example purposes, assume deposit is successful }
+def exchange_plaid_public_token(public_token):
+    try:
+        response = plaid_client.Item.public_token.exchange(public_token)
+        return response['access_token']
+    except Exception as e:
+        logger.error(f"Error exchanging Plaid public token: {e}")
+        raise
 
-// Middleware for JWT authentication function authenticateToken(req, res, next) { const authHeader = req.headers['authorization']; const token = authHeader && authHeader.split(' ')[1]; if (token == null) return res.sendStatus(401);
+# Treasury Prime API integration
+def verify_treasury_prime_account(account_id):
+    headers = {
+        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error verifying Treasury Prime account: {e}")
+        raise
 
-jwt.verify(token, jwtSecret, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-});
-}
+@app.route('/create-link-token', methods=['GET'])
+def create_link_token():
+    try:
+        link_token = create_plaid_link_token()
+        return jsonify({'link_token': link_token}), 200
+    except Exception as e:
+        return jsonify({'message': f'Error creating link token: {str(e)}'}), 500
 
-// API endpoint for handling micro deposits app.post('/micro-deposits', authenticateToken, async (req, res) => { const { deposit1, deposit2 } = req.body; if (!deposit1 || !deposit2) { return res.status(400).send('Micro deposits are required.'); } // Logic to verify micro deposits const isVerified = verifyMicroDeposits(deposit1, deposit2); if (isVerified) { return res.status(200).send('Account verified successfully.'); } else { return res.status(400).send('Micro deposits verification failed.'); } });
+@app.route('/exchange-public-token', methods=['POST'])
+def exchange_public_token():
+    public_token = request.json.get('public_token')
+    if not public_token:
+        return jsonify({'message': 'Public token is required'}), 400
+    try:
+        access_token = exchange_plaid_public_token(public_token)
+        return jsonify({'access_token': access_token}), 200
+    except Exception as e:
+        return jsonify({'message': f'Error exchanging public token: {str(e)}'}), 500
 
-// API endpoint for handling actual deposits app.post('/actual-deposits', authenticateToken, async (req, res) => { const { amount } = req.body; if (!amount || amount <= 0) { return res.status(400).send('Invalid deposit amount.'); } // Logic to handle the deposit const depositResult = handleActualDeposit(amount); if (depositResult.success) { return res.status(200).send('Deposit successful.'); } else { return res.status(500).send('Deposit failed.'); } });
+@app.route('/verify-account', methods=['POST'])
+def verify_account():
+    account_id = request.json.get('account_id')
+    if not account_id:
+        return jsonify({'message': 'Account ID is required'}), 400
+    try:
+        account_info = verify_treasury_prime_account(account_id)
+        return jsonify({'account_info': account_info}), 200
+    except Exception as e:
+        return jsonify({'message': f'Error verifying account: {str(e)}'}), 500
 
-// API endpoint for manual login and linking bank account app.post('/manual-login', authenticateToken, async (req, res) => { try { await manualLoginAndLinkBankAccount(); res.status(200).send('Manual login and bank account linking completed successfully.'); } catch (error) { logger.error('Error in manual login and bank account linking:', error); res.status(500).send('Internal Server Error'); } });
+if __name__ == '__main__':
+    app.run(port=3000)
 
-// Error handling middleware app.use(errors()); app.use((err, req, res, next) => { logger.error(err.stack); res.status(500).send('Something broke!'); });
-
-// Start the server const PORT = process.env.PORT || 3000; app.listen(PORT, () => { console.log(Server is running on port ${PORT}); });
-
-// Example usage manualLoginAndLinkBankAccount();
-
-// Mock the API endpoint nock('https://api.sandbox.treasuryprime.com') .post('/verification') .reply(200, { access_token: 'mock_access_token' });
-
-// Test the generateAccessToken function async function testGenerateAccessToken() { const verificationCode = 'mock_verification_code'; const accessToken = await generateAccessToken(verificationCode); console.log('Mock Access Token:', accessToken); }
-
-// Run the test testGenerateAccessToken();

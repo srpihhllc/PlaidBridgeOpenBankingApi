@@ -5,20 +5,21 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 1' # Runs every Monday at 00:00 UTC
 
 jobs:
   security:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Run Xanitizer
-      uses: xanitizer/runner@v1
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: python
 
-    - name: Scan for Secrets
-      uses: security/secrets@v1
-
-    - name: Vulnerability Scanner
-      uses: security/vuln-scan@v1
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
