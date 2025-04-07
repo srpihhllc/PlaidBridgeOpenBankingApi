@@ -1,19 +1,34 @@
-name: Azure Login
+- task: AzureCLI@2 # Or another task using azure/login as a dependency
+  inputs:
+    azureSubscription: 'your-azure-subscription'
+    scriptType: 'bash'
+    script: |
+      az account show
+  # ... other steps ...
 
-on: [push]
+- task: AzureLogin@1 # Older version
+  inputs:
+    azureSubscription: 'your-azure-subscription'
+    servicePrincipalId: '$(servicePrincipalId)'
+    servicePrincipalKey: '$(servicePrincipalKey)'
+    tenantId: '$(tenantId)'
 
-jobs:
-  login:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: read
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'your-azure-subscription'
+    scriptType: 'pscore'
+    script: |
+      Get-AzSubscription
+  # ... other steps ...
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
-    - name: Azure CLI Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+- task: AzureResourceManagerTemplateDeployment@3
+  inputs:
+    deploymentScope: 'Resource Group'
+    azureResourceManagerConnection: 'your-azure-rm-connection'
+    subscriptionId: '$(subscriptionId)'
+    resourceGroupName: '$(resourceGroupName)'
+    location: '$(location)'
+    templateLocation: 'Linked artifact'
+    csmFile: 'azuredeploy.json'
+    csmParametersFile: 'azuredeploy.parameters.json'
+    deploymentMode: 'Incremental'
