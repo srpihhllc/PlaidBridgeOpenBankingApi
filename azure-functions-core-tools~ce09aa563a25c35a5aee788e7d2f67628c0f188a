@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<publishData>
+  <publishProfile 
+    profileName="PlaidBridgeOpenBankingApi - Web Deploy" 
+    publishMethod="MSDeploy" 
+    publishUrl="aseuhqaphzhqa2a5.eastus-01.azurewebsites.net:443" 
+    msdeploySite="PlaidBridgeOpenBankingApi" 
+    userName="$PlaidBridgeOpenBankingApi" 
+    userPWD="your_password" 
+    destinationAppUrl="https://aseuhqaphzhqa2a5.eastus-01.azurewebsites.net" 
+    SQLServerDBConnectionString="" 
+    mySQLDBConnectionString="" 
+    hostingProviderForumLink="" 
+    controlPanelLink="" />
+</publishData>

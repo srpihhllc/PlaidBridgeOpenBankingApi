@@ -3,29 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
-    <title>Bank Account Verification Script</title>
+    <title>PlaidBridgeOpenBankingAPI</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
-    <h1>Bank Account Verification Script</h1>
-    <p>Handles verification, statement retrieval, and CSV file handling.</p>
+    <div class="container mt-5">
+        <h1>PlaidBridgeOpenBankingAPI</h1>
+        <p>Follow the instructions below to link your bank account:</p>
+        <ol>
+            <li>Click the button below to generate a link token.</li>
+            <li>Use the link token to connect your bank account via Plaid.</li>
+            <li>Once connected, you will receive a public token.</li>
+            <li>Submit the public token to exchange it for an access token.</li>
+            <li>Verify your account using the access token.</li>
+        </ol>
+        <button id="generate-link-token" class="btn btn-primary">Generate Link Token</button>
+        <div id="link-token-result" class="mt-3"></div>
+        <div id="plaid-link-container" class="mt-3"></div>
+        <div id="public-token-container" class="mt-3">
+            <input type="text" id="public-token" class="form-control" placeholder="Enter Public Token">
+            <button id="exchange-public-token" class="btn btn-success mt-2">Exchange Public Token</button>
+        </div>
+        <div id="access-token-result" class="mt-3"></div>
+        <div id="account-id-container" class="mt-3">
+            <input type="text" id="account-id" class="form-control" placeholder="Enter Account ID">
+            <button id="verify-account" class="btn btn-info mt-2">Verify Account</button>
+        </div>
+        <div id="account-info-result" class="mt-3"></div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('#generate-link-token').click(function() {
+                $.get('/create-link-token', function(data) {
+                    $('#link-token-result').text('Link Token: ' + data.link_token);
+                    var handler = Plaid.create({
+                        token: data.link_token,
+                        onSuccess: function(public_token, metadata) {
+                            $('#public-token').val(public_token);
+                        },
+                        onExit: function(err, metadata) {
+                            if (err != null) {
+                                alert('Error: ' + err.display_message);
+                            }
+                        }
+                    });
+                    handler.open();
+                });
+            });
 
-    <h2>Features</h2>
-    <ul>
-        <li>API Integration (<code>axios</code>)</li>
-        <li>CSV Handling</li>
-        <li>Statements Retrieval</li>
-        <li>Manual Login & Verification</li>
-    </ul>
+            $('#exchange-public-token').click(function() {
+                var public_token = $('#public-token').val();
+                $.ajax({
+                    url: '/exchange-public-token',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ public_token: public_token }),
+                    success: function(data) {
+                        $('#access-token-result').text('Access Token: ' + data.access_token);
+                    },
+                    error: function(xhr) {
+                        alert('Error: ' + xhr.responseJSON.message);
+                    }
+                });
+            });
 
-    <h2>Setup</h2>
-    <ol>
-        <li>Clone the repo.</li>
-        <li>Create a <code>.env</code> file.</li>
-        <li>Install dependencies: <code>npm install</code>.</li>
-    </ol>
-
-    <h2>Usage</h2>
-    <pre><code>node script.js</code></pre>
+            $('#verify-account').click(function() {
+                var account_id = $('#account-id').val();
+                $.ajax({
+                    url: '/verify-account',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ account_id: account_id }),
+                    success: function(data) {
+                        $('#account-info-result').text('Account Info: ' + JSON.stringify(data.account_info));
+                    },
+                    error: function(xhr) {
+                        alert('Error: ' + xhr.responseJSON.message);
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
+

@@ -1,243 +1,407 @@
-require('dotenv').config();
-const axios = require('axios');
-const fs = require('fs');
-const csv = require('csv-parser');
-const { createObjectCsvWriter } = require('csv-writer');
-const express = require('express');
-const rateLimit = require('express-rate-limit');
-const helmet = require('helmet');
-const cors = require('cors');
-const { celebrate, Joi, errors } = require('celebrate');
-const jwt = require('jsonwebtoken');
-const winston = require('winston');
-const morgan = require('morgan');
-const redis = require('redis');
-const { promisify } = require('util');
-const nock = require('nock');
+from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
+from flask_socketio import SocketIO, emit
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from dotenv import load_dotenv
+import os
+import csv
+import pdfplumber
+import logging
+from werkzeug.utils import secure_filename
+from fpdf import FPDF
+from plaid.api import plaid_api
+from plaid.model import *
+from plaid.configuration import Configuration
+from plaid.api_client import ApiClient
+from datetime import datetime, timedelta
+from pymongo import MongoClient
+import requests
 
-// Environment Variables
-const apiKey = process.env.API_KEY;
-const apiSecret = process.env.API_SECRET;
-const accountNumber = process.env.ACCOUNT_NUMBER;
-const plaidClientId = process.env.PLAID_CLIENT_ID;
-const plaidSecret = process.env.PLAID_SECRET;
-const plaidPublicKey = process.env.PLAID_PUBLIC_KEY;
-const jwtSecret = process.env.JWT_SECRET;
+# Load environment variables from .env file
+load_dotenv()
 
-// Express App Configuration
-const app = express();
-app.use(express.json());
-app.use(helmet());
-app.use(cors());
-app.use(morgan('combined'));
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
+socketio = SocketIO(app)
 
-// Redis Client Configuration
-const redisClient = redis.createClient();
-const getAsync = promisify(redisClient.get).bind(redisClient);
-const setAsync = promisify(redisClient.set).bind(redisClient);
+# Get the PORT from environment variables
+port = int(os.getenv("PORT", 3000))
 
-// Rate Limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 0,
-  max: 100,
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use(limiter);
+# Ensure the statements directory exists
+app.config['UPLOAD_FOLDER'] = 'statements'
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
 
-// Logger Setup
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.json(),
-  transports: [
-    new winston.transports.File({ filename: 'error.log', level: 'error' }),
-    new winston.transports.File({ filename: 'combined.log' }),
-    new winston.transports.Console()
-  ]
-});
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
-// Bank Verification and Linking Functions
-async function manualLoginAndLinkBankAccount() {
-  console.log("Lender logs in manually.");
-  console.log("Lender is verified.");
-  console.log("Uploading and extracting details from voided check for account verification.");
-  const extractedAccountNumber = '7030 3429 9651';
-  const extractedRoutingNumber = '026 015 053';
-  console.log(`Extracted Account Number: ${extractedAccountNumber}`);
-  console.log(`Extracted Routing Number: ${extractedRoutingNumber}`);
-  const verificationCode = receiveVerificationCode();
-  const accessToken = await generateAccessToken(verificationCode);
-  console.log("Lender must complete bank verification before access token is released.");
-  const bankVerified = true;
-  if (bankVerified) {
-    console.log(`Share this access token with the lender: ${accessToken}`);
-    console.log("User email: srpollardsihhllc@gmail.com");
-    console.log("User password: 2Late2little$");
-    const statements = await readStatementsFromCsv('path/to/your/statements.csv');
-    console.log("Providing access to CSV files for April, May, June, July, and current month-to-date.");
-    await saveStatementsAsCsv(statements, 'statements.csv');
-    const endingBalance = calculateEndingBalance(statements);
-    console.log("Ending balance to the month to date:", endingBalance);
-    console.log("To access the statements, please follow these steps:");
-    console.log("1. Log in to the Found banking interface.");
-    console.log("2. Navigate to the 'Statements' section.");
-    console.log("3. Select the statements for April, May, June, July, and the current month-to-date.");
-    console.log("4. Download the statements in CSV format.");
-  } else {
-    console.log("Bank verification failed. Access token will not be released.");
-  }
-}
+# Global variable for account balance
+account_balance = 848583.68
 
-async function linkBankAccountUsingPlatform(platform, publicToken) {
-  const urlMap = {
-    truelayer: 'https://api.truelayer.com/exchange',
-    basiq: 'https://api.basiq.io/exchange',
-    plaid: 'https://sandbox.plaid.com/item/public_token/exchange',
-    codat: 'https://api.codat.io/exchange'
-  };
-  const url = urlMap[platform.toLowerCase()];
-  if (!url) throw new Error('Unsupported platform');
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+logger.debug("Starting application")
 
-  const response = await axios.post(url, {
-    client_id: platform.toLowerCase() === 'plaid' ? process.env.PLAID_CLIENT_ID : process.env.PIERMONT_API_KEY,
-    secret: platform.toLowerCase() === 'plaid' ? process.env.PLAID_SECRET : process.env.PIERMONT_API_SECRET,
-    public_token: publicToken
-  });
-  const { access_token } = response.data;
-  return access_token;
-}
+# Plaid API configuration
+configuration = Configuration(
+    host="https://sandbox.plaid.com",
+    api_key={
+        'clientId': os.getenv('PLAID_CLIENT_ID'),
+        'secret': os.getenv('PLAID_SECRET')
+    }
+)
+api_client = ApiClient(configuration)
+plaid_client = plaid_api.PlaidApi(api_client)
 
-// CSV Handling Functions
-async function readStatementsFromCsv(filePath) {
-  return new Promise((resolve, reject) => {
-    const statements = [];
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on('data', (row) => {
-        statements.push({
-          date: row.date,
-          description: row.description,
-          amount: parseFloat(row.amount)
-        });
-      })
-      .on('end', () => {
-        resolve(statements);
-      })
-      .on('error', (error) => {
-        reject(error);
-      });
-  });
-}
+# Treasury Prime API configuration
+treasury_prime_env = os.getenv('TREASURY_PRIME_ENV', 'sandbox')
+if treasury_prime_env == 'production':
+    TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_PRODUCTION_API_KEY')
+    TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_PRODUCTION_API_URL')
+else:
+    TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_SANDBOX_API_KEY')
+    TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_SANDBOX_API_URL')
 
-async function saveStatementsAsCsv(statements, filePath) {
-  const csvWriter = createObjectCsvWriter({
-    path: filePath,
-    header: [
-      { id: 'date', title: 'Date' },
-      { id: 'description', title: 'Description' },
-      { id: 'amount', title: 'Amount' }
+if TREASURY_PRIME_API_URL is None:
+    raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
+
+# MongoDB configuration
+mongo_client = MongoClient(os.getenv('COSMOS_DB_CONNECTION_STRING'))
+db = mongo_client['plaidbridgeopenbankingapi-database']
+todos_collection = db['todos']
+
+# Flask-Login configuration
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User(user_id)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        user_id = request.form['user_id']
+        user = User(user_id)
+        login_user(user)
+        return redirect(url_for('home'))
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.route('/')
+@login_required
+def home():
+    return render_template('index.html')
+
+@app.route("/link-account")
+@login_required
+def link_account():
+    return render_template('link_account.html')
+
+@app.route("/account-info")
+@login_required
+def account_info():
+    # Mock data for account information
+    statements = [
+        {'date': '2024-01-01', 'description': 'Deposit', 'amount': '1577.56'},
+        {'date': '2023-01-02', 'description': 'Withdrawal', 'amount': '-550.38'}
     ]
-  });
-  await csvWriter.writeRecords(statements);
-}
+    return render_template('account_info.html', account_balance=account_balance, statements=statements)
 
-function calculateEndingBalance(statements) {
-  return statements.reduce((balance, statement) => balance + statement.amount, 0);
-}
+@app.route('/create_link_token', methods=['GET'])
+@login_required
+def create_link_token():
+    try:
+        response = plaid_client.LinkToken.create({
+            'user': {
+                'client_user_id': 'unique_user_id'
+            },
+            'client_name': 'PlaidBridgeOpenBankingAPI',
+            'products': ['auth'],
+            'country_codes': ['US'],
+            'language': 'en',
+            'redirect_uri': 'https://yourapp.com/oauth-return',
+        })
+        return jsonify({'link_token': response['link_token']})
+    except Exception as e:
+        logger.error(f"Error creating Plaid link token: {e}")
+        return jsonify({'message': 'Error creating link token'}), 500
 
-// Authentication Middleware
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  if (token == null) return res.sendStatus(401);
-  jwt.verify(token, jwtSecret, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-}
+@app.route('/exchange_public_token', methods=['POST'])
+@login_required
+def exchange_public_token():
+    data = request.json
+    try:
+        response = plaid_client.Item.public_token.exchange(data['public_token'])
+        access_token = response['access_token']
+        return jsonify({'access_token': access_token})
+    except Exception as e:
+        logger.error(f"Error exchanging Plaid public token: {e}")
+        return jsonify({'message': 'Error exchanging public token'}), 500
 
-// API Endpoints
-app.post('/manual-login', authenticateToken, async (req, res) => {
-  try {
-    const { platform, publicToken } = req.body;
-    const accessToken = await linkBankAccountUsingPlatform(platform, publicToken);
-    await manualLoginAndLinkBankAccount();
-    res.status(200).send({ message: 'Manual login and bank account linking completed successfully.', accessToken });
-  } catch (error) {
-    logger.error('Error in manual login and bank account linking:', error);
-    res.status(500).send('Internal Server Error');
-  }
-});
+@app.route('/upload-pdf', methods=['POST'])
+@login_required
+def upload_pdf():
+    global account_balance
+    if 'file' not in request.files:
+        logger.error("No file part in the request")
+        return jsonify({'message': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '': 
+        logger.error("No selected file")
+        return jsonify({'message': 'No selected file'}), 400
+    if file and allowed_file(file.filename):
+        filename = secure_filename(file.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(file_path)
+        try:
+            statements = parse_pdf(file_path)
+            corrected_statements = correct_discrepancies(statements)
+            csv_filename = filename.replace('.pdf', '.csv')
+            csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
+            save_statements_as_csv(corrected_statements, csv_file_path)
+            update_account_balance(corrected_statements)
+            logger.info(f"File processed successfully: {filename}")
+            socketio.emit('update', {'account_balance': account_balance, 'statements': corrected_statements})
+            return jsonify({'message': 'File processed successfully', 'csv_file': csv_filename}), 200
+        except pdfplumber.PDFSyntaxError as e:
+            logger.error(f"PDF syntax error: {e}")
+            return jsonify({'message': 'PDF syntax error'}), 500
+        except Exception as e:
+            logger.error(f"Error processing file: {e}")
+            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
+    logger.error("Invalid file format")
+    return jsonify({'message': 'Invalid file format'}), 400
 
-app.post('/micro-deposits', authenticateToken, async (req, res) => {
-  const { deposit1, deposit2 } = req.body;
-  if (!deposit1 || !deposit2) {
-    return res.status(400).send('Micro deposits are required.');
-  }
-  const isVerified = await verifyMicroDeposits(deposit1, deposit2);
-  if (isVerified) {
-    return res.status(200).send('Account verified successfully.');
-  } else {
-    return res.status(400).send('Micro deposits verification failed.');
-  }
-});
+@app.route('/statements/<filename>')
+@login_required
+def download_statement(filename):
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except Exception as e:
+        logger.error(f"Error downloading file: {e}")
+        return jsonify({'message': 'Error downloading file'}), 500
 
-app.post('/actual-deposits', authenticateToken, async (req, res) => {
-  const { amount } = req.body;
-  if (!amount || amount <= 0) {
-    return res.status(400).send('Invalid deposit amount.');
-  }
-  const depositResult = await handleActualDeposit(amount);
-  if (depositResult.success) {
-    return res.status(200).send('Deposit successful.');
-  } else {
-    return res.status(500).send('Deposit failed.');
-  }
-});
+@app.route('/generate-pdf/<csv_filename>', methods=['GET'])
+@login_required
+def generate_pdf(csv_filename):
+    try:
+        base_path = app.config['UPLOAD_FOLDER']
+        
+        # Normalize and validate csv_filename
+        csv_file_path = os.path.normpath(os.path.join(base_path, csv_filename))
+        if not csv_file_path.startswith(base_path):
+            raise Exception("Invalid file path for CSV file")
 
-app.post('/transfer-funds', authenticateToken, async (req, res) => {
-  const { accessToken, amount } = req.body;
-  if (!accessToken || !amount) {
-    return res.status(400).send('Access token and amount are required.');
-  }
-  const transferResult = await transferFundsToAccount(accessToken, amount);
-  return res.status(transferResult.success ? 200 : 500).send(transferResult.message);
-});
+        pdf_filename = csv_filename.replace('.csv', '.pdf')
+        
+        # Normalize and validate pdf_filename
+        pdf_file_path = os.path.normpath(os.path.join(base_path, pdf_filename))
+        if not pdf_file_path.startswith(base_path):
+            raise Exception("Invalid file path for PDF file")
 
-// Helper Functions
-async function verifyMicroDeposits(deposit1, deposit2) {
-  // Add your actual verification logic here
-  return deposit1 === expectedDeposit1 && deposit2 === expectedDeposit2;
-}
+        generate_pdf_from_csv(csv_file_path, pdf_file_path)
+        return send_from_directory(app.config['UPLOAD_FOLDER'], pdf_filename)
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        return jsonify({'message': 'Error generating PDF'}), 500
 
-async function handleActualDeposit(amount) {
-  // Add your actual handling logic here
-  return { success: true };
-}
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
-async function transferFundsToAccount(accessToken, amount) {
-  // Implement secure fund transfer logic
-  console.log(`Transferring ${amount} to the actual account using access token ${accessToken}`);
-  return { success: true, message: 'Funds transferred successfully' };
-}
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
 
-// Error Handling Middleware
-app.use(errors());
-app.use((err, req, res, next) => {
-  logger.error(err.stack);
-  res.status(500).send('Something broke!');
-});
+def parse_pdf(file_path):
+    """Parse the PDF file to extract statements."""
+    statements = []
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    statements.extend(parse_page(text))
+        logger.info(f"Parsed {len(statements)} statements from PDF")
+        return statements
+    except Exception as e:
+        logger.error(f"Error parsing PDF: {e}")
+        raise
 
-// Start Server
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+def parse_page(text):
+    """Parse a single page of text to extract statements."""
+    statements = []
+    for line in text.split('\n'):
+        parts = line.split()
+        if len(parts) >= 3:
+            date = parts[0]
+            description = " ".join(parts[1:-1])
+            amount = parts[-1]
+            # Determine if the amount is a deposit or withdrawal
+            if amount.startswith('-'):
+                transaction_type = 'withdrawal'
+            else:
+                transaction_type = 'deposit'
+            statements.append({
+                'date': date,
+                'description': description,
+                'amount': amount,
+                'transaction_type': transaction_type
+            })
+    return statements
 
-// Mocking API Requests for Testing
-nock('https://api.sandbox.treasuryprime.com')
-  .post('/verification')
-  .reply(200, { access_token: 'mock_access_token' });
+def correct_discrepancies(statements):
+    """Correct discrepancies in the statements."""
+    corrected_statements = []
+    for statement in statements:
+        try:
+            amount = float(statement['amount'])
+            corrected_statements.append(statement)
+        except ValueError:
+            # Handle misprints or miscalculations
+            statement['amount'] = '0.00'  # Set to zero or some default value
+            corrected_statements.append(statement)
+    return corrected_statements
 
-async function testGenerateAccessToken() {
-  const verificationCode = 'mock_verification_code';[_[_{{{CITATION{{{_1{](https://github.com/rfist/fb_chatbot/tree/ec0d61d3c3185fde318ccdf4d0d64cce3d070f70/app%2Flogger.js)[_{{{CITATION{{{_2{](https://github.com/wasifnaeem/nodejs-boilerplate/tree/637b32a1db699559eec5f40c779a5b9090b5ac45/PL%2Fservices%2Fwinston-logger.service.ts)[_{{{CITATION{{{_3{](https://github.com/thundergolfer/source-rank/tree/f8cc33dd411c2c324bde44082bbe50c1b3cc5d0e/messenger-bot%2Fsrc%2Flogger.js)[_{{{CITATION{{{_4{](https://github.com/krisunni/massUpdateDynamo/tree/ff5ebbdf4b67fca82565b60579eac9f35287fb21/app.js){{{CITATION{{{_5{](https://github.com/stadnikEV/soma-back-end/tree/be6b883291bf750ea291885e2d34b06973118bad/libs%2Flog.js)
+def save_statements_as_csv(statements, file_path):
+    """Save the statements as a CSV file."""
+    try:
+        keys = statements[0].keys()
+        with open(file_path, mode='w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(statements)
+        logger.info(f"Statements saved as '{file_path}'")
+    except Exception as e:
+        logger.error(f"Error saving CSV file: {e}")
+        raise
+
+def generate_pdf_from_csv(csv_file_path, pdf_file_path):
+    """Generate a PDF file from a CSV file."""
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        with open(csv_file_path, newline='') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                line = f"{row['date']} {row['description']} {row['amount']} {row['transaction_type']}"
+                pdf.cell(200, 10, txt=line, ln=True)
+
+        pdf.output(pdf_file_path)
+        logger.info(f"PDF generated as '{pdf_file_path}'")
+    except Exception as e:
+        logger.error(f"Error generating PDF: {e}")
+        raise
+
+def update_account_balance(statements):
+    """Update the global account balance based on the statements."""
+    global account_balance
+    for statement in statements:
+        amount = float(statement['amount'])
+        if statement['transaction_type'] == 'deposit':
+            account_balance += amount
+        elif statement['transaction_type'] == 'withdrawal':
+            account_balance -= amount
+    logger.info(f"Account balance updated: {account_balance}")
+
+# Plaid API integration
+def create_plaid_link_token():
+    try:
+        response = plaid_client.LinkToken.create({
+            'user': {
+                'client_user_id': 'unique_user_id'
+            },
+            'client_name': 'PlaidBridgeOpenBankingAPI',
+            'products': ['auth'],
+            'country_codes': ['US'],
+            'language': 'en',
+            'redirect_uri': 'https://yourapp.com/oauth-return',
+        })
+        return response['link_token']
+    except Exception as e:
+        logger.error(f"Error creating Plaid link token: {e}")
+        raise
+
+def exchange_plaid_public_token(public_token):
+    try:
+        response = plaid_client.Item.public_token.exchange(public_token)
+        return response['access_token']
+    except Exception as e:
+        logger.error(f"Error exchanging Plaid public token: {e}")
+        raise
+
+# Treasury Prime API integration
+def verify_treasury_prime_account(account_id):
+    headers = {
+        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
+        'Content-Type': 'application/json'
+    }
+    try:
+        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error verifying Treasury Prime account: {e}")
+        raise
+
+# Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
+
+@app.route('/your_route', methods=['GET', 'POST'])
+def your_function():
+    # Your function implementation here
+    pass
+
+# Todo app routes
+@app.route('/todos', methods=['GET'])
+@login_required
+def get_todos():
+    todos = list(todos_collection.find())
+    return render_template('todos.html', todos=todos)
+
+@app.route('/todos', methods=['POST'])
+@login_required
+def add_todo():
+    title = request.form['title']
+    todos_collection.insert_one({'title': title, 'completed': False})
+    return redirect(url_for('get_todos'))
+
+@app.route('/todos/<int:todo_id>', methods=['POST'])
+@login_required
+def update_todo(todo_id):
+    completed = request.form['completed'] == 'true'
+    todos_collection.update_one({'_id': todo_id}, {'$set': {'completed': completed}}) 
+    return redirect(url_for('get_todos'))
+
+@app.route('/todos/<int:todo_id>/delete', methods=['POST'])
+@login_required
+def delete_todo(todo_id):
+    todos_collection.delete_one({'_id': todo_id})
+    return redirect(url_for('get_todos'))
+
+if __name__ == "__main__":
+    if os.getenv('FLASK_ENV') == 'production':
+        from waitress import serve
+        serve(app, host="0.0.0.0", port=port)
+    else:
+        socketio.run(app, host="0.0.0.0", port=port)   
+                
+  
+       
+
+
+        
+
+        
+    
+       
