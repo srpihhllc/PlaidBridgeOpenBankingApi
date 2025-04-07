@@ -30,7 +30,7 @@ RUN mkdir -p /app/logs && mkdir -p /app/statements
 EXPOSE 5000
 
 # Use a non-root user for security
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+# RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 USER appuser
 
 # Command to run the Flask app
