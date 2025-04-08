@@ -24,7 +24,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
 socketio = SocketIO(app)
 
 # Get the PORT from environment variables
-port = int(os.getenv("PORT", 3000))
+port = int(os.getenv("PORT", 5000))
 
 # Ensure the statements directory exists
 app.config['UPLOAD_FOLDER'] = 'statements'
