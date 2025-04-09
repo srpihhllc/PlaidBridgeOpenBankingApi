@@ -9,12 +9,15 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # Install system-level dependencies required for your app
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
     build-essential \
     libpq-dev \
     gcc \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Add Google DNS nameserver to resolve potential network issues
+RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
 # Install Python dependencies
 COPY requirements.txt /app/
