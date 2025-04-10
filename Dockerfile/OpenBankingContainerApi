@@ -1,0 +1,57 @@
+# Stage 1: Python Environment Setup
+FROM python:3.12-slim AS python-layer
+
+# Set working directory for Python application
+WORKDIR /app
+
+# Copy Python dependencies
+COPY requirements.txt /app/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the remaining Python source code
+COPY . /app
+
+
+# Stage 2: .NET (C#) Environment for Azure Functions
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS dotnet-layer
+
+# Set working directory for C# Azure Functions
+WORKDIR /functions
+
+# Copy Azure Functions source code
+COPY ./functions /functions
+
+# Build Azure Functions app
+RUN dotnet restore
+RUN dotnet build --configuration Release --output /out
+
+
+# Stage 3: Final Image for Combined App
+FROM python:3.12-slim
+
+# Copy Python app from the python-layer
+COPY --from=python-layer /app /app
+
+# Copy C# Azure Functions from the dotnet-layer
+COPY --from=dotnet-layer /out /functions
+
+# Set working directory for the Python app
+WORKDIR /app
+
+# Install SQL-related dependencies (e.g., SQL Server or Postgres drivers)
+RUN apt-get update && apt-get install -y \
+    libpq-dev gcc \
+    && pip install psycopg2  # Install Postgres driver for SQL interaction
+
+# Expose required ports for Python app and Azure Functions
+EXPOSE 80 7071
+
+# Define environment variables for the app
+ENV NAME plaidbridgeopenbankingapi
+ENV FUNCTION_PORT 7071
+ENV SQL_CONNECTION_STRING "your_sql_connection_string_here"
+
+# Start Python app and Azure Functions together
+CMD ["sh", "-c", "python app.py & func start --script-root /functions --port $FUNCTION_PORT"]
