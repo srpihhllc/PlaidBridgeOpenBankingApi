@@ -1,37 +1,45 @@
-# Use the official Python slim image as the base image
-FROM python:3.9-slim AS builder
+# Stage 1: Python Environment Setup
+FROM python:3.12-slim AS python-layer
 
-# Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . /app
 
-# Set the working directory inside the container
+# Stage 2: .NET (C#) Environment for Azure Functions
+FROM mcr.microsoft.com/dotnet/sdk:6.0 AS dotnet-layer
+
+WORKDIR /functions
+COPY ./functions /functions
+RUN dotnet restore
+RUN dotnet build --configuration Release --output /out
+
+
+# Stage 3: Final Image for Combined App with Nginx
+FROM python:3.12-slim
+
+# Install Nginx
+RUN apt-get update && apt-get install -y nginx
+
+# Copy Python app from the python-layer
+COPY --from=python-layer /app /app
+
+# Copy C# Azure Functions from the dotnet-layer
+COPY --from=dotnet-layer /out /functions
+
+# Copy the updated Nginx configuration
+COPY nginx.conf /etc/nginx/nginx.conf
+
+# Set the working directory for the Python app
 WORKDIR /app
 
-# Install system-level dependencies required for your app
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    gcc \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Expose ports for Nginx (80) and Azure Functions (7071)
+EXPOSE 80 7071
 
-# Install Python dependencies
-COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install --user -r requirements.txt
+# Define environment variables
+ENV NAME plaidbridgeopenbankingapi
+ENV FUNCTION_PORT 7071
+ENV SQL_CONNECTION_STRING "your_sql_connection_string_here"
 
-# Copy the application code into the working directory
-COPY . /app/
-
-# Create directories for logs and uploads if they do not exist
-RUN mkdir -p /app/logs && mkdir -p /app/statements
-
-# Expose the port for the Flask app
-EXPOSE 5000
-
-# Use a non-root user for security
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
-USER appuser
-
-# Command to run the Flask app
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+# Start Nginx and then your Python app and Azure Functions
+CMD service nginx start && python app.py & func start --script-root /functions --port $FUNCTION_PORT
