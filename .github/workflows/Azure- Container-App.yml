@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-22.04
     name: Build and Deploy Job
     steps:
-      # Step 1: Checkout code
+      # Step 1: Checkout Code
       - name: Checkout code
         uses: actions/checkout@v2
 
