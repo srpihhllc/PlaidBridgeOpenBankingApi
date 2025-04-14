@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  web:
+    # Build your API container from the Dockerfile in the current directory
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Map port 5000 on the container to port 5000 on your host machine.
+    ports:
+      - "5000:5000"
+    # Set environment variables for your API
+    environment:
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@db:5432/mydatabase
+    # Ensure the database starts before your API service
+    depends_on:
+      - db
+
+  db:
+    # Use a pre-built PostgreSQL image
+    image: postgres:13
+    restart: always
+    # Environment variables for configuring the database
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mydatabase
+    # Persist database data on the host for data durability across container restarts
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+# Named volume for persistent storage
+volumes:
+  dbdata:
