@@ -19,9 +19,11 @@ RUN apt-get update && apt-get install -y \
 # Add Google DNS nameserver to resolve potential network issues
 RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
 
+# Ensure the build context includes requirements.txt
+COPY PlaidBridgeOpenBankingApi/requirements.txt /app/
+
 # Install Python dependencies
-COPY requirements.txt /app/
-RUN pip install --upgrade pip && pip install --user -r requirements.txt
+RUN pip install --upgrade pip && pip install --user -r /app/requirements.txt
 
 # Copy the application code into the working directory
 COPY . /app/
