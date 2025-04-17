@@ -70,6 +70,28 @@ def calculate_global_balance():
     balance = sum(account.get('balance', 0) for account in account_data)
     return global_account_balance + balance
 
+# Login Route Added
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.authenticate(username, password)
+        
+        if user:
+            login_user(user)
+            return redirect(url_for('account_info'))
+        
+        return jsonify({"message": "Invalid credentials"}), 401
+
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login')
+                    
 # Routes
 @app.route('/')
 @login_required
