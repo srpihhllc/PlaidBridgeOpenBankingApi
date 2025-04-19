@@ -1,11 +1,12 @@
 [tool.poetry]
 name = "PlaidBridgeOpenBankingApi"
-version = "3.13.0"
+version = "3.12-slim"
 description = "A Python project integrating with Plaid’s API to support Open Banking functionalities"
 authors = ["srpihhllc <srpollardsihhllc@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.13"
-requests = "^2.25.1"
+python = "^3.12-slim"
+
+requests = "^2.32.0"
 flask = "^2.0.1"
-python-dotenv = "^0.19.1"
+python-dotenv = "^0.19.0"
