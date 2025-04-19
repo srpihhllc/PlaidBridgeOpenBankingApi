@@ -1,5 +1,5 @@
 # Stage 1: Python Environment Setup
-FROM python:3.9-slim AS python-layer
+FROM python:3.12-slim AS python-layer
 
 # Set working directory for Python application
 WORKDIR /app
