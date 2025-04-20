@@ -43,22 +43,30 @@ login_manager.login_view = 'login'
 # Global account balance (starting value)
 global_account_balance = 848583.68
 
-# User class for authentication and session management
+# User class for authentication and session management (including verification status)
 class User(UserMixin):
-    def __init__(self, id, username=None):
+    def __init__(self, id, username=None, verified=False):
         self.id = id
         self.username = username
+        self.verified = verified
 
     @staticmethod
     def authenticate(username, password):
-        # Example user lookup; replace with a secure DB lookup as needed
-        user_data = {"username": "test_user", "password": "test_password"}
+        # Example user lookup; replace with a secure lookup from your DB.
+        # Here, we simulate a lender ("test_user") who must be verified.
+        user_data = {
+            "username": "test_user",
+            "password": "test_password",
+            "verified": False  # Initially, the lender is not verified.
+        }
         if username == user_data["username"] and password == user_data["password"]:
-            return User("1", username=user_data["username"])
+            return User("1", username=user_data["username"], verified=user_data["verified"])
         return None
 
 @login_manager.user_loader
 def load_user(user_id):
+    # For the purpose of this mock API, we create a new User object.
+    # In a real implementation, load the user from persistent storage.
     return User(user_id)
 
 # Calculate the global balance by summarizing individual account balances
@@ -68,7 +76,7 @@ def calculate_global_balance():
     balance = sum(account.get('balance', 0) for account in account_data)
     return global_account_balance + balance
 
-# Treasury Prime API integration
+# Treasury Prime API integration: fetch account data
 def get_treasury_prime_accounts():
     headers = {"Authorization": f"Bearer {os.getenv('TREASURY_PRIME_API_KEY')}"}
     response = requests.get(os.getenv('TREASURY_PRIME_API_URL') + "/accounts", headers=headers)
@@ -104,7 +112,6 @@ def verify_identity():
     borrower_exists = accounts_collection.find_one({"_id": borrower_id})
     
     if lender_exists and borrower_exists:
-        # Emit a real-time event to inform connected clients of successful verification
         socketio.emit('identity_verified', {'lender_id': lender_id, 'borrower_id': borrower_id})
         return jsonify({"message": "Identity Verified"}), 200
     return jsonify({"message": "Identity Verification Failed"}), 400
@@ -130,6 +137,36 @@ def detach_account():
         socketio.emit('account_detached', {'account_id': account_id})
         return jsonify({"message": "Account detached"}), 200
     return jsonify({"message": "Detachment failed"}), 400
+
+# New: Lender verification endpoint using bank account linking
+@app.route('/verify-lender-account', methods=['POST'])
+@login_required
+def verify_lender_account():
+    """
+    Lenders must link their bank account to verify their identity under the same scrutiny they require for borrowers.
+    Expected JSON payload:
+    {
+        "company_name": "ABC Corp",
+        "owner_name": "John Doe",
+        "address": "123 Main St, City, State, ZIP",
+        "routing_number": "111000025",
+        "account_number": "123456789"
+    }
+    """
+    data = request.json
+    required_fields = ["company_name", "owner_name", "address", "routing_number", "account_number"]
+    missing = [field for field in required_fields if field not in data or not data[field]]
+    if missing:
+        return jsonify({"message": f"Missing required fields: {', '.join(missing)}"}), 400
+
+    # Here, add any additional business logic to validate bank details.
+    # In a real-world scenario, you'd call an external API (such as Plaid or a banking service)
+    # to verify that the details are correct and the bank account is valid.
+
+    # For this mock API, we simulate successful verification.
+    current_user.verified = True
+    socketio.emit('lender_verified', {'user': current_user.username})
+    return jsonify({"message": "Lender verified successfully"}), 200
 
 # Home page route (requires login)
 @app.route('/')
@@ -173,12 +210,10 @@ def upload_pdf():
     file.save(filename)
 
     try:
-        # Parse the PDF and simulate correction of discrepancies
         statements = parse_pdf(filename)
         account_updates = correct_discrepancies(statements)
         for update in account_updates:
             global_account_balance += float(update["amount"])
-        # Emit event indicating PDF processing completion
         socketio.emit('pdf_processed', {'new_balance': global_account_balance})
         return jsonify({"message": "PDF processed successfully", "account_balance": global_account_balance}), 200
     except Exception as e:
@@ -270,6 +305,10 @@ def login():
         password = request.form.get('password')
         user = User.authenticate(username, password)
         if user:
+            if not user.verified:
+                # Emit an event indicating login failure due to unverified lender
+                socketio.emit('login_failed', {'message': 'Lender not verified. Please complete bank account linking.'})
+                return jsonify({"message": "Lender not verified. Please complete bank account linking."}), 403
             login_user(user)
             socketio.emit('login_success', {'user': user.username})
             return redirect(url_for('account_info'))
