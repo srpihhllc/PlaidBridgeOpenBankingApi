@@ -155,7 +155,10 @@ def parse_pdf(file_path):
                 statements.extend(parse_page(text))
         return statements
 
-def parse_page(text):
+(file_path):
+    """Parse the CSV and extract financial transactions."""
+    statements = []
+    with opendef parse_page(text):
     """Parse the text of a single PDF page to extract date, description, and amount."""
     statements = []
     for line in text.split('\n'):
@@ -170,10 +173,68 @@ def parse_page(text):
                 continue
     return statements
 
-def parse_csv(file_path):
-    """Parse the CSV and extract financial transactions."""
-    statements = []
-    with open(file_path, newline='', encoding='utf-8') as csvfile:
+# Borrower Account Linking via Plaid
+@app.route('/link-borrower-account', methods=['POST'])
+@login_required
+def link_borrower_account():
+    borrower_id = request.json.get("borrower_id")
+
+    headers = {"Authorization": f"Bearer {os.getenv('PLAID_SECRET')}"}
+    response = requests.post(os.getenv('PLAID_API_URL') + "/link/token/create", headers=headers, json={})
+
+    if response.status_code == 200:
+        link_token = response.json()["link_token"]
+        return jsonify({"message": "Plaid link token generated", "link_token": link_token}), 200
+
+    return jsonify({"message": "Failed to generate Plaid link token"}), 400
+
+# Lender Access to Borrower Transactions
+@app.route('/get-borrower-transactions', methods=['GET'])
+@login_required
+def get_borrower_transactions():
+    lender_id = current_user.id
+    borrower_id = request.args.get('borrower_id')
+
+    lender_data = accounts_collection.find_one({"_id": lender_id, "role": "lender"})
+    borrower_data = accounts_collection.find_one({"_id": borrower_id, "role": "borrower"})
+
+    if not lender_data or not lender_data.get("verified"):
+        return jsonify({"message": "Lender verification required"}), 403
+
+    if not borrower_data:
+        return jsonify({"message": "Borrower not found"}), 404
+
+    transactions = borrower_data.get("transactions", [])
+    return jsonify({"transactions": transactions}), 200
+
+# Borrower Account Freezing & Detachment
+@app.route('/freeze-account', methods=['POST'])
+@login_required
+def freeze_account():
+    account_id = request.json.get("account_id")
+
+    result = accounts_collection.update_one({"_id": account_id}, {"$set": {"status": "frozen"}})
+
+    if result.modified_count > 0:
+        socketio.emit('account_status_update', {'account_id': account_id, 'status': 'frozen'})
+        return jsonify({"message": "Account frozen"}), 200
+
+    return jsonify({"message": "Freeze failed"}), 400
+
+@app.route('/detach-account', methods=['POST'])
+@login_required
+def detach_account():
+    account_id = request.json.get("account_id")
+
+    result = accounts_collection.delete_one({"_id": account_id})
+
+    if result.deleted_count > 0:
+        socketio.emit('account_detached', {'account_id': account_id})
+        return jsonify({"message": "Account detached"}), 200
+
+    return jsonify({"message": "Detachment failed"}), 400
+
+def parse_csv(file_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             try:
