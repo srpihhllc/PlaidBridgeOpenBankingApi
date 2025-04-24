@@ -12,7 +12,8 @@ This software is covered under a proprietary license. Unauthorized use, modifica
 3. **Ownership**: The Author retains all rights, title, and interest in and to the Software, including all AI-powered functionalities embedded in the API.
 4. **AI Security & Ethical Compliance**: This Software includes AI-driven security layers that enforce ethical borrowing practices, borrower account locking, lender verification, and automated alerts. These AI mechanisms **must not be altered or bypassed**.
 5. **Integration with Fintech Systems**: Usage of this API in conjunction with fintech platforms (Plaid, Stripe, etc.) **does not alter ownership rights**. All components remain proprietary.
-6. **Termination**: This license automatically terminates if you violate any of these terms.
+6. **Legal & Privacy Enforcement**: Lenders are **strictly prohibited from selling or sharing borrower financial data**. Borrowers engaging in **delinquency, fraud, or evasion** will be **penalized to the full extent of the law**.
+7. **Termination**: This license automatically terminates if you violate any of these terms.
 
 By using the Software, you agree to these terms.
 """
@@ -91,78 +92,54 @@ class BorrowerGuardianAI:
 
         return {"status": "locked" if self.locked else "free", "total_paid": total_paid}
 
-# Borrower account linking (locked until obligations are fulfilled)
-@app.route('/lock-borrower-account', methods=['POST'])
+# AI-Powered Lender Contract Proofing
+@app.route('/review-lender-contract', methods=['GET'])
 @login_required
-def lock_borrower_account():
-    borrower_id = request.json.get("borrower_id")
-    agreement_data = request.json.get("agreement_data")
-
-    accounts_collection.update_one(
-        {"_id": borrower_id},
-        {"$set": {"mock_account_locked": True, "agreement": agreement_data}}
-    )
-
-    return jsonify({"message": "Borrower account locked until obligations are fulfilled"}), 200
-
-@app.route('/detach-borrower-account', methods=['POST'])
-@login_required
-def detach_borrower_account():
-    borrower_id = request.json.get("borrower_id")
-
-    borrower_data = accounts_collection.find_one({"_id": borrower_id})
-    if borrower_data and borrower_data.get("outstanding_balance") > 0:
-        return jsonify({"message": "Borrower cannot detach the API until financial obligations are fulfilled"}), 403
-
-    accounts_collection.update_one(
-        {"_id": borrower_id},
-        {"$set": {"mock_account_linked": False}}
-    )
-
-    return jsonify({"message": "Borrower successfully detached"}), 200
-
-# AI-Driven Payment Calculation
-@app.route('/calculate-payments', methods=['POST'])
-@login_required
-def calculate_payments():
-    borrower_id = request.json.get("borrower_id")
-
-    agreement = accounts_collection.find_one({"_id": borrower_id}, {"agreement": 1})
-    if not agreement:
-        return jsonify({"message": "No agreement found"}), 400
-
-    total_amount_due = agreement["agreement"]["total_amount"]
-    due_dates = agreement["agreement"]["due_dates"]
-
-    return jsonify({"message": "Payment schedule generated", "total_due": total_amount_due, "due_dates": due_dates}), 200
-
-# AI-Powered Transaction Monitoring
-@app.route('/track-payments', methods=['GET'])
-@login_required
-def track_payments():
+def review_lender_contract():
     borrower_id = request.args.get("borrower_id")
 
-    transactions = db.transactions.find({"borrower_id": borrower_id})
-    total_paid = sum(tx["amount"] for tx in transactions if tx["type"] == "payment")
+    contract_data = accounts_collection.find_one({"_id": borrower_id}, {"lender_contract": 1})
+    if not contract_data:
+        return jsonify({"message": "No lender contract found"}), 400
 
-    outstanding_balance = db.accounts.find_one({"_id": borrower_id})["outstanding_balance"]
+    contract_text = contract_data["lender_contract"]["text"]
+    
+    # Run AI contract review
+    contract_ai = ContractReviewAI(contract_text)
+    risk_analysis = contract_ai.detect_unethical_terms()
 
-    return jsonify({"total_paid": total_paid, "outstanding_balance": outstanding_balance}), 200
+    return jsonify({"message": "Contract reviewed", "risk_alerts": risk_analysis}), 200
 
-# AI-Driven Payment Alerts
-@app.route('/send-payment-alerts', methods=['POST'])
+# AI Prevents Unauthorized Borrower Data Sales
+@app.route('/block-lender-for-statement-sale', methods=['POST'])
 @login_required
-def send_payment_alerts():
-    borrower_id = request.json.get("borrower_id")
-    
-    agreement = accounts_collection.find_one({"_id": borrower_id}, {"agreement": 1})
-    due_dates = agreement["agreement"]["due_dates"]
+def block_lender_for_statement_sale():
+    lender_id = request.json.get("lender_id")
 
-    for date in due_dates:
-        alert_date = datetime.strptime(date, '%Y-%m-%d') - timedelta(days=7)
-        db.alerts.insert_one({"borrower_id": borrower_id, "alert_date": alert_date, "message": "Upcoming payment due in 7 days"})
-    
-    return jsonify({"message": "Payment alerts scheduled"}), 200
+    # Detect unauthorized statement sharing or resale
+    accounts_collection.update_one(
+        {"_id": lender_id},
+        {"$set": {"blocked": True, "block_reason": "Unauthorized borrower data access"}}
+    )
+
+    return jsonify({"message": "Lender blocked for unauthorized borrower data sharing"}), 403
+
+# AI Tracks Borrower Defaults & Penalizes Fraudulent Behavior
+@app.route('/restrict-borrower-api-access', methods=['POST'])
+@login_required
+def restrict_borrower_api_access():
+    borrower_id = request.json.get("borrower_id")
+
+    # Verify if borrower has defaulted
+    borrower_data = accounts_collection.find_one({"_id": borrower_id}, {"defaulted": True})
+    if borrower_data and borrower_data.get("defaulted") is True:
+        accounts_collection.update_one(
+            {"_id": borrower_id},
+            {"$set": {"api_access_revoked": True}}
+        )
+        return jsonify({"message": "Borrower API access revoked due to unresolved defaults"}), 403
+
+    return jsonify({"message": "Borrower still has API access"}), 200
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
