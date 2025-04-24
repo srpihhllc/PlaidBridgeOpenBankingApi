@@ -18,22 +18,23 @@ This software is covered under a proprietary license. Unauthorized use, modifica
 By using the Software, you agree to these terms.
 """
 
-from flask import Flask, jsonify, request, render_template, redirect, url_for
+from flask import Flask, jsonify, request, render_template, send_from_directory, redirect, url_for
 from flask_socketio import SocketIO
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from dotenv import load_dotenv
 from pymongo import MongoClient
 import os
-import requests
 import csv
 import pdfplumber
+from bson import ObjectId
 from fpdf import FPDF
 from datetime import datetime, timedelta
+import requests
 
 # Load environment variables
 load_dotenv()
 
-# Flask app configuration
+# Flask app setup
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY') or "fallback_secret_key"
 app.config['UPLOAD_FOLDER'] = 'statements'
@@ -49,11 +50,15 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 mongo_client = MongoClient(os.getenv('MONGO_CONNECTION_STRING'))
 db = mongo_client['open_banking_api']
 accounts_collection = db['accounts']
+todos_collection = db["todos"]
 
 # Login Manager setup
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+# Global account balance
+global_account_balance = 848583.68
 
 # User authentication class
 class User(UserMixin):
@@ -70,78 +75,70 @@ class User(UserMixin):
 def load_user(user_id):
     return User(user_id)
 
-# AI-Powered Borrower Locking & Payment Enforcement
-class BorrowerGuardianAI:
-    def __init__(self, borrower_id):
-        self.borrower_id = borrower_id
-        self.locked = True  # Ensures borrower remains linked until payments are fulfilled
-        self.agreement = None
+# Calculate global balance
+def calculate_global_balance():
+    global global_account_balance
+    account_data = accounts_collection.find()
+    balance = sum(account.get('balance', 0) for account in account_data)
+    return global_account_balance + balance
 
-    def analyze_agreement(self, agreement_text):
-        # AI extracts payment terms and schedules
-        self.agreement = {"total_due": 5000, "due_dates": ["2025-05-01", "2025-06-01"]}
-        return self.agreement
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        user = User.authenticate(username, password)
+        
+        if user:
+            login_user(user)
+            return redirect(url_for('account_info'))
+        
+        return jsonify({"message": "Invalid credentials"}), 401
 
-    def enforce_payment_schedule(self):
-        # AI monitors transactions and prevents detachment until payment completion
-        payment_history = db.transactions.find({"borrower_id": self.borrower_id})
-        total_paid = sum(tx["amount"] for tx in payment_history)
+    return render_template('login.html')
 
-        if total_paid >= self.agreement["total_due"]:
-            self.locked = False  # Allow detachment once obligations are met
-
-        return {"status": "locked" if self.locked else "free", "total_paid": total_paid}
-
-# AI-Powered Lender Contract Proofing
-@app.route('/review-lender-contract', methods=['GET'])
+@app.route('/logout')
 @login_required
-def review_lender_contract():
-    borrower_id = request.args.get("borrower_id")
+def logout():
+    logout_user()
+    return redirect(url_for('login'))  
 
-    contract_data = accounts_collection.find_one({"_id": borrower_id}, {"lender_contract": 1})
-    if not contract_data:
-        return jsonify({"message": "No lender contract found"}), 400
-
-    contract_text = contract_data["lender_contract"]["text"]
-    
-    # Run AI contract review
-    contract_ai = ContractReviewAI(contract_text)
-    risk_analysis = contract_ai.detect_unethical_terms()
-
-    return jsonify({"message": "Contract reviewed", "risk_alerts": risk_analysis}), 200
-
-# AI Prevents Unauthorized Borrower Data Sales
-@app.route('/block-lender-for-statement-sale', methods=['POST'])
+@app.route('/')
 @login_required
-def block_lender_for_statement_sale():
-    lender_id = request.json.get("lender_id")
+def home():
+    return render_template('index.html')
 
-    # Detect unauthorized statement sharing or resale
-    accounts_collection.update_one(
-        {"_id": lender_id},
-        {"$set": {"blocked": True, "block_reason": "Unauthorized borrower data access"}}
-    )
-
-    return jsonify({"message": "Lender blocked for unauthorized borrower data sharing"}), 403
-
-# AI Tracks Borrower Defaults & Penalizes Fraudulent Behavior
-@app.route('/restrict-borrower-api-access', methods=['POST'])
+@app.route('/account-info')
 @login_required
-def restrict_borrower_api_access():
+def account_info():
+    user_balance = accounts_collection.find_one({"user_id": current_user.id}, {"balance": 1}) or {"balance": 0}
+    total_global_balance = calculate_global_balance()
+    return render_template('account_info.html', account_balance=user_balance.get("balance"), global_balance=total_global_balance)
+
+@app.route('/global_balance', methods=['GET'])
+@login_required
+def global_balance():
+    return jsonify({"global_balance": calculate_global_balance()}), 200
+
+@app.route('/link-borrower-account', methods=['POST'])
+@login_required
+def link_borrower_account():
     borrower_id = request.json.get("borrower_id")
 
-    # Verify if borrower has defaulted
-    borrower_data = accounts_collection.find_one({"_id": borrower_id}, {"defaulted": True})
-    if borrower_data and borrower_data.get("defaulted") is True:
-        accounts_collection.update_one(
-            {"_id": borrower_id},
-            {"$set": {"api_access_revoked": True}}
-        )
-        return jsonify({"message": "Borrower API access revoked due to unresolved defaults"}), 403
+    headers = {"Authorization": f"Bearer {os.getenv('PLAID_SECRET')}"}
+    response = requests.post(os.getenv('PLAID_API_URL') + "/link/token/create", headers=headers, json={})
 
-    return jsonify({"message": "Borrower still has API access"}), 200
+    if response.status_code == 200:
+        return jsonify({"message": "Plaid link token generated", "link_token": response.json()["link_token"]}), 200
 
-# Health check endpoint
+    return jsonify({"message": "Failed to generate Plaid link token"}), 400
+
+@app.route('/todo_list')
+@login_required
+def todo_list():
+    todos = list(todos_collection.find({"user_id": current_user.id}))
+    return render_template("todos.html", todos=todos)
+
 @app.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy"}), 200
