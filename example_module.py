@@ -1,8 +1,10 @@
-class ExampleClass:
-    def __init__(self, name):
-        self.name = name  # Store the name as an instance attribute
+from example_module import ExampleClass
 
-    def example_method(self):
-        return f"Hello, {self.name}!"
+example = ExampleClass("Alice")
+print(example.greet())  # Output: Hello, Alice!
+
+print(example.change_name("Bob"))  # Output: Name updated to Bob
+print(example.greet())  # Output: Hello, Bob!
+
 
 
