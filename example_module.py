@@ -5,3 +5,4 @@ class ExampleClass:
     def example_method(self):
         return f"Hello, {self.name}!"
 
+
