@@ -9,6 +9,7 @@ from flask_jwt_extended import (
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
+from example_module import ExampleClass  # 🔹 Importing the module
 
 # 🔹 Initialize Flask app
 app = Flask(__name__)
@@ -51,6 +52,13 @@ class Transaction(db.Model):
     date = db.Column(db.String(20), nullable=False)
     description = db.Column(db.String(200), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+
+# 🔹 API Route to Use ExampleClass from `example_module.py`
+@app.route('/greet/<name>', methods=['GET'])
+def greet_user(name):
+    """Greet a user using ExampleClass"""
+    example = ExampleClass(name)
+    return jsonify({"message": example.greet()})
 
 # 🔹 User Registration with Secure Hashing
 @app.route('/register', methods=['POST'])
