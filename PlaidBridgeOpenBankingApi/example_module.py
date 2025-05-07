@@ -6,7 +6,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 class ExampleClass:
-    def __init__(self, name="Example"):
+    def __init__(self, name="Example"):  # ✅ Accepts a name parameter now
         """Initialize the class with a dynamic name."""
         self.name = name
         logging.info(f"ExampleClass initialized with name: {self.name}")
