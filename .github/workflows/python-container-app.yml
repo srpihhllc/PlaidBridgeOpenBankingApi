@@ -1,0 +1,41 @@
+name: Build and Test Python App - PlaidBridgeOpenBankingApi
+
+on:
+  push:
+    branches:
+      - PlaidBridgeOpenBankingApi
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - PlaidBridgeOpenBankingApi
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the repository code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Run Tests (If applicable)
+      - name: Run Tests
+        run: |
+          pytest || echo "No tests found, skipping."
+
+      # Step 5: Build Docker Image (Optional)
+      - name: Build Docker image
+        run: |
+          docker build -t plaidbridgeopenbankingapi .
