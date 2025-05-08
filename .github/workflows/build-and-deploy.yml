@@ -1,0 +1,23 @@
+name: Build and Push Container
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry
+        run: echo "${{ secrets.PAT_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build the container image
+        run: podman build -t ghcr.io/${{ github.repository }}/my-image:latest .
+
+      - name: Push the container image
+        run: podman push ghcr.io/${{ github.repository }}/my-image:latest
