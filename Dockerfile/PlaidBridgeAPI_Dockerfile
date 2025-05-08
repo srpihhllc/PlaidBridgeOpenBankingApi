@@ -1,6 +1,10 @@
 # Use the full Python image instead of slim for more memory
 FROM python:3.12 AS builder
 
+# Define build arguments
+ARG APP_ENV=production
+ARG INSTALL_DEV_TOOLS=false
+
 # Set environment variables for Python
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
