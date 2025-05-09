@@ -1,46 +1,27 @@
-# Use the full Python image instead of slim for more memory
-FROM python:3.12 AS builder
+FROM python:3.12-slim
 
-# Define build arguments
-ARG APP_ENV=production
-ARG INSTALL_DEV_TOOLS=false
-
-# Set environment variables for Python
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set the working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Install system-level dependencies required for your app
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    libpq-dev \
-    gcc \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    gcc libpq-dev build-essential \
+    --no-install-recommends && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add Google DNS nameserver to resolve potential network issues
-RUN echo "nameserver 8.8.8.8" > /etc/resolv.conf
-
-# Ensure the build context includes requirements.txt
-COPY PlaidBridgeOpenBankingApi/requirements.txt /app/
-
-# Install Python dependencies
-RUN pip install --upgrade pip && pip install --user -r /app/requirements.txt
-
-# Copy the application code into the working directory
+# Copy application files
 COPY . /app/
 
-# Create directories for logs and uploads if they do not exist
-RUN mkdir -p /app/logs && mkdir -p /app/statements
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the port for the Flask app
+# Expose the application port
 EXPOSE 5000
 
-# Use a non-root user for security
-RUN groupadd -r appgroup && useradd -r -g appgroup appuser
-USER appuser
-
-# Command to run the Flask app
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
+# Command to run the app
+CMD ["python", "app.py"]
