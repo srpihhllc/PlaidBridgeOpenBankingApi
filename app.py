@@ -31,6 +31,14 @@ import waitress
 from plaid.api.plaid_api import PlaidApi
 from plaid import ApiClient, Configuration
 
+configuration = Configuration(
+    host="https://sandbox.plaid.com",
+    api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
+)
+api_client = ApiClient(configuration)
+plaid_client = PlaidApi(api_client)
+
+
 # Load environment variables
 load_dotenv()
 
