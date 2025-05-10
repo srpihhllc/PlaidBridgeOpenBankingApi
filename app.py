@@ -18,8 +18,21 @@ from marshmallow import Schema, fields, validate
 from werkzeug.security import generate_password_hash, check_password_hash
 import logging
 import os
-from plaid import Client as PlaidClient
+import requests
+import pdfplumber
+from fpdf import FPDF
+import pymongo
+from dotenv import load_dotenv
 from flask_prometheus_metrics import register_metrics
+import gunicorn
+import waitress
+
+# Import Plaid using updated API structure
+from plaid.api.plaid_api import PlaidApi
+from plaid import ApiClient, Configuration
+
+# Load environment variables
+load_dotenv()
 
 # --------------------------------------------
 # App Initialization
@@ -58,7 +71,13 @@ logging.basicConfig(
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
 PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
-plaid_client = PlaidClient(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
+
+configuration = Configuration(
+    host="https://sandbox.plaid.com",
+    api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
+)
+api_client = ApiClient(configuration)
+plaid_client = PlaidApi(api_client)
 
 # --------------------------------------------
 # Models
@@ -145,26 +164,6 @@ def login():
         return jsonify(access_token=access_token, refresh_token=refresh_token), 200
 
     return jsonify({"message": "Invalid credentials"}), 401
-
-@app.route('/analyze_loan', methods=['POST'])
-@jwt_required()
-def analyze_loan():
-    """Analyze loan agreements for unethical practices using Celery."""
-    data = request.json
-    terms = data.get('terms')
-
-    if not terms:
-        return jsonify({"message": "Missing loan terms"}), 400
-
-    task = analyze_loan_task.delay(terms)
-    return jsonify({"task_id": task.id}), 202
-
-@celery.task
-def analyze_loan_task(terms):
-    """Background task for loan analysis."""
-    if "high penalty" in terms.lower():
-        return "Loan flagged for unethical practices"
-    return "Loan terms are ethical"
 
 @app.route('/health', methods=['GET'])
 def health_check():
