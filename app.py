@@ -27,7 +27,17 @@ from flask_prometheus_metrics import register_metrics
 import gunicorn
 import waitress
 
-# Import Plaid using updated API structure
+# --------------------------------------------
+# Load environment variables
+# --------------------------------------------
+load_dotenv()
+PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
+PLAID_SECRET = os.getenv('PLAID_SECRET')
+PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
+
+# --------------------------------------------
+# Plaid Client Configuration
+# --------------------------------------------
 from plaid.api.plaid_api import PlaidApi
 from plaid import ApiClient, Configuration
 
@@ -38,14 +48,9 @@ configuration = Configuration(
 api_client = ApiClient(configuration)
 plaid_client = PlaidApi(api_client)
 
-
-# Load environment variables
-load_dotenv()
-
 # --------------------------------------------
-# App Initialization
+# Flask App Initialization
 # --------------------------------------------
-
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "https://yourtrusteddomain.com"}})  # Restrict to trusted domains
 register_metrics(app, app_version="v1.0.0", app_config="production")  # Prometheus metrics
@@ -66,26 +71,15 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 celery = Celery(app.name, broker='redis://localhost:6379/0')
 
 # Logging Configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=getattr(logging, LOG_LEVEL),
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("app.log"),
         logging.StreamHandler()
     ]
 )
-
-# Plaid Client Configuration
-PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
-PLAID_SECRET = os.getenv('PLAID_SECRET')
-PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
-
-configuration = Configuration(
-    host="https://sandbox.plaid.com",
-    api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
-)
-api_client = ApiClient(configuration)
-plaid_client = PlaidApi(api_client)
 
 # --------------------------------------------
 # Models
