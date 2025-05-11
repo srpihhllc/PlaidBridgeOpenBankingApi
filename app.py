@@ -4,13 +4,9 @@
 
 from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import (
-    JWTManager,
-    create_access_token,
-    jwt_required,
-    get_jwt_identity
-)
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
+from flask_limiter.storage import RedisStorage
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from celery import Celery
@@ -28,7 +24,7 @@ import gunicorn
 import waitress
 
 # --------------------------------------------
-# Load environment variables
+# Load Environment Variables
 # --------------------------------------------
 load_dotenv()
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
@@ -40,19 +36,19 @@ PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
 # --------------------------------------------
 from plaid.api.plaid_api import PlaidApi
 from plaid import ApiClient, Configuration
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
 
 configuration = Configuration(
-    host="https://sandbox.plaid.com",
+    host=f"https://{PLAID_ENV}.plaid.com",
     api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
 )
 api_client = ApiClient(configuration)
 plaid_client = PlaidApi(api_client)
 
-from plaid.model.link_token_create_request import LinkTokenCreateRequest
-
 def create_link_token():
+    """Generates a Plaid Link token for initializing Plaid Link."""
     request = LinkTokenCreateRequest(
-        client_name="Your App Name",
+        client_name="PlaidBridge Open Banking API",
         language="en",
         country_codes=["US"],
         user={"client_user_id": "unique-user-id"},
@@ -60,7 +56,6 @@ def create_link_token():
     )
     response = plaid_client.link_token_create(request)
     return response["link_token"]
-
 
 # --------------------------------------------
 # Flask App Initialization
@@ -76,10 +71,10 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 86400
 
-# Initialize database, JWT, and Limiter
+# Initialize Database, JWT, and Limiter
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"])
+limiter = Limiter(get_remote_address, app=app, storage=RedisStorage("redis://localhost:6379"))
 
 # Celery Configuration
 celery = Celery(app.name, broker='redis://localhost:6379/0')
@@ -164,22 +159,6 @@ def register():
     db.session.commit()
 
     return jsonify({"message": "User registered successfully"}), 201
-
-@app.route('/login', methods=['POST'])
-@limiter.limit("5 per minute")
-def login():
-    """Log in a user and return access and refresh tokens."""
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-
-    user = User.query.filter_by(username=username).first()
-    if user and check_password_hash(user.password, password):
-        access_token = create_access_token(identity={"id": user.id, "role": user.role})
-        refresh_token = create_access_token(identity={"id": user.id}, fresh=False)
-        return jsonify(access_token=access_token, refresh_token=refresh_token), 200
-
-    return jsonify({"message": "Invalid credentials"}), 401
 
 @app.route('/health', methods=['GET'])
 def health_check():
