@@ -48,6 +48,20 @@ configuration = Configuration(
 api_client = ApiClient(configuration)
 plaid_client = PlaidApi(api_client)
 
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+
+def create_link_token():
+    request = LinkTokenCreateRequest(
+        client_name="Your App Name",
+        language="en",
+        country_codes=["US"],
+        user={"client_user_id": "unique-user-id"},
+        products=["auth", "transactions"]
+    )
+    response = plaid_client.link_token_create(request)
+    return response["link_token"]
+
+
 # --------------------------------------------
 # Flask App Initialization
 # --------------------------------------------
