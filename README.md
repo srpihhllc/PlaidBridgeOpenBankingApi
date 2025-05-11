@@ -1,37 +1,88 @@
+# --------------------------------------------
+# Enhanced App for PlaidBridge Open Banking API
+# --------------------------------------------
+
 from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import (
-    JWTManager,
-    create_access_token,
-    jwt_required,
-    get_jwt_identity
-)
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_limiter import Limiter
+from flask_limiter.storage import RedisStorage
+from flask_limiter.util import get_remote_address
 from flask_cors import CORS
-import os
+from celery import Celery
+from marshmallow import Schema, fields, validate
+from werkzeug.security import generate_password_hash, check_password_hash
 import logging
-from plaid import Client as PlaidClient
+import os
+import requests
+import pdfplumber
+from fpdf import FPDF
+import pymongo
+from dotenv import load_dotenv
+from flask_prometheus_metrics import register_metrics
+import gunicorn
+import waitress
 
-# 🔹 Initialize Flask app
+# --------------------------------------------
+# Load Environment Variables
+# --------------------------------------------
+load_dotenv()
+PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
+PLAID_SECRET = os.getenv('PLAID_SECRET')
+PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
+
+# --------------------------------------------
+# Plaid Client Configuration
+# --------------------------------------------
+from plaid.api.plaid_api import PlaidApi
+from plaid import ApiClient, Configuration
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+
+configuration = Configuration(
+    host=f"https://{PLAID_ENV}.plaid.com",
+    api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
+)
+api_client = ApiClient(configuration)
+plaid_client = PlaidApi(api_client)
+
+def create_link_token():
+    """Generates a Plaid Link token for initializing Plaid Link."""
+    request = LinkTokenCreateRequest(
+        client_name="PlaidBridge Open Banking API",
+        language="en",
+        country_codes=["US"],
+        user={"client_user_id": "unique-user-id"},
+        products=["auth", "transactions"]
+    )
+    response = plaid_client.link_token_create(request)
+    return response["link_token"]
+
+# --------------------------------------------
+# Flask App Initialization
+# --------------------------------------------
 app = Flask(__name__)
-CORS(app)  # Enable Cross-Origin Resource Sharing
+CORS(app, resources={r"/*": {"origins": "https://yourtrusteddomain.com"}})  # Restrict to trusted domains
+register_metrics(app, app_version="v1.0.0", app_config="production")  # Prometheus metrics
 
-# 🔹 Database Configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')  # Use PostgreSQL in production
+# Configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
+app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 86400
 
-# 🔹 JWT Configuration
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')  # Use env variables for production
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600  # Tokens expire in 1 hour
-app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 86400  # Refresh tokens last 24 hours
-
-# 🔹 Initialize Database and JWT Manager
+# Initialize Database, JWT, and Limiter
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+limiter = Limiter(get_remote_address, app=app, storage=RedisStorage("redis://localhost:6379"))
 
-# 🔹 Logging Configuration
+# Celery Configuration
+celery = Celery(app.name, broker='redis://localhost:6379/0')
+
+# Logging Configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=getattr(logging, LOG_LEVEL),
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.FileHandler("app.log"),
@@ -39,14 +90,10 @@ logging.basicConfig(
     ]
 )
 
-# 🔹 Plaid API Client Configuration
-PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
-PLAID_SECRET = os.getenv('PLAID_SECRET')
-PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')  # Default to sandbox for testing
+# --------------------------------------------
+# Models
+# --------------------------------------------
 
-plaid_client = PlaidClient(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
-
-# 🔹 Models
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -71,25 +118,37 @@ class LoanAgreement(db.Model):
     status = db.Column(db.String(20), default="active")  # 'active', 'completed', 'defaulted'
     ai_flagged = db.Column(db.Boolean, default=False)
 
-# 🔹 Routes
+# --------------------------------------------
+# Input Validation Schemas
+# --------------------------------------------
+
+class RegisterSchema(Schema):
+    username = fields.String(required=True, validate=validate.Length(min=3))
+    password = fields.String(required=True, validate=validate.Length(min=6))
+    role = fields.String(required=True, validate=validate.OneOf(["lender", "borrower"]))
+
+# --------------------------------------------
+# Routes
+# --------------------------------------------
+
 @app.route('/')
 def dashboard():
     """Render the dashboard page."""
     return render_template('dashboard.html')
 
 @app.route('/register', methods=['POST'])
+@limiter.limit("10 per minute")
 def register():
-    """Register a new user (lender or borrower)."""
+    """Register a new user."""
+    schema = RegisterSchema()
+    errors = schema.validate(request.json)
+    if errors:
+        return jsonify(errors), 400
+
     data = request.json
     username = data.get('username')
     password = data.get('password')
     role = data.get('role')
-
-    if not username or not password or not role:
-        return jsonify({"message": "Missing required fields"}), 400
-
-    if role not in ['lender', 'borrower']:
-        return jsonify({"message": "Invalid role. Must be 'lender' or 'borrower'"}), 400
 
     if User.query.filter_by(username=username).first():
         return jsonify({"message": "Username already exists"}), 400
@@ -101,74 +160,24 @@ def register():
 
     return jsonify({"message": "User registered successfully"}), 201
 
-@app.route('/login', methods=['POST'])
-def login():
-    """Log in a user and return access and refresh tokens."""
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-
-    user = User.query.filter_by(username=username).first()
-    if user and check_password_hash(user.password, password):
-        access_token = create_access_token(identity={"id": user.id, "role": user.role})
-        refresh_token = create_access_token(identity={"id": user.id}, fresh=False)
-        return jsonify(access_token=access_token, refresh_token=refresh_token), 200
-
-    return jsonify({"message": "Invalid credentials"}), 401
-
-@app.route('/refresh', methods=['POST'])
-@jwt_required(refresh=True)
-def refresh_token():
-    """Generate a new access token using a refresh token."""
-    identity = get_jwt_identity()
-    new_access_token = create_access_token(identity=identity)
-    return jsonify(access_token=new_access_token), 200
-
-@app.route('/link_account', methods=['POST'])
-@jwt_required()
-def link_account():
-    """Link a user account using Plaid."""
-    user_identity = get_jwt_identity()
-    data = request.json
-    public_token = data.get('public_token')
-
-    if not public_token:
-        return jsonify({"message": "Missing public token"}), 400
-
-    exchange_response = plaid_client.Item.public_token.exchange(public_token)
-    access_token = exchange_response['access_token']
-    item_id = exchange_response['item_id']
-
-    # Store access_token securely (not implemented here for brevity)
-    return jsonify({"message": "Account linked successfully", "item_id": item_id}), 200
-
-@app.route('/analyze_loan', methods=['POST'])
-@jwt_required()
-def analyze_loan():
-    """Analyze loan agreements for unethical practices."""
-    data = request.json
-    terms = data.get('terms')
-
-    if not terms:
-        return jsonify({"message": "Missing loan terms"}), 400
-
-    # Mock AI analysis
-    unethical = "high penalty" in terms.lower()  # Example flagging rule
-
-    if unethical:
-        return jsonify({"message": "Loan flagged for unethical practices"}), 400
-
-    return jsonify({"message": "Loan terms are ethical"}), 200
-
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint."""
     return jsonify({"status": "healthy"}), 200
 
-# 🔹 Initialize Database on Startup
-with app.app_context():
-    db.create_all()
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"message": "Resource not found"}), 404
 
-# 🔹 Run Flask App
+@app.errorhandler(500)
+def internal_server_error(error):
+    return jsonify({"message": "An internal error occurred"}), 500
+
+# --------------------------------------------
+# App Initialization and Run
+# --------------------------------------------
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    with app.app_context():
+        db.create_all()
+    app.run(host='0.0.0.0', port=5000)
