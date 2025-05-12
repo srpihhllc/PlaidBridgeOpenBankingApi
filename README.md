@@ -21,7 +21,7 @@ import pymongo
 from dotenv import load_dotenv
 from flask_prometheus_metrics import register_metrics
 import gunicorn
-import waitress
+
 
 # --------------------------------------------
 # Load Environment Variables
