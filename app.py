@@ -7,6 +7,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from limits.storage import RedisStorage  # ✅ Import RedisStorage explicitly
 
 from flask_cors import CORS
 from celery import Celery
@@ -70,12 +71,16 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
 app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 86400
 
-# Initialize Database, JWT, and Limiter
+# Initialize Database, JWT
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# **FIXED Flask-Limiter Configuration**
-limiter = Limiter(key_func=get_remote_address, storage_uri="redis://localhost:6379", app=app)
+# ✅ Corrected Flask-Limiter Configuration
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage=RedisStorage("redis://localhost:6379"),
+    app=app
+)
 
 # Celery Configuration
 celery = Celery(app.name, broker='redis://localhost:6379/0')
