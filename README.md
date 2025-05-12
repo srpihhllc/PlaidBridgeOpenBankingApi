@@ -6,7 +6,7 @@ from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
-from flask_limiter.storage import RedisStorage
+from limits.storage import RedisStorage  # ✅ Correct
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from celery import Celery
@@ -177,7 +177,8 @@ def internal_server_error(error):
 # App Initialization and Run
 # --------------------------------------------
 
-if __name__ == '__main__':
+  if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    app.run(host='0.0.0.0', port=5000)
+        db.create_all()  # Initializes DB tables
+    app.run(host='0.0.0.0', port=5000)  # Use Flask's built-in server for local testing
+
