@@ -6,8 +6,8 @@ from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
-from limits.storage import RedisStorage  # ✅ Correct
 from flask_limiter.util import get_remote_address
+
 from flask_cors import CORS
 from celery import Celery
 from marshmallow import Schema, fields, validate
@@ -21,7 +21,6 @@ import pymongo
 from dotenv import load_dotenv
 from flask_prometheus_metrics import register_metrics
 import gunicorn
-
 
 # --------------------------------------------
 # Load Environment Variables
@@ -74,7 +73,9 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 86400
 # Initialize Database, JWT, and Limiter
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
-limiter = Limiter(get_remote_address, app=app, storage=RedisStorage("redis://localhost:6379"))
+
+# **FIXED Flask-Limiter Configuration**
+limiter = Limiter(key_func=get_remote_address, storage_uri="redis://localhost:6379", app=app)
 
 # Celery Configuration
 celery = Celery(app.name, broker='redis://localhost:6379/0')
@@ -177,9 +178,7 @@ def internal_server_error(error):
 # App Initialization and Run
 # --------------------------------------------
 
-if __name__ == '__main__':  # ✅ Remove extra space before 'if'
+if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # Initializes DB tables
     app.run(host='0.0.0.0', port=5000)  # Use Flask's built-in server for local testing
-
-
