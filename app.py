@@ -177,8 +177,9 @@ def internal_server_error(error):
 # App Initialization and Run
 # --------------------------------------------
 
-if __name__ == '__main__':
+  if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-    gunicorn -w 4 -b 0.0.0.0:5000 app:app  
+        db.create_all()  # Initializes DB tables
+    app.run(host='0.0.0.0', port=5000)  # Use Flask's built-in server for local testing
+
 
