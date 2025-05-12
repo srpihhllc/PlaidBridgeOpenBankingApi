@@ -9,7 +9,7 @@ plaid-python==29.1.0  # Updated to the latest version
 
 # Web server configurations
 gunicorn>=23.0.0
-waitress>=3.0.1
+
 
 # PDF and document processing
 pdfplumber==0.5.28
