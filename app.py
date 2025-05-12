@@ -177,9 +177,10 @@ def internal_server_error(error):
 # App Initialization and Run
 # --------------------------------------------
 
-  if __name__ == '__main__':
+if __name__ == '__main__':  # ✅ Remove extra space before 'if'
     with app.app_context():
         db.create_all()  # Initializes DB tables
     app.run(host='0.0.0.0', port=5000)  # Use Flask's built-in server for local testing
+
 
 
