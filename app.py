@@ -6,7 +6,7 @@ from flask import Flask, jsonify, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
-from limits.storage import RedisStorage  # ✅ Correct
+limiter = Limiter(app, key_func=get_remote_address, storage_uri="redis://localhost:6379")
 from flask_limiter.util import get_remote_address
 from flask_cors import CORS
 from celery import Celery
