@@ -3,21 +3,26 @@ name: Build and Push Container
 on:
   push:
     branches:
-      - main
+      - main  # Runs on push to 'main' branch
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v3
 
+      - name: Install Podman (if not already present)
+        run: |
+          sudo apt update
+          sudo apt install -y podman
+
       - name: Log in to GitHub Container Registry
-        run: echo "${{ secrets.PAT_TOKEN }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.GHCR_PAT }}" | podman login ghcr.io -u ${{ github.actor }} --password-stdin
 
-      - name: Build the container image
-        run: podman build -t ghcr.io/${{ github.repository }}/my-image:latest .
+      - name: Build the Container Image
+        run: podman build -t ghcr.io/${{ github.repository_owner }}/plaidbridgeopenbankingapi:latest -f Dockerfile/PlaidBridgeAPI_Dockerfile .
 
-      - name: Push the container image
-        run: podman push ghcr.io/${{ github.repository }}/my-image:latest
+      - name: Push the Container Image
+        run: podman push ghcr.io/${{ github.repository_owner }}/plaidbridgeopenbankingapi:latest
