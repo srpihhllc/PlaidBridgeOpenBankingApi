@@ -1,5 +1,6 @@
 # --------------------------------------------
 # Enhanced App for PlaidBridge Open Banking API
+# (Updated per AppVision – No Redis, Extra Functionalities)
 # --------------------------------------------
 
 from flask import Flask, jsonify, request, render_template
@@ -7,10 +8,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from limits.storage import RedisStorage  # ✅ Import RedisStorage explicitly
-
+# Removed: from limits.storage import RedisStorage (Redis removed)
 from flask_cors import CORS
-from celery import Celery
+# Removed Celery since you no longer need a Redis broker:
+# from celery import Celery
 from marshmallow import Schema, fields, validate
 from werkzeug.security import generate_password_hash, check_password_hash
 import logging
@@ -47,22 +48,22 @@ plaid_client = PlaidApi(api_client)
 
 def create_link_token():
     """Generates a Plaid Link token for initializing Plaid Link."""
-    request = LinkTokenCreateRequest(
+    request_body = LinkTokenCreateRequest(
         client_name="PlaidBridge Open Banking API",
         language="en",
         country_codes=["US"],
         user={"client_user_id": "unique-user-id"},
         products=["auth", "transactions"]
     )
-    response = plaid_client.link_token_create(request)
+    response = plaid_client.link_token_create(request_body)
     return response["link_token"]
 
 # --------------------------------------------
 # Flask App Initialization
 # --------------------------------------------
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "https://yourtrusteddomain.com"}})  # Restrict to trusted domains
-register_metrics(app, app_version="v1.0.0", app_config="production")  # Prometheus metrics
+CORS(app, resources={r"/*": {"origins": "https://yourtrusteddomain.com"}})
+register_metrics(app, app_version="v1.0.0", app_config="production")
 
 # Configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
@@ -75,17 +76,15 @@ app.config['JWT_REFRESH_TOKEN_EXPIRES'] = 86400
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# ✅ Corrected Flask-Limiter Configuration
-limiter = Limiter(
-    key_func=get_remote_address,
-    storage=RedisStorage("redis://localhost:6379"),
-    app=app
-)
+# --------------------------------------------
+# Rate Limiting (Redis removed – using default in-memory storage)
+# --------------------------------------------
+limiter = Limiter(key_func=get_remote_address)
+limiter.init_app(app)
 
-# Celery Configuration
-celery = Celery(app.name, broker='redis://localhost:6379/0')
-
+# --------------------------------------------
 # Logging Configuration
+# --------------------------------------------
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
@@ -124,6 +123,13 @@ class LoanAgreement(db.Model):
     status = db.Column(db.String(20), default="active")  # 'active', 'completed', 'defaulted'
     ai_flagged = db.Column(db.Boolean, default=False)
 
+# New Model for To-Do List Functionality
+class Todo(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    content = db.Column(db.String(200), nullable=False)
+    completed = db.Column(db.Boolean, default=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+
 # --------------------------------------------
 # Input Validation Schemas
 # --------------------------------------------
@@ -132,6 +138,19 @@ class RegisterSchema(Schema):
     username = fields.String(required=True, validate=validate.Length(min=3))
     password = fields.String(required=True, validate=validate.Length(min=6))
     role = fields.String(required=True, validate=validate.OneOf(["lender", "borrower"]))
+
+class TodoSchema(Schema):
+    content = fields.String(required=True, validate=validate.Length(min=1))
+    completed = fields.Boolean()
+
+# --------------------------------------------
+# Helper Functions
+# --------------------------------------------
+
+def calculate_global_balance():
+    """Aggregates the balance from all transactions."""
+    balance = db.session.query(db.func.sum(Transaction.amount)).scalar() or 0.0
+    return balance
 
 # --------------------------------------------
 # Routes
@@ -165,6 +184,122 @@ def register():
     db.session.commit()
 
     return jsonify({"message": "User registered successfully"}), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    """User login."""
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    user = User.query.filter_by(username=username).first()
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({"message": "Incorrect username or password"}), 401
+
+    access_token = create_access_token(identity=user.id)
+    return jsonify({"access_token": access_token}), 200
+
+# --------------------------------------------
+# To-Do List Endpoints (Task Management)
+# --------------------------------------------
+
+@app.route('/todos', methods=['GET'])
+@jwt_required()
+def get_todos():
+    """Fetch all to-dos for the logged-in user."""
+    user_id = get_jwt_identity()
+    todos = Todo.query.filter_by(user_id=user_id).all()
+    todo_schema = TodoSchema(many=True)
+    return jsonify(todo_schema.dump(todos)), 200
+
+@app.route('/todos', methods=['POST'])
+@jwt_required()
+def add_todo():
+    """Add a new to-do item for the logged-in user."""
+    user_id = get_jwt_identity()
+    todo_schema = TodoSchema()
+    errors = todo_schema.validate(request.json)
+    if errors:
+        return jsonify(errors), 400
+
+    data = request.json
+    new_todo = Todo(content=data.get('content'),
+                    completed=data.get('completed', False),
+                    user_id=user_id)
+    db.session.add(new_todo)
+    db.session.commit()
+    return jsonify(todo_schema.dump(new_todo)), 201
+
+@app.route('/todos/<int:todo_id>', methods=['PUT'])
+@jwt_required()
+def update_todo(todo_id):
+    """Update an existing to-do item."""
+    user_id = get_jwt_identity()
+    todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
+    if not todo:
+        return jsonify({"message": "Todo not found"}), 404
+
+    data = request.json
+    if 'content' in data:
+        todo.content = data['content']
+    if 'completed' in data:
+        todo.completed = data['completed']
+    db.session.commit()
+    todo_schema = TodoSchema()
+    return jsonify(todo_schema.dump(todo)), 200
+
+@app.route('/todos/<int:todo_id>', methods=['DELETE'])
+@jwt_required()
+def delete_todo(todo_id):
+    """Delete a to-do item."""
+    user_id = get_jwt_identity()
+    todo = Todo.query.filter_by(id=todo_id, user_id=user_id).first()
+    if not todo:
+        return jsonify({"message": "Todo not found"}), 404
+
+    db.session.delete(todo)
+    db.session.commit()
+    return jsonify({"message": "Todo deleted"}), 200
+
+# --------------------------------------------
+# Global Account Balance Tracking Endpoint
+# --------------------------------------------
+
+@app.route('/global_balance', methods=['GET'])
+@jwt_required()
+def global_balance():
+    """Return the aggregated global balance from all transactions."""
+    balance = calculate_global_balance()
+    return jsonify({"global_balance": balance}), 200
+
+# --------------------------------------------
+# PDF Statement Processing & Transaction Verification
+# --------------------------------------------
+
+@app.route('/upload_statement', methods=['POST'])
+@jwt_required()
+def upload_statement():
+    """
+    Receive a bank statement PDF, process it using pdfplumber, and extract relevant text.
+    (Further AI validation and corrections can be added here.)
+    """
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file part in the request'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'message': 'No file selected'}), 400
+
+    try:
+        with pdfplumber.open(file) as pdf:
+            first_page = pdf.pages[0]
+            extracted_text = first_page.extract_text()
+    except Exception as e:
+        return jsonify({'message': f'Error processing PDF: {str(e)}'}), 500
+
+    return jsonify({'message': 'Statement processed successfully', 'extracted_text': extracted_text}), 200
+
+# --------------------------------------------
+# Health Check & Error Handlers
+# --------------------------------------------
 
 @app.route('/health', methods=['GET'])
 def health_check():
