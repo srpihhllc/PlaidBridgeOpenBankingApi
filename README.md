@@ -1,15 +1,24 @@
-1. Flask App Initialization
-This section sets up the Flask app, database, JSON Web Tokens for authentication, rate limiting, and logging.
+"""
+Financial Powerhouse API
+-------------------------
+This API serves as a secure intermediary between lenders and borrowers.
+It enforces ethical lending through AI-driven compliance, fraud detection,
+smart contract automation, real-time financial health monitoring, multi-currency lending, 
+and integration with major fintech platforms.
+"""
 
-python
+import os
+import logging
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import logging
-import os
+import pdfplumber
 
+# ---------------------------
+# 1. Flask App Initialization
+# ---------------------------
 app = Flask(__name__)
 
 # Environment configuration
@@ -23,14 +32,22 @@ jwt = JWTManager(app)
 limiter = Limiter(key_func=get_remote_address)
 limiter.init_app(app)
 
-# Configure logging
+# Configure Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(levelname)s] %(message)s")
-2. AI-Powered Compliance & Ethical Lending Enforcement
-This section includes a model for loan agreements, an AI analysis function to flag unethical language, and an endpoint to review loan agreements.
 
-python
-# Model for Loan Agreements
+# ---------------------------
+# (Optional) User Model
+# ---------------------------
+# NOTE: A user model is needed for foreign key references (e.g., lender_id, borrower_id).
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    # Add other fields (email, password hash, etc.) as required
+
+# ---------------------------
+# 2. AI-Powered Compliance & Ethical Lending Enforcement
+# ---------------------------
 class LoanAgreement(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     lender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -40,7 +57,7 @@ class LoanAgreement(db.Model):
     ai_flagged = db.Column(db.Boolean, default=False)
 
 def analyze_loan_agreement(agreement_text):
-    """AI analyzes loan agreements for compliance"""
+    """AI analyzes loan agreements for compliance and ethical standards."""
     unethical_terms = ["hidden fees", "predatory interest rates", "undisclosed penalties"]
     for term in unethical_terms:
         if term in agreement_text.lower():
@@ -50,14 +67,13 @@ def analyze_loan_agreement(agreement_text):
 @app.route('/review_agreement', methods=['POST'])
 @jwt_required()
 def review_agreement():
-    """AI scans and verifies loan agreements"""
+    """Endpoint for AI to scan and verify loan agreements."""
     data = request.json
     result = analyze_loan_agreement(data.get('terms', ''))
     return jsonify(result), 200
 
-# Extra: Automated Compliance Report Generation
 def generate_compliance_report(agreements):
-    """Creates a compliance report for loan agreements flagged by AI"""
+    """Creates a compliance report for loan agreements flagged by AI."""
     flagged = [ag for ag in agreements if ag.ai_flagged]
     if flagged:
         return {"status": "report_generated", "violations": [ag.id for ag in flagged]}
@@ -66,15 +82,14 @@ def generate_compliance_report(agreements):
 @app.route('/compliance_report', methods=['GET'])
 @jwt_required()
 def compliance_report():
-    """Generates and returns a compliance report based on loan agreements."""
+    """Generates a compliance report based on loan agreements."""
     agreements = LoanAgreement.query.all()
     report = generate_compliance_report(agreements)
     return jsonify(report), 200
-3. AI-Driven Financial Security & Fraud Prevention
-This block defines a transaction model with an AI comparison to flag suspicious transactions. An endpoint validates transactions accordingly.
 
-python
-# Transaction model for financial operations
+# ---------------------------
+# 3. AI-Driven Financial Security & Fraud Prevention
+# ---------------------------
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -83,7 +98,7 @@ class Transaction(db.Model):
     ai_verified = db.Column(db.Boolean, default=False)
 
 def detect_fraudulent_transaction(description, amount):
-    """Flags fraudulent transactions based on patterns"""
+    """Flags potentially fraudulent transactions based on patterns."""
     suspicious_terms = ["unexpected large withdrawal", "account drained", "unauthorized payment"]
     if amount > 5000 or any(term in description.lower() for term in suspicious_terms):
         return True
@@ -92,33 +107,32 @@ def detect_fraudulent_transaction(description, amount):
 @app.route('/validate_transaction', methods=['POST'])
 @jwt_required()
 def validate_transaction():
-    """Validates a transaction and flags it if fraudulent"""
+    """Endpoint to validate a transaction using AI fraud detection rules."""
     data = request.json
     fraud_detected = detect_fraudulent_transaction(data.get('description', ''), data.get('amount', 0))
     return jsonify({"fraudulent": fraud_detected}), 200
-4. Borrower-Lender Smart Financial Integration
-An endpoint for borrowers to link their accounts while confirming verification.
 
-python
+# ---------------------------
+# 4. Borrower-Lender Smart Financial Integration
+# ---------------------------
 @app.route('/link_borrower_account', methods=['POST'])
 @jwt_required()
 def link_borrower_account():
     """Allows borrowers to link their accounts securely for lender access."""
     data = request.json
-    borrower_verified = True  # Implement actual borrower verification here.
+    # Implement actual verification logic here
+    borrower_verified = True  
     if borrower_verified:
         return jsonify({"status": "linked", "message": "Borrower account successfully linked"}), 200
     return jsonify({"status": "failed", "message": "Verification required"}), 400
-5. AI-Powered PDF Statement Processing & Transaction Verification
-Uploads a PDF, extracts text, and would ideally analyze transactions for errors or fraud.
 
-python
-import pdfplumber
-
+# ---------------------------
+# 5. AI-Powered PDF Statement Processing & Transaction Verification
+# ---------------------------
 @app.route('/upload_statement', methods=['POST'])
 @jwt_required()
 def upload_statement():
-    """Processes bank statements via PDF, extracts text, and validates transactions."""
+    """Processes bank statements via PDF, extracts text, and performs basic transaction verification."""
     if 'file' not in request.files:
         return jsonify({'message': 'No file uploaded'}), 400
     file = request.files['file']
@@ -127,12 +141,12 @@ def upload_statement():
             extracted_text = pdf.pages[0].extract_text()
     except Exception as e:
         return jsonify({'message': f'Error processing PDF: {str(e)}'}), 500
-    # Here you could add AI-based correction of miscalculations/spellings.
+    # AI-based corrections to miscalculations/spellings can be added here.
     return jsonify({'message': 'Statement processed successfully', 'extracted_text': extracted_text}), 200
-6. Seamless Fintech API Integration
-Integrate with Plaid (or another provider) to generate a link token for account connections.
 
-python
+# ---------------------------
+# 6. Seamless Fintech API Integration (with Plaid)
+# ---------------------------
 from plaid.api.plaid_api import PlaidApi
 from plaid import ApiClient, Configuration
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
@@ -161,15 +175,14 @@ def generate_link_token():
     )
     response = plaid_client.link_token_create(request_body)
     return jsonify({"link_token": response["link_token"]}), 200
-7. Advanced AI-Driven Enhancements
-The following extra features further empower your API.
 
-a. Smart Contract Execution (Simulated)
-This function simulates smart contract execution. In a production system, you would integrate a blockchain network.
-
-python
+# ---------------------------
+# 7. Advanced AI-Driven Enhancements
+# ---------------------------
+# a. Smart Contract Execution (Simulated)
 def execute_smart_contract(loan_agreement_id):
-    """Simulate smart contract automation for a loan agreement."""
+    """Simulate smart contract automation for a loan agreement.
+       In a production system, this could trigger blockchain smart contracts."""
     agreement = LoanAgreement.query.get(loan_agreement_id)
     if agreement and agreement.status == "active":
         # Example: Auto-trigger repayment schedules and lock account details.
@@ -184,12 +197,10 @@ def execute_contract(loan_agreement_id):
     """Endpoint to execute a smart contract for a given loan agreement."""
     result = execute_smart_contract(loan_agreement_id)
     return jsonify(result), 200
-b. Real-Time Financial Health Score
-Analyzes a user’s transactions to compute a financial health score.
 
-python
+# b. Real-Time Financial Health Score
 def generate_financial_health_score(user_id):
-    """Calculates a simple financial health score for a user."""
+    """Calculates a simple financial health score for a user based on transaction history."""
     transactions = Transaction.query.filter_by(user_id=user_id).all()
     if transactions:
         total = sum(t.amount for t in transactions)
@@ -201,51 +212,48 @@ def generate_financial_health_score(user_id):
 @app.route('/financial_health/<int:user_id>', methods=['GET'])
 @jwt_required()
 def financial_health(user_id):
-    """Endpoint to get a real-time financial health score."""
+    """Endpoint to get a real-time financial health score for a user."""
     result = generate_financial_health_score(user_id)
     return jsonify(result), 200
-c. Multi-Currency Conversion for Global Lending
-This example uses a placeholder function for currency conversion. In practice, integrate a live exchange rate API.
 
-python
+# c. Multi-Currency Conversion for Global Lending
 def get_exchange_rate(from_currency, to_currency):
-    """Placeholder: Retrieve exchange rate from an external API."""
-    # Replace with actual API call, e.g., to exchangeratesapi.io or Open Exchange Rates.
+    """Placeholder: Retrieve exchange rate from an external API.
+       Replace with actual API integration (e.g., Open Exchange Rates)."""
     return 1.0  # For simplicity, return 1.0
 
 def convert_currency(amount, from_currency, to_currency):
-    """Converts an amount from one currency to another."""
+    """Converts an amount from one currency to another using live exchange rates."""
     exchange_rate = get_exchange_rate(from_currency, to_currency)
     return amount * exchange_rate
 
 @app.route('/convert_currency', methods=['POST'])
 @jwt_required()
 def convert_currency_route():
-    """Endpoint for converting currencies."""
+    """Endpoint for converting currencies, enabling cross-border transactions."""
     data = request.json
-    converted_amount = convert_currency(data.get('amount', 0),
-                                        data.get('from_currency', 'USD'),
-                                        data.get('to_currency', 'USD'))
+    converted_amount = convert_currency(
+        data.get('amount', 0),
+        data.get('from_currency', 'USD'),
+        data.get('to_currency', 'USD')
+    )
     return jsonify({"converted_amount": converted_amount}), 200
-d. Secure Biometric Authentication (Placeholder)
-Integrate with a third-party biometric authentication service. This section outlines where you’d add such logic.
 
-python
-# Note: For biometric authentication, consider integrating OAuth providers or specialized SDKs.
+# d. Secure Biometric Authentication (Placeholder)
 @app.route('/biometric_auth', methods=['POST'])
 def biometric_auth():
-    """Endpoint placeholder for biometric authentication."""
-    # Implement biometric verification using an external service or SDK.
+    """Endpoint placeholder for biometric authentication.
+       Integrate with specialized biometric authentication services or SDKs."""
     data = request.json
-    # For example, verify fingerprint data, facial recognition, etc.
+    # Example: Verify fingerprint data, facial recognition, etc.
     return jsonify({"status": "authenticated", "message": "Biometric authentication successful"}), 200
-8. Health Check & Error Handlers
-Endpoints to check API health and handle common errors.
 
-python
+# ---------------------------
+# 8. Health Check & Error Handlers
+# ---------------------------
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Simple health check endpoint."""
+    """Simple endpoint to report API health."""
     return jsonify({"status": "healthy"}), 200
 
 @app.errorhandler(404)
@@ -255,11 +263,11 @@ def not_found(error):
 @app.errorhandler(500)
 def internal_error(error):
     return jsonify({"message": "An internal error occurred"}), 500
-9. App Initialization & Run
-The final section creates the database tables and starts your Flask app.
 
-python
+# ---------------------------
+# 9. App Initialization & Run
+# ---------------------------
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # Initializes all defined tables
+        db.create_all()  # Initializes all defined tables, including User, LoanAgreement, Transaction, etc.
     app.run(host='0.0.0.0', port=5000)
