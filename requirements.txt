@@ -13,5 +13,5 @@ Flask-Limiter==2.7.0
 # PDF processing for extracting text from PDF files
 pdfplumber==0.7.4
 
-# Plaid API integration for linking bank accounts
-plaid-python==10.1.0
+# Plaid API integration for linking bank accounts (updated version)
+plaid-python==11.1.0
