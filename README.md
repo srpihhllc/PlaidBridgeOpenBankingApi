@@ -53,8 +53,11 @@ class LoanAgreement(db.Model):
     lender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     borrower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     terms = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default="active")  # active, completed, defaulted
+    status = db.Column(db.String(20), default="active")  
     ai_flagged = db.Column(db.Boolean, default=False)
+    locked = db.Column(db.Boolean, default=False)  # ✅ NEW: Account locking field
+    violation_count = db.Column(db.Integer, default=0)  # ✅ Tracks compliance violations
+
 
 def analyze_loan_agreement(agreement_text):
     """AI analyzes loan agreements for compliance and ethical standards."""
@@ -67,10 +70,23 @@ def analyze_loan_agreement(agreement_text):
 @app.route('/review_agreement', methods=['POST'])
 @jwt_required()
 def review_agreement():
-    """Endpoint for AI to scan and verify loan agreements."""
+    """AI scans and verifies loan agreements, locking borrower accounts upon excessive violations."""
     data = request.json
-    result = analyze_loan_agreement(data.get('terms', ''))
+    borrower_id = data.get('borrower_id')
+    agreement_text = data.get('terms', '')
+    
+    result = analyze_loan_agreement(agreement_text)
+    borrower_agreements = LoanAgreement.query.filter_by(borrower_id=borrower_id).all()
+    
+    if result["status"] == "flagged":
+        for agreement in borrower_agreements:
+            agreement.violation_count += 1
+            if agreement.violation_count >= 3:  # ✅ Lock account after 3 violations
+                agreement.locked = True
+        db.session.commit()
+
     return jsonify(result), 200
+
 
 def generate_compliance_report(agreements):
     """Creates a compliance report for loan agreements flagged by AI."""
@@ -107,10 +123,21 @@ def detect_fraudulent_transaction(description, amount):
 @app.route('/validate_transaction', methods=['POST'])
 @jwt_required()
 def validate_transaction():
-    """Endpoint to validate a transaction using AI fraud detection rules."""
+    """Flags fraudulent transactions and auto-locks borrower accounts on severe fraud detection."""
     data = request.json
+    borrower_id = data.get('user_id')
+    
     fraud_detected = detect_fraudulent_transaction(data.get('description', ''), data.get('amount', 0))
+    
+    if fraud_detected:
+        borrower_agreements = LoanAgreement.query.filter_by(borrower_id=borrower_id).all()
+        for agreement in borrower_agreements:
+            agreement.locked = True  # ✅ Auto-locking borrower account upon fraud detection
+        db.session.commit()
+        return jsonify({"status": "locked", "message": "Transaction blocked—borrower account locked due to fraud."}), 403
+
     return jsonify({"fraudulent": fraud_detected}), 200
+
 
 # ---------------------------
 # 4. Borrower-Lender Smart Financial Integration
@@ -125,6 +152,28 @@ def link_borrower_account():
     if borrower_verified:
         return jsonify({"status": "linked", "message": "Borrower account successfully linked"}), 200
     return jsonify({"status": "failed", "message": "Verification required"}), 400
+
+@app.route('/unlink_borrower_account', methods=['POST'])
+@jwt_required()
+def unlink_borrower_account():
+    """
+    Endpoint to unlink a borrower account.
+    Blocking unlinking if the account is currently locked due to an active, accepted loan agreement.
+    """
+    data = request.json
+    borrower_id = data.get('borrower_id')
+    
+    # Check if the borrower has any active agreements still locked
+    locked_agreements = LoanAgreement.query.filter_by(borrower_id=borrower_id, locked=True).count()
+    if locked_agreements > 0:
+        return jsonify({
+            "status": "blocked",
+            "message": "Cannot unlink account until all loan obligations are met."
+        }), 403
+    
+    # Proceed with unlinking logic (not shown)
+    return jsonify({"status": "unlinked", "message": "Borrower account unlinked successfully."}), 200
+
 
 # ---------------------------
 # 5. AI-Powered PDF Statement Processing & Transaction Verification
