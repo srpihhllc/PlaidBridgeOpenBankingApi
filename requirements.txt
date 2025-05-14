@@ -1,34 +1,17 @@
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+# Core web framework
+Flask==2.2.2
 
-# Initialize Flask app
-app = Flask(__name__)
+# Database ORM for Flask
+Flask-SQLAlchemy==3.0.2
 
-# Configure the database URI
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# JWT-based authentication for securing endpoints
+Flask-JWT-Extended==4.4.4
 
-# Initialize SQLAlchemy
-db = SQLAlchemy(app)
+# Rate limiting to prevent API abuse
+Flask-Limiter==2.7.0
 
-# Define a database model
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
+# PDF processing for extracting text from PDF files
+pdfplumber==0.7.4
 
-    def __repr__(self):
-        return f'<User {self.username}>'
-
-# Create the database tables
-with app.app_context():
-    db.create_all()
-
-# Define a simple route
-@app.route('/')
-def index():
-    return "Flask-SQLAlchemy is working!"
-
-# Run the Flask app
-if __name__ == "__main__":
-    app.run(debug=True)
+# Plaid API integration for linking bank accounts
+plaid-python==10.1.0
