@@ -40,10 +40,38 @@ logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(le
 # (Optional) User Model
 # ---------------------------
 # NOTE: A user model is needed for foreign key references (e.g., lender_id, borrower_id).
+from werkzeug.security import generate_password_hash, check_password_hash
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    # Add other fields (email, password hash, etc.) as required
+    password_hash = db.Column(db.String(200), nullable=False)  # Store hashed passwords
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        return jsonify({"message": "Missing username or password"}), 400
+
+    if User.query.filter_by(username=username).first():
+        return jsonify({"message": "User already exists"}), 400
+
+    user = User(username=username)
+    user.set_password(password)  # Store hashed password
+    db.session.add(user)
+    db.session.commit()
+
+    return jsonify({"msg": "User created"}), 201
+
 
 # ---------------------------
 # 2. AI-Powered Compliance & Ethical Lending Enforcement
