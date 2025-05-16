@@ -224,21 +224,29 @@ def upload_statement():
 # ---------------------------
 # 6. Seamless Fintech API Integration (with Plaid)
 # ---------------------------
-from plaid.api.plaid_api import PlaidApi
-from plaid import ApiClient, Configuration
+from flask import Flask, jsonify, request
+from flask_jwt_extended import jwt_required
+from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.configuration import Configuration
+from plaid.api_client import ApiClient
 
+# Plaid API credentials
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
 PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
 
+# Plaid configuration
 configuration = Configuration(
-    host=f"https://{PLAID_ENV}.plaid.com",
+    host="https://sandbox.plaid.com",
     api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
 )
-api_client = ApiClient(configuration)
-plaid_client = PlaidApi(api_client)
 
+# Initialize API client
+api_client = ApiClient(configuration)
+plaid_client = plaid_api.PlaidApi(api_client)
+
+# Plaid Link Token Generation Endpoint
 @app.route('/generate_link_token', methods=['GET'])
 @jwt_required()
 def generate_link_token():
@@ -250,8 +258,13 @@ def generate_link_token():
         user={"client_user_id": "unique-user-id"},
         products=["auth", "transactions"]
     )
+
     response = plaid_client.link_token_create(request_body)
-    return jsonify({"link_token": response["link_token"]}), 200
+    return jsonify({"link_token": response.link_token}), 200
+
+
+
+
 
 # ---------------------------
 # 7. Advanced AI-Driven Enhancements
