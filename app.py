@@ -246,7 +246,7 @@ from flask_jwt_extended import JWTManager, jwt_required
 import plaid
 from plaid.api_client import ApiClient
 from plaid.configuration import Configuration
-from plaid.api import PlaidApi
+from plaid.api.plaid_api import PlaidApi
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 
 # Initialize Flask app
