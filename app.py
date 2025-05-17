@@ -12,14 +12,19 @@ import logging
 from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask import Flask
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
+app = Flask(__name__)  # Ensure app is defined first
+
 limiter = Limiter(
     key_func=get_remote_address,
-    storage_uri="redis://localhost:6379"  # Replace with your Redis server URI
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="redis://localhost:6379"
 )
-limiter.init_app(app)
+limiter.init_app(app)  # Now app is defined, so this works.
+
 
 
 # ---------------------------
