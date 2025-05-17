@@ -14,30 +14,27 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# Correctly instantiate Flask App once
-app = Flask(__name__)  
+# Initialize Flask app (Only once)
+app = Flask(__name__)
 
-# Initialize Limiter AFTER defining the app
-limiter = Limiter(
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="redis://localhost:6379"
-)
-limiter.init_app(app)  # Ensure app is defined before passing it to limiter
-
-# Configuration and additional initializations
+# Configuration settings
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 
+# Initialize extensions (Only once)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-
-
-
-
+# Corrected Limiter initialization using in-memory storage (No Redis needed)
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+limiter.init_app(app)
 
 # ---------------------------
 # 1. Flask App Initialization
@@ -95,7 +92,6 @@ def register():
 
     return jsonify({"msg": "User created"}), 201
 
-
 # ---------------------------
 # 2. AI-Powered Compliance & Ethical Lending Enforcement
 # ---------------------------
@@ -108,7 +104,6 @@ class LoanAgreement(db.Model):
     ai_flagged = db.Column(db.Boolean, default=False)
     locked = db.Column(db.Boolean, default=False)  # ✅ NEW: Account locking field
     violation_count = db.Column(db.Integer, default=0)  # ✅ Tracks compliance violations
-
 
 def analyze_loan_agreement(agreement_text):
     """AI analyzes loan agreements for compliance and ethical standards."""
@@ -137,7 +132,6 @@ def review_agreement():
         db.session.commit()
 
     return jsonify(result), 200
-
 
 def generate_compliance_report(agreements):
     """Creates a compliance report for loan agreements flagged by AI."""
@@ -189,7 +183,6 @@ def validate_transaction():
 
     return jsonify({"fraudulent": fraud_detected}), 200
 
-
 # ---------------------------
 # 4. Borrower-Lender Smart Financial Integration
 # ---------------------------
@@ -224,7 +217,6 @@ def unlink_borrower_account():
     
     # Proceed with unlinking logic (not shown)
     return jsonify({"status": "unlinked", "message": "Borrower account unlinked successfully."}), 200
-
 
 # ---------------------------
 # 5. AI-Powered PDF Statement Processing & Transaction Verification
@@ -320,7 +312,6 @@ def generate_link_token():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-
 
 # ---------------------------
 # 7. Advanced AI-Driven Enhancements
