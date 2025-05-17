@@ -257,6 +257,10 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret')
 jwt = JWTManager(app)
 
 # ----- Plaid API Credentials & Environment -----
+import os
+import logging
+import plaid  # Ensure the plaid package is imported for non-sandbox environments
+
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
 PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox').lower()
@@ -267,8 +271,7 @@ if not PLAID_CLIENT_ID or not PLAID_SECRET:
 # Determine the host based on the environment using Plaid's built-in environments.
 if PLAID_ENV == 'sandbox':
     from plaid.configuration import Environment
-host = Environment.Sandbox
-
+    host = Environment.Sandbox
 elif PLAID_ENV == 'development':
     host = plaid.Environment.Development
 elif PLAID_ENV == 'production':
@@ -277,14 +280,19 @@ else:
     logging.warning("Unknown PLAID_ENV; defaulting to Sandbox.")
     host = plaid.Environment.Sandbox
 
+
+
+
 # ----- Plaid API Configuration -----
 configuration = Configuration(
     host=host,
     api_key={
-        "clientId": PLAID_CLIENT_ID,  # Some versions might require "client_id" – verify per your docs.
+        "clientId": PLAID_CLIENT_ID,  # Some versions might require "client_id"; verify per your docs.
         "secret": PLAID_SECRET
     }
 )
+
+
 
 # Initialize the Plaid API client using the correct import.
 api_client = ApiClient(configuration)
