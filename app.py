@@ -229,11 +229,12 @@ import logging
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, jwt_required
 import plaid
-from plaid import ApiClient, Configuration
+from plaid.api_client import ApiClient
+from plaid.configuration import Configuration
 from plaid.api import PlaidApi
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 
-# Initialize the Flask application
+# Initialize Flask app
 app = Flask(__name__)
 
 # ----- JWT Setup -----
@@ -248,7 +249,7 @@ PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox').lower()
 if not PLAID_CLIENT_ID or not PLAID_SECRET:
     raise Exception("PLAID_CLIENT_ID and PLAID_SECRET must be defined in your environment.")
 
-# Determine the host from the environment. For version 31, it's better to use the provided Environments.
+# Determine the host based on the environment using Plaid's built-in environments.
 if PLAID_ENV == 'sandbox':
     host = plaid.Environment.Sandbox
 elif PLAID_ENV == 'development':
@@ -263,12 +264,12 @@ else:
 configuration = Configuration(
     host=host,
     api_key={
-        "clientId": PLAID_CLIENT_ID,  # Verify with Plaid docs if your version requires "client_id" instead
+        "clientId": PLAID_CLIENT_ID,  # Some versions might require "client_id" – verify per your docs.
         "secret": PLAID_SECRET
     }
 )
 
-# Initialize the Plaid API client using the updated import path
+# Initialize the Plaid API client using the correct import.
 api_client = ApiClient(configuration)
 plaid_client = PlaidApi(api_client)
 
@@ -285,7 +286,7 @@ def generate_link_token():
             client_name="PlaidBridge Open Banking API",
             language="en",
             country_codes=["US"],
-            user={"client_user_id": "unique-user-id"},  # Replace with your dynamic user id if needed
+            user={"client_user_id": "unique-user-id"},  # Replace with dynamic user id as needed
             products=["auth", "transactions"]
         )
         response = plaid_client.link_token_create(request_body)
