@@ -14,7 +14,13 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import pdfplumber
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    storage_uri="redis://localhost:6379"  # Replace with your Redis server URI
+)
+limiter.init_app(app)
+
 
 # ---------------------------
 # 1. Flask App Initialization
