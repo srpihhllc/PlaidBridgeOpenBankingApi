@@ -266,7 +266,9 @@ if not PLAID_CLIENT_ID or not PLAID_SECRET:
 
 # Determine the host based on the environment using Plaid's built-in environments.
 if PLAID_ENV == 'sandbox':
-    host = plaid.Environment.Sandbox
+    from plaid.configuration import Environment
+host = Environment.Sandbox
+
 elif PLAID_ENV == 'development':
     host = plaid.Environment.Development
 elif PLAID_ENV == 'production':
