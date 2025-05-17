@@ -224,43 +224,79 @@ def upload_statement():
 # ---------------------------
 # 6. Seamless Fintech API Integration (with Plaid)
 # ---------------------------
+import os
+import logging
 from flask import Flask, jsonify, request
-from flask_jwt_extended import jwt_required
-from plaid.api import plaid_api
+from flask_jwt_extended import JWTManager, jwt_required
+import plaid
+from plaid import ApiClient, Configuration
+from plaid.api import PlaidApi
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
-from plaid.configuration import Configuration
-from plaid.api_client import ApiClient
 
-# Plaid API credentials
+# Initialize the Flask application
+app = Flask(__name__)
+
+# ----- JWT Setup -----
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your_jwt_secret')
+jwt = JWTManager(app)
+
+# ----- Plaid API Credentials & Environment -----
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
-PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
+PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox').lower()
 
-# Plaid configuration
+if not PLAID_CLIENT_ID or not PLAID_SECRET:
+    raise Exception("PLAID_CLIENT_ID and PLAID_SECRET must be defined in your environment.")
+
+# Determine the host from the environment. For version 31, it's better to use the provided Environments.
+if PLAID_ENV == 'sandbox':
+    host = plaid.Environment.Sandbox
+elif PLAID_ENV == 'development':
+    host = plaid.Environment.Development
+elif PLAID_ENV == 'production':
+    host = plaid.Environment.Production
+else:
+    logging.warning("Unknown PLAID_ENV; defaulting to Sandbox.")
+    host = plaid.Environment.Sandbox
+
+# ----- Plaid API Configuration -----
 configuration = Configuration(
-    host="https://sandbox.plaid.com",
-    api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
+    host=host,
+    api_key={
+        "clientId": PLAID_CLIENT_ID,  # Verify with Plaid docs if your version requires "client_id" instead
+        "secret": PLAID_SECRET
+    }
 )
 
-# Initialize API client
+# Initialize the Plaid API client using the updated import path
 api_client = ApiClient(configuration)
-plaid_client = plaid_api.PlaidApi(api_client)
+plaid_client = PlaidApi(api_client)
 
-# Plaid Link Token Generation Endpoint
+# ----- Plaid Link Token Generation Endpoint -----
 @app.route('/generate_link_token', methods=['GET'])
 @jwt_required()
 def generate_link_token():
-    """Generates a Plaid Link token for open banking integration."""
-    request_body = LinkTokenCreateRequest(
-        client_name="PlaidBridge Open Banking API",
-        language="en",
-        country_codes=["US"],
-        user={"client_user_id": "unique-user-id"},
-        products=["auth", "transactions"]
-    )
+    """
+    Generates a Plaid Link token for open banking integration.
+    This endpoint is protected by JWT.
+    """
+    try:
+        request_body = LinkTokenCreateRequest(
+            client_name="PlaidBridge Open Banking API",
+            language="en",
+            country_codes=["US"],
+            user={"client_user_id": "unique-user-id"},  # Replace with your dynamic user id if needed
+            products=["auth", "transactions"]
+        )
+        response = plaid_client.link_token_create(request_body)
+        return jsonify({"link_token": response.link_token}), 200
+    except Exception as e:
+        logging.error("Error generating Plaid link token: %s", e)
+        return jsonify({"error": str(e)}), 500
 
-    response = plaid_client.link_token_create(request_body)
-    return jsonify({"link_token": response.link_token}), 200
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
 
 # ---------------------------
 # 7. Advanced AI-Driven Enhancements
