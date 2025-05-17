@@ -262,10 +262,6 @@ def generate_link_token():
     response = plaid_client.link_token_create(request_body)
     return jsonify({"link_token": response.link_token}), 200
 
-
-
-
-
 # ---------------------------
 # 7. Advanced AI-Driven Enhancements
 # ---------------------------
