@@ -15,6 +15,10 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
+from dotenv import load_dotenv  # ✅ Load environment variables from .env
+
+# ✅ Load environment variables
+load_dotenv()
 
 # ✅ Initialize Flask app (Only once)
 app = Flask(__name__)
@@ -28,17 +32,33 @@ app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# ✅ Corrected Limiter initialization using in-memory storage (No Redis needed)
+# ✅ Fixed Flask-Limiter Initialization (Correct Argument Order)
 limiter = Limiter(
-    get_remote_address,  # ✅ Fix: Removed explicit 'key_func='
-    app,
+    key_func=get_remote_address,  # ✅ Correctly passes `key_func` argument
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://"
 )
+limiter.init_app(app)  # ✅ Attach limiter separately to Flask app
 
 # ✅ Configure Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(levelname)s] %(message)s")
+
+# ---------------------------
+# Health Check Endpoint
+# ---------------------------
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
+# ---------------------------
+# App Initialization & Run
+# ---------------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # ✅ Initializes all defined tables
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
 
 
 # ---------------------------
