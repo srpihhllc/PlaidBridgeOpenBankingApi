@@ -16,45 +16,30 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 
-# Initialize Flask app (Only once)
+# ✅ Initialize Flask app (Only once)
 app = Flask(__name__)
 
-# Configuration settings
+# ✅ Configuration settings
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 
-# Initialize extensions (Only once)
+# ✅ Initialize extensions (Only once)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# Corrected Limiter initialization using in-memory storage (No Redis needed)
+# ✅ Corrected Limiter initialization using in-memory storage (No Redis needed)
 limiter = Limiter(
-    key_func=get_remote_address,
+    get_remote_address,  # ✅ Fix: Removed explicit 'key_func='
+    app,
     default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://"
 )
-limiter.init_app(app)
 
-# ---------------------------
-# 1. Flask App Initialization
-# ---------------------------
-app = Flask(__name__)
-
-# Environment configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
-
-# Initialize Database, JWT Manager and Rate Limiter
-db = SQLAlchemy(app)
-jwt = JWTManager(app)
-limiter = Limiter(key_func=get_remote_address)
-limiter.init_app(app)
-
-# Configure Logging
+# ✅ Configure Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(levelname)s] %(message)s")
+
 
 # ---------------------------
 # (Optional) User Model
