@@ -262,7 +262,7 @@ PLAID_SECRET = os.getenv('PLAID_SECRET')
 PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox').lower()
 
 if not PLAID_CLIENT_ID or not PLAID_SECRET:
-    raise Exception("PLAID_CLIENT_ID and PLAID_SECRET must be defined in your environment.")
+    raise Exception(f"PLAID_CLIENT_ID: {PLAID_CLIENT_ID}, PLAID_SECRET: {PLAID_SECRET} must be defined in your environment.")
 
 # Determine the host based on the environment using Plaid's built-in environments.
 if PLAID_ENV == 'sandbox':
