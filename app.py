@@ -241,6 +241,7 @@ def upload_statement():
 # ---------------------------
 import os
 import logging
+from dotenv import load_dotenv  # ✅ Added dotenv for loading environment variables
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, jwt_required
 import plaid
@@ -248,6 +249,9 @@ from plaid.api_client import ApiClient
 from plaid.configuration import Configuration
 from plaid.api.plaid_api import PlaidApi
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
+
+# ✅ Load environment variables from .env file
+load_dotenv()
 
 # Initialize Flask app (if not already initialized in your project)
 app = Flask(__name__)
