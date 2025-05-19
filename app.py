@@ -9,47 +9,29 @@ and integration with major fintech platforms.
 
 import os
 import logging
-from flask import Flask, jsonify, request
+from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
-from werkzeug.security import generate_password_hash, check_password_hash
-from dotenv import load_dotenv  # ✅ Load environment variables from .env
+from flask_jwt_extended import JWTManager
+from dotenv import load_dotenv
 
-# ✅ Load environment variables
+# Load environment variables
 load_dotenv()
 
-# ✅ Initialize Flask app (Only once)
+# Initialize Flask app
 app = Flask(__name__)
 
-# ✅ Configuration settings
+# Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
-
-# ✅ Initialize extensions (Only once)
 db = SQLAlchemy(app)
+
+# JWT Configuration
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 jwt = JWTManager(app)
 
-# ✅ Fixed Flask-Limiter Initialization (Correct Argument Order)
-limiter = Limiter(
-    key_func=get_remote_address,  # ✅ Correctly passes `key_func` argument
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
-)
-limiter.init_app(app)  # ✅ Attach limiter separately to Flask app
-
-# ✅ Configure Logging
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+# Logging configuration
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(levelname)s] %(message)s")
-
-# ---------------------------
-# Health Check Endpoint
-# ---------------------------
-@app.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy"}), 200
 
 # ---------------------------
 # App Initialization & Run
@@ -57,7 +39,13 @@ def health_check():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()  # ✅ Initializes all defined tables
-    app.run(host='0.0.0.0', port=5000, debug=True)
+        logging.info("Database initialized.")  # ✅ Logs successful DB setup
+
+    try:
+        app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=os.getenv('FLASK_DEBUG', 'False') == 'True')
+    except Exception as e:
+        logging.error(f"Error starting Flask app: {e}")
+
 
 
 
