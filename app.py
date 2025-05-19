@@ -33,7 +33,8 @@ jwt = JWTManager(app)
 
 # ✅ Flask-Limiter for rate limiting
 from limits.storage import MemoryStorage
-limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "50 per hour"], storage_uri="memory://")
+limiter = Limiter(app, key_func=get_remote_address, default_limits=["200 per day", "50 per hour"], storage_uri="memory://")
+
 
 # ✅ Configure Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
