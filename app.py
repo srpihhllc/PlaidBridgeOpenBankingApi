@@ -37,8 +37,9 @@ from limits.storage import MemoryStorage
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri=MemoryStorage()
+    storage=MemoryStorage()  # ✅ Use `storage=` instead of `storage_uri=`
 )
+
 
 limiter.init_app(app)
 
