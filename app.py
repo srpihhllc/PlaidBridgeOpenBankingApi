@@ -246,19 +246,19 @@ def upload_statement():
 # ---------------------------
 import os
 import logging
-from dotenv import load_dotenv  # ✅ Added dotenv for loading environment variables
+from dotenv import load_dotenv  # For loading environment variables
 from flask import Flask, jsonify, request
-from flask_jwt_extended import JWTManager, jwt_required
+from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 import plaid
 from plaid.api_client import ApiClient
 from plaid.configuration import Configuration
 from plaid.api.plaid_api import PlaidApi
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 
-# ✅ Load environment variables from .env file
+# Load environment variables from .env file
 load_dotenv()
 
-# Initialize Flask app (if not already initialized in your project)
+# Initialize Flask app
 app = Flask(__name__)
 
 # ----- JWT Setup -----
@@ -298,6 +298,25 @@ configuration = Configuration(
 api_client = ApiClient(configuration)
 plaid_client = PlaidApi(api_client)
 
+# ----- Login Endpoint for JWT -----
+# This endpoint simulates user authentication, generating a JWT token for use with protected endpoints.
+@app.route('/api/login', methods=['POST'])
+def login():
+    """
+    Authenticates the user and returns a JWT token.
+    This is a simplified example and should be replaced with actual validation logic.
+    """
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+    
+    # Replace the following with your real user authentication logic.
+    if username == 'test' and password == 'password':
+        access_token = create_access_token(identity=username)
+        return jsonify(access_token=access_token), 200
+    else:
+        return jsonify({"msg": "Bad username or password"}), 401
+
 # ----- Plaid Link Token Generation Endpoint -----
 @app.route('/generate_link_token', methods=['GET'])
 @jwt_required()
@@ -307,11 +326,16 @@ def generate_link_token():
     This endpoint is protected by JWT.
     """
     try:
+        # Retrieve dynamic user id from the JWT
+        current_user = get_jwt_identity()
+        # Use the authenticated user's identity as client_user_id, or fallback to a default value.
+        client_user_id = current_user if current_user else "unique-user-id"
+
         request_body = LinkTokenCreateRequest(
             client_name="PlaidBridge Open Banking API",
             language="en",
             country_codes=["US"],
-            user={"client_user_id": "unique-user-id"},  # Replace with dynamic user id as needed.
+            user={"client_user_id": client_user_id},  # Dynamic assignment based on JWT identity
             products=["auth", "transactions"]
         )
         response = plaid_client.link_token_create(request_body)
