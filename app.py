@@ -32,13 +32,16 @@ db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
 # ✅ Flask-Limiter for rate limiting
+from limits.storage import MemoryStorage
+
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
-    storage_uri="memory://"
+    storage_uri=MemoryStorage()
 )
 
 limiter.init_app(app)
+
 
 # ✅ Configure Logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
