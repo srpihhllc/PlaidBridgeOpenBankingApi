@@ -9,29 +9,46 @@ and integration with major fintech platforms.
 
 import os
 import logging
-from flask import Flask
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
-# Load environment variables
+# ✅ Load environment variables
 load_dotenv()
 
-# Initialize Flask app
+# ✅ Initialize Flask app
 app = Flask(__name__)
 
-# Database configuration
+# ✅ Configuration settings
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-# JWT Configuration
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
+
+# ✅ Initialize extensions
+db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
-# Logging configuration
-LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
+# ✅ Flask-Limiter for rate limiting
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+limiter.init_app(app)
+
+# ✅ Configure Logging
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
 logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(levelname)s] %(message)s")
+
+# ---------------------------
+# Health Check Endpoint
+# ---------------------------
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy"}), 200
 
 # ---------------------------
 # App Initialization & Run
@@ -42,12 +59,13 @@ if __name__ == '__main__':
         logging.info("Database initialized.")  # ✅ Logs successful DB setup
 
     try:
-        app.run(host='0.0.0.0', port=int(os.getenv('PORT', 5000)), debug=os.getenv('FLASK_DEBUG', 'False') == 'True')
+        app.run(
+            host='0.0.0.0', 
+            port=int(os.getenv('PORT', 5000)),  # ✅ Dynamically set port
+            debug=os.getenv('FLASK_DEBUG', 'False') == 'True'  # ✅ Toggles debug mode dynamically
+        )
     except Exception as e:
         logging.error(f"Error starting Flask app: {e}")
-
-
-
 
 # ---------------------------
 # (Optional) User Model
