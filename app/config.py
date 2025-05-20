@@ -1,7 +1,9 @@
 # app/config.py
+
 from dotenv import load_dotenv
 import os
 
+# ✅ Load environment variables
 load_dotenv()
 
 class Config:
@@ -19,5 +21,12 @@ class Config:
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
     
-    # Application Settings
-    PORT = int(os.getenv('PORT', 3000))
+    # Flask-Limiter Settings (MemoryStorage)
+    LIMITER_DEFAULTS = ["200 per day", "50 per hour"]
+
+    # Plaid API Configuration
+    PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')  # Default environment
+
+    # ✅ Correct Port Setting
+    PORT = int(os.getenv('PORT', 5000))  # ✅ **Now correctly set to 5000**
+
