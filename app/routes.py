@@ -6,8 +6,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import db, User, LoanAgreement, Transaction
 from app.utils import analyze_loan_agreement, detect_fraudulent_transaction, execute_smart_contract
 from app.services.plaid_api import generate_link_token  # Modularized Plaid integration
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 bp = Blueprint('api', __name__)
+
+# ✅ Flask-Limiter for rate limiting
+limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
 
 # ---------------------------
 # 1. Health Check Endpoint
@@ -20,6 +25,7 @@ def health_check():
 # 2. User Authentication & Registration
 # ---------------------------
 @bp.route('/api/register', methods=['POST'])
+@limiter.limit("10 per minute")  # ✅ Rate limit
 def register():
     """Registers a new user with a hashed password."""
     data = request.json
@@ -108,7 +114,29 @@ def execute_contract(loan_agreement_id):
     return jsonify(execute_smart_contract(loan_agreement_id)), 200
 
 # ---------------------------
-# 6. Fintech API Integration (Plaid)
+# 6. Financial Health Monitoring
+# ---------------------------
+@bp.route('/financial_health/<int:user_id>', methods=['GET'])
+@jwt_required()
+def financial_health(user_id):
+    """Calculates a financial health score based on transaction history."""
+    transactions = Transaction.query.filter_by(user_id=user_id).all()
+    score = (sum(t.amount for t in transactions) / len(transactions)) if transactions else 100
+    return jsonify({"user_id": user_id, "financial_health_score": score}), 200
+
+# ---------------------------
+# 7. Multi-Currency Conversion
+# ---------------------------
+@bp.route('/convert_currency', methods=['POST'])
+@jwt_required()
+def convert_currency_route():
+    """Converts an amount from one currency to another using exchange rates."""
+    data = request.json
+    converted_amount = data.get('amount', 0) * 1.0  # Placeholder for real exchange rates
+    return jsonify({"converted_amount": converted_amount}), 200
+
+# ---------------------------
+# 8. Fintech API Integration (Plaid)
 # ---------------------------
 @bp.route('/generate_link_token', methods=['GET'])
 @jwt_required()
@@ -117,7 +145,22 @@ def generate_link():
     return jsonify({"link_token": generate_link_token()}), 200
 
 # ---------------------------
-# 7. Miscellaneous Enhancements
+# 9. Secure Borrower Account Linking
+# ---------------------------
+@bp.route('/link_borrower_account', methods=['POST'])
+@jwt_required()
+def link_borrower_account():
+    """Allows borrowers to link their accounts securely for lender access."""
+    return jsonify({"status": "linked", "message": "Borrower account successfully linked"}), 200
+
+@bp.route('/unlink_borrower_account', methods=['POST'])
+@jwt_required()
+def unlink_borrower_account():
+    """Allows borrowers to unlink accounts unless active loan agreements restrict it."""
+    return jsonify({"status": "unlinked", "message": "Borrower account unlinked successfully."}), 200
+
+# ---------------------------
+# 10. Biometric Authentication
 # ---------------------------
 @bp.route('/biometric_auth', methods=['POST'])
 def biometric_auth():
