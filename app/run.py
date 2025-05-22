@@ -23,7 +23,7 @@ with app.app_context():
 if __name__ == "__main__":
     # Read configuration values (port and debug flag) from the environment,
     # offering default values if the environment variables are not set.
-    port = int(os.environ.get("PORT", 3000))  # ✅ Changed default port to 3000
+    port = int(os.environ.get("PORT", 5000))  # ✅ Changed default port to 5000
     debug = os.environ.get("DEBUG", "False").lower() in ["true", "1", "yes"]
 
     # Run Flask-SocketIO server instead of default Flask `app.run()`
