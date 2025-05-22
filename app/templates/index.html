@@ -1,0 +1,125 @@
+# index.html
+
+
+{% extends "base.html" %}
+
+{% block title %}Home - Financial Powerhouse API{% endblock %}
+
+{% block content %}
+  <h2>Welcome to the Financial Powerhouse API Dashboard</h2>
+  <p>
+    This dashboard allows you to manage users, review loan agreements, monitor financial health,
+    integrate with Plaid, and more.
+  </p>
+
+  <h3>API Endpoints</h3>
+  <ul class="api-list">
+    <li>
+      <strong>Health Check:</strong><br>
+      Endpoint: <code>/health</code> (GET)<br>
+      <a href="{{ url_for('api.health_check') }}" target="_blank">Check Health</a>
+    </li>
+    <li>
+      <strong>Register User:</strong><br>
+      Endpoint: <code>/api/register</code> (POST)<br>
+      <form action="{{ url_for('api.register') }}" method="post">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Register</button>
+      </form>
+    </li>
+    <li>
+      <strong>User Login:</strong><br>
+      Endpoint: <code>/api/login</code> (POST)<br>
+      <form action="{{ url_for('api.login') }}" method="post">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <button type="submit">Login</button>
+      </form>
+    </li>
+    <li>
+      <strong>Review Agreement:</strong><br>
+      Endpoint: <code>/review_agreement</code> (POST)<br>
+      <form action="{{ url_for('api.review_agreement') }}" method="post">
+        <input type="number" name="borrower_id" placeholder="Borrower ID" required>
+        <textarea name="terms" placeholder="Enter agreement text here" required></textarea>
+        <button type="submit">Review Agreement</button>
+      </form>
+    </li>
+    <li>
+      <strong>Compliance Report:</strong><br>
+      Endpoint: <code>/compliance_report</code> (GET)<br>
+      <a href="{{ url_for('api.compliance_report') }}" target="_blank">View Report</a>
+    </li>
+    <li>
+      <strong>Validate Transaction:</strong><br>
+      Endpoint: <code>/validate_transaction</code> (POST)<br>
+      <form action="{{ url_for('api.validate_transaction') }}" method="post">
+        <input type="number" name="user_id" placeholder="User ID" required>
+        <input type="text" name="description" placeholder="Description" required>
+        <input type="number" step="0.01" name="amount" placeholder="Amount" required>
+        <button type="submit">Validate Transaction</button>
+      </form>
+    </li>
+    <li>
+      <strong>Link Borrower Account:</strong><br>
+      Endpoint: <code>/link_borrower_account</code> (POST)<br>
+      <form action="{{ url_for('api.link_borrower_account') }}" method="post">
+        <input type="number" name="borrower_id" placeholder="Borrower ID" required>
+        <button type="submit">Link Account</button>
+      </form>
+    </li>
+    <li>
+      <strong>Unlink Borrower Account:</strong><br>
+      Endpoint: <code>/unlink_borrower_account</code> (POST)<br>
+      <form action="{{ url_for('api.unlink_borrower_account') }}" method="post">
+        <input type="number" name="borrower_id" placeholder="Borrower ID" required>
+        <button type="submit">Unlink Account</button>
+      </form>
+    </li>
+    <li>
+      <strong>Upload Statement:</strong><br>
+      Endpoint: <code>/upload_statement</code> (POST - File Upload)<br>
+      <form action="{{ url_for('api.upload_statement') }}" method="post" enctype="multipart/form-data">
+        <input type="file" name="file" accept="application/pdf" required>
+        <button type="submit">Upload Statement</button>
+      </form>
+    </li>
+    <li>
+      <strong>Generate Plaid Link Token:</strong><br>
+      Endpoint: <code>/generate_link_token</code> (GET)<br>
+      <a href="{{ url_for('api.generate_link') }}" target="_blank">Generate Link Token</a>
+    </li>
+    <li>
+      <strong>Execute Smart Contract:</strong><br>
+      Endpoint: <code>/execute_contract/&lt;loan_agreement_id&gt;</code> (POST)<br>
+      <form action="{{ url_for('api.execute_contract', loan_agreement_id=1) }}" method="post">
+        <input type="number" name="loan_agreement_id" placeholder="Loan Agreement ID" required>
+        <button type="submit">Execute Contract</button>
+      </form>
+    </li>
+    <li>
+      <strong>Financial Health Score:</strong><br>
+      Endpoint: <code>/financial_health/&lt;user_id&gt;</code> (GET)<br>
+      <a href="{{ url_for('api.financial_health', user_id=1) }}" target="_blank">View Financial Health</a>
+    </li>
+    <li>
+      <strong>Convert Currency:</strong><br>
+      Endpoint: <code>/convert_currency</code> (POST)<br>
+      <form action="{{ url_for('api.convert_currency') }}" method="post">
+        <input type="number" step="0.01" name="amount" placeholder="Amount" required>
+        <input type="text" name="from_currency" placeholder="From Currency (e.g., USD)" required>
+        <input type="text" name="to_currency" placeholder="To Currency (e.g., EUR)" required>
+        <button type="submit">Convert Currency</button>
+      </form>
+    </li>
+    <li>
+      <strong>Biometric Authentication:</strong><br>
+      Endpoint: <code>/biometric_auth</code> (POST)<br>
+      <form action="{{ url_for('api.biometric_auth') }}" method="post">
+        <input type="text" name="data" placeholder="Biometric Data" required>
+        <button type="submit">Authenticate</button>
+      </form>
+    </li>
+  </ul>
+{% endblock %}
