@@ -1,6 +1,6 @@
 # app/routes.py
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, render_template  # ✅ Add `render_template`
 from flask_jwt_extended import jwt_required, create_access_token, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from app.models import db, User, LoanAgreement, Transaction
@@ -8,16 +8,18 @@ from app.utils import analyze_loan_agreement, detect_fraudulent_transaction, exe
 from app.services.plaid_api import generate_link_token  # Modularized Plaid integration
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+
+bp = Blueprint('api', __name__)
+
+# ✅ Flask-Limiter for rate limiting
+limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
+
 # ---------------------------
 # Web Page Route (Serves HTML Template)
 # ---------------------------
 @bp.route("/")
 def home():
     return render_template("index.html")  # ✅ Ensure `index.html` is in `app/templates/`
-bp = Blueprint('api', __name__)
-
-# ✅ Flask-Limiter for rate limiting
-limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "50 per hour"])
 
 # ---------------------------
 # 1. Health Check Endpoint
@@ -25,6 +27,7 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["200 per day", "5
 @bp.route('/health', methods=['GET'])
 def health_check():
     return jsonify({"status": "healthy"}), 200
+
 
 # ---------------------------
 # 2. User Authentication & Registration
