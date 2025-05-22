@@ -1,5 +1,5 @@
 """
-Financial Powerhouse API
+PlaidBridgeOpenBankingApi
 -------------------------
 This API serves as a secure intermediary between lenders and borrowers.
 It enforces ethical lending through AI-driven compliance, fraud detection,
