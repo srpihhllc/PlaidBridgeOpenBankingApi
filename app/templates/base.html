@@ -1,0 +1,50 @@
+# base.html
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Financial Powerhouse API{% endblock %}</title>
+  <!-- Optional: Link to your common CSS file -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <style>
+    body { font-family: Arial, sans-serif; background-color: #f8f9fa; margin: 0; padding: 0; }
+    header { background: #343a40; color: #fff; padding: 1rem; text-align: center; }
+    nav { background: #495057; padding: 0.5rem; }
+    nav ul { list-style: none; padding: 0; text-align: center; margin: 0; }
+    nav ul li { display: inline-block; margin: 0 1rem; }
+    nav ul li a { color: #fff; text-decoration: none; }
+    .container { max-width: 1200px; margin: 2rem auto; padding: 1rem; background: #fff; }
+    footer { background: #343a40; color: #fff; text-align: center; padding: 1rem; margin-top: 2rem; }
+    form { margin-top: 0.5rem; }
+    form input, form textarea, form button { margin: 0.25rem 0; padding: 0.5rem; }
+    form input, form textarea { width: 80%; display: block; }
+    form button { padding: 0.5rem 1rem; }
+    ul.api-list { list-style: none; padding: 0; }
+    ul.api-list li { margin-bottom: 1.5rem; }
+    code { background: #e9ecef; padding: 0.2rem 0.3rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Financial Powerhouse API Dashboard</h1>
+  </header>
+  <nav>
+    <ul>
+      <!-- Common navigation links (adjust endpoints as needed) -->
+      <li><a href="{{ url_for('api.health_check') }}">Health Check</a></li>
+      <li><a href="{{ url_for('api.register') }}">Register</a></li>
+      <li><a href="{{ url_for('api.login') }}">Login</a></li>
+      <li><a href="{{ url_for('api.compliance_report') }}">Compliance Report</a></li>
+      <li><a href="{{ url_for('api.financial_health', user_id=1) }}">Financial Health</a></li>
+    </ul>
+  </nav>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+  <footer>
+    <p>&copy; 2025 Financial Powerhouse Inc. All rights reserved.</p>
+  </footer>
+</body>
+</html>
