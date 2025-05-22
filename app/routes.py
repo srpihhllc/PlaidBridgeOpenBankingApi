@@ -8,7 +8,12 @@ from app.utils import analyze_loan_agreement, detect_fraudulent_transaction, exe
 from app.services.plaid_api import generate_link_token  # Modularized Plaid integration
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-
+# ---------------------------
+# Web Page Route (Serves HTML Template)
+# ---------------------------
+@bp.route("/")
+def home():
+    return render_template("index.html")  # ✅ Ensure `index.html` is in `app/templates/`
 bp = Blueprint('api', __name__)
 
 # ✅ Flask-Limiter for rate limiting
