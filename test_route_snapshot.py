@@ -17,7 +17,7 @@ def test_route_snapshot(app):
             }
             for rule in app.url_map.iter_rules()
         ),
-        key=lambda item: (item["rule"], item["methods"], item["endpoint"]),
+        key=lambda item: (item["rule"], tuple(item["methods"]), item["endpoint"]),
     )
 
     if not SNAPSHOT_FILE.exists():
