@@ -1,10 +1,8 @@
 # app/utils.py
 
-import datetime
 import base64
+import datetime
 from io import BytesIO
-from fpdf import FPDF
-from PyPDF2 import PdfReader, PdfWriter
 
 def analyze_loan_agreement(agreement_text):
     """AI analyzes loan agreements for compliance and ethical standards."""
@@ -33,6 +31,8 @@ def execute_smart_contract(loan_agreement_id):
 
 def create_bank_statement(data, signature_base64=None):
     """Generates a bank statement PDF using FPDF."""
+    from fpdf import FPDF
+
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -72,4 +72,3 @@ def create_bank_statement(data, signature_base64=None):
     pdf.output(pdf_stream)
     pdf_stream.seek(0)
     return pdf_stream
-

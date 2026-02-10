@@ -1,0 +1,107 @@
+[
+  {
+    "rule": "/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.home"
+  },
+  {
+    "rule": "/api/login",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.login"
+  },
+  {
+    "rule": "/api/register",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.register"
+  },
+  {
+    "rule": "/biometric_auth",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.biometric_auth"
+  },
+  {
+    "rule": "/compliance_report",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.compliance_report"
+  },
+  {
+    "rule": "/convert_currency",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.convert_currency_route"
+  },
+  {
+    "rule": "/execute_contract/<int:loan_agreement_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.execute_contract"
+  },
+  {
+    "rule": "/financial_health/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.financial_health"
+  },
+  {
+    "rule": "/generate_link_token",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.generate_link"
+  },
+  {
+    "rule": "/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.health_check"
+  },
+  {
+    "rule": "/link_borrower_account",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.link_borrower_account"
+  },
+  {
+    "rule": "/review_agreement",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.review_agreement"
+  },
+  {
+    "rule": "/static/<path:filename>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "static"
+  },
+  {
+    "rule": "/unlink_borrower_account",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.unlink_borrower_account"
+  },
+  {
+    "rule": "/validate_transaction",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.validate_transaction"
+  }
+]
