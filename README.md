@@ -1,407 +1,322 @@
-from flask import Flask, jsonify, request, send_from_directory, redirect, url_for, abort, render_template
-from flask_socketio import SocketIO, emit
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from dotenv import load_dotenv
+"""
+Financial Powerhouse API
+-------------------------
+This API serves as a secure intermediary between lenders and borrowers.
+It enforces ethical lending through AI-driven compliance, fraud detection,
+smart contract automation, real-time financial health monitoring, multi-currency lending, 
+and integration with major fintech platforms.
+"""
+
 import os
-import csv
-import pdfplumber
 import logging
-from werkzeug.utils import secure_filename
-from fpdf import FPDF
-from plaid.api import plaid_api
-from plaid.model import *
-from plaid.configuration import Configuration
-from plaid.api_client import ApiClient
-from datetime import datetime, timedelta
-from pymongo import MongoClient
-import requests
+from flask import Flask, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import pdfplumber
 
-# Load environment variables from .env file
-load_dotenv()
-
+# ---------------------------
+# 1. Flask App Initialization
+# ---------------------------
 app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
-socketio = SocketIO(app)
 
-# Get the PORT from environment variables
-port = int(os.getenv("PORT", 3000))
+# Environment configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///mock_api.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'supersecretkey')
 
-# Ensure the statements directory exists
-app.config['UPLOAD_FOLDER'] = 'statements'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # Limit file size to 16MB
+# Initialize Database, JWT Manager and Rate Limiter
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
+limiter = Limiter(key_func=get_remote_address)
+limiter.init_app(app)
 
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
+# Configure Logging
+LOG_LEVEL = os.getenv('LOG_LEVEL', 'DEBUG')
+logging.basicConfig(level=getattr(logging, LOG_LEVEL), format="%(asctime)s [%(levelname)s] %(message)s")
 
-# Global variable for account balance
-account_balance = 848583.68
+# ---------------------------
+# (Optional) User Model
+# ---------------------------
+# NOTE: A user model is needed for foreign key references (e.g., lender_id, borrower_id).
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    # Add other fields (email, password hash, etc.) as required
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-logger.debug("Starting application")
+# ---------------------------
+# 2. AI-Powered Compliance & Ethical Lending Enforcement
+# ---------------------------
+class LoanAgreement(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    lender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    borrower_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    terms = db.Column(db.Text, nullable=False)
+    status = db.Column(db.String(20), default="active")  
+    ai_flagged = db.Column(db.Boolean, default=False)
+    locked = db.Column(db.Boolean, default=False)  # ✅ NEW: Account locking field
+    violation_count = db.Column(db.Integer, default=0)  # ✅ Tracks compliance violations
 
-# Plaid API configuration
+
+def analyze_loan_agreement(agreement_text):
+    """AI analyzes loan agreements for compliance and ethical standards."""
+    unethical_terms = ["hidden fees", "predatory interest rates", "undisclosed penalties"]
+    for term in unethical_terms:
+        if term in agreement_text.lower():
+            return {"status": "flagged", "reason": f"Contains unethical term: {term}"}
+    return {"status": "approved"}
+
+@app.route('/review_agreement', methods=['POST'])
+@jwt_required()
+def review_agreement():
+    """AI scans and verifies loan agreements, locking borrower accounts upon excessive violations."""
+    data = request.json
+    borrower_id = data.get('borrower_id')
+    agreement_text = data.get('terms', '')
+    
+    result = analyze_loan_agreement(agreement_text)
+    borrower_agreements = LoanAgreement.query.filter_by(borrower_id=borrower_id).all()
+    
+    if result["status"] == "flagged":
+        for agreement in borrower_agreements:
+            agreement.violation_count += 1
+            if agreement.violation_count >= 3:  # ✅ Lock account after 3 violations
+                agreement.locked = True
+        db.session.commit()
+
+    return jsonify(result), 200
+
+
+def generate_compliance_report(agreements):
+    """Creates a compliance report for loan agreements flagged by AI."""
+    flagged = [ag for ag in agreements if ag.ai_flagged]
+    if flagged:
+        return {"status": "report_generated", "violations": [ag.id for ag in flagged]}
+    return {"status": "compliant"}
+
+@app.route('/compliance_report', methods=['GET'])
+@jwt_required()
+def compliance_report():
+    """Generates a compliance report based on loan agreements."""
+    agreements = LoanAgreement.query.all()
+    report = generate_compliance_report(agreements)
+    return jsonify(report), 200
+
+# ---------------------------
+# 3. AI-Driven Financial Security & Fraud Prevention
+# ---------------------------
+class Transaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    description = db.Column(db.String(200), nullable=False)
+    ai_verified = db.Column(db.Boolean, default=False)
+
+def detect_fraudulent_transaction(description, amount):
+    """Flags potentially fraudulent transactions based on patterns."""
+    suspicious_terms = ["unexpected large withdrawal", "account drained", "unauthorized payment"]
+    if amount > 5000 or any(term in description.lower() for term in suspicious_terms):
+        return True
+    return False
+
+@app.route('/validate_transaction', methods=['POST'])
+@jwt_required()
+def validate_transaction():
+    """Flags fraudulent transactions and auto-locks borrower accounts on severe fraud detection."""
+    data = request.json
+    borrower_id = data.get('user_id')
+    
+    fraud_detected = detect_fraudulent_transaction(data.get('description', ''), data.get('amount', 0))
+    
+    if fraud_detected:
+        borrower_agreements = LoanAgreement.query.filter_by(borrower_id=borrower_id).all()
+        for agreement in borrower_agreements:
+            agreement.locked = True  # ✅ Auto-locking borrower account upon fraud detection
+        db.session.commit()
+        return jsonify({"status": "locked", "message": "Transaction blocked—borrower account locked due to fraud."}), 403
+
+    return jsonify({"fraudulent": fraud_detected}), 200
+
+
+# ---------------------------
+# 4. Borrower-Lender Smart Financial Integration
+# ---------------------------
+@app.route('/link_borrower_account', methods=['POST'])
+@jwt_required()
+def link_borrower_account():
+    """Allows borrowers to link their accounts securely for lender access."""
+    data = request.json
+    # Implement actual verification logic here
+    borrower_verified = True  
+    if borrower_verified:
+        return jsonify({"status": "linked", "message": "Borrower account successfully linked"}), 200
+    return jsonify({"status": "failed", "message": "Verification required"}), 400
+
+@app.route('/unlink_borrower_account', methods=['POST'])
+@jwt_required()
+def unlink_borrower_account():
+    """
+    Endpoint to unlink a borrower account.
+    Blocking unlinking if the account is currently locked due to an active, accepted loan agreement.
+    """
+    data = request.json
+    borrower_id = data.get('borrower_id')
+    
+    # Check if the borrower has any active agreements still locked
+    locked_agreements = LoanAgreement.query.filter_by(borrower_id=borrower_id, locked=True).count()
+    if locked_agreements > 0:
+        return jsonify({
+            "status": "blocked",
+            "message": "Cannot unlink account until all loan obligations are met."
+        }), 403
+    
+    # Proceed with unlinking logic (not shown)
+    return jsonify({"status": "unlinked", "message": "Borrower account unlinked successfully."}), 200
+
+
+# ---------------------------
+# 5. AI-Powered PDF Statement Processing & Transaction Verification
+# ---------------------------
+@app.route('/upload_statement', methods=['POST'])
+@jwt_required()
+def upload_statement():
+    """Processes bank statements via PDF, extracts text, and performs basic transaction verification."""
+    if 'file' not in request.files:
+        return jsonify({'message': 'No file uploaded'}), 400
+    file = request.files['file']
+    try:
+        with pdfplumber.open(file) as pdf:
+            extracted_text = pdf.pages[0].extract_text()
+    except Exception as e:
+        return jsonify({'message': f'Error processing PDF: {str(e)}'}), 500
+    # AI-based corrections to miscalculations/spellings can be added here.
+    return jsonify({'message': 'Statement processed successfully', 'extracted_text': extracted_text}), 200
+
+# ---------------------------
+# 6. Seamless Fintech API Integration (with Plaid)
+# ---------------------------
+from plaid.api.plaid_api import PlaidApi
+from plaid import ApiClient, Configuration
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+
+PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
+PLAID_SECRET = os.getenv('PLAID_SECRET')
+PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
+
 configuration = Configuration(
-    host="https://sandbox.plaid.com",
-    api_key={
-        'clientId': os.getenv('PLAID_CLIENT_ID'),
-        'secret': os.getenv('PLAID_SECRET')
-    }
+    host=f"https://{PLAID_ENV}.plaid.com",
+    api_key={"clientId": PLAID_CLIENT_ID, "secret": PLAID_SECRET}
 )
 api_client = ApiClient(configuration)
-plaid_client = plaid_api.PlaidApi(api_client)
+plaid_client = PlaidApi(api_client)
 
-# Treasury Prime API configuration
-treasury_prime_env = os.getenv('TREASURY_PRIME_ENV', 'sandbox')
-if treasury_prime_env == 'production':
-    TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_PRODUCTION_API_KEY')
-    TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_PRODUCTION_API_URL')
-else:
-    TREASURY_PRIME_API_KEY = os.getenv('TREASURY_PRIME_SANDBOX_API_KEY')
-    TREASURY_PRIME_API_URL = os.getenv('TREASURY_PRIME_SANDBOX_API_URL')
+@app.route('/generate_link_token', methods=['GET'])
+@jwt_required()
+def generate_link_token():
+    """Generates a Plaid Link token for open banking integration."""
+    request_body = LinkTokenCreateRequest(
+        client_name="PlaidBridge Open Banking API",
+        language="en",
+        country_codes=["US"],
+        user={"client_user_id": "unique-user-id"},
+        products=["auth", "transactions"]
+    )
+    response = plaid_client.link_token_create(request_body)
+    return jsonify({"link_token": response["link_token"]}), 200
 
-if TREASURY_PRIME_API_URL is None:
-    raise ValueError("TREASURY_PRIME_API_URL is not set in the environment variables.")
+# ---------------------------
+# 7. Advanced AI-Driven Enhancements
+# ---------------------------
+# a. Smart Contract Execution (Simulated)
+def execute_smart_contract(loan_agreement_id):
+    """Simulate smart contract automation for a loan agreement.
+       In a production system, this could trigger blockchain smart contracts."""
+    agreement = LoanAgreement.query.get(loan_agreement_id)
+    if agreement and agreement.status == "active":
+        # Example: Auto-trigger repayment schedules and lock account details.
+        agreement.status = "under_contract"
+        db.session.commit()
+        return {"contract_status": "executed", "loan_agreement_id": loan_agreement_id}
+    return {"contract_status": "failed", "reason": "Invalid agreement or status."}
 
-# MongoDB configuration
-mongo_client = MongoClient(os.getenv('COSMOS_DB_CONNECTION_STRING'))
-db = mongo_client['plaidbridgeopenbankingapi-database']
-todos_collection = db['todos']
+@app.route('/execute_contract/<int:loan_agreement_id>', methods=['POST'])
+@jwt_required()
+def execute_contract(loan_agreement_id):
+    """Endpoint to execute a smart contract for a given loan agreement."""
+    result = execute_smart_contract(loan_agreement_id)
+    return jsonify(result), 200
 
-# Flask-Login configuration
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
+# b. Real-Time Financial Health Score
+def generate_financial_health_score(user_id):
+    """Calculates a simple financial health score for a user based on transaction history."""
+    transactions = Transaction.query.filter_by(user_id=user_id).all()
+    if transactions:
+        total = sum(t.amount for t in transactions)
+        score = total / len(transactions)  # Simplified evaluation
+    else:
+        score = 100  # Default healthy score if no transactions are found
+    return {"user_id": user_id, "financial_health_score": score}
 
-class User(UserMixin):
-    def __init__(self, id):
-        self.id = id
+@app.route('/financial_health/<int:user_id>', methods=['GET'])
+@jwt_required()
+def financial_health(user_id):
+    """Endpoint to get a real-time financial health score for a user."""
+    result = generate_financial_health_score(user_id)
+    return jsonify(result), 200
 
-@login_manager.user_loader
-def load_user(user_id):
-    return User(user_id)
+# c. Multi-Currency Conversion for Global Lending
+def get_exchange_rate(from_currency, to_currency):
+    """Placeholder: Retrieve exchange rate from an external API.
+       Replace with actual API integration (e.g., Open Exchange Rates)."""
+    return 1.0  # For simplicity, return 1.0
 
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        user_id = request.form['user_id']
-        user = User(user_id)
-        login_user(user)
-        return redirect(url_for('home'))
-    return render_template('login.html')
+def convert_currency(amount, from_currency, to_currency):
+    """Converts an amount from one currency to another using live exchange rates."""
+    exchange_rate = get_exchange_rate(from_currency, to_currency)
+    return amount * exchange_rate
 
-@app.route('/logout')
-@login_required
-def logout():
-    logout_user()
-    return redirect(url_for('login'))
-
-@app.route('/')
-@login_required
-def home():
-    return render_template('index.html')
-
-@app.route("/link-account")
-@login_required
-def link_account():
-    return render_template('link_account.html')
-
-@app.route("/account-info")
-@login_required
-def account_info():
-    # Mock data for account information
-    statements = [
-        {'date': '2024-01-01', 'description': 'Deposit', 'amount': '1577.56'},
-        {'date': '2023-01-02', 'description': 'Withdrawal', 'amount': '-550.38'}
-    ]
-    return render_template('account_info.html', account_balance=account_balance, statements=statements)
-
-@app.route('/create_link_token', methods=['GET'])
-@login_required
-def create_link_token():
-    try:
-        response = plaid_client.LinkToken.create({
-            'user': {
-                'client_user_id': 'unique_user_id'
-            },
-            'client_name': 'PlaidBridgeOpenBankingAPI',
-            'products': ['auth'],
-            'country_codes': ['US'],
-            'language': 'en',
-            'redirect_uri': 'https://yourapp.com/oauth-return',
-        })
-        return jsonify({'link_token': response['link_token']})
-    except Exception as e:
-        logger.error(f"Error creating Plaid link token: {e}")
-        return jsonify({'message': 'Error creating link token'}), 500
-
-@app.route('/exchange_public_token', methods=['POST'])
-@login_required
-def exchange_public_token():
+@app.route('/convert_currency', methods=['POST'])
+@jwt_required()
+def convert_currency_route():
+    """Endpoint for converting currencies, enabling cross-border transactions."""
     data = request.json
-    try:
-        response = plaid_client.Item.public_token.exchange(data['public_token'])
-        access_token = response['access_token']
-        return jsonify({'access_token': access_token})
-    except Exception as e:
-        logger.error(f"Error exchanging Plaid public token: {e}")
-        return jsonify({'message': 'Error exchanging public token'}), 500
+    converted_amount = convert_currency(
+        data.get('amount', 0),
+        data.get('from_currency', 'USD'),
+        data.get('to_currency', 'USD')
+    )
+    return jsonify({"converted_amount": converted_amount}), 200
 
-@app.route('/upload-pdf', methods=['POST'])
-@login_required
-def upload_pdf():
-    global account_balance
-    if 'file' not in request.files:
-        logger.error("No file part in the request")
-        return jsonify({'message': 'No file part'}), 400
-    file = request.files['file']
-    if file.filename == '': 
-        logger.error("No selected file")
-        return jsonify({'message': 'No selected file'}), 400
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(file_path)
-        try:
-            statements = parse_pdf(file_path)
-            corrected_statements = correct_discrepancies(statements)
-            csv_filename = filename.replace('.pdf', '.csv')
-            csv_file_path = os.path.join(app.config['UPLOAD_FOLDER'], csv_filename)
-            save_statements_as_csv(corrected_statements, csv_file_path)
-            update_account_balance(corrected_statements)
-            logger.info(f"File processed successfully: {filename}")
-            socketio.emit('update', {'account_balance': account_balance, 'statements': corrected_statements})
-            return jsonify({'message': 'File processed successfully', 'csv_file': csv_filename}), 200
-        except pdfplumber.PDFSyntaxError as e:
-            logger.error(f"PDF syntax error: {e}")
-            return jsonify({'message': 'PDF syntax error'}), 500
-        except Exception as e:
-            logger.error(f"Error processing file: {e}")
-            return jsonify({'message': f'Error processing file: {str(e)}'}), 500
-    logger.error("Invalid file format")
-    return jsonify({'message': 'Invalid file format'}), 400
+# d. Secure Biometric Authentication (Placeholder)
+@app.route('/biometric_auth', methods=['POST'])
+def biometric_auth():
+    """Endpoint placeholder for biometric authentication.
+       Integrate with specialized biometric authentication services or SDKs."""
+    data = request.json
+    # Example: Verify fingerprint data, facial recognition, etc.
+    return jsonify({"status": "authenticated", "message": "Biometric authentication successful"}), 200
 
-@app.route('/statements/<filename>')
-@login_required
-def download_statement(filename):
-    try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-    except Exception as e:
-        logger.error(f"Error downloading file: {e}")
-        return jsonify({'message': 'Error downloading file'}), 500
-
-@app.route('/generate-pdf/<csv_filename>', methods=['GET'])
-@login_required
-def generate_pdf(csv_filename):
-    try:
-        base_path = app.config['UPLOAD_FOLDER']
-        
-        # Normalize and validate csv_filename
-        csv_file_path = os.path.normpath(os.path.join(base_path, csv_filename))
-        if not csv_file_path.startswith(base_path):
-            raise Exception("Invalid file path for CSV file")
-
-        pdf_filename = csv_filename.replace('.csv', '.pdf')
-        
-        # Normalize and validate pdf_filename
-        pdf_file_path = os.path.normpath(os.path.join(base_path, pdf_filename))
-        if not pdf_file_path.startswith(base_path):
-            raise Exception("Invalid file path for PDF file")
-
-        generate_pdf_from_csv(csv_file_path, pdf_file_path)
-        return send_from_directory(app.config['UPLOAD_FOLDER'], pdf_filename)
-    except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
-        return jsonify({'message': 'Error generating PDF'}), 500
-
+# ---------------------------
+# 8. Health Check & Error Handlers
+# ---------------------------
 @app.route('/health', methods=['GET'])
 def health_check():
+    """Simple endpoint to report API health."""
     return jsonify({"status": "healthy"}), 200
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() == 'pdf'
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"message": "Resource not found"}), 404
 
-def parse_pdf(file_path):
-    """Parse the PDF file to extract statements."""
-    statements = []
-    try:
-        with pdfplumber.open(file_path) as pdf:
-            for page in pdf.pages:
-                text = page.extract_text()
-                if text:
-                    statements.extend(parse_page(text))
-        logger.info(f"Parsed {len(statements)} statements from PDF")
-        return statements
-    except Exception as e:
-        logger.error(f"Error parsing PDF: {e}")
-        raise
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({"message": "An internal error occurred"}), 500
 
-def parse_page(text):
-    """Parse a single page of text to extract statements."""
-    statements = []
-    for line in text.split('\n'):
-        parts = line.split()
-        if len(parts) >= 3:
-            date = parts[0]
-            description = " ".join(parts[1:-1])
-            amount = parts[-1]
-            # Determine if the amount is a deposit or withdrawal
-            if amount.startswith('-'):
-                transaction_type = 'withdrawal'
-            else:
-                transaction_type = 'deposit'
-            statements.append({
-                'date': date,
-                'description': description,
-                'amount': amount,
-                'transaction_type': transaction_type
-            })
-    return statements
-
-def correct_discrepancies(statements):
-    """Correct discrepancies in the statements."""
-    corrected_statements = []
-    for statement in statements:
-        try:
-            amount = float(statement['amount'])
-            corrected_statements.append(statement)
-        except ValueError:
-            # Handle misprints or miscalculations
-            statement['amount'] = '0.00'  # Set to zero or some default value
-            corrected_statements.append(statement)
-    return corrected_statements
-
-def save_statements_as_csv(statements, file_path):
-    """Save the statements as a CSV file."""
-    try:
-        keys = statements[0].keys()
-        with open(file_path, mode='w', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=keys)
-            writer.writeheader()
-            writer.writerows(statements)
-        logger.info(f"Statements saved as '{file_path}'")
-    except Exception as e:
-        logger.error(f"Error saving CSV file: {e}")
-        raise
-
-def generate_pdf_from_csv(csv_file_path, pdf_file_path):
-    """Generate a PDF file from a CSV file."""
-    try:
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Arial", size=12)
-
-        with open(csv_file_path, newline='') as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                line = f"{row['date']} {row['description']} {row['amount']} {row['transaction_type']}"
-                pdf.cell(200, 10, txt=line, ln=True)
-
-        pdf.output(pdf_file_path)
-        logger.info(f"PDF generated as '{pdf_file_path}'")
-    except Exception as e:
-        logger.error(f"Error generating PDF: {e}")
-        raise
-
-def update_account_balance(statements):
-    """Update the global account balance based on the statements."""
-    global account_balance
-    for statement in statements:
-        amount = float(statement['amount'])
-        if statement['transaction_type'] == 'deposit':
-            account_balance += amount
-        elif statement['transaction_type'] == 'withdrawal':
-            account_balance -= amount
-    logger.info(f"Account balance updated: {account_balance}")
-
-# Plaid API integration
-def create_plaid_link_token():
-    try:
-        response = plaid_client.LinkToken.create({
-            'user': {
-                'client_user_id': 'unique_user_id'
-            },
-            'client_name': 'PlaidBridgeOpenBankingAPI',
-            'products': ['auth'],
-            'country_codes': ['US'],
-            'language': 'en',
-            'redirect_uri': 'https://yourapp.com/oauth-return',
-        })
-        return response['link_token']
-    except Exception as e:
-        logger.error(f"Error creating Plaid link token: {e}")
-        raise
-
-def exchange_plaid_public_token(public_token):
-    try:
-        response = plaid_client.Item.public_token.exchange(public_token)
-        return response['access_token']
-    except Exception as e:
-        logger.error(f"Error exchanging Plaid public token: {e}")
-        raise
-
-# Treasury Prime API integration
-def verify_treasury_prime_account(account_id):
-    headers = {
-        'Authorization': f'Bearer {TREASURY_PRIME_API_KEY}',
-        'Content-Type': 'application/json'
-    }
-    try:
-        response = requests.get(f'{TREASURY_PRIME_API_URL}/accounts/{account_id}', headers=headers)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error verifying Treasury Prime account: {e}")
-        raise
-
-# Additional functionalities for micro deposits, account linking, fund transfers, notifications, and handling delinquencies
-
-@app.route('/your_route', methods=['GET', 'POST'])
-def your_function():
-    # Your function implementation here
-    pass
-
-# Todo app routes
-@app.route('/todos', methods=['GET'])
-@login_required
-def get_todos():
-    todos = list(todos_collection.find())
-    return render_template('todos.html', todos=todos)
-
-@app.route('/todos', methods=['POST'])
-@login_required
-def add_todo():
-    title = request.form['title']
-    todos_collection.insert_one({'title': title, 'completed': False})
-    return redirect(url_for('get_todos'))
-
-@app.route('/todos/<int:todo_id>', methods=['POST'])
-@login_required
-def update_todo(todo_id):
-    completed = request.form['completed'] == 'true'
-    todos_collection.update_one({'_id': todo_id}, {'$set': {'completed': completed}}) 
-    return redirect(url_for('get_todos'))
-
-@app.route('/todos/<int:todo_id>/delete', methods=['POST'])
-@login_required
-def delete_todo(todo_id):
-    todos_collection.delete_one({'_id': todo_id})
-    return redirect(url_for('get_todos'))
-
-if __name__ == "__main__":
-    if os.getenv('FLASK_ENV') == 'production':
-        from waitress import serve
-        serve(app, host="0.0.0.0", port=port)
-    else:
-        socketio.run(app, host="0.0.0.0", port=port)   
-                
-  
-       
-
-
-        
-
-        
-    
-       
+# ---------------------------
+# 9. App Initialization & Run
+# ---------------------------
+if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()  # Initializes all defined tables, including User, LoanAgreement, Transaction, etc.
+    app.run(host='0.0.0.0', port=5000)

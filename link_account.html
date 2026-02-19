@@ -8,31 +8,30 @@
 <div id="link-result"></div>
 <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 <script>
-    document.getElementById('link-button').addEventListener('click', function() {
-        fetch('/create_link_token')
-            .then(response => response.json())
-            .then(data => {
-                const handler = Plaid.create({
-                    token: data.link_token,
-                    onSuccess: function(public_token, metadata) {
-                        fetch('/exchange_public_token', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ public_token: public_token })
-                        })
-                        .then(response => response.json())
-                        .then(result => {
-                            document.getElementById('link-result').innerText = 'Account linked successfully!';
-                        });
-                    },
-                    onExit: function(err, metadata) {
-                        document.getElementById('link-result').innerText = 'Linking account failed.';
-                    }
-                });
-                handler.open();
-            });
+document.getElementById('link-button').addEventListener('click', function() {
+  // Updated endpoint to match your app.py
+  fetch('/plaid-link-token')
+  .then(response => response.json())
+  .then(data => {
+    const handler = Plaid.create({
+      token: data.link_token,
+      onSuccess: function(public_token, metadata) {
+        fetch('/exchange_public_token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ public_token: public_token })
+        })
+        .then(response => response.json())
+        .then(result => {
+          document.getElementById('link-result').innerText = 'Account linked successfully!';
+        });
+      },
+      onExit: function(err, metadata) {
+        document.getElementById('link-result').innerText = 'Linking account failed.';
+      }
     });
+    handler.open();
+  });
+});
 </script>
 {% endblock %}
