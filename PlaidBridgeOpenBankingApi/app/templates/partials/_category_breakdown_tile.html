@@ -1,0 +1,38 @@
+<div class="col-md-4">
+  <div class="card shadow-sm rounded">
+    <div class="card-header bg-info text-white">
+      <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Category Breakdown</h5>
+    </div>
+
+    <div class="card-body">
+      <ul class="list-group mb-3">
+        <li class="list-group-item d-flex justify-content-between">
+          <span>Total Volume</span>
+          <strong>${{ "%.2f"|format(category_summary.total_amount) }}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between text-success">
+          <span>Income</span>
+          <strong>${{ "%.2f"|format(category_summary.income) }}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between text-danger">
+          <span>Expenses</span>
+          <strong>${{ "%.2f"|format(category_summary.expenses) }}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span>Net Cash Flow</span>
+          <strong>${{ "%.2f"|format(category_summary.net_cash_flow) }}</strong>
+        </li>
+      </ul>
+
+      <h6 class="text-muted">By Category</h6>
+      <ul class="list-group">
+        {% for cat, amt in category_summary.categories.items() %}
+          <li class="list-group-item d-flex justify-content-between">
+            <span>{{ cat }}</span>
+            <strong>${{ "%.2f"|format(amt) }}</strong>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>

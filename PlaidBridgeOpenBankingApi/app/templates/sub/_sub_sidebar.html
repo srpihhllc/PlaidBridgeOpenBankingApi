@@ -1,0 +1,142 @@
+{# templates/sub/_sub_sidebar.html #}
+
+<div class="d-flex flex-column flex-shrink-0 p-3 bg-dark text-light border-end border-secondary h-100">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="text-light mb-0">Subscriber Panel</h6>
+
+    {% if is_operator %}
+      <span class="badge bg-warning text-dark">Operator</span>
+    {% endif %}
+  </div>
+
+  <!-- Collapsible Toggle (mobile) -->
+  <button class="btn btn-outline-secondary btn-sm d-md-none mb-3"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#sidebarNav"
+          aria-expanded="false">
+    Menu
+  </button>
+
+  <div class="collapse d-md-block" id="sidebarNav">
+
+    <!-- Navigation -->
+    <ul class="nav nav-pills flex-column mb-4">
+      <li class="nav-item mb-1">
+        <a href="{{ url_for('sub_ui.dashboard') }}"
+           class="nav-link d-flex align-items-center text-light sidebar-link {% if request.endpoint == 'sub_ui.dashboard' %}active bg-secondary{% endif %}">
+          <span class="me-2">📊</span> Dashboard
+        </a>
+      </li>
+
+      <li class="nav-item mb-1">
+        <a href="{{ url_for('sub_ui.vault_dashboard') }}"
+           class="nav-link d-flex align-items-center text-light sidebar-link {% if request.endpoint == 'sub_ui.vault_dashboard' %}active bg-secondary{% endif %}">
+          <span class="me-2">💼</span> Vaults
+        </a>
+      </li>
+
+      <li class="nav-item mb-1">
+        <a href="{{ url_for('sub_ui.fraud_drilldown') }}"
+           class="nav-link d-flex align-items-center text-light sidebar-link {% if request.endpoint == 'sub_ui.fraud_drilldown' %}active bg-secondary{% endif %}">
+          <span class="me-2">🛡️</span> Fraud Drilldown
+        </a>
+      </li>
+
+      <li class="nav-item mb-1">
+        <a href="{{ url_for('sub_ui.settings') }}"
+           class="nav-link d-flex align-items-center text-light sidebar-link {% if request.endpoint == 'sub_ui.settings' %}active bg-secondary{% endif %}">
+          <span class="me-2">⚙️</span> Settings
+        </a>
+      </li>
+    </ul>
+
+    <!-- Quick Actions -->
+    <div class="mb-4">
+      <h6 class="text-light small fw-semibold mb-2">Quick Actions</h6>
+      <div class="d-grid gap-2">
+        <a href="{{ url_for('sub_ui.vault_dashboard') }}" class="btn btn-outline-light btn-sm">
+          Add Vault
+        </a>
+        <a href="{{ url_for('sub_ui.fraud_drilldown') }}" class="btn btn-outline-light btn-sm">
+          Review Fraud Alerts
+        </a>
+        <a href="{{ url_for('sub_ui.settings') }}" class="btn btn-outline-light btn-sm">
+          Update Preferences
+        </a>
+      </div>
+    </div>
+
+    <!-- Bank Link Status -->
+    <div class="mb-4">
+      <h6 class="text-light small fw-semibold mb-2">Bank Link Status</h6>
+
+      {% if current_user.bank_linked %}
+        <div class="alert alert-success py-1 px-2 mb-1 small">
+          ✓ Bank Linked
+        </div>
+        <div class="text-muted small">
+          Institution: {{ current_user.bank_name or "Demo Bank" }}<br>
+          Account Ending: {{ current_user.account_ending or "0000" }}
+        </div>
+      {% else %}
+        <div class="alert alert-danger py-1 px-2 mb-1 small">
+          ✗ Not Linked
+        </div>
+        <a href="{{ url_for('sub_ui.settings') }}" class="btn btn-warning btn-sm w-100">
+          Link Bank
+        </a>
+      {% endif %}
+    </div>
+
+    <!-- Operator Tools -->
+    {% if is_operator %}
+      <div class="mb-4">
+        <h6 class="text-warning small fw-semibold mb-2">Operator Tools</h6>
+        <ul class="nav flex-column small">
+          <li class="nav-item mb-1">
+            <a href="{{ url_for('sub_ui.debug_dto') }}"
+               class="nav-link text-warning sidebar-link">
+              🧩 DTO Inspector
+            </a>
+          </li>
+          <li class="nav-item mb-1">
+            <a href="{{ url_for('sub_ui.audit_report') }}"
+               class="nav-link text-warning sidebar-link">
+              📜 Audit Report
+            </a>
+          </li>
+          <li class="nav-item mb-1">
+            <a href="{{ url_for('sub_ui.tile_diagnostics') }}"
+               class="nav-link text-warning sidebar-link">
+              🧭 Tile Diagnostics
+            </a>
+          </li>
+        </ul>
+      </div>
+    {% endif %}
+
+    <!-- Divider -->
+    <hr class="my-2 border-secondary">
+
+    <!-- Audit Info -->
+    <div class="small text-muted">
+      <div class="fw-semibold text-light">Audit Status</div>
+      <div>Last audit: {{ audit_info.last_audit_date if audit_info else "—" }}</div>
+      <div>Status: {{ audit_info.status if audit_info else "—" }}</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Hover Styles -->
+<style>
+  .sidebar-link:hover {
+    background-color: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    text-decoration: none;
+  }
+</style>
+

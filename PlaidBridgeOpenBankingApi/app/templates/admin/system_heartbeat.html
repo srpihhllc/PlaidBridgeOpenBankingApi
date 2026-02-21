@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}System Heartbeat | FinBrain{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-3">🫀 FinBrain System Heartbeat</h2>
+  <p><strong>Last Application Reload:</strong></p>
+  <div class="alert alert-info mt-2">
+    {{ restart_time }}
+  </div>
+</div>
+{% endblock %}

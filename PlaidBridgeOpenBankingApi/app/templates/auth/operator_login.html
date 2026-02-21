@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}Operator Login | FinBrain Cortex{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+
+      <!-- Operator Identity Banner -->
+      {% if current_user.is_authenticated %}
+      <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <div>
+          <strong>Operator:</strong> {{ current_user.username }}<br>
+          <strong>Role:</strong> {{ current_user.role_label }}
+        </div>
+        <div class="text-end small">
+          <strong>Last Access:</strong><br>
+          {{ current_user.updated_at.strftime('%Y-%m-%d %H:%M UTC') }}
+        </div>
+      </div>
+      {% endif %}
+
+      <h2 class="text-center mb-4">👑 Operator Console Access</h2>
+
+      <!-- Flash Messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show text-break" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Operator Login Form -->
+      <form id="operatorForm"
+            action="{{ url_for('admin_api.operator_entry') }}"
+            method="POST"
+            class="border p-4 rounded bg-light shadow-sm">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <!-- Ignition Code -->
+        <div class="mb-3">
+          <label for="passcode" class="form-label">🔑 Operator Ignition Code</label>
+          <div class="input-group">
+            <input
+              type="password"
+              class="form-control"
+              id="passcode"
+              name="passcode"
+              placeholder="Enter ignition code"
+              required
+              autofocus
+            >
+            <button class="btn btn-outline-secondary" type="button" onclick="togglePasscode()">
+              Show
+            </button>
+          </div>
+        </div>
+
+        <!-- MFA Code (only if enabled) -->
+        {% if current_user.is_authenticated and current_user.is_mfa_enabled %}
+        <div class="mb-3">
+          <label for="mfa_code" class="form-label">🔐 MFA Code</label>
+          <input
+            type="text"
+            class="form-control"
+            id="mfa_code"
+            name="mfa_code"
+            placeholder="Enter MFA code"
+            required
+          >
+        </div>
+        {% endif %}
+
+        {% if request.args.get('next') %}
+          <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+        {% endif %}
+
+        <button id="submitBtn" type="submit" class="btn btn-primary w-100 mt-2 py-2">
+          Enter Operator Console
+        </button>
+      </form>
+
+      <!-- Operator Capabilities -->
+      <div class="mt-4 p-3 bg-white border rounded shadow-sm">
+        <h6 class="fw-bold mb-2">🛠️ Operator Console Grants Access To:</h6>
+        <ul class="small mb-0">
+          <li>Cockpit telemetry (TTL, MFA, system health)</li>
+          <li>Schema events & migration logs</li>
+          <li>Registry & trace events</li>
+          <li>Subscriber analytics & dashboards</li>
+          <li>Admin-only tools & system controls</li>
+        </ul>
+      </div>
+
+      <!-- Audit Notice -->
+      <div class="alert alert-warning mt-3 small">
+        ⚠️ <strong>All operator actions are logged</strong> for compliance, auditing, and system integrity.
+      </div>
+
+      <!-- Footer Links -->
+      <div class="text-center mt-4">
+        <p class="mb-1">
+          Subscriber?
+          <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Login here</a>
+        </p>
+        <p class="mb-0">
+          <a href="{{ url_for('main.home') }}" class="text-decoration-none">← Return to Home</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ===========================
+     JS Enhancements
+=========================== -->
+<script>
+// Show/Hide Passcode
+function togglePasscode() {
+  const field = document.getElementById("passcode");
+  field.type = field.type === "password" ? "text" : "password";
+}
+
+// Loading State
+document.getElementById("operatorForm").addEventListener("submit", function() {
+  const btn = document.getElementById("submitBtn");
+  btn.disabled = true;
+  btn.textContent = "Authenticating...";
+});
+</script>
+
+{% endblock %}
+

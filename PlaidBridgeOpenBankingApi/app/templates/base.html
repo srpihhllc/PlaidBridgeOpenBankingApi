@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}PlaidBridge Open Banking{% endblock %}</title>
+
+  <!-- Bootstrap CSS (served locally to avoid cross-origin storage / tracking-protection issues) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+
+  <!-- Favicon & Manifest -->
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='favicon-32x32.png') }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='favicon-16x16.png') }}">
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='android-chrome-192x192.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+</head>
+<body class="bg-body text-dark">
+  {% include 'navbar.html' %}
+
+  <!-- Flash messages -->
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="container mt-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <!-- Page content -->
+  <main class="container py-4">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include 'footer.html' %}
+
+  <!-- Bootstrap JS Bundle (served locally) -->
+  <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
+
+  <!-- Optional: register local service worker (keeps PWA behavior controlled) -->
+  {% if config.get('ENABLE_SERVICE_WORKER', true) %}
+    {% include 'partials/sw_register.html' %}
+  {% endif %}
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+

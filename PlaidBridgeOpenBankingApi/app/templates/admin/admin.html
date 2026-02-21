@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block title %}Admin Panel — {{ current_user.username }}{% endblock %}
+{% block content %}
+
+  <h2>Admin Tools</h2>
+  <div class="list-group">
+    <a href="{{ url_for('main.log_viewer') }}" class="list-group-item list-group-item-action">📬 View Flask Logs</a>
+    <a href="{{ url_for('main.cache_health') }}" class="list-group-item list-group-item-action">🧪 Cache Health</a>
+    <a href="{{ url_for('main.rate_limits_dashboard') }}" class="list-group-item list-group-item-action">📥 Rate Limits</a>
+    <a href="{{ url_for('main.db_health') }}" class="list-group-item list-group-item-action">🧠 DB Health Check</a>
+    <a href="{{ url_for('api.health_check') }}" class="list-group-item list-group-item-action">🩺 Health Check</a>
+    <a href="{{ url_for('main.schema_diagram') }}" class="list-group-item list-group-item-action">📄 Schema Diagram</a>
+    <a href="{{ url_for('api.generate_statement') }}" class="list-group-item list-group-item-action">📑 Generate Statement</a>
+    <a href="{{ url_for('api.generate_fraud_report') }}" class="list-group-item list-group-item-action">🚨 Fraud Report</a>
+    <!-- add more admin actions here -->
+  </div>
+
+  <h3 class="mt-4">📊 Live Metrics</h3>
+  <ul class="list-group mt-2">
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      🧾 Users
+      <span class="badge bg-primary rounded-pill">{{ total_users }}</span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      💰 Transactions
+      <span class="badge bg-success rounded-pill">{{ total_transactions }}</span>
+    </li>
+  </ul>
+
+  <h3 class="mt-4">Pending Approvals</h3>
+  {% if pending_users %}
+    <ul class="list-group mb-4">
+      {% for user in pending_users %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ user.email }}
+          <form action="{{ url_for('main.approve_user', user_id=user.id) }}" method="post" style="margin: 0;">
+            <button type="submit" class="btn btn-sm btn-success">Approve</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No users waiting for approval.</p>
+  {% endif %}
+
+{% endblock %}
+

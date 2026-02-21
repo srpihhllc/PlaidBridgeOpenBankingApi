@@ -1,0 +1,52 @@
+<div class="tile">
+  <h3>📄 Export Audit Snapshot</h3>
+  <input id="bankName" type="text" placeholder="Bank Name" style="width:100%; margin-bottom:0.5rem;">
+  <button onclick="triggerPdfExport()">Generate PDF</button>
+  <span class="ttl-pill">TTL: 120s</span>
+
+  <div id="pdfResult" style="margin-top:1rem; display:none;">
+    <p><strong>Resolved Logo:</strong></p>
+    <img id="logoImg" src="" alt="Bank Logo" style="max-height:50px; display:block; margin-bottom:0.5rem;">
+    <a id="downloadLink" href="#" download="">Download PDF</a>
+  </div>
+</div>
+
+<script>
+async function triggerPdfExport() {
+  const bankName = document.getElementById('bankName').value.trim();
+  if (!bankName) {
+    alert('Please enter a bank name');
+    return;
+  }
+
+  try {
+    const res = await fetch('/cockpit/pdf-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bank_name: bankName })
+    });
+
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
+    const data = await res.json();
+
+    // Show logo
+    const logoImg = document.getElementById('logoImg');
+    logoImg.src = data.logo_path.replace(/^.*static\//, '/static/');
+    logoImg.alt = `Logo for ${bankName}`;
+
+    // Prepare PDF download
+    const downloadLink = document.getElementById('downloadLink');
+    downloadLink.href = `data:application/pdf;base64,${data.pdf_base64}`;
+    downloadLink.download = `${bankName.replace(/\s+/g, '_')}.pdf`;
+
+    // Show result section
+    document.getElementById('pdfResult').style.display = 'block';
+
+  } catch (err) {
+    console.error(err);
+    alert('Error generating PDF — check cockpit logs for details.');
+  }
+}
+</script>
+

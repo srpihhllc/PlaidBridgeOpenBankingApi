@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Transfer Funds Between Vault Accounts</h2>
+
+<form method="POST" class="mt-3">
+  <div class="mb-3">
+    <label for="from_id" class="form-label">From Account</label>
+    <select class="form-select" name="from_id" required>
+      {% for acct in accounts %}
+      <option value="{{ acct.id }}">
+        🏦 {{ acct.account_type.title() }} — {{ acct.account_number }} (${{ "%.2f"|format(acct.balance) }})
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label for="to_id" class="form-label">To Account</label>
+    <select class="form-select" name="to_id" required>
+      {% for acct in accounts %}
+      <option value="{{ acct.id }}">
+        🏦 {{ acct.account_type.title() }} — {{ acct.account_number }}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label for="amount" class="form-label">Amount</label>
+    <input type="number" step="0.01" name="amount" class="form-control" required />
+  </div>
+
+  <button type="submit" class="btn btn-primary">💸 Transfer</button>
+</form>
+
+<hr class="mt-5" />
+
+<div class="row">
+  <div class="col-md-8">
+    <h4>Recent Transactions</h4>
+    {% if recent_txns %}
+      <ul class="list-group">
+        {% for txn in recent_txns %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ txn.date }} — {{ txn.merchant }}
+          <span class="badge bg-secondary">${{ "%.2f"|format(txn.amount) }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p>No recent transactions found.</p>
+    {% endif %}
+  </div>
+
+  <div class="col-md-4">
+    <h4>Spend Summary</h4>
+    <canvas id="monthly-spend-chart"></canvas>
+    <canvas id="category-breakdown" class="mt-4"></canvas>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const monthlySpendCtx = document.getElementById('monthly-spend-chart').getContext('2d');
+  const categoryBreakdownCtx = document.getElementById('category-breakdown').getContext('2d');
+
+  new Chart(monthlySpendCtx, {
+    type: 'line',
+    data: {
+      labels: {{ monthly_labels | tojson }},
+      datasets: [{
+        label: 'Monthly Spend',
+        data: {{ monthly_amounts | tojson }},
+        borderColor: '#007bff',
+        fill: false,
+        tension: 0.3
+      }]
+    }
+  });
+
+  new Chart(categoryBreakdownCtx, {
+    type: 'doughnut',
+    data: {
+      labels: {{ category_labels | tojson }},
+      datasets: [{
+        data: {{ category_amounts | tojson }},
+        backgroundColor: ['#28a745', '#dc3545', '#ffc107', '#17a2b8', '#6f42c1']
+      }]
+    }
+  });
+</script>
+
+{% endblock %}
+
+

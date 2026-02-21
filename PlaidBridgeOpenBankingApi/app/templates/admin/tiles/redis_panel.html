@@ -1,0 +1,18 @@
+<!-- templates/admin/redis_panel.html -->
+{% extends "admin_base.html" %}
+{% block title %}Redis Dashboard{% endblock %}
+
+{% block content %}
+<h2>Redis Key TTL Report</h2>
+<ul>
+  {% for item in redis_keys %}
+    <li>
+      <strong>{{ item.key }}</strong> → TTL: {{ item.ttl }}
+      <form method="POST" action="{{ url_for('main.delete_redis_key') }}" style="display:inline;">
+        <input type="hidden" name="key" value="{{ item.key }}">
+        <button type="submit" onclick="return confirm('Delete this key?');">🗑️</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}
