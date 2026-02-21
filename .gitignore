@@ -1,30 +1,5 @@
-﻿# Python artifacts
+﻿# Ignore artifacts
+.env
+*.log
 *.pyc
 __pycache__/
-*.pyo
-*.pyd
-
-# caches and test artifacts
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.venv/
-venv/
-env/
-ENV/
-
-# editor / OS files
-*.DS_Store
-Thumbs.db
-
-# runtime / logs / databases
-*.log
-logs/
-instance/*.db
-*.db
-PlaidBridgeOpenBankingApi/logs/
-PlaidBridgeOpenBankingApi/instance/*.db
-
-# environment files
-.env
-.env.*.local
