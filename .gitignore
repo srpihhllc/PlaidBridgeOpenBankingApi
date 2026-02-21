@@ -1,0 +1,28 @@
+# Ignore Python artifacts
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+
+# caches & test artifacts
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+ENV/
+
+# editor / OS files
+*.DS_Store
+Thumbs.db
+
+# runtime / logs / databases
+*.log
+logs/
+instance/*.db
+*.db
+
+# environment and secret files
+.env
+.env.*.local
