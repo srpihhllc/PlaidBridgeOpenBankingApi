@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Borrower Card Vault{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>💳 Vault Overview</h2>
+  <div class="row">
+    {% for card in cards %}
+    <div class="col-md-4 mb-3">
+      <div class="card border-{{ card.color }}">
+        <div class="card-body">
+          <h5 class="card-title">{{ card.borrower.username }}</h5>
+          <p>Card Number: **** **** **** {{ card.card_number[-4:] }}</p>
+          <p>Expires: {{ card.expiration_date }} | CVV: {{ card.cvv }}</p>
+          <p>Score: {{ card.score }} | Issued: {{ card.issued_at.strftime("%Y-%m-%d") }}</p>
+          <p>
+            Status:
+            {% if card.revoked %}
+              <span class="badge bg-danger">Revoked</span>
+            {% else %}
+              <span class="badge bg-success">Active</span>
+            {% endif %}
+          </p>
+          <div class="btn-group mt-2">
+            <form method="POST" action="/revoke-card/{{ card.id }}">
+              <button class="btn btn-outline-danger btn-sm">Revoke</button>
+            </form>
+            <form method="POST" action="/link-wallet/{{ card.id }}">
+              <button class="btn btn-outline-info btn-sm">Link Wallet</button>
+            </form>
+            <a href="/card-audit/{{ card.id }}" class="btn btn-outline-secondary btn-sm">View Audit Trail</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

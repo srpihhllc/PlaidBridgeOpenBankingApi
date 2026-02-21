@@ -1,0 +1,46 @@
+<!--
+  _blueprint_audit_tile.html
+
+  This partial template displays an audit summary tile for a blueprint.
+  It is designed to be included in the main dashboard template.
+
+  Expected context variables:
+  - `audit_info`: A dictionary containing audit data.
+    - `last_audit_date`: ISO-8601 timestamp string (e.g., "2026-01-01T18:04:45Z")
+    - `audit_status`: The status of the last audit (e.g., "Pass", "Fail").
+    - `audit_issues`: The number of issues found in the last audit.
+-->
+
+<div class="col-md-4">
+  <div class="card bg-warning text-white shadow-sm rounded">
+    <div class="card-body">
+      <h5 class="card-title">
+        <i class="fas fa-clipboard-list"></i> Blueprint Audit
+      </h5>
+
+      <p class="card-text">
+        <small class="text-white-50">
+          Last Audit Date:
+          <strong>{{ audit_info.last_audit_date[:10] }}</strong>
+        </small><br>
+
+        <small class="text-white-50">
+          Status:
+          <strong>{{ audit_info.audit_status }}</strong>
+        </small><br>
+
+        <small class="text-white-50">
+          Issues Found:
+          <strong>{{ audit_info.audit_issues }}</strong>
+        </small>
+      </p>
+
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <a href="#" class="btn btn-outline-light btn-sm">View Report</a>
+        <span class="badge badge-pill badge-light">
+          {{ audit_info.audit_status }}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>

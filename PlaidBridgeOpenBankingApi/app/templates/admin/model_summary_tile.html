@@ -1,0 +1,19 @@
+<div class="col-md-4 mb-4">
+  <div class="card bg-dark text-light shadow">
+    <div class="card-body text-center">
+      <h5 class="card-title">🔬 Schema Diagnostics</h5>
+      <p class="card-text">Validate schema coverage and model activity.</p>
+      <div id="model-count" class="mb-2 text-info">Loading model count...</div>
+      <a href="{{ url_for('admin.model_summary') }}" class="btn btn-outline-info">Run Diagnostics</a>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch("/admin/system_metrics.json")
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById("model-count").innerText =
+      `Models Detected: ${data.schema_versions || "0"}`;
+  });
+</script>

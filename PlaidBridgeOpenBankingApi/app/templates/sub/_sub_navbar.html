@@ -1,0 +1,39 @@
+{# templates/sub/_sub_navbar.html #}
+<nav class="navbar navbar-expand-lg navbar-dark bg-black border-bottom border-secondary">
+  <div class="container-fluid">
+    <a class="navbar-brand text-warning fw-bold" href="{{ url_for('sub_ui.dashboard') }}">
+      PlaidBridge
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#subNavbar">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="subNavbar">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'sub_ui.dashboard' %} active{% endif %}"
+             href="{{ url_for('sub_ui.dashboard') }}">
+            Dashboard
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link{% if request.endpoint == 'sub_ui.settings' %} active{% endif %}"
+             href="{{ url_for('sub_ui.settings') }}">
+            Settings
+          </a>
+        </li>
+      </ul>
+
+      <span class="navbar-text me-3">
+        {{ current_user.username or 'Subscriber' }}
+      </span>
+
+      <form class="d-inline" method="post" action="{{ url_for('main.logout') }}">
+        <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
+      </form>
+    </div>
+  </div>
+</nav>
+

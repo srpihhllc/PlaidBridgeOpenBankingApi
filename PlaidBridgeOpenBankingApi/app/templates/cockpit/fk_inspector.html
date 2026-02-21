@@ -1,0 +1,13 @@
+<h2>🔗 Foreign Key Inspector</h2>
+{% if fk_issues %}
+  <ul>
+    {% for issue in fk_issues %}
+      <li>
+        Table {{ issue.table }} → FK {{ issue.fk }} ({{ issue.columns }}) : {{ issue.error }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p>✅ No FK issues detected.</p>
+{% endif %}
+

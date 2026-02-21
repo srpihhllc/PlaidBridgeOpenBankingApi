@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Dispute Blast Logs{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <h2 class="mb-4">📊 Dispute Blast Logs</h2>
+
+  <form method="GET" class="row row-cols-md-auto g-2 mb-3">
+    <input type="text" name="user" placeholder="User ID or Name" class="form-control" value="{{ request.args.get('user') }}">
+    <select name="status" class="form-select">
+      <option value="">All Statuses</option>
+      <option value="sent" {% if request.args.get('status') == 'sent' %}selected{% endif %}>Sent</option>
+      <option value="acknowledged" {% if request.args.get('status') == 'acknowledged' %}selected{% endif %}>Acknowledged</option>
+      <option value="overdue" {% if request.args.get('status') == 'overdue' %}selected{% endif %}>Overdue</option>
+    </select>
+    <button class="btn btn-outline-primary" type="submit">🔍 Filter</button>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-striped align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>User</th>
+          <th>Bureau</th>
+          <th>Method</th>
+          <th>Status</th>
+          <th>Sent</th>
+          <th>Acknowledged</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr class="{% if log.status == 'overdue' %}table-warning{% endif %}">
+          <td>{{ log.id }}</td>
+          <td>{{ log.user.full_name }}</td>
+          <td>{{ log.bureau }}</td>
+          <td>{{ log.method }}</td>
+          <td>
+            <span class="badge {% if log.status == 'sent' %}bg-secondary{% elif log.status == 'acknowledged' %}bg-success{% else %}bg-warning text-dark{% endif %}">
+              {{ log.status.capitalize() }}
+            </span>
+          </td>
+          <td>{{ log.delivery_ts.strftime('%Y-%m-%d %H:%M') }}<br><small class="text-muted">{{ log.delivery_ts|time_since }} ago</small></td>
+          <td>
+            {% if log.acknowledged_ts %}
+              {{ log.acknowledged_ts.strftime('%Y-%m-%d') }}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td class="d-flex flex-column gap-1">
+            <a href="/download/letter/{{ log.id }}" class="btn btn-sm btn-outline-secondary">
+              📄 Letter
+            </a>
+            <a href="/storage/bundles/dispute_{{ log.id }}_full.zip" class="btn btn-sm btn-outline-info">
+              📦 Bundle
+            </a>
+            <a href="/admin/bundle_preview/{{ log.id }}" class="btn btn-sm btn-outline-dark">
+              🔍 Preview All
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+

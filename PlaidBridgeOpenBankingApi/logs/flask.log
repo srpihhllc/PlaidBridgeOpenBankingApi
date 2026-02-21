@@ -1,0 +1,708 @@
+2025-06-04 21:35:47,933 [INFO] 🚀 Flask app initialized successfully!
+2025-06-04 21:35:49,214 [INFO] Weekly Compliance Report Scheduled.
+2025-06-04 21:39:42,293 [INFO] 🚀 Flask app initialized successfully!
+2025-06-04 21:39:43,412 [INFO] Weekly Compliance Report Scheduled.
+2025-06-04 22:16:24,324 [INFO] 🚀 Flask app initialized successfully!
+2025-06-04 22:16:25,751 [INFO] Weekly Compliance Report Scheduled.
+2025-06-04 22:21:57,538 [INFO] 🚀 Flask app initialized successfully!
+2025-06-04 22:21:59,061 [INFO] Weekly Compliance Report Scheduled.
+2025-06-04 22:43:00,780 [INFO] 🚀 Flask app initialized successfully!
+2025-06-04 22:43:01,920 [INFO] Weekly Compliance Report Scheduled.
+2025-06-05 01:13:09,306 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 01:13:11,223 [INFO] Weekly Compliance Report Scheduled.
+2025-06-05 14:44:32,526 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 18:59:11,352 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 20:04:41,281 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 21:30:11,980 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 22:09:52,774 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 22:17:10,969 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 22:42:38,102 [INFO] 🚀 Flask app initialized successfully!
+2025-06-05 22:42:47,627 [INFO] 🚀 Flask app initialized successfully!
+2025-06-06 13:09:27,060 [INFO] 🚀 Flask app initialized successfully!
+2025-06-06 20:14:39,207 [INFO] 🚀 Flask app initialized successfully!
+2025-06-06 20:53:10,847 [INFO] 🚀 Flask app initialized successfully!
+2025-06-06 21:16:23,916 [INFO] 🚀 Flask app initialized successfully!
+2025-06-06 21:16:25,280 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.0.5.74:5000
+2025-06-06 21:16:25,280 [INFO] [33mPress CTRL+C to quit[0m
+2025-06-06 23:14:42,368 [INFO] 🚀 Flask app initialized successfully!
+2025-06-06 23:36:06,201 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 00:27:36,324 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 00:30:51,775 [ERROR] Exception on /api/register [POST]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/sqlalchemy/sql/base.py", line 2193, in _entity_namespace_key
+    return getattr(ns, key)  # type: ignore
+           ^^^^^^^^^^^^^^^^
+AttributeError: type object 'User' has no attribute 'email'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 110, in register
+    if User.query.filter_by(email=email).first():
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/sqlalchemy/orm/query.py", line 1992, in filter_by
+    _entity_namespace_key(from_entity, key) == value
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/sqlalchemy/sql/base.py", line 2195, in _entity_namespace_key
+    raise exc.InvalidRequestError(
+sqlalchemy.exc.InvalidRequestError: Entity namespace for "user" has no property "email"
+2025-06-07 00:37:03,620 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 01:14:01,464 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 02:52:08,729 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 14:28:24,924 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 14:28:28,763 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 15:19:50,586 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 19:22:32,493 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 19:22:34,384 [ERROR] Error: Directory migrations already exists and is not empty
+2025-06-07 19:22:35,736 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 19:22:37,868 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 20:53:24,471 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 20:53:26,763 [INFO] 🚀 Flask app initialized successfully!
+2025-06-07 21:41:58,627 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 10:56:08,192 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 10:56:09,745 [ERROR] Error running WSGI application
+2025-06-08 10:56:09,757 [ERROR] ModuleNotFoundError: No module named 'app.compliance_ai'
+2025-06-08 10:56:09,758 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-08 10:56:09,758 [ERROR]     application = create_app()
+2025-06-08 10:56:09,758 [ERROR]                   ^^^^^^^^^^^^
+2025-06-08 10:56:09,758 [ERROR] 
+2025-06-08 10:56:09,759 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 60, in create_app
+2025-06-08 10:56:09,759 [ERROR]     from app.routes import main_bp, api_bp
+2025-06-08 10:56:09,759 [ERROR] 
+2025-06-08 10:56:09,759 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 17, in <module>
+2025-06-08 10:56:09,759 [ERROR]     from app.compliance import generate_compliance_report, predict_fraud_trends
+2025-06-08 10:56:09,759 [ERROR] 
+2025-06-08 10:56:09,760 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/compliance.py", line 9, in <module>
+2025-06-08 10:56:09,760 [ERROR]     from app.compliance_ai import predict_fraud_trends  # Ensuring fraud trend AI is properly integrated
+2025-06-08 10:56:09,760 [ERROR]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-08 10:56:09,760 [ERROR] ***************************************************
+2025-06-08 10:56:09,760 [ERROR] If you're seeing an import error and don't know why,
+2025-06-08 10:56:09,761 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-08 10:56:09,761 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-08 10:56:09,761 [ERROR] ***************************************************
+2025-06-08 10:56:14,081 [ERROR] Error running WSGI application
+2025-06-08 10:56:14,087 [ERROR] ModuleNotFoundError: No module named 'app.compliance_ai'
+2025-06-08 10:56:14,087 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-08 10:56:14,088 [ERROR]     application = create_app()
+2025-06-08 10:56:14,088 [ERROR]                   ^^^^^^^^^^^^
+2025-06-08 10:56:14,088 [ERROR] 
+2025-06-08 10:56:14,088 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 60, in create_app
+2025-06-08 10:56:14,088 [ERROR]     from app.routes import main_bp, api_bp
+2025-06-08 10:56:14,089 [ERROR] 
+2025-06-08 10:56:14,089 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 17, in <module>
+2025-06-08 10:56:14,089 [ERROR]     from app.compliance import generate_compliance_report, predict_fraud_trends
+2025-06-08 10:56:14,089 [ERROR] 
+2025-06-08 10:56:14,089 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/compliance.py", line 9, in <module>
+2025-06-08 10:56:14,089 [ERROR]     from app.compliance_ai import predict_fraud_trends  # Ensuring fraud trend AI is properly integrated
+2025-06-08 10:56:14,090 [ERROR]     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-08 10:56:14,090 [ERROR] ***************************************************
+2025-06-08 10:56:14,090 [ERROR] If you're seeing an import error and don't know why,
+2025-06-08 10:56:14,090 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-08 10:56:14,090 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-08 10:56:14,091 [ERROR] ***************************************************
+2025-06-08 14:04:21,338 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 14:14:19,562 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 14:40:26,849 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 18:58:48,777 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 19:36:17,817 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 19:37:04,129 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 19:39:21,957 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 19:39:32,277 [ERROR] Exception on /admin [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 526, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Flask' object has no attribute 'login_manager'
+2025-06-08 19:39:49,272 [ERROR] Exception on /admin [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 526, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Flask' object has no attribute 'login_manager'
+2025-06-08 19:40:33,418 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 19:46:47,503 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 21:55:09,348 [INFO] 🚀 Flask app initialized successfully!
+2025-06-08 22:11:47,488 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 00:48:58,019 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 01:10:56,142 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 01:10:56,475 [ERROR] Error running WSGI application
+2025-06-09 01:10:56,482 [ERROR] ImportError: cannot import name 'app' from 'app' (/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py)
+2025-06-09 01:10:56,482 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-09 01:10:56,482 [ERROR]     application = create_app()
+2025-06-09 01:10:56,482 [ERROR]                   ^^^^^^^^^^^^
+2025-06-09 01:10:56,482 [ERROR] 
+2025-06-09 01:10:56,482 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 63, in create_app
+2025-06-09 01:10:56,482 [ERROR]     from app.routes import main_bp, api_bp
+2025-06-09 01:10:56,482 [ERROR] 
+2025-06-09 01:10:56,482 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 11, in <module>
+2025-06-09 01:10:56,483 [ERROR]     from app import app, limiter
+2025-06-09 01:10:56,483 [ERROR] ***************************************************
+2025-06-09 01:10:56,483 [ERROR] If you're seeing an import error and don't know why,
+2025-06-09 01:10:56,483 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-09 01:10:56,483 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-09 01:10:56,483 [ERROR] ***************************************************
+2025-06-09 01:11:09,668 [ERROR] Error running WSGI application
+2025-06-09 01:11:09,670 [ERROR] ImportError: cannot import name 'app' from 'app' (/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py)
+2025-06-09 01:11:09,670 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-09 01:11:09,671 [ERROR]     application = create_app()
+2025-06-09 01:11:09,671 [ERROR]                   ^^^^^^^^^^^^
+2025-06-09 01:11:09,671 [ERROR] 
+2025-06-09 01:11:09,671 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 63, in create_app
+2025-06-09 01:11:09,671 [ERROR]     from app.routes import main_bp, api_bp
+2025-06-09 01:11:09,671 [ERROR] 
+2025-06-09 01:11:09,671 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 11, in <module>
+2025-06-09 01:11:09,672 [ERROR]     from app import app, limiter
+2025-06-09 01:11:09,672 [ERROR] ***************************************************
+2025-06-09 01:11:09,672 [ERROR] If you're seeing an import error and don't know why,
+2025-06-09 01:11:09,672 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-09 01:11:09,672 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-09 01:11:09,672 [ERROR] ***************************************************
+2025-06-09 14:10:23,034 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 15:49:48,962 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 15:49:48,970 [ERROR] Error running WSGI application
+2025-06-09 15:49:48,978 [ERROR] TypeError: Limiter.__init__() got multiple values for argument 'key_func'
+2025-06-09 15:49:48,979 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-09 15:49:48,979 [ERROR]     application = create_app()
+2025-06-09 15:49:48,979 [ERROR]                   ^^^^^^^^^^^^
+2025-06-09 15:49:48,980 [ERROR] 
+2025-06-09 15:49:48,980 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 34, in create_app
+2025-06-09 15:49:48,980 [ERROR]     limiter = Limiter(
+2025-06-09 15:49:48,981 [ERROR]               ^^^^^^^^
+2025-06-09 15:49:48,983 [ERROR] ***************************************************
+2025-06-09 15:49:48,983 [ERROR] If you're seeing an import error and don't know why,
+2025-06-09 15:49:48,983 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-09 15:49:48,984 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-09 15:49:48,984 [ERROR] ***************************************************
+2025-06-09 15:50:32,613 [ERROR] Error running WSGI application
+2025-06-09 15:50:32,619 [ERROR] TypeError: Limiter.__init__() got multiple values for argument 'key_func'
+2025-06-09 15:50:32,620 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-09 15:50:32,620 [ERROR]     application = create_app()
+2025-06-09 15:50:32,620 [ERROR]                   ^^^^^^^^^^^^
+2025-06-09 15:50:32,621 [ERROR] 
+2025-06-09 15:50:32,621 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 34, in create_app
+2025-06-09 15:50:32,621 [ERROR]     limiter = Limiter(
+2025-06-09 15:50:32,621 [ERROR]               ^^^^^^^^
+2025-06-09 15:50:32,621 [ERROR] ***************************************************
+2025-06-09 15:50:32,622 [ERROR] If you're seeing an import error and don't know why,
+2025-06-09 15:50:32,622 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-09 15:50:32,622 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-09 15:50:32,622 [ERROR] ***************************************************
+2025-06-09 21:38:52,631 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 22:54:54,858 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 22:55:47,777 [INFO] 🚀 Flask app initialized successfully!
+2025-06-09 22:56:01,306 [ERROR] Exception on /admin [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 526, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Flask' object has no attribute 'login_manager'
+2025-06-09 22:57:25,616 [ERROR] Exception on /admin [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 526, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Flask' object has no attribute 'login_manager'
+2025-06-10 01:17:49,596 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 01:19:42,366 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 01:52:01,691 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 02:43:14,087 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 02:43:44,353 [ERROR] Exception on /admin [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 526, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Flask' object has no attribute 'login_manager'
+2025-06-10 12:21:57,948 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 12:22:20,664 [ERROR] Exception on /admin [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 284, in decorated_view
+    elif not current_user.is_authenticated:
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 318, in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/werkzeug/local.py", line 526, in _get_current_object
+    return get_name(local())
+                    ^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 25, in <lambda>
+    current_user = LocalProxy(lambda: _get_user())
+                                      ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'Flask' object has no attribute 'login_manager'
+2025-06-10 15:51:50,331 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 21:53:49,343 [INFO] 🚀 Flask app initialized successfully!
+2025-06-10 22:47:20,097 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 02:33:10,028 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 03:43:10,368 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 04:07:48,986 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 04:08:35,420 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 04:46:14,448 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 04:59:12,644 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 17:15:47,491 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 17:15:47,957 [ERROR] Error running WSGI application
+2025-06-11 17:15:48,035 [ERROR] ValueError: Port could not be cast to integer value as 'your_redis_url'
+2025-06-11 17:15:48,035 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-11 17:15:48,035 [ERROR]     application = create_app()
+2025-06-11 17:15:48,040 [ERROR]                   ^^^^^^^^^^^^
+2025-06-11 17:15:48,040 [ERROR] 
+2025-06-11 17:15:48,041 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 68, in create_app
+2025-06-11 17:15:48,041 [ERROR]     limiter.init_app(app)
+2025-06-11 17:15:48,045 [ERROR] 
+2025-06-11 17:15:48,045 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_limiter/extension.py", line 333, in init_app
+2025-06-11 17:15:48,045 [ERROR]     storage_from_string(
+2025-06-11 17:15:48,045 [ERROR] 
+2025-06-11 17:15:48,046 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/__init__.py", line 65, in storage_from_string
+2025-06-11 17:15:48,046 [ERROR]     return cast(StorageTypes, SCHEMES[scheme](storage_string, **options))
+2025-06-11 17:15:48,053 [ERROR]                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:15:48,054 [ERROR] 
+2025-06-11 17:15:48,054 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/redis.py", line 101, in __init__
+2025-06-11 17:15:48,054 [ERROR]     self.storage = self.dependency.from_url(uri, **options)
+2025-06-11 17:15:48,054 [ERROR]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:15:48,054 [ERROR] 
+2025-06-11 17:15:48,055 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/utils.py", line 50, in from_url
+2025-06-11 17:15:48,055 [ERROR]     return Redis.from_url(url, **kwargs)
+2025-06-11 17:15:48,055 [ERROR]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:15:48,060 [ERROR] 
+2025-06-11 17:15:48,060 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/client.py", line 170, in from_url
+2025-06-11 17:15:48,060 [ERROR]     connection_pool = ConnectionPool.from_url(url, **kwargs)
+2025-06-11 17:15:48,060 [ERROR]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:15:48,061 [ERROR] 
+2025-06-11 17:15:48,061 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1364, in from_url
+2025-06-11 17:15:48,061 [ERROR]     url_options = parse_url(url)
+2025-06-11 17:15:48,061 [ERROR]                   ^^^^^^^^^^^^^^
+2025-06-11 17:15:48,061 [ERROR] 
+2025-06-11 17:15:48,061 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1289, in parse_url
+2025-06-11 17:15:48,061 [ERROR]     if url.port:
+2025-06-11 17:15:48,062 [ERROR]        ^^^^^^^^
+2025-06-11 17:15:48,062 [ERROR] 
+2025-06-11 17:15:48,062 [ERROR]   File "/usr/local/lib/python3.12/urllib/parse.py", line 182, in port
+2025-06-11 17:15:48,062 [ERROR]     raise ValueError(f"Port could not be cast to integer value as {port!r}")
+2025-06-11 17:15:48,062 [ERROR] ***************************************************
+2025-06-11 17:15:48,063 [ERROR] If you're seeing an import error and don't know why,
+2025-06-11 17:15:48,063 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-11 17:15:48,063 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-11 17:15:48,064 [ERROR] ***************************************************
+2025-06-11 17:16:30,676 [ERROR] Error running WSGI application
+2025-06-11 17:16:30,722 [ERROR] ValueError: Port could not be cast to integer value as 'your_redis_url'
+2025-06-11 17:16:30,733 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-11 17:16:30,733 [ERROR]     application = create_app()
+2025-06-11 17:16:30,733 [ERROR]                   ^^^^^^^^^^^^
+2025-06-11 17:16:30,734 [ERROR] 
+2025-06-11 17:16:30,734 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 68, in create_app
+2025-06-11 17:16:30,734 [ERROR]     limiter.init_app(app)
+2025-06-11 17:16:30,734 [ERROR] 
+2025-06-11 17:16:30,734 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_limiter/extension.py", line 333, in init_app
+2025-06-11 17:16:30,734 [ERROR]     storage_from_string(
+2025-06-11 17:16:30,735 [ERROR] 
+2025-06-11 17:16:30,735 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/__init__.py", line 65, in storage_from_string
+2025-06-11 17:16:30,735 [ERROR]     return cast(StorageTypes, SCHEMES[scheme](storage_string, **options))
+2025-06-11 17:16:30,735 [ERROR]                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:30,735 [ERROR] 
+2025-06-11 17:16:30,735 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/redis.py", line 101, in __init__
+2025-06-11 17:16:30,735 [ERROR]     self.storage = self.dependency.from_url(uri, **options)
+2025-06-11 17:16:30,736 [ERROR]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:30,736 [ERROR] 
+2025-06-11 17:16:30,736 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/utils.py", line 50, in from_url
+2025-06-11 17:16:30,744 [ERROR]     return Redis.from_url(url, **kwargs)
+2025-06-11 17:16:30,745 [ERROR]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:30,745 [ERROR] 
+2025-06-11 17:16:30,745 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/client.py", line 170, in from_url
+2025-06-11 17:16:30,745 [ERROR]     connection_pool = ConnectionPool.from_url(url, **kwargs)
+2025-06-11 17:16:30,745 [ERROR]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:30,746 [ERROR] 
+2025-06-11 17:16:30,746 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1364, in from_url
+2025-06-11 17:16:30,746 [ERROR]     url_options = parse_url(url)
+2025-06-11 17:16:30,746 [ERROR]                   ^^^^^^^^^^^^^^
+2025-06-11 17:16:30,746 [ERROR] 
+2025-06-11 17:16:30,746 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1289, in parse_url
+2025-06-11 17:16:30,747 [ERROR]     if url.port:
+2025-06-11 17:16:30,747 [ERROR]        ^^^^^^^^
+2025-06-11 17:16:30,747 [ERROR] 
+2025-06-11 17:16:30,747 [ERROR]   File "/usr/local/lib/python3.12/urllib/parse.py", line 182, in port
+2025-06-11 17:16:30,747 [ERROR]     raise ValueError(f"Port could not be cast to integer value as {port!r}")
+2025-06-11 17:16:30,747 [ERROR] ***************************************************
+2025-06-11 17:16:30,748 [ERROR] If you're seeing an import error and don't know why,
+2025-06-11 17:16:30,748 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-11 17:16:30,748 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-11 17:16:30,748 [ERROR] ***************************************************
+2025-06-11 17:16:46,521 [ERROR] Error running WSGI application
+2025-06-11 17:16:46,528 [ERROR] ValueError: Port could not be cast to integer value as 'your_redis_url'
+2025-06-11 17:16:46,529 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-11 17:16:46,529 [ERROR]     application = create_app()
+2025-06-11 17:16:46,529 [ERROR]                   ^^^^^^^^^^^^
+2025-06-11 17:16:46,530 [ERROR] 
+2025-06-11 17:16:46,530 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 68, in create_app
+2025-06-11 17:16:46,530 [ERROR]     limiter.init_app(app)
+2025-06-11 17:16:46,530 [ERROR] 
+2025-06-11 17:16:46,531 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_limiter/extension.py", line 333, in init_app
+2025-06-11 17:16:46,531 [ERROR]     storage_from_string(
+2025-06-11 17:16:46,531 [ERROR] 
+2025-06-11 17:16:46,531 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/__init__.py", line 65, in storage_from_string
+2025-06-11 17:16:46,531 [ERROR]     return cast(StorageTypes, SCHEMES[scheme](storage_string, **options))
+2025-06-11 17:16:46,531 [ERROR]                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:46,532 [ERROR] 
+2025-06-11 17:16:46,532 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/redis.py", line 101, in __init__
+2025-06-11 17:16:46,533 [ERROR]     self.storage = self.dependency.from_url(uri, **options)
+2025-06-11 17:16:46,533 [ERROR]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:46,534 [ERROR] 
+2025-06-11 17:16:46,534 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/utils.py", line 50, in from_url
+2025-06-11 17:16:46,534 [ERROR]     return Redis.from_url(url, **kwargs)
+2025-06-11 17:16:46,535 [ERROR]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:46,535 [ERROR] 
+2025-06-11 17:16:46,535 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/client.py", line 170, in from_url
+2025-06-11 17:16:46,536 [ERROR]     connection_pool = ConnectionPool.from_url(url, **kwargs)
+2025-06-11 17:16:46,537 [ERROR]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:16:46,539 [ERROR] 
+2025-06-11 17:16:46,540 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1364, in from_url
+2025-06-11 17:16:46,543 [ERROR]     url_options = parse_url(url)
+2025-06-11 17:16:46,545 [ERROR]                   ^^^^^^^^^^^^^^
+2025-06-11 17:16:46,545 [ERROR] 
+2025-06-11 17:16:46,546 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1289, in parse_url
+2025-06-11 17:16:46,546 [ERROR]     if url.port:
+2025-06-11 17:16:46,547 [ERROR]        ^^^^^^^^
+2025-06-11 17:16:46,547 [ERROR] 
+2025-06-11 17:16:46,547 [ERROR]   File "/usr/local/lib/python3.12/urllib/parse.py", line 182, in port
+2025-06-11 17:16:46,547 [ERROR]     raise ValueError(f"Port could not be cast to integer value as {port!r}")
+2025-06-11 17:16:46,548 [ERROR] ***************************************************
+2025-06-11 17:16:46,548 [ERROR] If you're seeing an import error and don't know why,
+2025-06-11 17:16:46,548 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-11 17:16:46,548 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-11 17:16:46,548 [ERROR] ***************************************************
+2025-06-11 17:21:55,837 [ERROR] Error running WSGI application
+2025-06-11 17:21:55,854 [ERROR] ValueError: Port could not be cast to integer value as 'your_redis_url'
+2025-06-11 17:21:55,855 [ERROR]   File "/var/www/srpihhllc_pythonanywhere_com_wsgi.py", line 28, in <module>
+2025-06-11 17:21:55,855 [ERROR]     application = create_app()
+2025-06-11 17:21:55,855 [ERROR]                   ^^^^^^^^^^^^
+2025-06-11 17:21:55,855 [ERROR] 
+2025-06-11 17:21:55,856 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/__init__.py", line 68, in create_app
+2025-06-11 17:21:55,856 [ERROR]     limiter.init_app(app)
+2025-06-11 17:21:55,856 [ERROR] 
+2025-06-11 17:21:55,856 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_limiter/extension.py", line 333, in init_app
+2025-06-11 17:21:55,856 [ERROR]     storage_from_string(
+2025-06-11 17:21:55,857 [ERROR] 
+2025-06-11 17:21:55,857 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/__init__.py", line 65, in storage_from_string
+2025-06-11 17:21:55,857 [ERROR]     return cast(StorageTypes, SCHEMES[scheme](storage_string, **options))
+2025-06-11 17:21:55,857 [ERROR]                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:21:55,858 [ERROR] 
+2025-06-11 17:21:55,858 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/limits/storage/redis.py", line 101, in __init__
+2025-06-11 17:21:55,858 [ERROR]     self.storage = self.dependency.from_url(uri, **options)
+2025-06-11 17:21:55,858 [ERROR]                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:21:55,858 [ERROR] 
+2025-06-11 17:21:55,859 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/utils.py", line 50, in from_url
+2025-06-11 17:21:55,859 [ERROR]     return Redis.from_url(url, **kwargs)
+2025-06-11 17:21:55,859 [ERROR]            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:21:55,860 [ERROR] 
+2025-06-11 17:21:55,860 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/client.py", line 170, in from_url
+2025-06-11 17:21:55,860 [ERROR]     connection_pool = ConnectionPool.from_url(url, **kwargs)
+2025-06-11 17:21:55,860 [ERROR]                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2025-06-11 17:21:55,861 [ERROR] 
+2025-06-11 17:21:55,861 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1364, in from_url
+2025-06-11 17:21:55,861 [ERROR]     url_options = parse_url(url)
+2025-06-11 17:21:55,861 [ERROR]                   ^^^^^^^^^^^^^^
+2025-06-11 17:21:55,861 [ERROR] 
+2025-06-11 17:21:55,862 [ERROR]   File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/redis/connection.py", line 1289, in parse_url
+2025-06-11 17:21:55,862 [ERROR]     if url.port:
+2025-06-11 17:21:55,862 [ERROR]        ^^^^^^^^
+2025-06-11 17:21:55,862 [ERROR] 
+2025-06-11 17:21:55,862 [ERROR]   File "/usr/local/lib/python3.12/urllib/parse.py", line 182, in port
+2025-06-11 17:21:55,863 [ERROR]     raise ValueError(f"Port could not be cast to integer value as {port!r}")
+2025-06-11 17:21:55,863 [ERROR] ***************************************************
+2025-06-11 17:21:55,863 [ERROR] If you're seeing an import error and don't know why,
+2025-06-11 17:21:55,863 [ERROR] we have a dedicated help page to help you debug: 
+2025-06-11 17:21:55,863 [ERROR] https://help.pythonanywhere.com/pages/DebuggingImportError/
+2025-06-11 17:21:55,864 [ERROR] ***************************************************
+2025-06-11 17:28:32,574 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 17:28:34,783 [ERROR] Exception on / [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 35, in home
+    return render_template("index.html")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 127, in _render
+    app.update_template_context(context)
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 530, in update_template_context
+    context.update(self.ensure_sync(func)())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 405, in _user_context_processor
+    return dict(current_user=_get_user())
+                             ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 347, in _load_user
+    raise Exception(
+Exception: Missing user_loader or request_loader. Refer to http://flask-login.readthedocs.io/#how-it-works for more info.
+2025-06-11 17:28:55,842 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 17:28:57,107 [ERROR] Exception on / [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 35, in home
+    return render_template("index.html")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 127, in _render
+    app.update_template_context(context)
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 530, in update_template_context
+    context.update(self.ensure_sync(func)())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 405, in _user_context_processor
+    return dict(current_user=_get_user())
+                             ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 347, in _load_user
+    raise Exception(
+Exception: Missing user_loader or request_loader. Refer to http://flask-login.readthedocs.io/#how-it-works for more info.
+2025-06-11 17:40:18,217 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 17:40:20,063 [ERROR] Exception on / [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 35, in home
+    return render_template("index.html")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 127, in _render
+    app.update_template_context(context)
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 530, in update_template_context
+    context.update(self.ensure_sync(func)())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 405, in _user_context_processor
+    return dict(current_user=_get_user())
+                             ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 347, in _load_user
+    raise Exception(
+Exception: Missing user_loader or request_loader. Refer to http://flask-login.readthedocs.io/#how-it-works for more info.
+2025-06-11 18:57:27,498 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 18:57:29,093 [ERROR] Exception on / [GET]
+Traceback (most recent call last):
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 1511, in wsgi_app
+    response = self.full_dispatch_request()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 919, in full_dispatch_request
+    rv = self.handle_user_exception(e)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 917, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 902, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes.py", line 35, in home
+    return render_template("index.html")
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 150, in render_template
+    return _render(app, template, context)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/templating.py", line 127, in _render
+    app.update_template_context(context)
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask/app.py", line 530, in update_template_context
+    context.update(self.ensure_sync(func)())
+                   ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 405, in _user_context_processor
+    return dict(current_user=_get_user())
+                             ^^^^^^^^^^^
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/utils.py", line 370, in _get_user
+    current_app.login_manager._load_user()
+  File "/home/srpihhllc/PlaidBridgeOpenBankingApi/venv/lib/python3.12/site-packages/flask_login/login_manager.py", line 347, in _load_user
+    raise Exception(
+Exception: Missing user_loader or request_loader. Refer to http://flask-login.readthedocs.io/#how-it-works for more info.
+2025-06-11 19:21:32,080 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 19:27:14,096 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 20:12:09,031 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 20:15:21,309 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 20:24:56,210 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 20:53:24,319 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 21:00:33,164 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 21:05:23,668 [INFO] 🚀 Flask app initialized successfully!
+2025-06-11 21:59:12,463 [INFO] 🚀 Flask app initialized successfully!
+2025-06-12 04:01:35,622 [INFO] 🚀 Flask app initialized successfully!

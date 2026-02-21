@@ -1,0 +1,66 @@
+<!-- app/templates/admin/lenders.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lender Verification Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+    <h1>Lender Verification Panel</h1>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Business</th>
+                <th>Owner</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Bank</th>
+                <th>Flags</th>
+                <th>Linked</th>
+                <th>Created</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for lender in lenders %}
+            <tr>
+                <td>{{ lender.id }}</td>
+                <td>{{ lender.business_name }}</td>
+                <td>{{ lender.owner_name }}</td>
+                <td>{{ lender.verification_score }}%</td>
+                <td>
+                    {% if lender.verification_status == "verified" %}
+                        <span class="badge verified">🟢 Verified</span>
+                    {% else %}
+                        <span class="badge rejected">🔴 Rejected</span>
+                    {% endif %}
+                </td>
+                <td>{{ lender.institution_name or "—" }}</td>
+                <td>
+                    {% if lender.flags %}
+                        <ul>
+                        {% for flag in lender.flags %}
+                            <li>{{ flag }}</li>
+                        {% endfor %}
+                        </ul>
+                    {% else %}
+                        <span>✅ Clean</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if lender.bank_linked %}
+                        <span class="badge linked">✅ Linked</span>
+                    {% else %}
+                        <span class="badge missing">❌ Not Linked</span>
+                    {% endif %}
+                </td>
+                <td>{{ lender.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

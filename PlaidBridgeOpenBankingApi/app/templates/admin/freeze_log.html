@@ -1,0 +1,37 @@
+{% extends "admin_sidebar.html" %}
+{% block content %}
+
+<h2>🧊 Suspended Cards Log</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Card ID</th>
+      <th>User ID</th>
+      <th>Credit Limit</th>
+      <th>Used</th>
+      <th>Last Payment</th>
+      <th>Status</th>
+      <th>Unfreeze</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for card in cards %}
+    <tr>
+      <td>{{ card.card_id }}</td>
+      <td>{{ card.user_id }}</td>
+      <td>${{ "%.2f"|format(card.credit_limit) }}</td>
+      <td>${{ "%.2f"|format(card.balance_used) }}</td>
+      <td>{{ card.last_payment_ts.strftime("%Y-%m-%d %H:%M") if card.last_payment_ts else "—" }}</td>
+      <td><span style="color:red;">🧊 Suspended</span></td>
+      <td>
+        <form method="POST" action="/admin/unfreeze_card/{{ card.card_id }}">
+          <button type="submit">Unfreeze</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% endblock %}

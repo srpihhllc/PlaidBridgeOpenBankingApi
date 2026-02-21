@@ -1,0 +1,14 @@
+<div class="card border-info mb-4 shadow-sm">
+  <div class="card-header bg-info text-white">🔐 OAuth Session Trace</div>
+  <div class="card-body">
+    {% if session["user_id"] %}
+      <p><strong>User ID:</strong> {{ session["user_id"] }}</p>
+      <p><strong>Provider:</strong> Google OAuth</p>
+      <p><strong>Redirect URI:</strong> https://srpihhllc.pythonanywhere.com/auth/callback/google</p>
+      <p class="text-success">✅ Token exchanged successfully</p>
+    {% else %}
+      <p class="text-warning">⚠️ No active session found</p>
+      <p class="text-danger">Possible token failure or session unset</p>
+    {% endif %}
+  </div>
+</div>

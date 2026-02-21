@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2 class="mb-3">{{ user.username }}'s Vault Accounts</h2>
+
+<ul class="list-group">
+  {% for acct in accounts %}
+    <li class="list-group-item">
+      🏦 <strong>{{ acct.account_type.title() }}</strong><br>
+      Account #: {{ acct.account_number }}<br>
+      Balance: <span class="fw-bold">${{ "%.2f"|format(acct.balance) }}</span><br>
+      Opened: {{ acct.created_at.strftime("%Y-%m-%d") }}
+
+      {% if acct.balance < 1 %}
+        <span class="badge bg-danger ms-2">Dormant</span>
+      {% elif acct.balance < 100 %}
+        <span class="badge bg-warning ms-2">Low Liquidity</span>
+      {% else %}
+        <span class="badge bg-success ms-2">Healthy</span>
+      {% endif %}
+    </li>
+  {% else %}
+    <li class="list-group-item">⚠️ No vault accounts found for this user.</li>
+  {% endfor %}
+</ul>
+
+{% endblock %}

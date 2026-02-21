@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Insights Dashboard</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons for a modern look -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      /* Custom styles to ensure icons are rendered */
+      .icon-container {
+        display: inline-block;
+        width: 1.5rem;
+        height: 1.5rem;
+      }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 text-gray-800 antialiased">
+
+    <div class="mx-auto max-w-4xl rounded-xl bg-white p-8 shadow-2xl transition-all duration-300">
+        <header class="mb-8 text-center">
+            <h1 class="text-4xl font-extrabold text-blue-700">
+                Gemini Insights Dashboard
+            </h1>
+            <p class="mt-2 text-lg text-gray-600">
+                Interact with your new API endpoints.
+            </p>
+        </header>
+
+        <main class="space-y-12">
+            <!-- Summary Component -->
+            <div class="rounded-lg border-2 border-indigo-200 bg-white p-6 shadow-md transition-all duration-300 hover:shadow-xl">
+                <div class="mb-4 flex items-center space-x-2">
+                    <span class="icon-container" id="sparkles-icon"></span>
+                    <h2 class="text-xl font-semibold text-indigo-700">
+                        Text Summarization
+                    </h2>
+                </div>
+                <p class="text-gray-600">
+                    Get a quick summary of long transaction details or notes.
+                </p>
+                <div class="mt-4">
+                    <textarea id="summary-text-area" class="w-full min-h-[120px] rounded-md border-2 border-gray-300 p-3 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors" placeholder="Paste your text here to summarize..."></textarea>
+                    <button id="summarize-button" class="mt-4 flex w-full items-center justify-center space-x-2 rounded-lg bg-indigo-600 px-6 py-3 text-white transition-transform duration-200 hover:scale-105 hover:bg-indigo-700 disabled:bg-gray-400">
+                        <span class="icon-container" id="summarize-button-icon"></span>
+                        <span id="summarize-button-text">Summarize</span>
+                    </button>
+                </div>
+                <div id="summary-output" class="hidden mt-6 rounded-md bg-gray-100 p-4">
+                    <h3 class="text-md font-medium text-gray-700">Summary:</h3>
+                    <p id="summary-content" class="mt-2 text-gray-800"></p>
+                </div>
+                <div id="summary-error" class="hidden mt-6 flex items-center space-x-2 rounded-md bg-red-100 p-4 text-red-700">
+                    <span class="icon-container" id="summary-error-icon"></span>
+                    <p id="summary-error-message"></p>
+                </div>
+            </div>
+
+            <!-- TTS Component -->
+            <div class="rounded-lg border-2 border-emerald-200 bg-white p-6 shadow-md transition-all duration-300 hover:shadow-xl">
+                <div class="mb-4 flex items-center space-x-2">
+                    <span class="icon-container" id="volume-icon"></span>
+                    <h2 class="text-xl font-semibold text-emerald-700">
+                        Text-to-Speech
+                    </h2>
+                </div>
+                <p class="text-gray-600">
+                    Convert text into natural-sounding speech for accessibility.
+                </p>
+                <div class="mt-4">
+                    <textarea id="tts-text-area" class="w-full min-h-[120px] rounded-md border-2 border-gray-300 p-3 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors" placeholder="Enter text to convert to speech..."></textarea>
+                    <button id="tts-button" class="mt-4 flex w-full items-center justify-center space-x-2 rounded-lg bg-emerald-600 px-6 py-3 text-white transition-transform duration-200 hover:scale-105 hover:bg-emerald-700 disabled:bg-gray-400">
+                        <span class="icon-container" id="tts-button-icon"></span>
+                        <span id="tts-button-text">Generate and Play Audio</span>
+                    </button>
+                </div>
+                <div id="tts-error" class="hidden mt-6 flex items-center space-x-2 rounded-md bg-red-100 p-4 text-red-700">
+                    <span class="icon-container" id="tts-error-icon"></span>
+                    <p id="tts-error-message"></p>
+                </div>
+            </div>
+
+            <!-- PDF Download Component -->
+            <div class="rounded-lg border-2 border-red-200 bg-white p-6 shadow-md transition-all duration-300 hover:shadow-xl">
+                <div class="mb-4 flex items-center space-x-2">
+                    <span class="icon-container" id="download-icon"></span>
+                    <h2 class="text-xl font-semibold text-red-700">
+                        Fraud Report PDF
+                    </h2>
+                </div>
+                <p class="text-gray-600">
+                    Download a PDF report of all transactions flagged as potentially fraudulent.
+                </p>
+                <button id="pdf-button" class="mt-4 flex w-full items-center justify-center space-x-2 rounded-lg bg-red-600 px-6 py-3 text-white transition-transform duration-200 hover:scale-105 hover:bg-red-700 disabled:bg-gray-400">
+                    <span class="icon-container" id="pdf-button-icon"></span>
+                    <span id="pdf-button-text">Download Fraud Report</span>
+                </button>
+                <div id="pdf-success" class="hidden mt-4 flex items-center space-x-2 rounded-md bg-green-100 p-4 text-green-700">
+                    <span class="icon-container" id="pdf-success-icon"></span>
+                    <p id="pdf-success-message"></p>
+                </div>
+                <div id="pdf-error" class="hidden mt-6 flex items-center space-x-2 rounded-md bg-red-100 p-4 text-red-700">
+                    <span class="icon-container" id="pdf-error-icon"></span>
+                    <p id="pdf-error-message"></p>
+                </div>
+            </div>
+        </main>
+
+        <footer class="mt-12 text-center text-sm text-gray-500">
+            <p>&copy; 2024 Your Business. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // Helper function to render Lucide icons
+        function renderIcons() {
+            lucide.createIcons();
+            document.getElementById('sparkles-icon').innerHTML = lucide.createIcons()['sparkles'].toSvg();
+            document.getElementById('volume-icon').innerHTML = lucide.createIcons()['volume-2'].toSvg();
+            document.getElementById('download-icon').innerHTML = lucide.createIcons()['download'].toSvg();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderIcons();
+
+            const summarizeButton = document.getElementById('summarize-button');
+            const summaryTextArea = document.getElementById('summary-text-area');
+            const summaryOutput = document.getElementById('summary-output');
+            const summaryContent = document.getElementById('summary-content');
+            const summarizeButtonText = document.getElementById('summarize-button-text');
+            const summarizeButtonIcon = document.getElementById('summarize-button-icon');
+            const summaryError = document.getElementById('summary-error');
+            const summaryErrorMessage = document.getElementById('summary-error-message');
+
+            const ttsButton = document.getElementById('tts-button');
+            const ttsTextArea = document.getElementById('tts-text-area');
+            const ttsButtonText = document.getElementById('tts-button-text');
+            const ttsButtonIcon = document.getElementById('tts-button-icon');
+            const ttsError = document.getElementById('tts-error');
+            const ttsErrorMessage = document.getElementById('tts-error-message');
+
+            const pdfButton = document.getElementById('pdf-button');
+            const pdfButtonText = document.getElementById('pdf-button-text');
+            const pdfButtonIcon = document.getElementById('pdf-button-icon');
+            const pdfSuccess = document.getElementById('pdf-success');
+            const pdfSuccessMessage = document.getElementById('pdf-success-message');
+            const pdfError = document.getElementById('pdf-error');
+            const pdfErrorMessage = document.getElementById('pdf-error-message');
+
+            // Function to handle the summarization API call
+            summarizeButton.addEventListener('click', async () => {
+                const text = summaryTextArea.value.trim();
+                if (!text) {
+                    summaryError.classList.remove('hidden');
+                    summaryErrorMessage.textContent = 'Please enter text to summarize.';
+                    return;
+                }
+
+                // Show loading state
+                summarizeButton.disabled = true;
+                summaryOutput.classList.add('hidden');
+                summaryError.classList.add('hidden');
+                summarizeButtonIcon.innerHTML = `<svg class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v2m0 12v2m-6-6H4m12 0h2m-6-6V4m0 12v2m-6-6H4m12 0h2m-6-6V4m0 12v2m-6-6H4m12 0h2M4 12h2m12 0h2m-6-6v2m0 12v2m-6-6H4m12 0h2M4 12h2m12 0h2m-6-6v2m0 12v2m-6-6H4m12 0h2"></path></svg>`;
+                summarizeButtonText.textContent = 'Summarizing...';
+
+                try {
+                    const response = await fetch('/api/summarize', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    summaryContent.textContent = data.summary;
+                    summaryOutput.classList.remove('hidden');
+                } catch (e) {
+                    console.error('Failed to fetch summary:', e);
+                    summaryError.classList.remove('hidden');
+                    summaryErrorMessage.textContent = 'Failed to generate summary. Please try again.';
+                } finally {
+                    // Reset button state
+                    summarizeButton.disabled = false;
+                    summarizeButtonIcon.innerHTML = `<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
+                    document.getElementById('summarize-button-icon').innerHTML = lucide.createIcons()['sparkles'].toSvg();
+                    summarizeButtonText.textContent = 'Summarize';
+                }
+            });
+
+            // Function to convert PCM audio data to a playable WAV Blob.
+            function pcmToWav(pcmData, sampleRate) {
+                const dataView = new DataView(new ArrayBuffer(44 + pcmData.byteLength));
+                let offset = 0;
+
+                const writeString = (str) => {
+                    for (let i = 0; i < str.length; i++) {
+                        dataView.setUint8(offset + i, str.charCodeAt(i));
+                    }
+                    offset += str.length;
+                };
+
+                const writeUint32 = (val) => {
+                    dataView.setUint32(offset, val, true);
+                    offset += 4;
+                };
+
+                const writeUint16 = (val) => {
+                    dataView.setUint16(offset, val, true);
+                    offset += 2;
+                };
+
+                writeString('RIFF');
+                writeUint32(36 + pcmData.byteLength);
+                writeString('WAVE');
+                writeString('fmt ');
+                writeUint32(16);
+                writeUint16(1); // Audio format (1 for PCM)
+                writeUint16(1); // Number of channels
+                writeUint32(sampleRate);
+                writeUint32(sampleRate * 2); // Byte rate
+                writeUint16(2); // Block align
+                writeUint16(16); // Bits per sample
+                writeString('data');
+                writeUint32(pcmData.byteLength);
+
+                new Int16Array(dataView.buffer, 44).set(new Int16Array(pcmData));
+
+                return new Blob([dataView.buffer], { type: 'audio/wav' });
+            }
+
+            // Function to handle the TTS API call
+            ttsButton.addEventListener('click', async () => {
+                const text = ttsTextArea.value.trim();
+                if (!text) {
+                    ttsError.classList.remove('hidden');
+                    ttsErrorMessage.textContent = 'Please enter text to convert to speech.';
+                    return;
+                }
+
+                // Show loading state
+                ttsButton.disabled = true;
+                ttsError.classList.add('hidden');
+                ttsButtonIcon.innerHTML = `<svg class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v2m0 12v2m-6-6H4m12 0h2m-6-6V4m0 12v2m-6-6H4m12 0h2m-6-6V4m0 12v2m-6-6H4m12 0h2M4 12h2m12 0h2m-6-6v2m0 12v2m-6-6H4m12 0h2M4 12h2m12 0h2m-6-6v2m0 12v2m-6-6H4m12 0h2"></path></svg>`;
+                ttsButtonText.textContent = 'Generating Audio...';
+
+                try {
+                    const response = await fetch('/api/tts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const audioData = await response.arrayBuffer();
+                    const wavBlob = pcmToWav(audioData, 24000);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onended = () => {
+                        URL.revokeObjectURL(audioUrl);
+                    };
+                } catch (e) {
+                    console.error('Failed to generate audio:', e);
+                    ttsError.classList.remove('hidden');
+                    ttsErrorMessage.textContent = 'Failed to generate and play audio. Please try again.';
+                } finally {
+                    // Reset button state
+                    ttsButton.disabled = false;
+                    ttsButtonIcon.innerHTML = `<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
+                    document.getElementById('tts-button-icon').innerHTML = lucide.createIcons()['volume-2'].toSvg();
+                    ttsButtonText.textContent = 'Generate and Play Audio';
+                }
+            });
+
+            // Function to handle the PDF download API call
+            pdfButton.addEventListener('click', async () => {
+                // Show loading state
+                pdfButton.disabled = true;
+                pdfSuccess.classList.add('hidden');
+                pdfError.classList.add('hidden');
+                pdfButtonIcon.innerHTML = `<svg class="h-5 w-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v2m0 12v2m-6-6H4m12 0h2m-6-6V4m0 12v2m-6-6H4m12 0h2m-6-6V4m0 12v2m-6-6H4m12 0h2M4 12h2m12 0h2m-6-6v2m0 12v2m-6-6H4m12 0h2M4 12h2m12 0h2m-6-6v2m0 12v2m-6-6H4m12 0h2"></path></svg>`;
+                pdfButtonText.textContent = 'Generating Report...';
+
+                try {
+                    const response = await fetch('/api/generate_fraud_pdf_report');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    // Get the file name from the Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filenameMatch = contentDisposition && contentDisposition.match(/filename="(.+)"/);
+                    const filename = filenameMatch ? filenameMatch[1] : 'fraud_report.pdf';
+
+                    // Create a Blob from the response data and a URL to it
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+
+                    // Create a temporary link and click it to trigger the download
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+
+                    // Clean up the URL object
+                    URL.revokeObjectURL(url);
+
+                    pdfSuccess.classList.remove('hidden');
+                    pdfSuccessMessage.textContent = 'Report generated successfully! Download should start automatically.';
+
+                } catch (e) {
+                    console.error('Failed to download PDF:', e);
+                    pdfError.classList.remove('hidden');
+                    pdfErrorMessage.textContent = 'Failed to download the PDF report. Please try again.';
+                } finally {
+                    // Reset button state
+                    pdfButton.disabled = false;
+                    pdfButtonIcon.innerHTML = `<svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>`;
+                    document.getElementById('pdf-button-icon').innerHTML = lucide.createIcons()['download'].toSvg();
+                    pdfButtonText.textContent = 'Download Fraud Report';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
