@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Underwriter Intake{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>🧠 Underwriter Audit Queue</h2>
+  <ul class="list-group">
+    {% for agent in underwriters %}
+    <li class="list-group-item">
+      <strong>{{ agent.name }}</strong> — Approved by <code>{{ agent.approved_by or "—" }}</code><br>
+      Verified: {{ agent.verified_at.strftime("%Y-%m-%d %H:%M") }}<br>
+      {% if agent.reviewed_by_symphony %}
+        <span class="badge bg-info text-dark">Reviewed by SymphonyAI</span>
+      {% else %}
+        <span class="badge bg-warning text-dark">Pending Review</span>
+      {% endif %}
+      <p class="mt-2"><em>Notes:</em> {{ agent.assessment_notes or "—" }}</p>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

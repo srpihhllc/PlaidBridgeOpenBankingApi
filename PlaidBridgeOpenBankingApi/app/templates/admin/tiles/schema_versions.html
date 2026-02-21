@@ -1,0 +1,25 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h2>Schema Versions</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Version Hash</th>
+      <th>Applied At</th>
+      <th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for version in versions %}
+    <tr>
+      <td><code>{{ version.version_hash }}</code></td>
+      <td>{{ version.applied_at.strftime('%b %d, %Y %H:%M:%S') }}</td>
+      <td>
+        {% if loop.first %}🟢 Latest{% else %}—{% endif %}
+        <a href="https://github.com/YourOrg/YourRepo/blob/main/migrations/versions/{{ version.version_hash }}.py" target="_blank">🔍 View</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

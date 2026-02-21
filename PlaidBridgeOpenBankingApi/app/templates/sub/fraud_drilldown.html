@@ -1,0 +1,117 @@
+{% extends "sub/base_sub.html" %}
+{% block title %}Fraud Drilldown | {{ current_user.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3 class="mb-0">
+      <i class="fas fa-shield-alt me-2"></i> Fraud & Risk Drilldown
+    </h3>
+    <a href="{{ url_for('sub_ui.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+    </a>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6>Risk Score</h6>
+          <p class="display-6 text-danger mb-0">
+            {{ fraud_summary.risk_score if fraud_summary else 'N/A' }}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6>Flagged Transactions</h6>
+          <p class="display-6 text-danger mb-0">
+            {{ fraud_summary.flagged_count if fraud_summary else 0 }}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6>Last Audit</h6>
+          <p class="mb-0">
+            {{ fraud_summary.last_audit_date if fraud_summary and fraud_summary.last_audit_date else 'N/A' }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Flagged Transactions Table -->
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+      <h6 class="mb-0">Flagged Transactions</h6>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-striped mb-0">
+        <thead class="thead-dark">
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Category</th>
+            <th>Amount</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if flagged_transactions %}
+            {% for txn in flagged_transactions %}
+              <tr>
+                <td>{{ txn.date[:10] }}</td>
+                <td>{{ txn.description }}</td>
+                <td>{{ txn.category or '—' }}</td>
+                <td>${{ "%.2f"|format(txn.amount|default(0.00)) }}</td>
+                <td>{{ txn.fraud_reason or 'Flagged by rules engine' }}</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">
+                No flagged transactions at this time.
+              </td>
+            </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Simple Timeline List (can swap to chart later) -->
+  <div class="card">
+    <div class="card-header bg-light">
+      <h6 class="mb-0">
+        <i class="fas fa-chart-line me-2"></i> Risk Timeline
+      </h6>
+    </div>
+    <div class="card-body">
+      {% if timeline and timeline.points %}
+        <ul class="list-group small">
+          {% for p in timeline.points %}
+            <li class="list-group-item d-flex justify-content-between">
+              {{ p.date }} <span>${{ p.amount }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-muted small mb-0">
+          No timeline data available.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+
+
+

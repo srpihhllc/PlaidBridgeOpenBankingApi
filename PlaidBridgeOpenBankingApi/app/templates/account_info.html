@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Account Information{% endblock %}
+
+{% block content %}
+<h2>Account Information</h2>
+<div id="account-info">
+    <p>Account Balance: {{ account_balance }}</p>
+    <p>Account Statements:</p>
+    <ul>
+        {% for statement in statements %}
+        <li>{{ statement.date }} - {{ statement.description }} - {{ statement.amount }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Funds Flow for User {{ user_id }}</h2>
+<p class="text-muted">Trace of inbound/outbound liquidity over the last 7 days</p>
+
+<table class="table table-bordered mt-4">
+  <thead class="table-light">
+    <tr>
+      <th>Date</th>
+      <th>Inbound</th>
+      <th>Outbound</th>
+      <th>Net Flow</th>
+      <th>Signal</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for day in flow_data %}
+    <tr>
+      <td>{{ day.date }}</td>
+      <td>${{ "%.2f"|format(day.inbound or 0) }}</td>
+      <td>${{ "%.2f"|format(day.outbound or 0) }}</td>
+      <td>
+        {% if (day.net or 0) < 0 %}
+          <span class="text-danger">-${{ "%.2f"|format((day.net or 0) | abs) }}</span>
+        {% else %}
+          <span class="text-success">${{ "%.2f"|format(day.net or 0) }}</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if (day.net or 0) > 1000 %}
+          <span class="badge bg-success">Capital Surge</span>
+        {% elif (day.net or 0) < -1000 %}
+          <span class="badge bg-danger">Liquidity Drain</span>
+        {% else %}
+          <span class="badge bg-secondary">Stable</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<hr class="mt-5" />
+<h4>Weekly Net Flow Chart</h4>
+<canvas id="net-flow-chart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('net-flow-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ flow_data | map(attribute='date') | list | tojson }},
+      datasets: [{
+        label: 'Net Liquidity Flow ($)',
+        data: {{ flow_data | map(attribute='net') | list | tojson }},
+        backgroundColor: '#17a2b8'
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+</script>
+
+{% endblock %}
+

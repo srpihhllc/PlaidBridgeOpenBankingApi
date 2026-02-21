@@ -1,0 +1,83 @@
+{% extends "sub/base_sub.html" %}
+{% block content %}
+
+<h2 class="text-info fw-bold">Vault Dashboard</h2>
+<p class="text-muted">Your vault balance, flow, and activity</p>
+
+<!-- SUMMARY TILE -->
+<div class="row mt-4">
+  <div class="col-md-4">
+    <div class="card bg-dark border-info">
+      <div class="card-header text-info">Vault Balance</div>
+      <div class="card-body">
+        <h3>${{ "%.2f"|format(summary.total_balance) }}</h3>
+        <p class="text-muted small">Total balance across all vault transactions</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card bg-dark border-success">
+      <div class="card-header text-success">Deposits</div>
+      <div class="card-body">
+        <h4>${{ "%.2f"|format(summary.total_deposits) }}</h4>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card bg-dark border-danger">
+      <div class="card-header text-danger">Withdrawals</div>
+      <div class="card-body">
+        <h4>${{ "%.2f"|format(summary.total_withdrawals) }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="mt-5" />
+
+<!-- FLOW CHART -->
+<h4 class="text-info">Vault Flow (Last 14 Days)</h4>
+<canvas id="vault-flow-chart"></canvas>
+
+<script>
+  const ctx = document.getElementById('vault-flow-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ flow_labels | tojson }},
+      datasets: [{
+        label: 'Daily Net Flow',
+        data: {{ flow_values | tojson }},
+        borderColor: '#17a2b8',
+        backgroundColor: 'rgba(23,162,184,0.2)',
+        tension: 0.3,
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+</script>
+
+<hr class="mt-5" />
+
+<!-- FRAUD SIGNALS -->
+<h4 class="text-warning">Potential Fraud Signals</h4>
+
+{% if fraud_signals %}
+  <ul class="list-group">
+    {% for f in fraud_signals %}
+      <li class="list-group-item bg-dark text-warning border-warning">
+        <strong>{{ f.type }}</strong> — {{ f }}
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="text-muted">No fraud indicators detected.</p>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,7 @@
+<p><strong>Mock Session:</strong> 
+  {% if ttl_badge == "active" %}
+    <span class="badge bg-success">Active – {{ ttl }}s remaining</span>
+  {% else %}
+    <span class="badge bg-warning">Expired</span>
+  {% endif %}
+</p>

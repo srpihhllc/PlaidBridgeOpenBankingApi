@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Statement Timeline</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Hourly Statement Submission Timeline</h2>
+  <canvas id="timelineChart" width="600" height="300"></canvas>
+
+  <script>
+    fetch("/admin/statements_dashboard")
+      .then(res => res.json())
+      .then(data => {
+        const hourlyCounts = {};
+        data.logs.forEach(log => {
+          const hour = new Date(log.timestamp).getHours();
+          hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1;
+        });
+
+        const labels = Array.from({ length: 24 }, (_, i) => `${i}:00`);
+        const values = labels.map(label => {
+          const hour = parseInt(label.split(":")[0]);
+          return hourlyCounts[hour] || 0;
+        });
+
+        new Chart(document.getElementById("timelineChart"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: [{
+              label: "Statements per Hour",
+              data: values,
+              borderColor: "teal",
+              fill: false
+            }]
+          }
+        });
+      });
+  </script>
+</body>
+</html>

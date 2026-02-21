@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lender Risk — {{ date_str }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100 p-8 min-h-screen">
+
+<div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-6">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between pb-4 mb-6 border-b border-gray-200">
+        <h1 class="text-2xl font-bold text-gray-800">
+            Lender Risk Activity — {{ date_str }}
+        </h1>
+
+        <a href="/cockpit/tiles/lender_risk/heatmap"
+           class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
+            ← Back to Heatmap
+        </a>
+    </header>
+
+    <!-- Summary -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+        <div class="bg-red-50 p-4 rounded-lg shadow">
+            <p class="text-sm text-gray-600">Risk Alerts</p>
+            <p class="text-xl font-bold text-red-700">{{ events|selectattr("event_type", "equalto", "LENDER_RISK_ALERT")|list|length }}</p>
+        </div>
+
+        <div class="bg-blue-50 p-4 rounded-lg shadow">
+            <p class="text-sm text-gray-600">Self‑Link Events</p>
+            <p class="text-xl font-bold text-blue-700">
+                {{ events|selectattr("event_type", "equalto", "LENDER_SELF_LINKED")|list|length }}
+            </p>
+        </div>
+
+        <div class="bg-yellow-50 p-4 rounded-lg shadow">
+            <p class="text-sm text-gray-600">Fraud Cases</p>
+            <p class="text-xl font-bold text-yellow-700">{{ fraud_cases|length }}</p>
+        </div>
+    </div>
+
+    <!-- Schema Events -->
+    <section class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-800 mb-3">Schema Events</h2>
+
+        {% if events %}
+            <div class="space-y-3">
+                {% for e in events %}
+                    <div class="p-4 rounded-lg border shadow-sm bg-gray-50">
+                        <div class="flex justify-between">
+                            <span class="font-semibold text-gray-800">{{ e.event_type }}</span>
+                            <span class="text-xs text-gray-500">{{ e.timestamp }}</span>
+                        </div>
+                        <p class="text-sm text-gray-700 mt-1">
+                            {{ e.detail or "No detail provided" }}
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">User ID: {{ e.user_id }}</p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-gray-500 italic">No schema events recorded for this day.</p>
+        {% endif %}
+    </section>
+
+    <!-- Fraud Cases -->
+    <section class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-800 mb-3">Fraud Cases</h2>
+
+        {% if fraud_cases %}
+            <div class="space-y-3">
+                {% for f in fraud_cases %}
+                    <div class="p-4 rounded-lg border shadow-sm bg-red-50">
+                        <div class="flex justify-between">
+                            <span class="font-semibold text-red-800">Fraud Case #{{ f.id }}</span>
+                            <span class="text-xs text-gray-500">{{ f.timestamp }}</span>
+                        </div>
+                        <p class="text-sm text-gray-700 mt-1">
+                            Reason: {{ f.flagged_reason }}
+                        </p>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Transaction ID: {{ f.transaction_id }}
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-gray-500 italic">No fraud cases recorded for this day.</p>
+        {% endif %}
+    </section>
+
+    <!-- AI Logs -->
+    <section class="mb-10">
+        <h2 class="text-xl font-semibold text-gray-800 mb-3">AI Risk Evaluations</h2>
+
+        {% if ai_logs %}
+            <div class="space-y-3">
+                {% for log in ai_logs %}
+                    <div class="p-4 rounded-lg border shadow-sm bg-purple-50">
+                        <div class="flex justify-between">
+                            <span class="font-semibold text-purple-800">AI Evaluation</span>
+                            <span class="text-xs text-gray-500">{{ log.timestamp }}</span>
+                        </div>
+
+                        <pre class="text-xs bg-white p-3 rounded border mt-2 overflow-x-auto">
+{{ log | tojson(indent=2) }}
+                        </pre>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-gray-500 italic">No AI evaluations recorded for this day.</p>
+        {% endif %}
+    </section>
+
+</div>
+
+</body>
+</html>

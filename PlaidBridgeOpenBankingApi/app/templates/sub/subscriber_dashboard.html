@@ -1,0 +1,1146 @@
+{% extends "sub/base_sub.html" %}
+{% block title %}Dashboard | {{ current_user.username }} — PlaidBridgeOpenBankingApi{% endblock %}
+
+{% block content %}
+<div id="dashboard-root" class="dashboard-root {% if dashboard_settings.dark_mode %}dark-mode{% endif %}">
+
+  <!-- ========================================================= -->
+  <!-- LEFT SIDEBAR (FIXED ON DESKTOP, TOGGLABLE) -->
+  <!-- ========================================================= -->
+  <nav id="sidebar" class="sidebar">
+    <div class="sidebar-header d-flex align-items-center justify-content-between">
+      <span class="sidebar-logo fw-bold">
+        <i class="fas fa-layer-group me-2"></i> Cockpit
+      </span>
+      <button id="sidebar-toggle" class="btn btn-sm btn-outline-light d-md-none">
+        <i class="fas fa-bars"></i>
+      </button>
+    </div>
+
+    <ul class="nav flex-column mt-3">
+
+      <li class="nav-item">
+        <a class="nav-link active" href="{{ url_for('sub_ui.dashboard') }}">
+          <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="#section-financial" data-scroll>
+          <i class="fas fa-wallet me-2"></i> Financial Overview
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="#section-tasks" data-scroll>
+          <i class="fas fa-check-square me-2"></i> Tasks & Productivity
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="#section-services" data-scroll>
+          <i class="fas fa-toolbox me-2"></i> Services & Tools
+        </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" href="#section-identity" data-scroll>
+          <i class="fas fa-user-circle me-2"></i> Identity & Profile
+        </a>
+      </li>
+
+      <li class="nav-item mt-3">
+        <a class="nav-link" href="{{ url_for('main.logout') }}">
+          <i class="fas fa-sign-out-alt me-2"></i> Logout
+        </a>
+      </li>
+
+      {% if is_operator %}
+      <li class="nav-item mt-4">
+        <span class="nav-link text-warning small">
+          <i class="fas fa-exclamation-triangle me-2"></i> Operator Mode
+        </span>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+
+  <!-- MAIN CONTENT WRAPPER -->
+  <div class="dashboard-main">
+
+    <!-- TOP BAR: TITLE + DARK MODE TOGGLE -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <div>
+        <h2 class="text-primary fw-bold mb-0">
+          <i class="fas fa-tachometer-alt me-2"></i>
+          Welcome back, {{ current_user.username }}
+        </h2>
+        <p class="text-muted mb-0">
+          Unified cockpit: finances, tasks, services, and identity — all in one place.
+        </p>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button id="dark-mode-toggle" class="btn btn-outline-secondary btn-sm">
+          <i class="fas fa-moon me-1"></i>
+          <span id="dark-mode-label">
+            {% if dashboard_settings.dark_mode %}Light Mode{% else %}Dark Mode{% endif %}
+          </span>
+        </button>
+      </div>
+    </div>
+
+    {% if is_operator %}
+    <div class="alert alert-warning py-2 mb-3 small d-flex align-items-center">
+      <i class="fas fa-user-cog me-2"></i>
+      Operator mode active — tiles may show additional diagnostic overlays.
+    </div>
+    {% endif %}
+
+    <!-- OPERATIONAL TILES ROW -->
+    <div class="row mb-4">
+      <div class="col-md-4">
+        {% include "components/ttl_pulse.html" %}
+      </div>
+      <div class="col-md-4 position-relative">
+        {% include "partials/_blueprint_audit_tile.html" %}
+        {% if is_operator %}
+        <span class="operator-overlay badge bg-warning position-absolute top-0 end-0 m-2">
+          Audit Drift: {{ audit_info.status }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="col-md-4 position-relative">
+        {% include "partials/_redis_health_tile.html" %}
+        {% if is_operator %}
+        <span class="operator-overlay badge bg-info position-absolute top-0 end-0 m-2">
+          Redis Telemetry
+        </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- SECTION: FINANCIAL OVERVIEW (COLLAPSIBLE) -->
+    <!-- ========================================================= -->
+    <section id="section-financial" class="mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="mb-0">
+          <i class="fas fa-wallet me-2"></i> Financial Overview
+        </h4>
+        <button class="btn btn-sm btn-outline-secondary"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#financial-collapse">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+
+      <div id="financial-collapse" class="collapse show">
+        <div class="row g-4 mb-3">
+
+          <!-- TOTAL BALANCE -->
+          <div class="col-md-3">
+            <div class="card shadow-sm border-0 text-center">
+              <div class="card-body">
+                <h6>Total Balance</h6>
+                {% if current_user.total_balance is not none %}
+                  <p class="display-6 text-success mb-0">
+                    ${{ "%.2f"|format(current_user.total_balance) }}
+                  </p>
+                {% else %}
+                  <p class="display-6 text-success mb-0">$0.00</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- ACCOUNTS LINKED -->
+          <div class="col-md-3">
+            <div class="card shadow-sm border-0 text-center">
+              <div class="card-body">
+                <h6>Accounts Linked</h6>
+                <p class="display-6 mb-0">
+                  {{ current_user.num_accounts|default(0) }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- STATEMENTS -->
+          <div class="col-md-3">
+            <div class="card shadow-sm border-0 text-center">
+              <div class="card-body">
+                <h6>Statements</h6>
+                <p class="display-6 mb-0">
+                  {{ current_user.num_statements|default(0) }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- FRAUD SUMMARY -->
+          <div class="col-md-3">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h6 class="card-title">Fraud Summary</h6>
+                {% if fraud_summary %}
+                  <p class="fw-bold text-danger mb-1">
+                    {{ fraud_summary.flagged_count }} flagged
+                  </p>
+                  <p class="text-muted small mb-2">
+                    Risk Score: {{ fraud_summary.risk_score }}
+                  </p>
+                  <a href="{{ url_for('sub_ui.fraud_drilldown') }}"
+                     class="btn btn-outline-danger btn-sm">
+                    Investigate
+                  </a>
+                {% else %}
+                  <p class="text-muted small mb-0">
+                    No fraud analytics available yet.
+                  </p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RECENT TRANSACTIONS TABLE -->
+        <div class="card">
+          <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">Recent Transactions</h6>
+            {% if is_operator %}
+            <span class="badge bg-warning">DTO: TransactionDTO</span>
+            {% endif %}
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-striped mb-0">
+              <thead class="thead-dark">
+                <tr>
+                  <th>Date</th>
+                  <th>Account</th>
+                  <th>Description</th>
+                  <th>Category</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% if transactions %}
+                  {% for txn in transactions %}
+                    <tr>
+                      <td>{{ txn.date[:10] }}</td>
+                      <td>{{ txn.account or '—' }}</td>
+                      <td>{{ txn.description }}</td>
+                      <td>{{ txn.category or '—' }}</td>
+                      <td>${{ "%.2f"|format(txn.amount|default(0.00)) }}</td>
+                      <td>{{ txn.verification_status }}</td>
+                      <td>
+                        <button class="btn btn-sm btn-outline-danger"
+                                onclick="openDisputeModal('{{ txn.id }}',
+                                                           '{{ txn.account }}',
+                                                           '{{ txn.description }}',
+                                                           '{{ txn.amount }}')">
+                          Dispute
+                        </button>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                {% else %}
+                  <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                      No recent transactions found.
+                    </td>
+                  </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- SECTION: TASKS & PRODUCTIVITY (COLLAPSIBLE) -->
+    <!-- ========================================================= -->
+    <section id="section-tasks" class="mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="mb-0">
+          <i class="fas fa-check-square me-2"></i> Tasks & Productivity
+        </h4>
+        <button class="btn btn-sm btn-outline-secondary"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#tasks-collapse">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+
+      <div id="tasks-collapse" class="collapse show">
+        <div class="row g-4">
+
+          <!-- Today's Tasks -->
+          <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h5 class="card-title">Today's Tasks</h5>
+                <ul class="list-group small">
+                  {% if pending_todos %}
+                    {% for t in pending_todos %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        {{ t.title }}
+                        <span class="badge badge-warning">Pending</span>
+                      </li>
+                    {% endfor %}
+                  {% else %}
+                    <li class="list-group-item text-muted">
+                      No pending tasks.
+                    </li>
+                  {% endif %}
+                </ul>
+                <a href="#" class="btn btn-outline-primary btn-sm mt-2">
+                  View All Tasks
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Completed Tasks -->
+          <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h5 class="card-title">Completed Tasks</h5>
+                <ul class="list-group small">
+                  {% if completed_todos %}
+                    {% for t in completed_todos %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        {{ t.title }}
+                        <span class="badge badge-success">Done</span>
+                      </li>
+                    {% endfor %}
+                  {% else %}
+                    <li class="list-group-item text-muted">
+                      No completed tasks yet.
+                    </li>
+                  {% endif %}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Task Completion Trend -->
+          <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h5 class="card-title">Task Completion Trend</h5>
+                <p class="text-muted small mb-0">
+                  Chart integration coming soon.
+                </p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- SECTION: SERVICES & TOOLS (COLLAPSIBLE, REGISTRY-DRIVEN) -->
+    <!-- ========================================================= -->
+    <section id="section-services" class="mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="mb-0">
+          <i class="fas fa-toolbox me-2"></i> Services & Tools
+        </h4>
+        <button class="btn btn-sm btn-outline-secondary"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#services-collapse">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+
+      <div id="services-collapse" class="collapse show">
+        <div class="row g-4 mb-3">
+
+          <!-- LEFT COLUMN: CORE FINANCIAL TOOLS (STATIC) -->
+          <div class="col-md-6">
+
+            <!-- Bank Statements -->
+            <div class="card shadow-sm border-0 mb-3">
+              <div class="card-body">
+                <h5 class="card-title">
+                  <i class="fas fa-file-invoice-dollar me-2"></i> Bank Statements
+                </h5>
+                <p class="text-muted small">
+                  Generate PDF statements using your transaction history.
+                </p>
+                <a href="#" class="btn btn-outline-primary btn-sm">
+                  Generate Statement
+                </a>
+              </div>
+            </div>
+
+            <!-- Currency Conversion -->
+            <section id="currencyConversionSection" class="card mb-3">
+              <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                  <i class="fas fa-exchange-alt me-2"></i> Multi‑Currency Conversion
+                </h5>
+              </div>
+              <div class="card-body">
+                <form action="/api/convert_currency" method="POST">
+                  <div class="form-row">
+                    <div class="form-group col-md-4">
+                      <input type="number" name="amount" class="form-control" required placeholder="Amount">
+                    </div>
+                    <div class="form-group col-md-4">
+                      <input type="text" name="from" class="form-control" required placeholder="From (e.g. USD)">
+                    </div>
+                    <div class="form-group col-md-4">
+                      <input type="text" name="to" class="form-control" required placeholder="To (e.g. EUR)">
+                    </div>
+                  </div>
+                  <button type="submit" class="btn btn-outline-light bg-dark mt-3">
+                    Convert Currency
+                  </button>
+                </form>
+              </div>
+            </section>
+
+            <!-- Fraud & Compliance Insights -->
+            <section id="fraudInsights" class="card mb-3">
+              <div class="card-header bg-warning text-white">
+                <h5 class="mb-0">
+                  <i class="fas fa-shield-alt me-2"></i> Fraud & Compliance Insights
+                </h5>
+              </div>
+              <div class="card-body">
+                <p>
+                  We proactively monitor your transaction patterns to detect unusual
+                  or high‑risk activity. View detailed analytics and risk indicators
+                  in your personalized fraud drilldown.
+                </p>
+                <a href="{{ url_for('sub_ui.fraud_drilldown') }}"
+                   class="btn btn-outline-danger">
+                  View Fraud Drilldown
+                </a>
+              </div>
+            </section>
+
+            <!-- Smart Contract Management -->
+            <section id="smartContractExecution" class="card mb-3">
+              <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                  <i class="fas fa-file-contract me-2"></i> Smart Contract Management
+                </h5>
+              </div>
+              <div class="card-body">
+                <p>
+                  Automate loan agreement compliance and lock violators with
+                  blockchain‑verified enforcement.
+                </p>
+                <form action="/api/execute_contract/1" method="POST">
+                  <button type="submit" class="btn btn-outline-light bg-dark">
+                    Execute Smart Contract
+                  </button>
+                </form>
+              </div>
+            </section>
+
+          </div>
+
+          <!-- RIGHT COLUMN: AI & ANALYTICS + REGISTRY -->
+          <div class="col-md-6">
+
+            <!-- Gemini Insights -->
+            <div class="card mb-3">
+              <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                  <i class="fas fa-robot me-2"></i> Gemini‑Powered Insights ✨
+                </h5>
+                {% if is_operator %}
+                <span class="badge bg-light text-dark">/api/gemini/*</span>
+                {% endif %}
+              </div>
+              <div class="card-body">
+                <div class="d-flex justify-content-center flex-column flex-md-row gap-3">
+                  <button id="generate-summary-btn" class="btn btn-info btn-lg flex-fill">
+                    <span id="summary-btn-text">Generate Transaction Summary</span>
+                    <span id="summary-btn-spinner"
+                          class="spinner-border spinner-border-sm d-none"
+                          role="status"
+                          aria-hidden="true"></span>
+                  </button>
+
+                  <button id="read-summary-btn"
+                          class="btn btn-secondary btn-lg flex-fill"
+                          disabled>
+                    <span id="read-btn-text">Read Summary Aloud</span>
+                    <span id="read-btn-spinner"
+                          class="spinner-border spinner-border-sm d-none"
+                          role="status"
+                          aria-hidden="true"></span>
+                  </button>
+                </div>
+
+                <div id="summary-output" class="mt-4 p-4 rounded bg-light d-none">
+                  <h6 class="text-info">Transaction Summary:</h6>
+                  <p id="summary-text" class="mb-0"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transaction Summary -->
+            <div class="card mb-3">
+              <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">
+                  <i class="fas fa-chart-bar me-2"></i> Transaction Summary
+                </h5>
+              </div>
+              <div class="card-body">
+                <ul class="list-group">
+                  {% if transaction_summary %}
+                    <li class="list-group-item">
+                      Total Volume:
+                      ${{ "%.2f"|format(transaction_summary.total_amount|default(0.00)) }}
+                    </li>
+                    <li class="list-group-item text-success">
+                      Income:
+                      ${{ "%.2f"|format(transaction_summary.income|default(0.00)) }}
+                    </li>
+                    <li class="list-group-item text-danger">
+                      Expenses:
+                      ${{ "%.2f"|format(transaction_summary.expenses|default(0.00)) }}
+                    </li>
+                    <li class="list-group-item">
+                      Net Cash Flow:
+                      ${{ "%.2f"|format(transaction_summary.net_cash_flow|default(0.00)) }}
+                    </li>
+                  {% else %}
+                    <li class="list-group-item text-muted">
+                      No summary data available.
+                    </li>
+                  {% endif %}
+                </ul>
+              </div>
+            </div>
+
+            <!-- Timeline Analytics -->
+            <div class="card mb-3">
+              <div class="card-header bg-light">
+                <h5 class="mb-0">
+                  <i class="fas fa-chart-line me-2"></i> Timeline Analytics
+                </h5>
+              </div>
+              <div class="card-body">
+                {% if timeline and timeline.points %}
+                  <ul class="list-group small">
+                    {% for p in timeline.points %}
+                      <li class="list-group-item d-flex justify-content-between">
+                        {{ p.date }} <span>${{ p.amount }}</span>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% else %}
+                  <p class="text-muted small mb-0">
+                    No timeline data available.
+                  </p>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- SERVICE REGISTRY TILES -->
+            <div class="card mb-3">
+              <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                  <i class="fas fa-cubes me-2"></i> Service Registry
+                </h5>
+                {% if is_operator %}
+                <span class="badge bg-warning">Auto‑discovered from /services</span>
+                {% endif %}
+              </div>
+              <div class="card-body">
+                <div class="row g-2">
+                  {% for svc in service_registry %}
+                    <div class="col-md-6">
+                      <div class="border rounded px-2 py-2 small h-100">
+                        <div class="d-flex justify-content-between align-items-center">
+                          <span>
+                            <i class="fas {{ svc.icon }} me-1"></i>
+                            {{ svc.name }}
+                          </span>
+                          {% if is_operator %}
+                          <span class="badge bg-light text-dark">{{ svc.category }}</span>
+                          {% endif %}
+                        </div>
+                        {% if is_operator %}
+                        <div class="text-muted mt-1">
+                          <code class="small">{{ svc.module }}</code>
+                        </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================================================= -->
+    <!-- SECTION: IDENTITY & PROFILE (COLLAPSIBLE) -->
+    <!-- ========================================================= -->
+    <section id="section-identity" class="mb-5">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h4 class="mb-0">
+          <i class="fas fa-user-circle me-2"></i> Identity & Profile
+        </h4>
+        <button class="btn btn-sm btn-outline-secondary"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#identity-collapse">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+
+      <div id="identity-collapse" class="collapse show">
+        <div class="row g-4">
+
+          <!-- Profile -->
+          <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h5 class="card-title">
+                  <i class="fas fa-user me-2"></i> Profile
+                </h5>
+                <p class="text-muted small mb-1">Username: {{ profile.username }}</p>
+                <p class="text-muted small mb-3">Full Name: {{ profile.full_name }}</p>
+                <a href="{{ url_for('sub_ui.settings') }}"
+                   class="btn btn-outline-primary btn-sm">
+                  Edit Profile
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security -->
+          <div class="col-md-4">
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h5 class="card-title">
+                  <i class="fas fa-lock me-2"></i> Security
+                </h5>
+                <p class="text-muted small mb-2">
+                  MFA, TOTP, SMS verification, and more.
+                </p>
+                <a href="#" class="btn btn-outline-primary btn-sm">
+                  Manage Security
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <!-- API Key / Pulses -->
+          <div class="col-md-4">
+            <div class="card shadow-sm border-0 mb-3">
+              <div class="card-body">
+                <h5 class="card-title">
+                  <i class="fas fa-key me-2"></i> API Key
+                </h5>
+                <p class="text-muted small mb-2">
+                  Your API key is securely stored.
+                </p>
+                <a href="#" class="btn btn-outline-primary btn-sm">
+                  Regenerate Key
+                </a>
+              </div>
+            </div>
+
+            <!-- Access Token Pulse -->
+            <div class="card shadow-sm border-0 mb-3">
+              <div class="card-body">
+                <h6 class="card-title mb-2">
+                  <i class="fas fa-stream me-2"></i> Access Token Pulse
+                </h6>
+                <ul id="access-token-list" class="small list-unstyled mb-0">
+                  <li class="text-muted">Loading token data...</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- Vault Activity Pulse -->
+            <div class="card shadow-sm border-0">
+              <div class="card-body">
+                <h6 class="card-title mb-2">
+                  <i class="fas fa-piggy-bank me-2"></i> Vault Activity
+                </h6>
+                <ul id="vault-activity-list" class="small list-unstyled mb-0">
+                  <li class="text-muted">Loading vault activity...</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </div> <!-- /dashboard-main -->
+</div> <!-- /dashboard-root -->
+
+<!-- DISPUTE MODAL (unchanged) -->
+<div class="modal fade" id="disputeModal" tabindex="-1" role="dialog"
+     aria-labelledby="disputeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="disputeModalLabel">Dispute Transaction</h5>
+        <button type="button" class="close text-white" data-dismiss="modal"
+                aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <form id="disputeForm">
+          <input type="hidden" id="dispute_txn_id">
+
+          <div class="form-group">
+            <label for="dispute_bureau">Select Bureau</label>
+            <select id="dispute_bureau" class="form-control" required>
+              <option value="Experian">Experian</option>
+              <option value="Equifax">Equifax</option>
+              <option value="TransUnion">TransUnion</option>
+              <option value="Innovis">Innovis</option>
+              <option value="LexisNexis">LexisNexis</option>
+              <option value="LCI">LCI</option>
+              <option value="ARS">ARS</option>
+              <option value="Credco">Credco</option>
+              <option value="Clarity">Clarity</option>
+              <option value="DataX">DataX</option>
+              <option value="MicroBilt">MicroBilt</option>
+              <option value="FactorTrust">FactorTrust</option>
+              <option value="SageStream">SageStream</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="dispute_reason">Reason for Dispute</label>
+            <textarea id="dispute_reason"
+                      class="form-control"
+                      rows="3"
+                      required></textarea>
+          </div>
+
+          <button type="submit" class="btn btn-danger btn-block">
+            Submit Dispute
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Sidebar toggle (mobile)
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const dashboardRoot = document.getElementById('dashboard-root');
+    const darkModeToggle = document.getElementById('dark-mode-toggle');
+    const darkModeLabel = document.getElementById('dark-mode-label');
+
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('sidebar-open');
+        });
+    }
+
+    // Smooth scroll for sidebar links
+    document.querySelectorAll('a[data-scroll]').forEach(link => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            const targetId = link.getAttribute('href').slice(1);
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+    });
+
+    // Dark mode toggle: client-side only; persist via API if you want
+    if (darkModeToggle && dashboardRoot) {
+        darkModeToggle.addEventListener('click', async () => {
+            const isDark = dashboardRoot.classList.toggle('dark-mode');
+            darkModeLabel.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+
+            // Optional: persist via API
+            try {
+                await fetch('/api/dashboard_settings/dark_mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dark_mode: isDark })
+                });
+            } catch (e) {
+                console.warn('Failed to persist dark mode setting', e);
+            }
+        });
+    }
+
+    // DISPUTE FUNCTIONS
+    function openDisputeModal(id, account, description, amount) {
+        const disputeTxnId = document.getElementById('dispute_txn_id');
+        if (disputeTxnId) {
+            disputeTxnId.value = id;
+        }
+        $('#disputeModal').modal('show');
+    }
+
+    const disputeForm = document.getElementById('disputeForm');
+    if (disputeForm) {
+        disputeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const payload = {
+                txn_id: document.getElementById('dispute_txn_id').value,
+                bureau: document.getElementById('dispute_bureau').value,
+                reason: document.getElementById('dispute_reason').value
+            };
+
+            const batchRes = await fetch('/api/disputes/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ total: 1, origin: 'dashboard_dispute' })
+            });
+
+            const { batch_id, job_id } = await batchRes.json();
+
+            await fetch('/api/disputes/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...payload, batch_id, job_id })
+            });
+
+            $('#disputeModal').modal('hide');
+        });
+    }
+
+    // GEMINI INTEGRATION
+    const summaryBtn = document.getElementById('generate-summary-btn');
+    const summaryBtnText = document.getElementById('summary-btn-text');
+    const summaryBtnSpinner = document.getElementById('summary-btn-spinner');
+    const readBtn = document.getElementById('read-summary-btn');
+    const readBtnText = document.getElementById('read-btn-text');
+    const readBtnSpinner = document.getElementById('read-btn-spinner');
+    const summaryOutput = document.getElementById('summary-output');
+    const summaryText = document.getElementById('summary-text');
+
+    const base64ToArrayBuffer = (base64) => {
+        const binaryString = atob(base64);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes.buffer;
+    };
+
+    const pcmToWav = (pcmData, sampleRate) => {
+        const dataLength = pcmData.length;
+        const buffer = new ArrayBuffer(44 + dataLength * 2);
+        const view = new DataView(buffer);
+        let offset = 0;
+
+        const writeString = (view, offset, string) => {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        };
+
+        writeString(view, offset, 'RIFF'); offset += 4;
+        view.setUint32(offset, 36 + dataLength * 2, true); offset += 4;
+        writeString(view, offset, 'WAVE'); offset += 4;
+        writeString(view, offset, 'fmt '); offset += 4;
+        view.setUint32(offset, 16, true); offset += 4;
+        view.setUint16(offset, 1, true); offset += 2;
+        view.setUint16(offset, 1, true); offset += 2;
+        view.setUint32(offset, sampleRate, true); offset += 4;
+        view.setUint32(offset, sampleRate * 2, true); offset += 4;
+        view.setUint16(offset, 2, true); offset += 2;
+        view.setUint16(offset, 16, true); offset += 2;
+        writeString(view, offset, 'data'); offset += 4;
+        view.setUint32(offset, dataLength * 2, true); offset += 4;
+
+        for (let i = 0; i < dataLength; i++) {
+            view.setInt16(offset, pcmData[i], true);
+            offset += 2;
+        }
+
+        return new Blob([view], { type: 'audio/wav' });
+    };
+
+    if (summaryBtn && readBtn && summaryText && summaryOutput) {
+        summaryBtn.addEventListener('click', async () => {
+            summaryBtn.disabled = true;
+            summaryBtnText.textContent = 'Generating...';
+            summaryBtnSpinner.classList.remove('d-none');
+            summaryOutput.classList.add('d-none');
+            readBtn.disabled = true;
+
+            const transactionRows = document.querySelectorAll('.table tbody tr');
+            const transactions = [];
+            transactionRows.forEach(row => {
+                const columns = row.querySelectorAll('td');
+                if (columns.length >= 5) {
+                    transactions.push({
+                        date: columns[0].textContent,
+                        description: columns[2].textContent,
+                        amount: parseFloat(columns[4].textContent.replace('$', ''))
+                    });
+                }
+            });
+
+            try {
+                const response = await fetch('/api/gemini/summarize', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transactions })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const result = await response.json();
+                summaryText.textContent = result.summary;
+                summaryOutput.classList.remove('d-none');
+                readBtn.disabled = false;
+            } catch (error) {
+                console.error('Error generating summary:', error);
+                summaryText.textContent = 'Error: Could not generate a summary. Please try again.';
+                summaryOutput.classList.remove('d-none');
+            } finally {
+                summaryBtn.disabled = false;
+                summaryBtnText.textContent = 'Generate Transaction Summary';
+                summaryBtnSpinner.classList.add('d-none');
+            }
+        });
+
+        readBtn.addEventListener('click', async () => {
+            readBtn.disabled = true;
+            readBtnText.textContent = 'Reading...';
+            readBtnSpinner.classList.remove('d-none');
+
+            try {
+                const response = await fetch('/api/gemini/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: summaryText.textContent })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const result = await response.json();
+                const audioData = result.audio_data;
+                const sampleRate = result.sample_rate;
+
+                const pcmData = base64ToArrayBuffer(audioData);
+                const pcm16 = new Int16Array(pcmData);
+                const wavBlob = pcmToWav(pcm16, sampleRate);
+                const audioUrl = URL.createObjectURL(wavBlob);
+                const audio = new Audio(audioUrl);
+
+                audio.onended = () => {
+                    readBtn.disabled = false;
+                    readBtnText.textContent = 'Read Summary Aloud';
+                    readBtnSpinner.classList.add('d-none');
+                };
+
+                audio.play();
+            } catch (error) {
+                console.error('Error reading summary:', error);
+                readBtn.disabled = false;
+                readBtnText.textContent = 'Read Summary Aloud';
+                readBtnSpinner.classList.add('d-none');
+            }
+        });
+    }
+
+    // ACCESS TOKEN PULSE (updated)
+    // Calls canonical endpoint: /pulse/access_token?user_id=<id>
+    function fetchAccessTokenPulse(userId) {
+        if (!userId) return;
+        const url = `/pulse/access_token?user_id=${encodeURIComponent(userId)}`;
+
+        fetch(url, { cache: 'no-store' })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                const list = document.getElementById('access-token-list');
+                if (!list) return;
+                list.innerHTML = '';
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    const li = document.createElement('li');
+                    li.textContent = 'No active tokens found.';
+                    li.classList.add('text-muted');
+                    list.appendChild(li);
+                    return;
+                }
+
+                data.forEach(trace => {
+                    const li = document.createElement('li');
+
+                    // Defensive parsing of timestamps
+                    let issued = null;
+                    try {
+                        if (trace.issued_at) {
+                            issued = new Date(trace.issued_at);
+                            if (Number.isNaN(issued.getTime())) issued = null;
+                        }
+                    } catch (e) {
+                        issued = null;
+                    }
+
+                    let expires = null;
+                    try {
+                        if (trace.expires_at) {
+                            expires = new Date(trace.expires_at);
+                            if (Number.isNaN(expires.getTime())) expires = null;
+                        }
+                    } catch (e) {
+                        expires = null;
+                    }
+
+                    const now = new Date();
+                    let ttlBadge = '';
+                    let expired = false;
+
+                    if (expires) {
+                        const diffMs = expires - now;
+                        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                        if (diffDays < 0) {
+                            expired = true;
+                            ttlBadge = `<span class="badge badge-danger">Expired</span>`;
+                        } else {
+                            ttlBadge = `<span class="badge badge-light">Expires in ${diffDays} day${diffDays !== 1 ? 's' : ''}</span>`;
+                        }
+                    }
+
+                    const tokenShort = trace.token ? String(trace.token).slice(0, 8) + '...' : '—';
+
+                    li.innerHTML = `
+                        Token: ${tokenShort}
+                        <span class="badge badge-info">Issued: ${issued ? issued.toLocaleDateString() : '—'}</span>
+                        ${expires ? `<span class="badge badge-warning">Expires: ${expires.toLocaleDateString()}</span>` : `<span class="badge badge-secondary">No Expiry</span>`}
+                        ${ttlBadge}
+                        <button class="btn btn-sm btn-outline-danger ml-2" onclick="revokeToken('${trace.token}', this)">Revoke</button>
+                    `;
+
+                    if (expired) li.classList.add('text-danger');
+                    list.appendChild(li);
+                });
+            })
+            .catch(error => {
+                console.error('❌ Error fetching access token pulse:', error);
+                const list = document.getElementById('access-token-list');
+                if (list) list.innerHTML = '<li class="text-danger">Error loading token data.</li>';
+            });
+    }
+
+    function revokeToken(tokenId, button) {
+        if (!tokenId || !button) return;
+        button.disabled = true;
+        const originalText = button.textContent;
+        button.textContent = 'Revoking...';
+
+        fetch(`/api/token/revoke/${encodeURIComponent(tokenId)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Failed to revoke token');
+            // remove the list item
+            const li = button.closest('li');
+            if (li) li.remove();
+        })
+        .catch(error => {
+            console.error('❌ Token revoke failed:', error);
+            button.disabled = false;
+            button.textContent = originalText || 'Revoke';
+        });
+    }
+
+    // VAULT PULSE (kept as path-style, but hardened)
+    function fetchVaultPulse(userId) {
+        if (!userId) return;
+        const url = `/pulse/vault/${encodeURIComponent(userId)}`;
+
+        fetch(url, { cache: 'no-store' })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                const list = document.getElementById('vault-activity-list');
+                if (!list) return;
+                list.innerHTML = '';
+
+                if (!Array.isArray(data) || data.length === 0) {
+                    const li = document.createElement('li');
+                    li.textContent = 'No recent vault transactions.';
+                    li.classList.add('text-muted');
+                    list.appendChild(li);
+                    return;
+                }
+
+                data.forEach(trace => {
+                    const li = document.createElement('li');
+                    const ts = trace.timestamp ? new Date(trace.timestamp).toLocaleString() : '—';
+                    li.innerHTML = `
+                        ${trace.transaction_type || 'Txn'} of ${trace.amount || '—'} ${trace.currency || ''}
+                        <span class="badge badge-${trace.status === 'completed' ? 'success' : 'warning'}">${trace.status || 'unknown'}</span>
+                        <span class="badge badge-light">${ts}</span>
+                    `;
+                    list.appendChild(li);
+                });
+            })
+            .catch(error => {
+                console.error('❌ Error fetching vault pulse:', error);
+            });
+    }
+
+    const userId = {{ current_user.id|tojson }};
+    if (userId !== null) {
+        // Initial fetch and periodic polling
+        fetchAccessTokenPulse(userId);
+        fetchVaultPulse(userId);
+
+        setInterval(() => {
+            fetchAccessTokenPulse(userId);
+            fetchVaultPulse(userId);
+        }, 30000);
+    }
+</script>
+{% endblock %}
+
+
+
+
+
+

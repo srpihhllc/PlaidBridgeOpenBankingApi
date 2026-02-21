@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Operator Login | FinBrain Cortex{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+
+      {% if session.get('operator_mode') %}
+      <div class="alert alert-success mb-4">
+        👑 Operator Mode Active — expires in {{ session.get('operator_mode_ttl_seconds') }} seconds.
+      </div>
+      {% endif %}
+
+      <h2 class="text-center mb-4">👑 Operator Console Access</h2>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show text-break" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form
+        id="operatorForm"
+        action="{{ url_for('admin_api.operator_entry') }}"
+        method="POST"
+        class="border p-4 rounded bg-light shadow-sm"
+      >
+
+        <div class="mb-3">
+          <label for="passcode" class="form-label">🔑 Operator Ignition Code</label>
+          <input
+            type="text"
+            class="form-control"
+            id="passcode"
+            name="passcode"
+            placeholder="Enter ignition code"
+            pattern="[A-Za-z0-9]{6,16}"
+            maxlength="16"
+            required
+            autofocus
+          >
+        </div>
+
+        {% if request.args.get('next') %}
+          <input type="hidden" name="next" value="{{ request.args.get('next') }}">
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary w-100 mt-2">
+          Enter Operator Console
+        </button>
+      </form>
+
+      <div class="alert alert-warning small mt-3">
+        ⚠️ All operator actions are logged for compliance and audit.
+      </div>
+
+      <div class="text-center mt-4">
+        <p class="mb-0">
+          Subscriber?
+          <a href="{{ url_for('auth.login') }}" class="text-decoration-none">
+            Login here
+          </a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById("operatorForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const data = new FormData(form);
+
+  const res = await fetch(form.action, { method: "POST", body: data });
+  const json = await res.json();
+
+  if (json.status === "ok") {
+    window.location.href = "{{ url_for('admin_ui.admin_home') }}";
+  } else {
+    alert(json.message || "Invalid operator code");
+  }
+});
+</script>
+
+{% endblock %}
+
+

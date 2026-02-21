@@ -1,0 +1,159 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/static/styles.css
+
+/* ===== Base Layout & Components ===== */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+}
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+.btn {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+}
+.btn:hover {
+    background-color: #218838;
+}
+.account-info {
+    padding: 15px;
+    border: solid 1px #ddd;
+    border-radius: 8px;
+    background: #f8f9fa;
+    text-align: center;
+}
+.sidebar {
+    background-color: #343a40;
+    color: white;
+    padding: 15px;
+    min-height: 100vh;
+    position: fixed; /* Keeps sidebar visible when scrolling */
+    width: 250px;
+}
+.sidebar h5 {
+    font-size: 1.2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+.sidebar a {
+    color: #adb5bd;
+    text-decoration: none;
+    display: block;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+.sidebar a:hover,
+.sidebar a.active {
+    background-color: #495057;
+    color: white;
+}
+.pocket {
+    padding: 15px;
+    border-radius: 8px;
+    background: white;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    transition: all 0.3s ease-in-out;
+}
+.pocket:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    transform: scale(1.02);
+}
+/* ✅ Header Styling */
+header {
+    background-color: #007bff;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+/* ===== Cockpit Blueprint Audit Tile ===== */
+.tile-blueprints {
+    border-left: 5px solid #17a2b8; /* info accent */
+}
+
+.tile-blueprints .card-header {
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
+.tile-blueprints .status-line {
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+}
+
+.tile-blueprints .status {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+
+/* Status color variants */
+.tile-blueprints .status.success {
+    background-color: #28a745;
+    color: #fff;
+}
+.tile-blueprints .status.warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+.tile-blueprints .status.error {
+    background-color: #dc3545;
+    color: #fff;
+}
+.tile-blueprints .status.drift {
+    background-color: #fd7e14; /* orange */
+    color: #fff;
+}
+.tile-blueprints .status.unknown {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.tile-blueprints .last-audit {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.tile-blueprints .counts {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 0;
+}
+
+.tile-blueprints .counts li {
+    font-size: 0.85rem;
+    padding: 2px 0;
+    border-bottom: 1px dotted #e9ecef;
+}
+
+.tile-blueprints .counts li:last-child {
+    border-bottom: none;
+}
+
+
+
+
+
+
+
+
+
+
