@@ -1,0 +1,62 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/pyproject.toml
+
+[tool.poetry]
+name = "PlaidBridgeOpenBankingApi"
+version = "3.12.0"
+description = "A Python project integrating with Plaid’s API to support Open Banking functionalities"
+authors = ["srpihhllc <srpollardsihhllc@gmail.com>"]
+
+[[tool.poetry.packages]]
+include = "app"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+
+# Core Frameworks & Utilities
+flask = "^3.0.3"
+python-dotenv = "^1.0.0"
+requests = "^2.32.0"
+
+# Database & ORM
+flask-sqlalchemy = "^3.1.1"
+psycopg2-binary = "^2.9.9"
+
+# Authentication & Security
+flask-login = "^0.6.3"
+flask-jwt-extended = "^4.4.4"
+
+# Caching & Messaging
+redis = "^5.0.1"
+
+# Existing Dependencies
+flask-mail = "^0.9.1"
+flask-wtf = "^1.2.2"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.1.1"
+pytest-cov = "^7.0.0"
+ruff = "^0.8.4"
+mypy = "^1.11.2"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "PT", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"unittest" = { msg = "Use pytest fixtures instead of unittest." }
+"unittest.TestCase" = { msg = "Use pytest fixtures instead of unittest.TestCase." }
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["app"]
+
+[tool.black]
+line-length = 100
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

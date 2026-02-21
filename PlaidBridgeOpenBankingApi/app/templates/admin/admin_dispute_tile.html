@@ -1,0 +1,19 @@
+<div class="col-md-4 mb-4">
+  <div class="card bg-dark text-warning shadow">
+    <div class="card-body text-center">
+      <h5 class="card-title">🧾 Complaint Blast Engine</h5>
+      <p class="card-text">Launch legally enforceable dispute dispatch.</p>
+      <div id="dispute-count" class="mb-2 text-warning">Loading...</div>
+      <a href="{{ url_for('admin.dispute_logs') }}" class="btn btn-outline-warning">Launch Panel</a>
+    </div>
+  </div>
+</div>
+
+<script>
+fetch("/admin/system_metrics.json")
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById("dispute-count").innerText =
+      `Disputes Logged: ${data.dispute_logs || "0"}`;
+  });
+</script>

@@ -1,0 +1,366 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/plaidbridgeopenbankingapi.git
+"""
+Statement ingestion + Plaid / TreasuryPrime demo endpoints.
+- Preserves original endpoints and global names (account_balance, plaid_client) for parity.
+- Adds a safe factory create_flask_app() and hardening to avoid package/instance collisions.
+- Module-level legacy `app` is created only when EXPORT_LEGACY_APP=1 is set, otherwise callers should use create_flask_app().
+"""
+
+import os
+import csv
+import logging
+import requests
+from datetime import datetime
+from typing import List, Dict, Optional
+
+import pdfplumber
+from fpdf import FPDF
+from dotenv import load_dotenv
+from werkzeug.utils import secure_filename
+from flask import Flask, render_template, request, jsonify, send_from_directory, abort
+
+# Attempt to import Plaid client; keep a guarded fallback so import-time failures don't break app imports
+try:
+    from plaid import Client as PlaidClient  # may raise if plaid SDK not present
+except Exception:
+    PlaidClient = None
+
+# Load environment variables
+load_dotenv()
+
+# ---- Configuration and constants (match original defaults) ----
+UPLOAD_FOLDER = os.getenv("STATEMENTS_FOLDER", "statements")
+MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(16 * 1024 * 1024)))  # 16 MB
+ALLOWED_EXTENSIONS = {"pdf"}
+
+PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
+PLAID_SECRET = os.getenv("PLAID_SECRET")
+PLAID_ENV = os.getenv("PLAID_ENV", "sandbox")
+
+TREASURY_PRIME_API_KEY = os.getenv("TREASURY_PRIME_API_KEY")
+TREASURY_PRIME_API_URL = os.getenv("TREASURY_PRIME_API_URL", "https://api.treasuryprime.com")
+
+# ---- Logging (preserve original debug level behavior if requested) ----
+DEFAULT_LOG_LEVEL = logging.DEBUG if os.getenv("PLAID_DEBUG", "0") == "1" else logging.INFO
+logging.basicConfig(level=DEFAULT_LOG_LEVEL)
+logger = logging.getLogger(__name__)
+logger.debug("Starting application (module load)")
+
+# ---- Module-level globals preserved for parity with original behavior ----
+# NOTE: These remain available, but they are safe: plaid_client may be None if SDK missing.
+account_balance: float = 848583.68
+plaid_client: Optional[object] = None
+
+# Initialize a module-level Plaid client if possible (maintain original behavior), but guard failures
+try:
+    if PlaidClient is not None and PLAID_CLIENT_ID and PLAID_SECRET:
+        plaid_client = PlaidClient(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
+        logger.debug("Plaid client instantiated at module import.")
+    else:
+        plaid_client = None
+        logger.debug("Plaid client not instantiated at import (SDK or credentials missing).")
+except Exception as exc:
+    plaid_client = None
+    logger.warning("Plaid client initialization failed at import: %s", exc)
+
+# Ensure statements folder exists (safe to create here)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+
+# ---- Helpers (parity-preserving but hardened) ----
+def allowed_file(filename: str) -> bool:
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def parse_page(text: str) -> List[Dict]:
+    statements: List[Dict] = []
+    for line in text.split("\n"):
+        parts = line.strip().split()
+        if len(parts) >= 3:
+            date = parts[0]
+            description = " ".join(parts[1:-1])
+            amount = parts[-1].replace(",", "")
+            transaction_type = "withdrawal" if amount.startswith("-") else "deposit"
+            statements.append({
+                "date": date,
+                "description": description,
+                "amount": amount,
+                "transaction_type": transaction_type
+            })
+    return statements
+
+
+def parse_pdf(file_path: str) -> List[Dict]:
+    statements: List[Dict] = []
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                text = page.extract_text()
+                if text:
+                    statements.extend(parse_page(text))
+        logger.info("Parsed %d statements from PDF", len(statements))
+        return statements
+    except Exception as exc:
+        logger.exception("Error parsing PDF %s: %s", file_path, exc)
+        raise
+
+
+def correct_discrepancies(statements: List[Dict]) -> List[Dict]:
+    corrected: List[Dict] = []
+    for stmt in statements:
+        amt = stmt.get("amount", "0").strip()
+        try:
+            if amt.startswith("(") and amt.endswith(")"):
+                amt_val = -float(amt[1:-1])
+            else:
+                amt_val = float(amt)
+            stmt["amount"] = f"{amt_val:.2f}"
+        except Exception:
+            stmt["amount"] = "0.00"
+        corrected.append(stmt)
+    return corrected
+
+
+def save_statements_as_csv(statements: List[Dict], file_path: str) -> None:
+    if not statements:
+        raise ValueError("No statements to save")
+    keys = list(statements[0].keys())
+    try:
+        with open(file_path, mode="w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=keys)
+            writer.writeheader()
+            writer.writerows(statements)
+        logger.info("Saved CSV to %s", file_path)
+    except Exception:
+        logger.exception("Error saving CSV %s", file_path)
+        raise
+
+
+def generate_pdf_from_csv(csv_file_path: str, pdf_file_path: str) -> None:
+    try:
+        pdf = FPDF()
+        pdf.add_page()
+        pdf.set_font("Arial", size=12)
+
+        with open(csv_file_path, newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                line = f"{row.get('date','')} {row.get('description','')} {row.get('amount','')} {row.get('transaction_type','')}"
+                pdf.cell(200, 10, txt=line, ln=True)
+
+        pdf.output(pdf_file_path)
+        logger.info("PDF generated as '%s'", pdf_file_path)
+    except Exception:
+        logger.exception("Error generating PDF from %s", csv_file_path)
+        raise
+
+
+def update_account_balance(statements: List[Dict]) -> None:
+    global account_balance
+    for stmt in statements:
+        try:
+            amt = float(stmt.get("amount", "0.00"))
+        except Exception:
+            amt = 0.0
+        if stmt.get("transaction_type") == "deposit":
+            account_balance += amt
+        else:
+            account_balance -= amt
+    logger.info("Account balance updated: %s", account_balance)
+
+
+# ---- Plaid helper that prefers module-level client but will create one on demand ----
+def get_plaid_client():
+    global plaid_client
+    if plaid_client is not None:
+        return plaid_client
+    if PlaidClient is None:
+        raise RuntimeError("Plaid SDK not installed")
+    if not (PLAID_CLIENT_ID and PLAID_SECRET):
+        raise RuntimeError("Plaid credentials not configured")
+    plaid_client = PlaidClient(client_id=PLAID_CLIENT_ID, secret=PLAID_SECRET, environment=PLAID_ENV)
+    return plaid_client
+
+
+def create_plaid_link_token():
+    client = get_plaid_client()
+    # Preserve original payload shape; some SDKs expect different call signatures
+    payload = {
+        "user": {"client_user_id": "unique_user_id"},
+        "client_name": "PlaidBridgeOpenBankingAPI",
+        "products": ["auth"],
+        "country_codes": ["US"],
+        "language": "en",
+        "redirect_uri": os.getenv("PLAID_REDIRECT_URI", None),
+    }
+    # Remove redirect_uri if None (older SDKs might reject)
+    if payload["redirect_uri"] is None:
+        payload.pop("redirect_uri", None)
+    resp = client.LinkToken.create(payload)
+    # SDK might return dict-like or object-like
+    return resp.get("link_token") if isinstance(resp, dict) else resp["link_token"]
+
+
+def exchange_plaid_public_token(public_token: str) -> str:
+    client = get_plaid_client()
+    # Support both older and newer plaid SDK shapes
+    if hasattr(client, "Item") and hasattr(client.Item, "public_token"):
+        resp = client.Item.public_token.exchange(public_token)
+    elif hasattr(client, "sandbox") or hasattr(client, "Sandbox"):
+        # try common alternatives
+        sandbox = getattr(client, "Sandbox", getattr(client, "sandbox", None))
+        if sandbox and hasattr(sandbox, "public_token"):
+            resp = sandbox.public_token.exchange(public_token)
+        else:
+            # fall back to direct call (may raise)
+            resp = client.Item.public_token.exchange(public_token)
+    else:
+        resp = client.Item.public_token.exchange(public_token)
+    return resp.get("access_token") if isinstance(resp, dict) else resp["access_token"]
+
+
+def verify_treasury_prime_account(account_id: str) -> Dict:
+    headers = {
+        "Authorization": f"Bearer {TREASURY_PRIME_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    resp = requests.get(f"{TREASURY_PRIME_API_URL}/accounts/{account_id}", headers=headers, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+# ---- Application factory (primary safe entry point) ----
+def create_flask_app() -> Flask:
+    """
+    Create a Flask instance named flask_app that contains all routes and
+    behaviors identical to the original file, but avoids module/package name
+    collisions when imported as part of the larger package.
+    """
+    flask_app = Flask(__name__)
+    flask_app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+    flask_app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+
+    os.makedirs(flask_app.config["UPLOAD_FOLDER"], exist_ok=True)
+
+    # Routes (identical behavior to original, using flask_app)
+    @flask_app.route("/")
+    def index():
+        return render_template("index.html", account_balance=account_balance)
+
+    @flask_app.route("/upload-pdf", methods=["POST"])
+    def upload_pdf_route():
+        if "file" not in request.files:
+            logger.error("No file part in the request")
+            return jsonify({"message": "No file part"}), 400
+        file = request.files["file"]
+        if file.filename == "":
+            logger.error("No selected file")
+            return jsonify({"message": "No selected file"}), 400
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            file_path = os.path.join(flask_app.config["UPLOAD_FOLDER"], filename)
+            file.save(file_path)
+            try:
+                statements = parse_pdf(file_path)
+                corrected_statements = correct_discrepancies(statements)
+                csv_filename = filename.rsplit(".", 1)[0] + ".csv"
+                csv_file_path = os.path.join(flask_app.config["UPLOAD_FOLDER"], csv_filename)
+                save_statements_as_csv(corrected_statements, csv_file_path)
+                update_account_balance(corrected_statements)
+                logger.info("File processed successfully: %s", filename)
+                return jsonify({"message": "File processed successfully", "csv_file": csv_filename}), 200
+            except pdfplumber.PDFSyntaxError as e:
+                logger.error("PDF syntax error: %s", e)
+                return jsonify({"message": "PDF syntax error"}), 500
+            except Exception as e:
+                logger.exception("Error processing file: %s", e)
+                return jsonify({"message": f"Error processing file: {str(e)}"}), 500
+        logger.error("Invalid file format")
+        return jsonify({"message": "Invalid file format"}), 400
+
+    @flask_app.route("/statements/<path:filename>", methods=["GET"])
+    def download_statement(filename):
+        try:
+            return send_from_directory(flask_app.config["UPLOAD_FOLDER"], filename)
+        except Exception as e:
+            logger.exception("Error downloading file: %s", e)
+            return jsonify({"message": "Error downloading file"}), 500
+
+    @flask_app.route("/generate-pdf/<path:csv_filename>", methods=["GET"])
+    def generate_pdf_route(csv_filename):
+        try:
+            csv_file_path = os.path.join(flask_app.config["UPLOAD_FOLDER"], csv_filename)
+            if not os.path.exists(csv_file_path):
+                return jsonify({"message": "CSV file not found"}), 404
+            pdf_filename = csv_filename.rsplit(".", 1)[0] + ".pdf"
+            pdf_file_path = os.path.join(flask_app.config["UPLOAD_FOLDER"], pdf_filename)
+            generate_pdf_from_csv(csv_file_path, pdf_file_path)
+            return send_from_directory(flask_app.config["UPLOAD_FOLDER"], pdf_filename)
+        except Exception as e:
+            logger.exception("Error generating PDF: %s", e)
+            return jsonify({"message": "Error generating PDF"}), 500
+
+    # Plaid endpoints
+    @flask_app.route("/create-link-token", methods=["GET"])
+    def create_link_token_route():
+        try:
+            link_token = create_plaid_link_token()
+            return jsonify({"link_token": link_token}), 200
+        except Exception as e:
+            logger.exception("Error creating Plaid link token: %s", e)
+            return jsonify({"message": f"Error creating link token: {str(e)}"}), 500
+
+    @flask_app.route("/exchange-public-token", methods=["POST"])
+    def exchange_public_token_route():
+        payload = request.get_json(silent=True) or {}
+        public_token = payload.get("public_token") if payload else None
+        if not public_token:
+            return jsonify({"message": "Public token is required"}), 400
+        try:
+            access_token = exchange_plaid_public_token(public_token)
+            return jsonify({"access_token": access_token}), 200
+        except Exception as e:
+            logger.exception("Error exchanging Plaid public token: %s", e)
+            return jsonify({"message": f"Error exchanging public token: {str(e)}"}), 500
+
+    @flask_app.route("/verify-account", methods=["POST"])
+    def verify_account_route():
+        payload = request.get_json(silent=True) or {}
+        account_id = payload.get("account_id")
+        if not account_id:
+            return jsonify({"message": "Account ID is required"}), 400
+        try:
+            account_info = verify_treasury_prime_account(account_id)
+            return jsonify({"account_info": account_info}), 200
+        except Exception as e:
+            logger.exception("Error verifying Treasury Prime account: %s", e)
+            return jsonify({"message": f"Error verifying account: {str(e)}"}), 500
+
+    return flask_app
+
+
+# ---- Backwards compatibility: optionally expose a module-level app named `app` ----
+# This preserves the original file behavior when other parts of your code import
+# this module and expect `app` to be a Flask instance. To avoid global import-time
+# collisions with the package name `app`, we only create the module-level `app`
+# when the environment variable EXPORT_LEGACY_APP is explicitly set to "1".
+_module_app: Optional[Flask] = None
+if os.getenv("EXPORT_LEGACY_APP", "0") == "1":
+    try:
+        _module_app = create_flask_app()
+        # expose legacy symbol for compatibility
+        app = _module_app  # type: ignore[name-defined]
+        logger.info("Legacy module-level `app` exposed (EXPORT_LEGACY_APP=1).")
+    except Exception as exc:
+        logger.exception("Failed to create legacy module-level app: %s", exc)
+        _module_app = None
+
+# Runnable entrypoint preserves original behavior (runs a server)
+if __name__ == "__main__":
+    # when running directly we instantiate and run the app (parity with original)
+    server_app = create_flask_app()
+    port = int(os.getenv("PORT", "3000"))
+    debug = os.getenv("FLASK_DEBUG", "0") == "1"
+    server_app.run(host="0.0.0.0", port=port, debug=debug)
+
+

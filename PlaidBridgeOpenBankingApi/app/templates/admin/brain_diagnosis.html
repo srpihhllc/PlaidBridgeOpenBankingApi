@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Cognitive Diagnostics | FinBrain{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <!-- 🔍 Summary Insight -->
+  <div class="alert alert-info shadow-sm">
+    <h4 class="mb-2">🧠 Brain Diagnostic Summary</h4>
+    <p class="mb-0">{{ insight }}</p>
+  </div>
+
+  <!-- 📊 Route Trace Table -->
+  <div class="card border-primary mt-4">
+    <div class="card-header bg-primary text-white">
+      Cortex Activity Summary
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-hover table-bordered mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Endpoint</th>
+            <th>Hits</th>
+            <th>Last Accessed</th>
+            <th>Client IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in traces %}
+          <tr>
+            <td><code>{{ row.endpoint }}</code></td>
+            <td>{{ row.hits }}</td>
+            <td>{{ row.last_accessed }}</td>
+            <td>{{ row.client_ip }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 🧬 Diagnostic Prompt Reflection -->
+  <div class="card mt-4 border-secondary">
+    <div class="card-header bg-light">
+      🧬 Diagnostic Prompt Summary
+    </div>
+    <div class="card-body bg-white">
+      <pre class="bg-light p-3 rounded"><code>{{ prompt }}</code></pre>
+    </div>
+  </div>
+
+  <!-- 🔙 Navigation -->
+  <div class="mt-4">
+    <a href="{{ url_for('debug.cortex_map') }}" class="btn btn-outline-primary">
+      ← Back to Cortex Map
+    </a>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Template Tracer{% endblock %}
+{% block content %}
+<h2>Template Tracer</h2>
+<p><strong>Last Run:</strong> {{ timestamp.strftime('%Y-%m-%d %H:%M:%S') }} UTC</p>
+<table class="table table-bordered table-sm">
+  <thead>
+    <tr><th>Endpoint</th><th>Rule</th><th>Status</th><th>Request ID</th><th>Error</th></tr>
+  </thead>
+  <tbody>
+    {% for r in results %}
+    <tr class="{% if r.status == 'error' %}table-danger{% else %}table-success{% endif %}">
+      <td>{{ r.endpoint }}</td>
+      <td><code>{{ r.rule }}</code></td>
+      <td>{{ r.status }}</td>
+      <td><code>{{ r.req_id }}</code></td>
+      <td><pre>{{ r.error or "—" }}</pre></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

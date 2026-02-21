@@ -1,0 +1,38 @@
+/* App-wide overrides + dashboard layout fallback */
+
+/* Force a stable layout for the subscriber dashboard */
+.dashboard-root {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* Keep sidebar visible and scrollable */
+.sidebar {
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #212529;
+  z-index: 1030;
+}
+
+/* Ensure main content never collapses */
+.dashboard-main {
+  min-width: 0;
+}
+
+/* Mobile: stack sidebar and content */
+@media (max-width: 992px) {
+  .dashboard-root {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+    border-right: none;
+  }
+}

@@ -1,0 +1,24 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<h2>📘 Schema Event Log</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Event Type</th>
+      <th>Origin</th>
+      <th>Detail</th>
+      <th>Timestamp</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for event in events %}
+    <tr>
+      <td>{{ event.event_type }}</td>
+      <td>{{ event.origin or '-' }}</td>
+      <td>{{ event.detail or '' }}</td>
+      <td>{{ event.timestamp.strftime('%b %d, %Y %H:%M:%S') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

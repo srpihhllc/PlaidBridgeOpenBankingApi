@@ -1,0 +1,55 @@
+name: Build and deploy Python app - PlaidBridgeOpenBankingApi
+
+on:
+  push:
+    branches:
+      - PlaidBridgeOpenBankingApi
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - PlaidBridgeOpenBankingApi
+
+jobs:
+  build_job:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
+    runs-on: ubuntu-22.04
+    name: Build Job
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      # Step 3: Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 4: Set environment variables
+      - name: Set environment variables
+        run: |
+          echo "PLAID_CLIENT_ID=${{ secrets.PLAID_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "PLAID_SECRET=${{ secrets.PLAID_SECRET }}" >> $GITHUB_ENV
+          echo "PLAID_ENV=${{ secrets.PLAID_ENV }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_SANDBOX_API_KEY=${{ secrets.TREASURY_PRIME_SANDBOX_API_KEY }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_PRODUCTION_API_KEY=${{ secrets.TREASURY_PRIME_PRODUCTION_API_KEY }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_SANDBOX_API_URL=${{ secrets.TREASURY_PRIME_SANDBOX_API_URL }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_PRODUCTION_API_URL=${{ secrets.TREASURY_PRIME_PRODUCTION_API_URL }}" >> $GITHUB_ENV
+          echo "TREASURY_PRIME_ENV=${{ secrets.TREASURY_PRIME_ENV }}" >> $GITHUB_ENV
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
+          echo "ACCOUNT_NUMBER=${{ secrets.ACCOUNT_NUMBER }}" >> $GITHUB_ENV
+          echo "PLAID_PUBLIC_KEY=${{ secrets.PLAID_PUBLIC_KEY }}" >> $GITHUB_ENV
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+          echo "CLIENT_USER_ID=${{ secrets.CLIENT_USER_ID }}" >> $GITHUB_ENV
+          echo "USER_EMAIL=${{ secrets.USER_EMAIL }}" >> $GITHUB_ENV
+
+      # Step 5: Build Docker Image
+      - name: Build Docker image
+        run: |
+          docker build -t plaidbridgeopenbankingapi .

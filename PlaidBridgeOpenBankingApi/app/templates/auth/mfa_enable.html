@@ -1,0 +1,86 @@
+{# app/templates/auth/mfa_enable.html #}
+{% extends "base.html" %}
+
+{% block title %}
+  🔐 Enable MFA
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mt-4">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show text-break" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <h2 class="mb-4 text-center">🔐 Enable Multi‑Factor Authentication</h2>
+
+  {# Resolve user for template contexts: prefer passed-in user, fall back to current_user #}
+  {% set actor = user if user is defined and user else current_user %}
+
+  <div class="mb-3 text-muted small text-center">
+    Setting up MFA for <strong class="text-break">{{ actor.email if actor and actor.email else "your account" }}</strong>
+  </div>
+
+  <form method="POST" class="border p-4 rounded bg-light shadow-sm" novalidate>
+    {{ form.hidden_tag() }}
+
+    <div class="mb-3 text-center">
+      <label class="form-label">Choose MFA Method</label><br>
+      <div class="btn-group" role="group" aria-label="Select MFA mode">
+        <input type="radio" class="btn-check" name="mfa_mode" id="mfa_totp" value="totp" autocomplete="off" {% if selected_mode == 'totp' %}checked{% endif %}>
+        <label class="btn btn-outline-primary" for="mfa_totp">Authenticator App</label>
+
+        <input type="radio" class="btn-check" name="mfa_mode" id="mfa_redis" value="redis" autocomplete="off" {% if selected_mode == 'redis' %}checked{% endif %}>
+        <label class="btn btn-outline-info" for="mfa_redis">Email / SMS</label>
+      </div>
+    </div>
+
+    {% if qr_code_base64 %}
+      <div class="mb-4 text-center">
+        <img src="data:image/png;base64,{{ qr_code_base64 }}" alt="Scan QR with Authenticator" class="img-fluid border rounded shadow-sm" />
+        <p class="small text-muted mt-2">Scan this QR code with Google Authenticator, Authy, or Microsoft Authenticator.</p>
+      </div>
+    {% endif %}
+
+    {% if redis_code_hint %}
+      <div class="mb-4 text-center">
+        <span class="badge bg-info">{{ redis_code_hint }}</span>
+        <p class="small text-muted mt-2">A one‑time code has been sent to the address above. Use it below to complete setup.</p>
+      </div>
+    {% endif %}
+
+    {% if ttl is defined and ttl %}
+      <div class="mb-3 text-center">
+        <p class="small text-danger">⚠️ Code expires in {{ ttl }} seconds</p>
+      </div>
+    {% endif %}
+
+    <div class="mb-3">
+      {{ form.code.label(class="form-label") }}
+      {{ form.code(class="form-control", placeholder="Enter setup or one‑time code", autofocus=true, inputmode="numeric") }}
+      <div class="form-text">Enter the 6‑digit code from your authenticator or the one‑time code sent to you.</div>
+    </div>
+
+    <div class="mb-3">
+      {{ form.submit(class="btn btn-primary w-100") }}
+    </div>
+  </form>
+
+  <div class="mt-4 text-center">
+    <a href="{{ url_for('auth.me_dashboard') }}" class="text-decoration-none">Cancel and return to dashboard</a>
+  </div>
+
+</div>
+{% endblock %}
+
+
+

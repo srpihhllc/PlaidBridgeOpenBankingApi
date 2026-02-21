@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>DB Health</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+</head>
+<body class="container py-4">
+  <h1>📊 Database Health</h1>
+
+  <ul class="list-group mb-3">
+    <li class="list-group-item">Total Users: {{ total_users }}</li>
+    <li class="list-group-item">Stale Users (not approved): {{ stale_users }}</li>
+    <li class="list-group-item">Orphaned Transactions: {{ orphaned_tx|length }}</li>
+  </ul>
+
+  {% if orphaned_tx %}
+  <h3>Orphaned Transactions</h3>
+  <table class="table table-sm table-striped">
+    <thead>
+      <tr><th>ID</th><th>Amount</th><th>Date</th></tr>
+    </thead>
+    <tbody>
+      {% for tx in orphaned_tx %}
+      <tr>
+        <td>{{ tx.id }}</td>
+        <td>{{ tx.amount }}</td>
+        <td>{{ tx.date }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</body>
+</html>

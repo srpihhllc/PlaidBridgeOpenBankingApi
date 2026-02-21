@@ -1,0 +1,65 @@
+{% extends "sub/base_sub.html" %}
+{% block content %}
+
+<h2>Vault Liquidity Dashboard</h2>
+<p class="text-muted">Real-time snapshot of vault health and capital flow</p>
+
+<div class="row mt-4">
+  <div class="col-md-4">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-header">Total Vault Assets</div>
+      <div class="card-body">
+        <h5 class="card-title">${{ "%.2f"|format(total_assets) }}</h5>
+        <p class="card-text">Across {{ vault_count }} active vaults</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card text-white bg-warning mb-3">
+      <div class="card-header">Dormant Vaults</div>
+      <div class="card-body">
+        <h5 class="card-title">{{ dormant_count }}</h5>
+        <p class="card-text">{{ dormant_pct }}% of vaults have < $1 balance</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card text-white bg-info mb-3">
+      <div class="card-header">Liquidity Velocity</div>
+      <div class="card-body">
+        <h5 class="card-title">${{ "%.2f"|format(net_deposits_week) }}</h5>
+        <p class="card-text">Net deposits in the past 7 days</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="mt-5" />
+
+<h4>Vault Flow Trends</h4>
+<canvas id="vault-flow-chart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('vault-flow-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: {{ flow_labels | tojson }},
+      datasets: [{
+        label: 'Daily Net Deposits',
+        data: {{ flow_values | tojson }},
+        backgroundColor: '#17a2b8'
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+</script>
+
+{% endblock %}

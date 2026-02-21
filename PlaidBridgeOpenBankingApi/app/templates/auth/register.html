@@ -1,0 +1,54 @@
+{# app/templates/auth/register.html #}
+{% extends "base.html" %}
+
+{% block title %}
+  Register | FinBrain Cortex
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+
+      <h2 class="text-center mb-4">📝 Create Your Account</h2>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show text-break" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <form method="POST" class="border p-4 rounded bg-light shadow-sm">
+        {{ form.hidden_tag() }}
+
+        <div class="mb-3">
+          {{ form.email.label(class="form-label") }}
+          {{ form.email(class="form-control", placeholder="you@domain.com") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.password.label(class="form-label") }}
+          {{ form.password(class="form-control", placeholder="••••••••") }}
+        </div>
+
+        <div class="mb-3">
+          {{ form.submit(class="btn btn-primary w-100") }}
+        </div>
+      </form>
+
+      <div class="text-center mt-4">
+        <p class="mb-0">
+          Already have an account?
+          <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Login here</a>
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

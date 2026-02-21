@@ -1,0 +1,6 @@
+{% extends "admin_base.html" %}
+{% block title %}Database Schema Diagram{% endblock %}
+{% block content %}
+  <h2>📊 Current ERD Snapshot</h2>
+  <img src="{{ url_for('static', filename='docs/schema_diagram_v1.0.png') }}" alt="Schema ERD" style="max-width: 100%; border: 1px solid #ccc;">
+{% endblock %}

@@ -1,0 +1,38 @@
+<div class="tile cockpit-tile">
+  <div class="tile-header d-flex justify-content-between align-items-center">
+    <h4 class="tile-title">🧩 Blueprint Health</h4>
+    <span class="badge bg-primary">TTL Monitor</span>
+  </div>
+
+  <div class="tile-body">
+    <p class="mb-2">
+      <strong>Route Count:</strong> {{ route_count }}
+    </p>
+
+    <ul class="list-group">
+      {% for bp in blueprints %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-diagram-3-fill text-success me-2"></i>
+            {{ bp.name }}
+          </span>
+          {% if bp.ttl == "∞" %}
+            <span class="badge bg-secondary">TTL ∞</span>
+          {% elif bp.ttl >= 120 %}
+            <span class="badge bg-success">TTL {{ bp.ttl }}s</span>
+          {% elif bp.ttl >= 30 %}
+            <span class="badge bg-warning text-dark">TTL {{ bp.ttl }}s</span>
+          {% else %}
+            <span class="badge bg-danger">TTL {{ bp.ttl }}s</span>
+          {% endif %}
+        </li>
+      {% else %}
+        <li class="list-group-item text-muted">No blueprint traces found</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="tile-footer text-muted small mt-2">
+    Last updated: {{ now() }}
+  </div>
+</div>

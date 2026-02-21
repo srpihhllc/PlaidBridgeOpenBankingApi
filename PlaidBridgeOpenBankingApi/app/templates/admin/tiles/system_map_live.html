@@ -1,0 +1,36 @@
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  // 🔦 Show current schema version hash
+  fetch("/api/schema_head")
+    .then(r => r.json())
+    .then(data => {
+      const versionHash = data.version_hash;
+      const glowDiv = document.createElement("div");
+      glowDiv.innerText = `🔦 Live Version: ${versionHash}`;
+      glowDiv.style.position = "absolute";
+      glowDiv.style.top = "20px";
+      glowDiv.style.right = "30px";
+      glowDiv.style.color = "#00ffe7";
+      glowDiv.style.fontWeight = "bold";
+      glowDiv.style.zIndex = "999";
+      document.body.appendChild(glowDiv);
+    });
+
+  // 🧠 Redis-triggered SVG pulse overlay
+  fetch("/admin/system_map")
+    .then(r => r.text())
+    .then(html => {
+      const match = html.match(/svg_highlight=(.*?)\\n/);
+      const keyword = match ? match[1].trim() : "";
+      if (keyword) {
+        const svgDoc = document.querySelector("object").contentDocument;
+        if (svgDoc) {
+          const targetNode = svgDoc.getElementById(`model-${keyword}`);
+          if (targetNode) {
+            targetNode.classList.add("pulse-highlight");
+          }
+        }
+      }
+    });
+});
+</script>
