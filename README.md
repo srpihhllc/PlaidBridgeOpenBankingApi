@@ -1,172 +1,175 @@
-# 📘 Financial Powerhouse API
+📘 Financial Powerhouse Platform — Unified Architecture
+A full‑stack, operator‑grade fintech platform combining:
 
-This module contains the core Flask application for the **Financial Powerhouse API**. It enforces ethical lending, fraud detection, smart contract automation, real‑time financial health monitoring, and open banking integration.
+Flask Backend API (compliance, fraud, contracts, telemetry)
 
-[![CI Tests](https://github.com/srpihhllc/PlaidBridgeOpenBankingApi/actions/workflows/tests.yml/badge.svg)](../../actions/workflows/tests.yml)
+React Native / Expo Mobile Banking App
 
----
+Shared TypeScript TRPC Server
 
-## 🏗 Architecture Overview
-- **Framework**: Flask
-- **Database**: SQLAlchemy ORM + Alembic migrations
-- **Authentication**: JWT (via `flask-jwt-extended`)
-- **Rate Limiting**: `flask-limiter`
-- **Logging**: Python logging with configurable log level
-- **Integrations**:
-  - Plaid (account linking, transactions)
-  - Redis (telemetry, rate limiting, TTL traces)
-  - Treasury Prime (sandbox/production APIs)
-  - PDF parsing (via `pdfplumber`)
+Drizzle ORM Schema + Migrations
 
----
+Unified Developer Workflows
 
-## 📂 Key Files & Directories
-- `__init__.py` → App initialization and extension setup
-- `config.py` → Environment‑driven configuration (Flask secrets, DB, Redis, email)
-- `models.py` → SQLAlchemy models (`User`, `LoanAgreement`, `Transaction`, etc.)
-- `routes/` → API endpoints grouped by domain (compliance, fraud, accounts, etc.)
-- `services/` → Business logic (AI compliance, fraud detection, scoring)
-- `migrations/` → Alembic migration scripts (baseline + upgrades/downgrades)
-- `app/tests/` → Pytest suite (unit tests, FK smoke‑tests, CI coverage)
+Cockpit‑Grade Operator Visibility
 
----
+This repository represents the entire banking system in one cohesive, maintainable, operator‑friendly monorepo.
 
-## 🚦 Core Endpoints
-
-| Endpoint                  | Method | Purpose                                      |
-|----------------------------|--------|----------------------------------------------|
-| `/review_agreement`        | POST   | AI compliance scan of loan terms             |
-| `/compliance_report`       | GET    | Generate compliance report                   |
-| `/validate_transaction`    | POST   | Fraud detection                              |
-| `/link_borrower_account`   | POST   | Secure borrower account linking              |
-| `/unlink_borrower_account` | POST   | Prevent unlinking if obligations remain      |
-| `/upload_statement`        | POST   | PDF parsing and transaction extraction       |
-| `/generate_link_token`     | GET    | Plaid Link token generation                  |
-| `/execute_contract/<id>`   | POST   | Simulated smart contract execution           |
-| `/financial_health/<id>`   | GET    | Real‑time financial health score             |
-| `/convert_currency`        | POST   | Currency conversion                          |
-| `/biometric_auth`          | POST   | Placeholder biometric authentication         |
-| `/health`                  | GET    | Health check (operator visibility)           |
-
----
-
-## 🔐 Security & Configuration
-- **Secrets**: Loaded from environment variables (`.env` in dev, injected in prod).
-- **JWT & SECRET_KEY**: Must be rotated regularly.
-- **Rate Limiting**: Enabled globally to prevent abuse.
-- **Redis**: Defaults to `localhost:6379` for local dev.
-- **Flask App**: Defaults to `localhost:5000` (configurable via `PORT`).
-
-### Key Environment Variables
-| Variable                  | Purpose                                |
-|----------------------------|----------------------------------------|
-| `SQLALCHEMY_DATABASE_URI` | SQLAlchemy connection string           |
-| `REDIS_URL`               | Redis connection string                |
-| `JWT_SECRET_KEY`          | Secret for JWT signing                 |
-| `SECRET_KEY`              | Flask session secret                   |
-| `MAIL_SERVER`             | Outbound email server                  |
-| `PORT`                    | Port for Flask app (default: 5000)     |
-
----
-
-## 🔧 Database Migrations
-We use **Alembic** for schema migrations.
-
-```bash
-# Create a new migration
-poetry run alembic revision -m "describe change"
-
-# Apply migrations
-poetry run alembic upgrade head
-
-# Roll back
-poetry run alembic downgrade -1
-```
-
-- The baseline migration seeds an **admin user** (`admin@example.com` / `ChangeMe123!`) with a reproducible scrypt hash.
-- Downgrades automatically remove the seeded admin before dropping tables.
-- All foreign keys are validated by parametrized pytest smoke‑tests.
-
----
-
-## 🧪 Running Tests
-
-```bash
-# Run all tests with coverage
-poetry run pytest --cov=app
-
-# Run only fast commit‑time tests
-poetry run pytest -m ci
-
-# Run provider‑specific tests
-poetry run pytest -m plaid
-poetry run pytest -m treasuryprime
-
-# Run nightly soak/stress tests
-poetry run pytest -m nightly
-```
-
-- **Coverage**: Enforced at **100%** via `pytest-cov`. Builds fail if coverage dips.
-- **Smoke‑tests**: `app/tests/test_baseline.py` validates:
-  - Admin user exists.
-  - All 27 child tables referencing `users` enforce FK integrity.
-  - Cross‑table FKs (bank_transactions, ledger_entries, subscriptions, complaint_logs, fraud_reports) are enforced.
-
----
-
-## 📊 Telemetry & Observability
-- **Redis**: Stores rate‑limit counters, TTL traces, and operator telemetry.
-- **Health Checks**: `/health` endpoint exposes liveness and readiness.
-- **Audit Trails**: All critical actions (migrations, fraud flags, compliance locks) are logged with timestamps.
-- **CI/CD**: GitHub Actions runs migrations, seeds DB, executes full test suite, and enforces coverage.
-
----
-
-## 🛡️ Operational Behavior
-- **Compliance**: Loan agreements flagged 3+ times auto‑lock borrower accounts.
-- **Fraud**: Suspicious transactions auto‑lock accounts immediately.
-- **Contracts**: Smart contracts are simulated but structured for blockchain integration.
-- **Health**: `/health` endpoint ensures operator visibility.
-- **Telemetry**: Latency traces and TTL telemetry are emitted to Redis and validated by property‑based tests.
-
----
-
-## 🧭 Operator Checklist
-For new operators or deployments:
-
-1. **Migrate DB**
-   ```bash
-   poetry run alembic upgrade head
-   ```
-2. **Verify Admin Seed**
-   ```sql
-   SELECT id, username, email, role, is_admin FROM users WHERE email='admin@example.com';
-   ```
-3. **Run Smoke‑Tests**
-   ```bash
-   poetry run pytest app/tests/test_baseline.py
-   ```
-4. **Rotate Secrets**
-   - Change `JWT_SECRET_KEY` and `SECRET_KEY` immediately in production.
-   - Rotate the seeded admin password.
-5. **Monitor Telemetry**
-   - Check Redis traces and `/health` endpoint.
-   - Review logs for compliance/fraud auto‑locks.
-
----
-
-## 🚀 Quickstart
-
-```bash
-# Install dependencies
+🏗️ High‑Level Architecture
+Code
+┌──────────────────────────────────────────────┐
+│              Mobile App (Expo)               │
+│  React Native UI • Screens • Hooks • UX Flow │
+└───────────────────────┬──────────────────────┘
+                        │ TRPC Calls
+┌───────────────────────▼──────────────────────┐
+│        Shared TypeScript Server (TRPC)       │
+│ Routers • OAuth • Notifications • LLM • Auth │
+└───────────────────────┬──────────────────────┘
+                        │ REST / JSON
+┌───────────────────────▼──────────────────────┐
+│              Flask Backend API               │
+│ Compliance • Fraud • Contracts • Telemetry   │
+└───────────────────────┬──────────────────────┘
+                        │ SQLAlchemy ORM
+┌───────────────────────▼──────────────────────┐
+│                 PostgreSQL DB                │
+│     Alembic + Drizzle Schema + Migrations    │
+└──────────────────────────────────────────────┘
+📂 Repository Structure
+Code
+PlaidBridgeOpenBankingApi/
+│
+├── app/                         # Flask backend API
+│   ├── models.py
+│   ├── routes/
+│   ├── services/
+│   ├── tests/
+│   ├── migrations/
+│   └── config.py
+│
+├── mobile-app/                  # React Native / Expo mobile app
+│   ├── app/                     # Screens + navigation
+│   ├── assets/                  # Images, icons, splash
+│   ├── components/              # UI components
+│   ├── hooks/                   # Auth, biometric, filters, theme
+│   ├── server/                  # TRPC server + shared utilities
+│   ├── shared/                  # Shared TS types + constants
+│   ├── drizzle/                 # Drizzle ORM schema + migrations
+│   ├── tests/                   # Jest test suite
+│   ├── package.json
+│   └── tsconfig.json
+│
+└── docs/                        # Full multi‑page documentation suite
+🚀 Quickstart
+Backend (Flask)
+bash
 poetry install
-
-# Run the app locally
+poetry run alembic upgrade head
 poetry run flask run
-```
+Mobile App (Expo)
+bash
+cd mobile-app
+pnpm install
+pnpm start
+TRPC Server
+Runs automatically with the mobile app.
 
----
+🔥 Key Platform Capabilities
+Compliance & Lending
+AI‑driven agreement scanning
 
-This README now provides **architecture, migrations, testing, telemetry, and operator guidance** in one cockpit‑grade document.
+Auto‑lock borrower accounts
 
----
+Ethical lending enforcement
+
+Fraud Detection
+Transaction validation
+
+Pattern analysis
+
+Auto‑lock on suspicious activity
+
+Smart Contracts
+Simulated execution
+
+Event‑driven workflows
+
+Open Banking
+Plaid account linking
+
+Transaction ingestion
+
+PDF statement parsing
+
+Telemetry
+Redis TTL traces
+
+Rate‑limit counters
+
+Health checks
+
+Audit logs
+
+🧪 Testing
+Backend
+bash
+poetry run pytest --cov=app
+Mobile App
+bash
+cd mobile-app
+pnpm test
+🛡️ Security Requirements
+JWT rotation required
+
+SECRET_KEY rotation required
+
+Admin seed password must be changed in production
+
+OAuth secrets handled server‑side
+
+No secrets stored in mobile bundle
+
+🧭 Developer Onboarding
+Full onboarding guide located at:
+
+Code
+docs/05-developer-onboarding.md
+🛠️ CI/CD Pipeline
+Full pipeline documentation:
+
+Code
+docs/06-ci-cd-pipeline.md
+📊 Database ERD
+Full ERD located at:
+
+Code
+docs/04-database-erd.md
+📡 API Reference
+REST + TRPC + Drizzle schema:
+
+Code
+docs/09-api-reference.md
+📜 OpenAPI Specification
+REST endpoints only:
+
+Code
+docs/10-openapi.yaml
+🧭 Operator Handbook
+Daily, weekly, monthly operational tasks:
+
+Code
+docs/07-operator-handbook.md
+📝 Release Notes
+Versioned release history:
+
+Code
+docs/08-release-notes.md
+🧱 Monorepo Architecture Diagram
+Full monorepo diagram:
+
+Code
+docs/11-monorepo-architecture-diagram.md
+🎉 This repository is now a complete, unified fintech platform.
+Backend → TRPC → Mobile App → Database → Telemetry
+All in one cockpit‑grade, maintainable, operator‑friendly monorepo.
