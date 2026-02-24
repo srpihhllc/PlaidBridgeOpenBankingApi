@@ -57,3 +57,20 @@ It supports compliance workflows, fraud detection, smart contracts, and open ban
 
 # 📐 ERD Diagram (ASCII)
 
+Borrower ───< Agreement
+│
+├───< Transaction
+│
+├───< LinkedAccount
+│
+└───< Statement
+
+Code
+
+---
+
+# 🧩 Notes
+
+- All foreign keys enforce referential integrity.  
+- Migrations are managed via Alembic.  
+- Admin seed is validated by smoke tests.
