@@ -1,0 +1,82 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/.pre-commit-config.yaml
+
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/.pre-commit-config.yaml
+
+repos:
+  # ---------------------------------------------------------
+  # Local hook: ensure requirements lockfiles stay in sync
+  # ---------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: check-requirements-lock
+        name: Ensure requirements lockfiles are up to date
+        entry: |
+          bash -c 'if git diff --cached --name-only | grep -E "requirements(\-dev)?\.txt"; then
+            echo "⚠️  requirements.txt changed — run: make update";
+            exit 1;
+          fi'
+        language: system
+        pass_filenames: false
+
+  # ---------------------------------------------------------
+  # Black — code formatting (aligned to Ruff line-length 100)
+  # ---------------------------------------------------------
+  - repo: https://github.com/psf/black
+    rev: 24.8.0
+    hooks:
+      - id: black
+        args: ["--line-length=100"]
+
+  # ---------------------------------------------------------
+  # Flake8 — linting (aligned to line-length 100)
+  # ---------------------------------------------------------
+  - repo: https://github.com/PyCQA/flake8
+    rev: 7.2.0
+    hooks:
+      - id: flake8
+        args: ["--max-line-length=100"]
+
+  # ---------------------------------------------------------
+  # isort — import sorting (aligned to Black/Ruff style)
+  # ---------------------------------------------------------
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--line-length", "100"]
+
+  # ---------------------------------------------------------
+  # mypy — type checking
+  # Includes required stubs (types-requests)
+  # ---------------------------------------------------------
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        args: ["--install-types", "--non-interactive"]
+        additional_dependencies:
+          - types-requests
+          - types-PyYAML
+          - types-redis
+          - types-setuptools
+          - types-PyMySQL
+          - types-tabulate
+          - types-python-dateutil
+          - types-sqlalchemy
+
+  # ---------------------------------------------------------
+  # pytest — smoke test
+  # ---------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest quick run
+        entry: pytest --maxfail=1 --disable-warnings -q
+        language: system
+        types: [python]
+
+
+
+
+
+

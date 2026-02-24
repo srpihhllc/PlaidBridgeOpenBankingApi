@@ -1,0 +1,174 @@
+{# =============================================================================
+  FILE: app/templates/navbar.html
+  DESCRIPTION:
+    Global navbar for PUBLIC + SUBSCRIBER users.
+    Admins use admin_sidebar.html instead.
+
+    Features:
+      - Role‑aware UI
+      - Todo counter badge
+      - Quick‑Add Todo button
+      - User avatar dropdown
+      - Notifications bell
+      - Dark mode toggle
+      - Clean mobile UX
+      - Consistent iconography
+============================================================================= #}
+
+{% if current_user.is_authenticated and current_user.is_super_admin %}
+  {# Admins should NOT see this navbar #}
+  {% include "admin/admin_sidebar.html" %}
+{% else %}
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+  <div class="container-fluid">
+
+    <!-- Brand -->
+    <a class="navbar-brand fw-bold" href="{{ url_for('main.home') }}">
+      PlaidBridge
+    </a>
+
+    <!-- Mobile toggle -->
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navMenu">
+
+      <!-- Left side: Navigation Selector -->
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <form class="d-flex align-items-center">
+            <select class="form-select me-2" onchange="location = this.value;">
+              <option selected disabled>🔎 Navigate To</option>
+
+              <option value="{{ url_for('main.home') }}">🏠 Home</option>
+
+              {% if not current_user.is_authenticated %}
+                <option value="{{ url_for('main.subscriber_entry') }}">🚀 Get Started</option>
+                <option value="{{ url_for('auth.login') }}">🔐 Subscriber Login</option>
+
+              {% else %}
+                <option value="{{ url_for('sub_ui.dashboard') }}">📊 Dashboard</option>
+
+                <option value="{{ url_for('todo.list') }}">
+                  📝 Todos ({{ current_user.todos.count() }})
+                </option>
+
+                <option value="{{ url_for('auth.logout') }}">🚪 Logout</option>
+              {% endif %}
+            </select>
+          </form>
+        </li>
+      </ul>
+
+      <!-- Right side: Primary Nav Links -->
+      <ul class="navbar-nav ms-auto">
+
+        <!-- Home -->
+        <li class="nav-item">
+          <a class="nav-link {% if request.endpoint == 'main.home' %}active{% endif %}"
+             href="{{ url_for('main.home') }}">
+            Home
+          </a>
+        </li>
+
+        {% if current_user.is_authenticated and not current_user.is_super_admin %}
+
+          <!-- Dashboard -->
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'sub_ui.dashboard' %}active{% endif %}"
+               href="{{ url_for('sub_ui.dashboard') }}">
+              Dashboard
+            </a>
+          </li>
+
+          <!-- Quick Add Todo -->
+          <li class="nav-item">
+            <a class="btn btn-sm btn-warning ms-2"
+               href="{{ url_for('todo.list') }}#quickadd">
+              ➕ Todo
+            </a>
+          </li>
+
+          <!-- Todos with counter badge -->
+          <li class="nav-item position-relative">
+            {% set todo_count = current_user.todos.count() %}
+            <a class="nav-link {% if request.endpoint == 'todo.list' %}active{% endif %}"
+               href="{{ url_for('todo.list') }}">
+              Todos
+              {% if todo_count > 0 %}
+                <span class="badge bg-warning text-dark ms-1">{{ todo_count }}</span>
+              {% endif %}
+            </a>
+          </li>
+
+          <!-- Notifications Bell -->
+          <li class="nav-item">
+            <a class="nav-link" href="#">🔔</a>
+          </li>
+
+          <!-- Dark Mode Toggle -->
+          <li class="nav-item">
+            <a class="nav-link" href="#" onclick="document.body.classList.toggle('dark-mode')">
+              🌙
+            </a>
+          </li>
+
+          <!-- User Avatar Dropdown -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle"
+               href="#"
+               id="userMenu"
+               role="button"
+               data-bs-toggle="dropdown"
+               aria-expanded="false">
+              👤 {{ current_user.username or "User" }}
+            </a>
+
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
+              <li>
+                <a class="dropdown-item" href="{{ url_for('sub_ui.dashboard') }}">
+                  📊 Dashboard
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="{{ url_for('todo.list') }}">
+                  📝 Todos
+                </a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="{{ url_for('sub_ui.settings') }}">
+                  ⚙️ Dashboard Settings
+                </a>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item text-danger" href="{{ url_for('auth.logout') }}">
+                  🚪 Log Out
+                </a>
+              </li>
+            </ul>
+          </li>
+
+        {% else %}
+
+          <!-- Subscriber Login -->
+          <li class="nav-item">
+            <a class="nav-link {% if request.endpoint == 'auth.login' %}active{% endif %}"
+               href="{{ url_for('auth.login') }}">
+              Subscriber Login
+            </a>
+          </li>
+
+        {% endif %}
+
+      </ul>
+    </div>
+  </div>
+</nav>
+
+{% endif %}
+
+
+

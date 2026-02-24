@@ -1,0 +1,19 @@
+<h2>🔎 Redis Key Inspector</h2>
+<table border="1" cellspacing="0" cellpadding="5">
+  <tr>
+    <th>Prefix</th>
+    <th>Key</th>
+    <th>TTL (sec)</th>
+    <th>Type</th>
+    <th>Fresh?</th>
+  </tr>
+  {% for k in keys %}
+  <tr>
+    <td>{{ k.prefix }}</td>
+    <td>{{ k.key }}</td>
+    <td>{{ k.ttl }}</td>
+    <td>{{ k.type }}</td>
+    <td>{% if k.ttl > 0 %}✅{% else %}❌{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>

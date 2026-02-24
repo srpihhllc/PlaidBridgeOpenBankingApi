@@ -1,0 +1,17 @@
+{# tiles/blueprint_audit_tile.html #}
+<div class="tile blueprint-audit">
+    <h3>Blueprint Audit</h3>
+    <p>Last audit: {{ blueprint_audit.last_audit_iso|default("Never")|timeago }}</p>
+    <p>Status: <span class="status-pill {{ blueprint_audit.status|lower }}">
+        {{ blueprint_audit.status|capitalize }}
+    </span></p>
+    {% if blueprint_audit.errors %}
+        <ul class="audit-errors">
+            {% for err in blueprint_audit.errors %}
+                <li>{{ err }}</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No errors detected.</p>
+    {% endif %}
+</div>

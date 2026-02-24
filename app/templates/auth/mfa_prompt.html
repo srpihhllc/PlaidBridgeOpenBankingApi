@@ -1,0 +1,69 @@
+{# app/templates/auth/mfa_prompt.html #}
+{% extends "base.html" %}
+
+{% block title %}
+  🔐 MFA Prompt
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mt-4">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show text-break" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <h2 class="mb-4 text-center">🔐 MFA Verification</h2>
+
+  {% set actor = user if user is defined and user else current_user %}
+
+  {# Show active MFA mode based on resolved actor or ttl presence #}
+  {% if actor and actor.totp_secret %}
+    <div class="mb-3 text-center">
+      <span class="badge bg-primary">Authenticator App Mode</span>
+      <p class="small text-muted">Enter the 6‑digit code from your authenticator app.</p>
+    </div>
+  {% else %}
+    <div class="mb-3 text-center">
+      <span class="badge bg-info">Email/SMS Mode</span>
+      <p class="small text-muted">Enter the one‑time code sent to your email or phone.</p>
+      {% if ttl is defined and ttl and ttl > 0 %}
+        <p class="small text-danger mt-1">⚠️ Code expires in {{ ttl }} seconds</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  <form method="POST" class="border p-4 rounded bg-light shadow-sm" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="mb-3">
+      <label for="code" class="form-label">Enter MFA Code</label>
+      <input type="text" id="code" name="code" class="form-control" required autofocus inputmode="numeric" placeholder="Enter your MFA code" />
+      <div class="form-text">6‑digit authenticator code or one‑time SMS/email code.</div>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">Verify Code</button>
+  </form>
+
+  {% if ttl is defined and ttl and ttl > 0 and actor and actor.totp_secret %}
+    <div class="mt-3 text-center">
+      <span class="badge bg-success">✅ Recent MFA Verified ({{ ttl }}s remaining)</span>
+    </div>
+  {% endif %}
+
+  <div class="mt-4 text-center">
+    <a href="{{ url_for('auth.login') }}" class="text-decoration-none">Cancel and return to login</a>
+  </div>
+
+</div>
+{% endblock %}
+
+
+
+

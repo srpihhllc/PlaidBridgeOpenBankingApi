@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}🧬 Admin Console | PlaidBridgeOpenBankingApiFinBrain{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-3">👁️ FinBrain Admin Console</h2>
+
+  <!-- 🧬 Simulated Identity & Current Brain Mode -->
+  <div class="mb-3">
+    <label for="personaSelector">👤 Simulate as:</label>
+    <select id="personaSelector" class="form-select w-auto d-inline-block" onchange="switchPersona(this.value)">
+      <option value="admin">Admin (You)</option>
+      <option value="lender">Lender</option>
+      <option value="borrower">Borrower</option>
+      <option value="partner">Partner</option>
+    </select>
+    <small class="text-muted ms-2">Current: {{ session.get('simulated_persona', 'admin')|capitalize }}</small>
+  </div>
+
+  <!-- 🧠 Mode Indicator -->
+  <p class="text-muted">
+    🧠 Current Brain Mode: <strong>{{ session.get('simulated_persona', 'admin')|capitalize }}</strong>
+  </p>
+
+  <div class="row">
+    {% if session.get("simulated_persona") == "admin" %}
+      <!-- 📊 Diagnostics -->
+      <div class="col-md-3">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-info text-white">📊 Diagnostics</div>
+          <div class="card-body">
+            <a href="{{ url_for('diagnostics.route_list') }}" class="btn btn-outline-primary btn-sm mb-2">Route List</a>
+            <a href="{{ url_for('diagnostics.cache_health') }}" class="btn btn-outline-primary btn-sm mb-2">Cache Health</a>
+            <a href="{{ url_for('diagnostics.db_health') }}" class="btn btn-outline-primary btn-sm">DB Health</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🧠 Introspection -->
+      <div class="col-md-3">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-success text-white">🧠 Introspection</div>
+          <div class="card-body">
+            <a href="{{ url_for('introspection.cortex_map') }}" class="btn btn-outline-success btn-sm mb-2">Cortex Map</a>
+            <a href="{{ url_for('introspection.diagnose_brain') }}" class="btn btn-outline-success btn-sm">Diagnose Brain</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- 🛠️ Repair -->
+      <div class="col-md-3">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-warning text-dark">🛠️ Repair</div>
+          <div class="card-body">
+            <a href="{{ url_for('repair.system_heartbeat') }}" class="btn btn-outline-warning btn-sm mb-2">System Heartbeat</a>
+            <form action="{{ url_for('repair.self_repair') }}" method="POST">
+              <button class="btn btn-outline-warning btn-sm" type="submit">Trigger Self-Repair</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <!-- 📋 Audit Info -->
+      <div class="col-md-3">
+        <div class="card shadow-sm mb-4">
+          <div class="card-header bg-secondary text-white">📋 Audit Info</div>
+          <div class="card-body">
+            <p><strong>Status:</strong> {{ audit_info.status }}</p>
+            <p><strong>Last Audit:</strong> {{ audit_info.last_audit_date }}</p>
+            <p><strong>Drift:</strong> {{ audit_info.drift }}</p>
+            <p><strong>Missing:</strong> {{ audit_info.missing }}</p>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function switchPersona(role) {
+  fetch("/admin/switch_identity", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ persona: role })
+  }).then(() => location.reload());
+}
+</script>
+{% endblock %}
+
+
+

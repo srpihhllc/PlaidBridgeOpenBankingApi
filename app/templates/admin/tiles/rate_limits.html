@@ -1,0 +1,34 @@
+{% extends "admin_base.html" %}
+{% block title %}Rate Limit Analytics{% endblock %}
+{% block content %}
+  <h2>📥 Rate Limit Dashboard</h2>
+
+  {% if ip_stats %}
+    <table class="table mt-4">
+      <thead>
+        <tr>
+          <th>IP Address</th>
+          <th>Requests</th>
+          <th>TTL</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stat in ip_stats %}
+          <tr>
+            <td>{{ stat.ip }}</td>
+            <td>{{ stat.requests }}</td>
+            <td>
+              {{ stat.ttl }}
+              <form action="{{ url_for('main.delete_rate_limit') }}" method="post" style="display: inline; margin-left: 10px;">
+                <input type="hidden" name="ip" value="{{ stat.ip }}">
+                <button type="submit" class="btn btn-sm btn-danger" title="Remove from Redis">🗑️</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="mt-3">No active rate-limit entries found in Redis.</p>
+  {% endif %}
+{% endblock %}

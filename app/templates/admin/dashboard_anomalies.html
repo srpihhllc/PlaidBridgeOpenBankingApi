@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Vault Anomaly Dashboard</h2>
+<p class="text-muted">System-wide anomaly trace summary from AI flagging engine</p>
+
+<div class="row mt-4">
+  <div class="col-md-4">
+    <div class="card text-white bg-danger mb-3">
+      <div class="card-header">High Severity</div>
+      <div class="card-body">
+        <h5 class="card-title">{{ high_count }}</h5>
+        <p class="card-text">Flags like high-value deposits, unknown methods</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card text-white bg-warning mb-3">
+      <div class="card-header">Medium Severity</div>
+      <div class="card-body">
+        <h5 class="card-title">{{ medium_count }}</h5>
+        <p class="card-text">Flags like zero-balance deposits or timing anomalies</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card text-white bg-success mb-3">
+      <div class="card-header">Low Severity</div>
+      <div class="card-body">
+        <h5 class="card-title">{{ low_count }}</h5>
+        <p class="card-text">Minor flags or informational traces</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="mt-5" />
+<h4>Daily Anomaly Trace Volume</h4>
+<canvas id="anomaly-chart"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const ctx = document.getElementById('anomaly-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ anomaly_labels | tojson }},
+      datasets: [{
+        label: 'Anomalies per Day',
+        data: {{ anomaly_counts | tojson }},
+        borderColor: '#dc3545',
+        fill: false,
+        tension: 0.3
+      }]
+    },
+    options: {
+      scales: {
+        y: { beginAtZero: true }
+      }
+    }
+  });
+</script>
+
+{% endblock %}

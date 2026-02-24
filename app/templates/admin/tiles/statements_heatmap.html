@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bank Statement Heatmap</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Bank Statement Activity</h2>
+  <canvas id="statementChart" width="600" height="300"></canvas>
+
+  <script>
+    fetch("/admin/statements_dashboard")
+      .then(res => res.json())
+      .then(data => {
+        const counts = {};
+        data.logs.forEach(log => {
+          const bank = log.bank || "unknown";
+          counts[bank] = (counts[bank] || 0) + 1;
+        });
+
+        new Chart(document.getElementById("statementChart"), {
+          type: "bar",
+          data: {
+            labels: Object.keys(counts),
+            datasets: [{
+              label: "Statements Generated",
+              data: Object.values(counts),
+              backgroundColor: "orchid"
+            }]
+          }
+        });
+      });
+  </script>
+</body>
+</html>
