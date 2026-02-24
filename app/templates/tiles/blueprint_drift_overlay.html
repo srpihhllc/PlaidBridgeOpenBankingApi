@@ -1,0 +1,31 @@
+{# app/templates/tiles/blueprint_drift_overlay.html #}
+
+<div class="tile-header">
+  <h3>{{ title }}</h3>
+  {% if ttl_remaining %}
+    <span class="ttl-badge {% if status == 'fail' %}ttl-fail{% else %}ttl-ok{% endif %}">
+      TTL: {{ ttl_remaining }}s
+    </span>
+  {% endif %}
+</div>
+
+{% if failures %}
+  <ul class="drift-list">
+    {% for f in failures %}
+      <li>
+        <a href="{{ f.link }}"
+           class="status-pill fail"
+           title="Open {{ f.name }} at line {{ f.line }}">
+          <span class="pill-label">{{ f.name }}</span>
+          <span class="pill-meta">line {{ f.line }}</span>
+        </a>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <div class="status-pill ok">
+    <span class="pill-label">✅ No blueprint drift detected</span>
+  </div>
+{% endif %}
+
+

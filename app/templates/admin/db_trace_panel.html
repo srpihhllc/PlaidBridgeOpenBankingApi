@@ -1,0 +1,40 @@
+{% extends "admin_sidebar.html" %}
+{% block title %}🧠 DB Trace Panel{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h2 class="mb-4 text-center">🧠 MySQL Diagnostics Panel</h2>
+
+  <table class="table table-bordered table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th scope="col">Trace Field</th>
+        <th scope="col">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>✅ Host</td>
+        <td><code>{{ diagnostics.host }}</code></td>
+      </tr>
+      <tr>
+        <td>🔗 SQL URI</td>
+        <td><code>{{ diagnostics.uri }}</code></td>
+      </tr>
+      <tr>
+        <td>⏱️ Ping Latency (ms)</td>
+        <td>{{ diagnostics.ping_latency_ms }}</td>
+      </tr>
+      <tr>
+        <td>🔐 Connection Status</td>
+        <td><strong>{{ diagnostics.connection }}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="mt-4">
+    <a href="{{ url_for('main.redis_panel') }}" class="btn btn-outline-secondary">📡 View Redis Panel</a>
+    <a href="{{ url_for('main.debug_db') }}" class="btn btn-outline-primary ms-2">🔬 Run Raw DB Test</a>
+  </div>
+</div>
+{% endblock %}

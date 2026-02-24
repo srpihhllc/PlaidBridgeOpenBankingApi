@@ -1,0 +1,93 @@
+{% extends "base.html" %}{% block title %}Cortex Ignition Dashboard{% endblock %}{% block content %}<div class="container mt-4"><h2>🧠 Operator Ignition Events</h2>{% if ttl is not none and ttl <= 0 %}<script>setTimeout(() => {// NOTE: Using a custom modal or message box is recommended over alert()// as it's not supported in all environments.// alert("⚠️ Operator session expired. Please re-ignite cortex access.");window.location.href = "/terence_entry";}, 500);</script>{% endif %}{% if ttl and ttl < 60 %}<div class="alert alert-warning mt-2">⏳ Warning: Operator session TTL is below 60 seconds!</div>{% endif %}<!-- 🔁 TTL Pulse Bar -->{% include "components/ttl_pulse.html" %}<!-- 🧩 Unified Cockpit Overlay Row --><div class="row mt-4"><!-- 🔧 CLI Pulse -->
+<div class="col-md-3">
+  <div class="card border-success mb-3">
+    <div class="card-header bg-success text-white">🔧 CLI Pulse</div>
+    <div class="card-body">
+      <p><strong>Status:</strong> {{ cli_tile.status }}</p>
+      <p><strong>Last Run:</strong> {{ cli_tile.last_run }}</p>
+      <p><strong>Command Count:</strong> {{ cli_tile.command_count }}</p>
+      <p><strong>Trace:</strong> {{ cli_tile.trace }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- 🧭 Blueprint Audit -->
+<div class="col-md-3">
+  <div class="card border-info mb-3 tile-blueprints">
+    <div class="card-header bg-info text-white">🧭 Blueprint Audit</div>
+    <div class="card-body">
+      {% if blueprint_audit %}
+        <p class="status-line">
+          Status:
+          <span class="status {{ blueprint_audit.status|default('unknown') }}">
+            {{ blueprint_audit.status|default('Unknown')|capitalize }}
+          </span>
+        </p>
+
+        {% if blueprint_audit.last_audit_iso %}
+          <p class="last-audit">
+            Last audit:
+            {{ blueprint_audit.last_audit_iso }}
+            {% if blueprint_audit.last_audit_epoch %}
+              <small>({{ blueprint_audit.last_audit_epoch | timeago }})</small>
+            {% endif %}
+          </p>
+        {% endif %}
+
+        <ul class="counts">
+          <li>Expected: {{ blueprint_audit.expected }} {{ 'blueprint' if blueprint_audit.expected == 1 else 'blueprints' }}</li>
+          <li>Actual: {{ blueprint_audit.actual }} {{ 'blueprint' if blueprint_audit.actual == 1 else 'blueprints' }}</li>
+          <li>Missing: {{ blueprint_audit.missing or 0 }}{% if not blueprint_audit.missing %} (None){% endif %}</li>
+          <li>Drift: {{ blueprint_audit.drift or 0 }}{% if not blueprint_audit.drift %} (None){% endif %}</li>
+          <li>Extras: {{ blueprint_audit.extras or 0 }}{% if not blueprint_audit.extras %} (None){% endif %}</li>
+        </ul>
+      {% else %}
+        <p class="text-muted">No recent audit data.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- 🧩 Blueprint Health Tile -->
+<div class="col-md-3">
+  {% include "partials/blueprint_health_tile.html" %}
+</div>
+
+<!-- 🔐 Login Link Health -->
+<div class="col-md-3">
+  <div class="card border-warning mb-3">
+    <div class="card-header bg-warning text-dark">🔐 Login Link Health</div>
+    <div class="card-body">
+      <p><strong>Status:</strong> {{ login_link_tile.status }}</p>
+      <p><strong>URL:</strong> {{ login_link_tile.endpoint_url }}</p>
+      <p><strong>TTL:</strong> {{ login_link_tile.ttl }}</p>
+      <p><strong>Boot Timestamp:</strong> {{ login_link_tile.timestamp }}</p>
+      <p><strong>Trace Logic:</strong> {{ login_link_tile.trace }}</p>
+    </div>
+  </div>
+</div>
+
+<!-- 📋 Blueprint Names -->
+<div class="col-md-3">
+  <div class="card border-secondary mb-3">
+    <div class="card-header bg-secondary text-white">📋 Blueprint Names</div>
+    <div class="card-body">
+      <p><strong>Total:</strong> {{ blueprint_tile.count }}</p>
+      <ul>
+        {% for name in blueprint_tile.names %}
+          <li>{{ name }}</li>
+        {% endfor %}
+      </ul>
+      <p><strong>Trace:</strong> {{ blueprint_tile.trace }}</p>
+    </div>
+  </div>
+</div>
+</div><!-- /.row --><!-- 🔋 Session Bootstrap Tile --><div class="row mt-3"><div class="col-md-12"><div class="card border-primary mb-3"><div class="card-header bg-primary text-white">🔋 Session Bootstrap</div><div class="card-body">{% if session_bootstrap_ctx %}{% with method=session_bootstrap_ctx.method,freshness=(session_bootstrap_ctx.freshness or 0),seeded=session_bootstrap_ctx.seeded %}{% include "tiles/session_bootstrap_tile.html" %}{% if seeded %}<span class="badge bg-info ms-2">Seeded</span>{% endif %}{% endwith %}{% else %}<div class="text-muted">No session bootstrap context available.</div>{% endif %}</div></div></div></div><!-- 📝 Event Table --><table class="table table-bordered mt-3"><thead class="table-dark"><tr><th>Timestamp</th><th>IP Address</th><th>Status</th><th>Triggered By</th></tr></thead><tbody>{% for event in events %}<tr><td>{{ event.timestamp }}</td><td>{{ event.ip or "N/A" }}</td><td>{% if event.event_type == "CORTEX_IGNITION" %}<span class="badge bg-success">Success</span>{% else %}<span class="badge bg-danger">Failed</span>{% endif %}</td><td>{{ event.by or "N/A" }}</td></tr>{% else %}<tr><td colspan="4" class="text-center text-muted">No ignition events recorded.</td></tr>{% endfor %}</tbody></table></div>{% endblock %}
+
+
+
+
+
+
+
+

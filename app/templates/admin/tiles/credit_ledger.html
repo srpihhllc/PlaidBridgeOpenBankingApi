@@ -1,0 +1,89 @@
+<h3 class="mb-3">Credit Ledger</h3>
+
+<table class="table table-bordered table-sm align-middle">
+  <thead class="table-light">
+    <tr>
+      <th>Card ID</th>
+      <th>Limit</th>
+      <th>Used</th>
+      <th>Remaining</th>
+      <th>Usage</th>
+      <th>Last Payment</th>
+      <th>Status</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+
+  <tbody>
+    {% for entry in ledgers %}
+    <tr>
+      <td>{{ entry.card_id }}</td>
+
+      <td>${{ "%.2f"|format(entry.credit_limit) }}</td>
+
+      <td>${{ "%.2f"|format(entry.balance_used) }}</td>
+
+      <td>${{ "%.2f"|format(entry.credit_limit - entry.balance_used) }}</td>
+
+      <td>
+        {% set ratio = entry.balance_used / entry.credit_limit %}
+        {% set color = "#28a745" if ratio <= 0.5 else "#ffc107" if ratio <= 0.8 else "#dc3545" %}
+
+        <svg width="70" height="70">
+          <circle cx="35" cy="35" r="30" fill="#eee" />
+          <circle cx="35" cy="35" r="30"
+            stroke="{{ color }}"
+            stroke-width="6"
+            stroke-dasharray="{{ (ratio * 188)|round(0) }},188"
+            stroke-linecap="round"
+            fill="transparent"
+            transform="rotate(-90 35 35)" />
+          <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+                font-size="12" fill="#333">
+            {{ (ratio * 100)|round(0) }}%
+          </text>
+        </svg>
+      </td>
+
+      <td>
+        {{ entry.last_payment_ts.strftime('%Y-%m-%d %H:%M') if entry.last_payment_ts else "N/A" }}
+      </td>
+
+      <td>
+        {% if entry.suspended %}
+          <span class="text-danger">🧊 Suspended</span>
+        {% elif ratio > 0.9 %}
+          <span class="text-danger">⚠️ High Usage</span>
+        {% else %}
+          <span class="text-success">✅ Healthy</span>
+        {% endif %}
+      </td>
+
+      <td>
+        <form action="/admin/payment_processor" method="post" class="d-flex gap-1">
+          <input type="hidden" name="card_id" value="{{ entry.card_id }}">
+          <input type="number" name="amount" step="0.01" class="form-control form-control-sm"
+                 placeholder="Amount" required>
+          <button type="submit" class="btn btn-sm btn-primary">Pay</button>
+        </form>
+      </td>
+    </tr>
+
+    <tr>
+      <td colspan="8">
+        <details>
+          <summary>🧾 Payment History</summary>
+          <ul class="mt-2">
+            {% for log in entry.payment_logs %}
+              <li>${{ "%.2f"|format(log.amount) }} — {{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</li>
+            {% else %}
+              <li>No payments recorded.</li>
+            {% endfor %}
+          </ul>
+        </details>
+      </td>
+    </tr>
+
+    {% endfor %}
+  </tbody>
+</table>

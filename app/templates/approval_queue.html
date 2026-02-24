@@ -1,0 +1,83 @@
+<h2>📝 Pending Tradeline Approvals</h2>
+
+<!-- Flash message support -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, msg in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<!-- Status filter -->
+<div class="mb-3">
+  <form method="get" class="d-flex align-items-center">
+    <label for="status" class="form-label me-2 mb-0">Filter by status:</label>
+    <select name="status" id="status" class="form-select form-select-sm w-auto me-2" onchange="this.form.submit()">
+      <option value="pending" {{ 'selected' if status == 'pending' else '' }}>🔄 Pending</option>
+      <option value="active" {{ 'selected' if status == 'active' else '' }}>✅ Approved</option>
+      <option value="denied" {{ 'selected' if status == 'denied' else '' }}>❌ Denied</option>
+    </select>
+  </form>
+</div>
+
+<table class="table table-bordered table-hover">
+  <thead class="table-light">
+    <tr>
+      <th>Vendor</th>
+      <th>Type</th>
+      <th>Limit</th>
+      <th>Applicant</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for line in tradelines %}
+    <tr data-bs-toggle="collapse" data-bs-target="#details{{ line.id }}" class="cursor-pointer">
+      <td>{{ line.vendor_name }}</td>
+      <td>{{ line.tradeline_type }}</td>
+      <td>${{ line.credit_limit }}</td>
+      <td>
+        {{ line.user.username if line.user else "Unknown" }}
+        {% if line.user and line.user.complaint_score >= 2 %}
+          <span class="badge bg-danger ms-2">⚠️ Complaints</span>
+        {% elif line.user and line.user.fraud_score >= 90 %}
+          <span class="badge bg-dark ms-2">🚫 Fraud Risk</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if line.status == "active" %}
+          <span class="badge bg-success">Active</span>
+        {% elif line.status == "denied" %}
+          <span class="badge bg-danger">Denied</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">Pending</span>
+        {% endif %}
+      </td>
+      <td>
+        <form class="d-inline" method="post" action="{{ url_for('api_bp.tradeline_review', tradeline_id=line.id) }}">
+          <input type="hidden" name="action" value="approve">
+          <button class="btn btn-sm btn-success">Approve</button>
+        </form>
+        <form class="d-inline" method="post" action="{{ url_for('api_bp.tradeline_review', tradeline_id=line.id) }}">
+          <input type="hidden" name="action" value="deny">
+          <button class="btn btn-sm btn-danger">Deny</button>
+        </form>
+      </td>
+    </tr>
+    <tr class="accordion-collapse collapse" id="details{{ line.id }}">
+      <td colspan="6" class="bg-light text-muted">
+        <strong>Reports to:</strong> {{ line.reports_to or "Unknown" }} |
+        <strong>Annual Fee:</strong> ${{ line.annual_fee or "0.00" }} |
+        <strong>Terms:</strong> <a href="{{ line.terms_url }}" target="_blank">{{ line.terms_url }}</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+

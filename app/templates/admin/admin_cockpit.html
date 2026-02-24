@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Operator Cockpit | FinBrain{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="text-center mb-4" style="color: #00ffe7;">🧠 Operator Cockpit: FinBrain Control Panel</h2>
+  <p class="text-center text-muted mb-4">“Root cognition granted. Subsystems are now accessible by fingerprint.”</p>
+
+  <div class="row justify-content-center">
+
+    <!-- 💾 System Diagnostics -->
+    <div class="col-md-12">
+      <h4 class="text-info mb-3">💾 System Diagnostics</h4>
+    </div>
+    {% include 'admin/model_summary_tile.html' %}
+    {% include 'admin/schema_versions_tile.html' %}
+    {% include 'admin/db_health_tile.html' %}
+
+    <!-- 🧾 Complaint Engine & Document Flow -->
+    <div class="col-md-12">
+      <h4 class="text-warning mt-4 mb-3">🧾 Complaint & PDF Bundling</h4>
+    </div>
+    {% include 'admin/admin_dispute_tile.html' %}
+    {% include 'admin/bundle_preview_tile.html' %}
+    {% include 'admin/letter_preview_tile.html' %}
+
+    <!-- 📄 Grants & Lending Intelligence -->
+    <div class="col-md-12">
+      <h4 class="text-success mt-4 mb-3">📄 Grants & Lender Validation</h4>
+    </div>
+    {% include 'admin/grants_heatmap_tile.html' %}
+    {% include 'admin/lenders_tile.html' %}
+    {% include 'admin/grants_dashboard_tile.html' %}
+
+    <!-- 📈 Banking & Fraud Visualizations -->
+    <div class="col-md-12">
+      <h4 class="text-primary mt-4 mb-3">📈 Banking Statements & Fraud Insights</h4>
+    </div>
+    {% include 'admin/statements_heatmap_tile.html' %}
+    {% include 'admin/statements_timeline_tile.html' %}
+    {% include 'admin/fraud_charts_tile.html' %}
+
+    <!-- 🧠 Cognition Map & Tracing -->
+    <div class="col-md-12">
+      <h4 class="text-light mt-4 mb-3">🧠 Cognition Overlays & Agent Traces</h4>
+    </div>
+    {% include 'admin/system_map_tile.html' %}
+    {% include 'admin/trace_viewer_tile.html' %}
+    {% include 'admin/agent_activity_tile.html' %}
+
+    <!-- 🔗 FinTech Connectors -->
+    <div class="col-md-12">
+      <h4 class="text-muted mt-4 mb-3">🔗 FinTech Integrations</h4>
+    </div>
+    {% include 'admin/link_account_tile.html' %}
+
+    <!-- 🔐 OAuth Session Trace -->
+    <div class="col-md-12">
+      <h4 class="text-info mt-4 mb-3">🔐 OAuth Debugging</h4>
+    </div>
+    {% include 'admin/oauth_trace_tile.html' %}
+
+  </div>
+
+  <div class="text-center mt-5">
+    <small class="text-muted">Cortex Operational Mode → Elevated • Access Identity: Terence</small>
+  </div>
+</div>
+{% endblock %}
+
+

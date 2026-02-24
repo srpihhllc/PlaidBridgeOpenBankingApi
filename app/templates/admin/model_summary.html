@@ -1,0 +1,13 @@
+<h2>🧠 Active ORM Model Snapshot</h2>
+<table class="table table-bordered table-striped">
+  <thead><tr><th>Model</th><th>Table</th><th>Row Count</th></tr></thead>
+  <tbody>
+    {% for name, meta in summary.items() %}
+    <tr>
+      <td>{{ name }}</td>
+      <td>{{ meta.table }}</td>
+      <td>{{ meta.count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

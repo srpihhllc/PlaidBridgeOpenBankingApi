@@ -1,0 +1,47 @@
+
+*** Begin Patch
+
+*** Update File: app/__init__.py
+
+@@
+
+ from app.extensions import (
+
+     csrf,
+
+     db,
+
+     init_extensions,
+
+     jwt,
+
+     limiter,
+
+-    login_manager,
+
+ )
+
+@@
+
+ def _register_login_manager_loader(flask_app: Flask) -> None:
+
+-    @login_manager.user_loader
+
++    # Import login_manager here to avoid redefinition conflicts flagged by flake8 (F811).
+
++    # Keeping the import local reduces the chance of accidental rebinds elsewhere.
+
++    from app.extensions import login_manager
+
++
+
++    @login_manager.user_loader
+
+     def load_user(user_id):
+
+         if user_id is None:
+
+             return None
+
+*** End Patch
+

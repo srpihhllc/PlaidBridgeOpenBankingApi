@@ -1,0 +1,6 @@
+.md-header { background: #111827; }
+.md-nav__title, .md-nav__link { font-weight: 600; }
+code, pre {
+  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.md-typeset h1, .md-typeset h2, .md-typeset h3 { font-weight: 700; }

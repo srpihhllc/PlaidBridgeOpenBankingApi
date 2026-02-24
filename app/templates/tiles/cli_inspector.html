@@ -1,0 +1,44 @@
+{# app/templates/tiles/cli_inspector.html #}
+{% extends "admin_cockpit.html" %}
+
+{% block content %}
+  <h2>CLI Command Inspector</h2>
+
+  {% if commands %}
+    <table class="table table-striped mb-4">
+      <thead class="table-dark">
+        <tr>
+          <th>Command</th>
+          <th>Status</th>
+          <th>Last Run</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in commands %}
+          <tr>
+            <td><code>{{ item.command }}</code></td>
+            <td>{{ item.status }}</td>
+            <td>{{ item.last_run or "🕒 Never" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="cli-inspector-tile">
+      <h3>Command Lattice View</h3>
+      <ul class="list-group">
+        {% for cmd in commands %}
+          <li class="list-group-item">
+            <strong>{{ cmd.name }}</strong> — <code>{{ cmd.syntax }}</code>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="alert alert-warning mt-3">
+      ⚠️ No CLI commands found. Emitter cold or Redis session stale. Tile booted but empty.
+    </div>
+  {% endif %}
+{% endblock %}
+
+

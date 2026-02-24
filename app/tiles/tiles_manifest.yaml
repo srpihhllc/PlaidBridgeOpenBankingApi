@@ -1,0 +1,43 @@
+# app/tiles/tiles_manifest.yaml
+
+- tile: Boot Pulse → Redis
+  emitter: boot:redis_ping
+  freshness: ttl
+  trace_key: boot:redis_ping
+  role_visibility: [owner]
+  display: "Redis Ping Status"
+  ttl_secs: 600
+
+- tile: Boot Pulse → Env Vars
+  emitter: boot:env_vars
+  freshness: ttl
+  trace_key: boot:env_vars
+  role_visibility: [owner]
+  display: "Env Vars Liveness"
+  ttl_secs: 600
+
+- tile: Boot Pulse → Blueprint Reg
+  emitter: boot:blueprint_reg
+  freshness: ttl
+  trace_key: boot:blueprint_reg
+  role_visibility: [owner]
+  display: "Blueprint Import Check"
+  ttl_secs: 600
+
+- tile: Boot Pulse → Blueprint Drift
+  emitter: boot:blueprint_drift
+  freshness: ttl
+  trace_key: boot:blueprint_drift
+  role_visibility: [owner]
+  display: "Live Blueprint Drift Monitor"
+  ttl_secs: 300
+
+- tile: Blueprint Drift Overlay
+  path: cockpit/tiles/blueprint_drift_overlay_tile.py
+  description: Cockpit overlay showing exact blueprint drift failures with drilldown
+
+- tile: ttl_dashboard_tile
+  path: tiles/ttl_dashboard_tile.py
+  description: Cockpit overlay showing TTL freshness for CLI and subsystem telemetry
+
+

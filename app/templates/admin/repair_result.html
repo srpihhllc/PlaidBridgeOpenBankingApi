@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Self-Repair Results{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h3>🛠️ Self-Repair Completed</h3>
+  <p><strong>{{ repaired_count }}</strong> MFA keys updated with missing TTLs.</p>
+  {% if repaired_keys %}
+  <ul class="list-group mt-3">
+    {% for key in repaired_keys %}
+    <li class="list-group-item">{{ key }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="alert alert-success mt-3">No stale keys found. Cortex clean.</div>
+  {% endif %}
+  <a href="{{ url_for('debug.cortex_map') }}" class="btn btn-outline-primary mt-4">← Back to Cortex Map</a>
+</div>
+{% endblock %}

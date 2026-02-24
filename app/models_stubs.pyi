@@ -1,0 +1,16 @@
+from typing import Any
+
+class Model: ...
+
+class _DB:
+    Model = Model
+
+    def __getattr__(self, name: str) -> Any: ...
+
+db: _DB
+
+def get_db() -> Any: ...
+
+# allow arbitrary attributes at module level
+
+def __getattr__(name: str) -> Any: ...

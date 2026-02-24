@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Transaction History for Account {{ account.account_number }}</h2>
+<p class="text-muted">Type: {{ account.account_type.title() }} | Balance: ${{ "%.2f"|format(account.balance) }}</p>
+
+{% if txns %}
+  <ul class="list-group mt-4">
+    {% for txn in txns %}
+    <li class="list-group-item d-flex justify-content-between align-items-center">
+      <div>
+        <strong>{{ txn.txn_type.title() }}</strong>
+        {% if txn.from_account_id == account.id %}
+          <span class="badge bg-danger ms-2">Outbound</span>
+        {% elif txn.to_account_id == account.id %}
+          <span class="badge bg-success ms-2">Inbound</span>
+        {% endif %}
+        <br>
+        <small class="text-muted">{{ txn.timestamp.strftime("%Y-%m-%d %H:%M:%S") }}</small>
+      </div>
+      <span class="fw-bold">${{ "%.2f"|format(txn.amount) }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="mt-4">⚠️ No transactions found for this account.</p>
+{% endif %}
+
+<hr class="mt-5" />
+<p class="text-muted">Velocity: {{ velocity }} txns recorded</p>
+
+{% endblock %}

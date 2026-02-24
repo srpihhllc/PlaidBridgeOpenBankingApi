@@ -1,0 +1,46 @@
+{% extends "admin_base.html" %}
+{% block title %}MySQL Dashboard{% endblock %}
+
+{% block content %}
+<h2>SQL User Report</h2>
+<p>Total users: {{ total_users }}</p>
+<p>✅ Approved: {{ approved_count }} | ⏳ Pending: {{ pending_count }}</p>
+
+<p><a href="{{ url_for('main.export_users') }}">📤 Download CSV</a></p>
+
+<table border="1" cellpadding="6">
+  <thead>
+  <tr>
+    <th>ID</th>
+    <th>Email</th>
+    <th>Username</th>
+    <th>Status</th>
+    <th>Routing #</th>
+    <th>Account Ending</th>  <!-- ✅ Corrected from <td> to <th> -->
+    <th>Total Balance</th>
+  </tr>
+</thead>
+  <tbody>
+    {% for user in users %}
+    <tr>
+  <td>{{ user.id }}</td>
+  <td>{{ user.email }}</td>
+  <td>{{ user.username }}</td>
+  <td>
+    {% if user.is_approved %}
+      ✅ Approved
+    {% else %}
+      <form method="POST" action="{{ url_for('main.approve_user', user_id=user.id) }}">
+        <button type="submit">✅ Approve</button>
+      </form>
+    {% endif %}
+  </td>
+  <td>{{ user.routing_number }}</td>  <!-- ✅ New data -->
+  <td>•••• {{ user.account_ending[-4:] }}</td>
+  <td>${{ "%.2f"|format(user.total_balance or 0) }}</td>
+</tr>
+
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

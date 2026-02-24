@@ -1,0 +1,12 @@
+<div id="job-status-container">
+  <h3>Job Status</h3>
+  <pre id="job-status-output">Loading...</pre>
+</div>
+<script>
+async function fetchJobStatus(jobId) {
+  const res = await fetch(`/job-status/${jobId}`);
+  const data = await res.json();
+  document.getElementById("job-status-output").textContent = JSON.stringify(data, null, 2);
+}
+setInterval(() => fetchJobStatus("dispute:job:42:Experian"), 3000);
+</script>

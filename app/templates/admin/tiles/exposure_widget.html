@@ -1,0 +1,15 @@
+<div class="p-3 border rounded bg-light mb-3">
+  <strong>🧠 System Exposure Check</strong><br>
+
+  Total Limit: ${{ "%.2f"|format(data.credit_limit) }}<br>
+  Total Repaid: ${{ "%.2f"|format(data.repaid) }}<br>
+  Ratio: {{ (data.exposure_ratio * 100)|round(1) }}%
+
+  {% if data.status == 'risk' %}
+    <span class="text-danger">⚠️ Risk</span>
+  {% elif data.status == 'warning' %}
+    <span class="text-warning">⚠️ Warning</span>
+  {% else %}
+    <span class="text-success">✅ OK</span>
+  {% endif %}
+</div>

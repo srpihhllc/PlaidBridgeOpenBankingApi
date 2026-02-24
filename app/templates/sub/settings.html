@@ -1,0 +1,137 @@
+{% extends "sub/base_sub.html" %}
+{% block title %}Dashboard Settings — {{ current_user.username }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+
+  <h2 class="fw-bold mb-2">
+    <i class="fas fa-cog me-2"></i> Dashboard Settings
+  </h2>
+  <p class="text-muted mb-4">
+    Customize your cockpit experience — theme, widgets, layout, and vault preferences.
+  </p>
+
+  <!-- =============================== -->
+  <!-- THEME SETTINGS -->
+  <!-- =============================== -->
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+      <i class="fas fa-moon me-2"></i> Theme
+    </div>
+    <div class="card-body">
+      <button id="dark-mode-toggle" class="btn btn-outline-secondary">
+        {% if dashboard_settings.dark_mode %}
+          <i class="fas fa-sun me-1"></i> Switch to Light Mode
+        {% else %}
+          <i class="fas fa-moon me-1"></i> Switch to Dark Mode
+        {% endif %}
+      </button>
+    </div>
+  </div>
+
+  <!-- =============================== -->
+  <!-- WIDGET VISIBILITY -->
+  <!-- =============================== -->
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+      <i class="fas fa-th-large me-2"></i> Widget Visibility
+    </div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('sub_ui.settings') }}">
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="show_transactions"
+                 {% if dashboard_settings.show_transactions %}checked{% endif %}>
+          <label class="form-check-label">Show Recent Transactions</label>
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="show_fraud"
+                 {% if dashboard_settings.show_fraud %}checked{% endif %}>
+          <label class="form-check-label">Show Fraud Summary</label>
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="show_todos"
+                 {% if dashboard_settings.show_todos %}checked{% endif %}>
+          <label class="form-check-label">Show Tasks & Productivity</label>
+        </div>
+
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="show_vaults"
+                 {% if dashboard_settings.show_vaults %}checked{% endif %}>
+          <label class="form-check-label">Show Vault Dashboard</label>
+        </div>
+
+        <button class="btn btn-primary" type="submit">
+          <i class="fas fa-save me-1"></i> Save Settings
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =============================== -->
+  <!-- LAYOUT PREFERENCES -->
+  <!-- =============================== -->
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+      <i class="fas fa-columns me-2"></i> Layout Preferences
+    </div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('sub_ui.settings') }}">
+        <label class="form-label">Dashboard Density</label>
+        <select class="form-select mb-3" name="density">
+          <option value="comfortable" {% if dashboard_settings.density == 'comfortable' %}selected{% endif %}>Comfortable</option>
+          <option value="compact" {% if dashboard_settings.density == 'compact' %}selected{% endif %}>Compact</option>
+        </select>
+
+        <label class="form-label">Default Section</label>
+        <select class="form-select mb-3" name="default_section">
+          <option value="financial" {% if dashboard_settings.default_section == 'financial' %}selected{% endif %}>Financial Overview</option>
+          <option value="tasks" {% if dashboard_settings.default_section == 'tasks' %}selected{% endif %}>Tasks & Productivity</option>
+          <option value="services" {% if dashboard_settings.default_section == 'services' %}selected{% endif %}>Services & Tools</option>
+          <option value="identity" {% if dashboard_settings.default_section == 'identity' %}selected{% endif %}>Identity & Profile</option>
+          <option value="vaults" {% if dashboard_settings.default_section == 'vaults' %}selected{% endif %}>Vault Dashboard</option>
+        </select>
+
+        <button class="btn btn-primary" type="submit">
+          <i class="fas fa-save me-1"></i> Save Layout
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- =============================== -->
+  <!-- VAULT SETTINGS -->
+  <!-- =============================== -->
+  <div class="card mb-4">
+    <div class="card-header bg-dark text-white">
+      <i class="fas fa-vault me-2"></i> Vault Preferences
+    </div>
+    <div class="card-body">
+      <form method="post" action="{{ url_for('sub_ui.settings') }}">
+        <label class="form-label">Vault Display Mode</label>
+        <select class="form-select mb-3" name="vault_display">
+          <option value="summary" {% if dashboard_settings.vault_display == 'summary' %}selected{% endif %}>Summary Only</option>
+          <option value="detailed" {% if dashboard_settings.vault_display == 'detailed' %}selected{% endif %}>Detailed View</option>
+        </select>
+
+        <button class="btn btn-primary" type="submit">
+          <i class="fas fa-save me-1"></i> Save Vault Settings
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+
+<!-- =============================== -->
+<!-- DARK MODE JS -->
+<!-- =============================== -->
+<script>
+document.getElementById("dark-mode-toggle")?.addEventListener("click", async () => {
+  const res = await fetch("/api/dashboard_settings/dark_mode", { method: "POST" });
+  if (res.ok) location.reload();
+});
+</script>
+
+{% endblock %}

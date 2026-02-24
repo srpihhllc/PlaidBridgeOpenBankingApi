@@ -1,0 +1,25 @@
+# -----------------------------------
+# app/templates/identity_theft.txt
+# -----------------------------------
+
+{{ user.name }}
+{{ user.address }}
+{{ user.city }}, {{ user.state }} {{ user.zip }}
+
+{{ bureau.name }}
+{{ bureau.address }}
+
+RE: ID Theft Dispute – REMOVE FRAUDULENT ACCOUNT
+
+To Whom It May Concern:
+
+I am writing to formally dispute the account listed below, which I did not authorize or open. Under FCRA §605B, I request immediate deletion and reinvestigation.
+
+Account: {{ dispute.account_number }}
+Creditor: {{ dispute.creditor }}
+Opened: {{ dispute.opened_date }}
+
+Please provide documentation supporting your verification, including your Method of Verification under FCRA §611.
+
+Sincerely,  
+{{ user.name }}

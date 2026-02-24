@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Anomaly Trace Viewer for Vault {{ acct_id }}</h2>
+<p class="text-muted">AI-flagged deposit anomalies with full trace context</p>
+
+{% if anomalies %}
+  <ul class="list-group mt-4">
+    {% for entry in anomalies %}
+    <li class="list-group-item">
+      <strong>Txn #{{ entry.txn_id }}</strong><br>
+
+      <!-- Timestamp + TTL Freshness -->
+      <small class="text-muted">
+        {{ entry.timestamp }} &nbsp;|&nbsp; Trace Age:
+        {% if entry.ttl < 60 %}
+          <span class="text-success">{{ entry.ttl }}s 🟢</span>
+        {% elif entry.ttl < 300 %}
+          <span class="text-warning">{{ entry.ttl }}s 🟡</span>
+        {% else %}
+          <span class="text-danger">{{ entry.ttl }}s 🔴</span>
+        {% endif %}
+      </small><br>
+
+      <!-- Flag Badges with Tooltips -->
+      {% for flag in entry.flags %}
+        {% if "High-Value" in flag %}
+          <span class="badge bg-danger me-1" data-bs-toggle="tooltip" title="Transaction exceeds normal threshold">🔴 {{ flag }}</span>
+        {% elif "Unknown Method" in flag %}
+          <span class="badge bg-warning me-1" data-bs-toggle="tooltip" title="Transaction method could not be classified">⚠️ {{ flag }}</span>
+        {% elif "Zero Balance" in flag %}
+          <span class="badge bg-info me-1" data-bs-toggle="tooltip" title="Deposit led to zero balance or void state">💧 {{ flag }}</span>
+        {% else %}
+          <span class="badge bg-secondary me-1" data-bs-toggle="tooltip" title="Miscellaneous or lower severity anomaly">🔍 {{ flag }}</span>
+        {% endif %}
+      {% endfor %}
+
+      <!-- Amount -->
+      <div class="mt-2">💰 Amount: <strong>${{ "%.2f"|format(entry.amount) }}</strong></div>
+
+      <!-- Collapsible Trace Viewer -->
+      <button class="btn btn-sm btn-outline-secondary mt-2" data-bs-toggle="collapse" data-bs-target="#trace-{{ entry.txn_id }}">
+        View Trace Context
+      </button>
+      <div class="collapse mt-2" id="trace-{{ entry.txn_id }}">
+        <pre class="bg-light p-2 rounded small">{{ entry.trace | tojson(indent=2) }}</pre>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="mt-4">✅ No anomalies flagged for this account.</p>
+{% endif %}
+
+<!-- Bootstrap Tooltip Activation -->
+<script>
+  var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+  tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+    new bootstrap.Tooltip(tooltipTriggerEl);
+  });
+</script>
+
+{% endblock %}
+
+
+
+
