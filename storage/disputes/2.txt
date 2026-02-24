@@ -1,0 +1,43 @@
+
+Subject: Formal Notice of Credit Dispute
+
+Date: 2025-07-09 06:26:03
+
+Bureau: Experian
+
+Method: Email Dispatch via SendGrid
+
+Dispute ID: 2
+
+
+
+To Whom It May Concern,
+
+
+
+I am formally disputing the accuracy of the account listed under reference number XXXXXXXX-EX on my consumer credit file. This account was flagged for incorrect status reporting, unauthorized collections activity, and lacks verifiable documentation.
+
+
+
+In accordance with the Fair Credit Reporting Act (FCRA), 15 U.S.C. § 1681i, you are required to complete this reinvestigation within 30 calendar days. I am requesting:
+
+
+
+- Full documentation verifying the source and basis for this account
+
+- Immediate removal of any unverifiable or inaccurate data
+
+- Written confirmation of the results from your reinvestigation
+
+
+
+I have attached relevant supporting documentation, including prior correspondence and a copy of my ID.
+
+
+
+Sincerely,  
+
+Terence
+
+EOFee
+

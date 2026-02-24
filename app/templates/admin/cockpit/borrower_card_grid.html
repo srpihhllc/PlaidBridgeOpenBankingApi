@@ -1,0 +1,28 @@
+<div class="container mt-4">
+  <h2>💳 Borrower Credit Cards</h2>
+  <div class="row">
+    {% for card in cards %}
+    <div class="col-md-4 mb-3">
+
+      {% set exp_month, exp_year = card.expiration.split('/') %}
+      {% set now = namespace(month=current_time.month, year=current_time.year) %}
+      {% if exp_year|int == now.year and exp_month|int - now.month <= 1 %}
+        <div class="alert alert-warning">
+          ⚠️ Card expiring soon ({{ card.expiration }})
+        </div>
+      {% endif %}
+
+      <div class="card border-{{ card.color }}">
+        <div class="card-body">
+          <h5 class="card-title">{{ card.name }}</h5>
+          <p>Credit Score: {{ card.score }}</p>
+          <p>Card Number: **** **** **** {{ card.card_number[-4:] }}</p>
+          <p>Expires: {{ card.expiration }} | CVV: {{ card.cvv }}</p>
+          <span class="badge bg-{{ card.color }}">{{ card.color|capitalize }} Risk</span>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+

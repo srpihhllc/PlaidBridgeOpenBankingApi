@@ -1,0 +1,69 @@
+<!-- templates/admin/cockpit_oauth_audit.html -->
+
+{% extends "base.html" %}
+
+{% block content %}
+<h2>🔐 OAuth Login Audit</h2>
+
+<section>
+  <h4>🧠 Trace Events</h4>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Type</th>
+        <th>Email</th>
+        <th>IP</th>
+        <th>Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for event in events %}
+      <tr>
+        <td>{{ event.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>
+          {% if event.event_type == "OAUTH_LOGIN_SUCCESS" %}
+            <span class="badge bg-success">{{ event.event_type }}</span>
+          {% elif event.event_type == "OAUTH_LOGIN_FAILURE" %}
+            <span class="badge bg-danger">{{ event.event_type }}</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{{ event.event_type }}</span>
+          {% endif %}
+        </td>
+        <td>{{ event.email or "—" }}</td>
+        <td>{{ event.ip or "—" }}</td>
+        <td>{{ event.detail or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<hr>
+
+<section>
+  <h4>📡 Redis TTL Traces</h4>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>TTL (s)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for trace in ttl_traces %}
+      <tr>
+        <td>{{ trace.key }}</td>
+        <td>
+          {% if trace.ttl == "∞" %}
+            <span class="badge bg-secondary">Persistent</span>
+          {% else %}
+            <span class="badge bg-info">{{ trace.ttl }}</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

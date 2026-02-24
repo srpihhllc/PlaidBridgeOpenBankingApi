@@ -1,0 +1,116 @@
+# app/static/css/cockpit.css
+
+/* Cockpit Tile Styling */
+.card {
+  border-radius: 12px;
+  background: rgba(28, 28, 28, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 0 24px rgba(0, 255, 231, 0.25);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 0 32px rgba(0, 255, 231, 0.35);
+}
+
+/* Title Styling */
+h2 {
+  color: #00ffe7;
+  text-shadow: 0 0 6px rgba(0, 255, 231, 0.5);
+}
+
+/* Buttons */
+.btn {
+  border-radius: 6px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.btn-outline-info {
+  border-color: #00ffe7;
+  color: #00ffe7;
+}
+
+.btn-outline-info:hover {
+  background-color: #00ffe7;
+  color: #121212;
+}
+
+.btn-outline-light:hover {
+  background-color: #f0f0f0;
+  color: #121212;
+}
+
+/* Operator Footer */
+.operator-footer {
+  margin-top: 50px;
+  font-size: 0.85rem;
+  color: #888;
+  text-align: center;
+}
+
+/* SVG Overlays */
+.svg-overlay {
+  position: relative;
+  width: 100%;
+  margin: 30px 0;
+}
+
+.svg-overlay svg {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 12px rgba(0,255,231,0.2));
+}
+
+/* Pulse Highlights */
+.pulse-highlight {
+  animation: pulse 1.5s infinite;
+  fill: #00ffe7;
+  stroke: #00ffe7;
+  stroke-width: 2px;
+}
+
+@keyframes pulse {
+  0%   { transform: scale(1); opacity: 1; }
+  50%  { transform: scale(1.1); opacity: 0.6; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ============================= */
+/* Blueprint Drift Overlay Hooks */
+/* ============================= */
+
+/* TTL badge color cues */
+.ttl-badge.ttl-fail { background-color: #b71c1c; color: #fff; }
+.ttl-badge.ttl-ok   { background-color: #2e7d32; color: #fff; }
+
+/* Drift list styling */
+.drift-list { list-style: none; margin: 0; padding: 0; }
+.drift-list li { margin-bottom: 4px; }
+
+/* Status pill enhancements */
+.status-pill.fail {
+  background-color: #ffebee;
+  border-left: 4px solid #c62828;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+.status-pill.ok {
+  background-color: #e8f5e9;
+  border-left: 4px solid #2e7d32;
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.status-pill .pill-label { font-weight: bold; }
+.status-pill .pill-meta  { font-size: 0.85em; color: #555; margin-left: 6px; }
+

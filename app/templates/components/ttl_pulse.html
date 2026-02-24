@@ -1,0 +1,30 @@
+{% if ttl %}
+<style>
+  @keyframes pulse-red {
+    0%   { background-color: #dc3545; }
+    50%  { background-color: #ff6b6b; }
+    100% { background-color: #dc3545; }
+  }
+  .pulse-red {
+    animation: pulse-red 1s infinite;
+  }
+</style>
+
+<div class="ttl-bar mt-3">
+  <label>Operator Session TTL:</label>
+  <div class="progress" style="height: 20px;">
+    <div class="progress-bar
+                {% if ttl < 30 %}bg-danger pulse-red
+                {% elif ttl < 60 %}bg-warning
+                {% else %}bg-info{% endif %}"
+         role="progressbar"
+         style="width: {{ (ttl / 900) * 100 }}%"
+         aria-valuenow="{{ ttl }}"
+         aria-valuemin="0" aria-valuemax="900">
+      {{ ttl }}s remaining
+    </div>
+  </div>
+</div>
+{% endif %}
+
+

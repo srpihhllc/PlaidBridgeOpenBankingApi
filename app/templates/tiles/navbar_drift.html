@@ -1,0 +1,69 @@
+<!-- app/templates/admin/admin_navbar_drift.html -->
+<div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+    <div class="card h-100 shadow-sm">
+
+        <!-- Header -->
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span title="Detects mismatches between navbar links and actual Flask endpoints.">
+                🧭 Navbar Drift
+            </span>
+
+            {% set missing_nav = data.navbar.missing_endpoints|length %}
+            {% set missing_tpl = data.templates.missing_endpoints|length %}
+            {% set drift = (missing_nav + missing_tpl) > 0 %}
+
+            <span class="badge {% if drift %}bg-danger{% else %}bg-success{% endif %}">
+                {% if drift %}
+                    Drift ({{ missing_nav + missing_tpl }})
+                {% else %}
+                    Aligned ✓
+                {% endif %}
+            </span>
+        </div>
+
+        <!-- Body -->
+        <div class="card-body">
+
+            <!-- Navbar endpoints -->
+            <h6 class="text-muted">Endpoints in navbar.html</h6>
+            <ul class="small mb-3">
+                {% for ep in data.navbar.endpoints_in_nav or [] %}
+                <li class="{% if ep not in app.view_functions %}text-danger{% else %}text-success{% endif %}">
+                    {{ ep }}
+                    {% if ep not in app.view_functions %}
+                        <span class="badge bg-danger ms-1">missing</span>
+                    {% else %}
+                        <span class="badge bg-success ms-1">ok</span>
+                    {% endif %}
+                </li>
+                {% else %}
+                <li class="text-muted">No endpoints found in navbar.html</li>
+                {% endfor %}
+            </ul>
+
+            <!-- Template drift -->
+            <h6 class="text-muted">Templates referencing missing endpoints</h6>
+            {% if data.templates.missing_endpoints %}
+            <ul class="small">
+                {% for ep in data.templates.missing_endpoints %}
+                <li class="text-danger">{{ ep }}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="small text-success">All template references resolve.</div>
+            {% endif %}
+        </div>
+
+        <!-- Footer -->
+        <div class="card-footer text-muted small d-flex justify-content-between">
+            <span>Source: nav_audit context at boot</span>
+            <a href="{{ url_for('admin_ui.nav_audit') }}" class="text-decoration-none">
+                View Audit →
+            </a>
+        </div>
+
+    </div>
+</div>
+
+
+

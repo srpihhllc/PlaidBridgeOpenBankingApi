@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}📜 Dispute Bundle Preview{% endblock %}
+
+{% block content %}
+<div class="container">
+  <h2 class="my-4">📦 Dispute Bundle for Log #{{ log_id }}</h2>
+
+  <ul class="nav nav-tabs mb-3" id="letterTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="letter1-tab" onclick="switchTab('letter1')">Letter 1</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="letter2-tab" onclick="switchTab('letter2')">Letter 2</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="letter3-tab" onclick="switchTab('letter3')">Letter 3</button>
+    </li>
+  </ul>
+
+  <div class="tab-content border p-3" style="white-space: pre-wrap;">
+    <div id="letter1" class="tab-pane active">{{ letter1 }}</div>
+    <div id="letter2" class="tab-pane" style="display:none;">{{ letter2 }}</div>
+    <div id="letter3" class="tab-pane" style="display:none;">{{ letter3 }}</div>
+  </div>
+
+  <div class="mt-4">
+    <a href="/storage/bundles/dispute_{{ log_id }}_full.zip" class="btn btn-outline-info me-2" download>
+      📦 Download Bundle ZIP
+    </a>
+    <a href="/preview_letter/{{ log_id }}" class="btn btn-outline-secondary">
+      🔎 Preview Letter 1
+    </a>
+  </div>
+</div>
+
+<script>
+function switchTab(id) {
+  document.querySelectorAll(".tab-pane").forEach(el => el.style.display = "none");
+  document.querySelectorAll(".nav-link").forEach(btn => btn.classList.remove("active"));
+  document.getElementById(id).style.display = "block";
+  document.getElementById(id + "-tab").classList.add("active");
+}
+</script>
+{% endblock %}
+

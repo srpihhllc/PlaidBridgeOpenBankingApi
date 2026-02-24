@@ -1,0 +1,61 @@
+{# templates/sub/base_sub.html #}
+<!doctype html>
+<html lang="en">
+  <head>
+    {% block head %}
+    <meta charset="utf-8">
+    <title>{% block title %}Subscriber Dashboard — PlaidBridge{% endblock %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    {% block styles %}
+    <!-- Bootstrap 5 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+
+    <!-- Subscriber Dashboard Layout (grid, sidebar, dark mode, cards, etc.) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+    <!-- Cockpit/Operator Styling (shared components used in subscriber dashboard) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/cockpit.css') }}">
+
+    <!-- Legacy global styles (safe to include) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
+    <!-- App-wide overrides -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+    {% endblock styles %}
+    {% endblock head %}
+  </head>
+
+  <body class="bg-dark text-light">
+    {% block body %}
+
+    {% block navbar %}
+      {% include "sub/_sub_navbar.html" %}
+    {% endblock navbar %}
+
+    <main class="container-fluid mt-4">
+      {% block content %}{% endblock content %}
+    </main>
+
+    <footer class="text-center text-muted mt-5 mb-3">
+      © PlaidBridge — Subscriber Portal
+    </footer>
+
+    {% block scripts %}
+    <!-- Bootstrap 5 JS -->
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+
+    <!-- Chart.js (subscriber dashboard uses charts) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Cockpit/Operator overlays (subscriber dashboard uses operator mode) -->
+    <script src="{{ url_for('static', filename='js/cockpit.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/trace_overlay.js') }}"></script>
+
+    <!-- App-wide JS -->
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% endblock scripts %}
+
+    {% endblock body %}
+  </body>
+</html>

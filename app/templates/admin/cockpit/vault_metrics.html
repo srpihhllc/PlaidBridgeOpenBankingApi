@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Vault Metrics{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>📊 Card Pulse Map</h2>
+  <ul class="list-group">
+    <li class="list-group-item d-flex justify-content-between">
+      <strong>✅ Healthy Cards</strong>
+      <span class="badge bg-success">{{ active }}</span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between">
+      <strong>⚠️ Expiring Soon</strong>
+      <span class="badge bg-warning text-dark">{{ expiring }}</span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between">
+      <strong>💤 Dormant</strong>
+      <span class="badge bg-secondary">{{ dormant }}</span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between">
+      <strong>🔴 Revoked</strong>
+      <span class="badge bg-danger">{{ revoked }}</span>
+    </li>
+    <li class="list-group-item d-flex justify-content-between">
+      <strong>Total Cards</strong>
+      <span class="badge bg-dark">{{ total }}</span>
+    </li>
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+<div class="tile tile-access-token">
+  <h5>Access Tokens</h5>
+  <ul id="access-token-list">
+    {% for token in user.access_tokens.order_by(AccessToken.created_at.desc()).limit(5) %}
+      <li>
+        Token: {{ token.token[:8] }}...
+        <span class="badge badge-info">Issued: {{ token.created_at.strftime('%Y-%m-%d') }}</span>
+        {% if token.expires_at %}
+          <span class="badge badge-warning">Expires: {{ token.expires_at.strftime('%Y-%m-%d') }}</span>
+        {% else %}
+          <span class="badge badge-secondary">No Expiry</span>
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</div>

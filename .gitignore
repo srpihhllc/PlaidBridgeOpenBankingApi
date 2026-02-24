@@ -1,30 +1,54 @@
-﻿# Python artifacts
-*.pyc
-__pycache__/
-*.pyo
-*.pyd
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/.gitignore
 
-# caches and test artifacts
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.venv/
-venv/
+# Python-specific
+__pycache__/
+*.py[cod]
+*.egg-info
+instance/
+
+# Virtual environments
+.venv
 env/
+venv/
 ENV/
 
-# editor / OS files
-*.DS_Store
+# Flask
+/instance/
+/logs/   # added explicitly
+
+# Uploads - VERY IMPORTANT: MATCH YOUR app.py UPLOAD_FOLDER
+statements/  # Changed from uploads/ to statements/
+
+# Docker
+.dockerenv
+.env
+docker-compose.override.yml
+docker-compose.yml
+/tmp/
+
+# OS-specific
+.DS_Store
 Thumbs.db
 
-# runtime / logs / databases
-*.log
-logs/
-instance/*.db
-*.db
-PlaidBridgeOpenBankingApi/logs/
-PlaidBridgeOpenBankingApi/instance/*.db
+# VS Code - (optional, but good practice)
+.vscode/
 
-# environment files
-.env
-.env.*.local
+# Azure Functions tooling (no longer used)
+azure-functions-core-tools/
+
+# Backup or scratch dirs
+backup/
+
+# Test & coverage caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# MyPy cache
+.mypy_cache/
+
+# Pre-commit / lint caches
+.pre-commit-config.yaml~
+.pre-commit-hooks.yaml~
+
+
