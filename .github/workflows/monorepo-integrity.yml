@@ -1,1 +1,50 @@
-name: Monorepo Integrity\n\non:\n  push:\n    branches: [ main, docs/infrastructure-upgrade ]\n  pull_request:\n    branches: [ main, docs/infrastructure-upgrade ]\n\njobs:\n  monorepo-integrity:\n    runs-on: ubuntu-latest\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n\n      - name: Verify repo structure\n        run: |\n          test -d app\n          test -d mobile-app\n          test -d docs\n          test -f README.md\n          test -f docs/10-openapi.yaml\n          test -f docs/05-developer-onboarding.md\n          test -f docs/06-ci-cd-pipeline.md\n          test -f docs/07-operator-handbook.md\n          test -f docs/08-release-notes.md\n          test -f docs/11-monorepo-architecture-diagram.md\n\n      - name: Verify env template\n        run: |\n          test -f .env.example\n          grep -q "DATABASE_URL" .env.example || echo "Warn: DATABASE_URL not documented"\n          grep -q "PLAID_CLIENT_ID" .env.example || echo "Warn: PLAID_CLIENT_ID not documented"\n\n      - name: Validate OpenAPI (basic)\n        run: |\n          python -m pip install --upgrade pip\n          python -m pip install openapi-spec-validator\n          python -m openapi_spec_validator docs/10-openapi.yaml\n\n      - name: Validate mobile shared TS types\n        working-directory: mobile-app\n        run: |\n          npm install -g typescript >/dev/null 2>&1 || true\n          if [ -f tsconfig.json ]; then\n            npx tsc --noEmit\n          else\n            echo "No tsconfig.json; skipping TS validation."\n          fi\n
+name: Monorepo Integrity
+
+on:
+  push:
+    branches: [ main, docs/infrastructure-upgrade ]
+  pull_request:
+    branches: [ main, docs/infrastructure-upgrade ]
+
+jobs:
+  monorepo-integrity:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify repo structure
+        run: |
+          test -d app
+          test -d mobile-app
+          test -d docs
+          test -f README.md
+          test -f docs/10-openapi.yaml
+          test -f docs/05-developer-onboarding.md
+          test -f docs/06-ci-cd-pipeline.md
+          test -f docs/07-operator-handbook.md
+          test -f docs/08-release-notes.md
+          test -f docs/11-monorepo-architecture-diagram.md
+
+      - name: Verify env template
+        run: |
+          test -f .env.example
+          grep -q "DATABASE_URL" .env.example || echo "Warn: DATABASE_URL not documented"
+          grep -q "PLAID_CLIENT_ID" .env.example || echo "Warn: PLAID_CLIENT_ID not documented"
+
+      - name: Validate OpenAPI (basic)
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install openapi-spec-validator
+          python -m openapi_spec_validator docs/10-openapi.yaml
+
+      - name: Validate mobile shared TS types
+        working-directory: mobile-app
+        run: |
+          npm install -g typescript >/dev/null 2>&1 || true
+          if [ -f tsconfig.json ]; then
+            npx tsc --noEmit
+          else
+            echo "No tsconfig.json; skipping TS validation."
+          fi
