@@ -17,21 +17,17 @@ from flask import Flask, jsonify, request
 from sqlalchemy import inspect
 from werkzeug.exceptions import BadRequest, HTTPException
 
-# Absolute imports for configuration
-from PlaidBridgeOpenBankingApi.app.config import get_config_class
-
-# Absolute imports for extensions
-from PlaidBridgeOpenBankingApi.app.extensions import (
+# Use relative imports to avoid circular import issues during package init
+from .config import get_config_class
+from .extensions import (
     db,
     init_extensions,
     jwt,
     login_manager,
     socketio,
 )
-
-# Absolute imports for models
-from PlaidBridgeOpenBankingApi.app.models.revoked_token import RevokedToken
-from PlaidBridgeOpenBankingApi.app.models.user import User
+from .models.revoked_token import RevokedToken
+from .models.user import User
 
 __all__ = ["create_app", "get_app", "socketio"]
 
@@ -57,10 +53,7 @@ def _safe_status_code(code) -> int:
 
 def _register_blueprints(flask_app: Flask) -> None:
     try:
-        from PlaidBridgeOpenBankingApi.app.blueprints import (
-            register_blueprints,
-            validate_blueprints_graph,
-        )
+        from .blueprints import register_blueprints, validate_blueprints_graph
 
         register_blueprints(flask_app)
         validate_blueprints_graph(flask_app)
@@ -158,7 +151,7 @@ def _ensure_db_tables(flask_app: Flask) -> None:
 def create_app(env_name: str = None, config_class=None) -> Flask:
     package_root = Path(__file__).resolve().parent
     flask_app = Flask(
-        "flask_app",
+        __name__,
         template_folder=str(package_root / "templates"),
         static_folder=str(package_root / "static"),
     )
@@ -172,7 +165,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # 2. Testing overrides
     if flask_app.config.get("TESTING"):
-        from PlaidBridgeOpenBankingApi.app.config import TestingConfig
+        from .config import TestingConfig
 
         flask_app.config.from_object(TestingConfig)
         flask_app.config["SECRET_KEY"] = "test-secret"
@@ -228,16 +221,13 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     _register_login_manager_loader(flask_app)
 
     # 7. Admin blueprints
-    from PlaidBridgeOpenBankingApi.app.blueprints.admin_routes import (
-        admin_api_bp,
-        admin_bp,
-    )
+    from .blueprints.admin_routes import admin_api_bp, admin_bp
 
     flask_app.register_blueprint(admin_bp)
     flask_app.register_blueprint(admin_api_bp)
 
     # 7.5 Tiles blueprint
-    from PlaidBridgeOpenBankingApi.app.routes.tiles import tiles_bp
+    from .routes.tiles import tiles_bp
 
     flask_app.register_blueprint(tiles_bp)
 
@@ -251,15 +241,13 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # 10. CLI commands
     try:
-        from PlaidBridgeOpenBankingApi.app.cli import init_app as init_cli
+        from .cli import init_app as init_cli
 
         init_cli(flask_app)
     except Exception as exc:
         _logger.error("Failed to register CLI commands: %s", exc)
 
-    from PlaidBridgeOpenBankingApi.app.cli_commands.sweep_endpoints import (
-        sweep_endpoints,
-    )
+    from .cli_commands.sweep_endpoints import sweep_endpoints
 
     flask_app.cli.add_command(sweep_endpoints)
 
@@ -270,16 +258,10 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     return flask_app
 
+
 # =============================================================================
 # Legacy shim compatibility
 # =============================================================================
 from .flask_app import get_app as legacy_get_app
 
-# Export both the real factory and the shim accessor
-create_app = create_app  # real factory stays exported
-get_app = legacy_get_app
-
 __all__ = ["create_app", "get_app", "socketio"]
-
-
-
