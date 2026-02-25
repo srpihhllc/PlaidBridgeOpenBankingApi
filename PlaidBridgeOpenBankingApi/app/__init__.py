@@ -3,7 +3,9 @@
 # =============================================================================
 
 """
-Hardened Flask application factory.
+Hardened Flask application factory for PlaidBridgeOpenBankingApi.
+Provides a stable, production-grade create_app() entrypoint and exposes
+get_app() for legacy shim compatibility.
 """
 
 import logging
@@ -15,10 +17,10 @@ from flask import Flask, jsonify, request
 from sqlalchemy import inspect
 from werkzeug.exceptions import BadRequest, HTTPException
 
-# Correct absolute import
+# Absolute imports for configuration
 from PlaidBridgeOpenBankingApi.app.config import get_config_class
 
-# Correct absolute imports for extensions
+# Absolute imports for extensions
 from PlaidBridgeOpenBankingApi.app.extensions import (
     db,
     init_extensions,
@@ -27,17 +29,17 @@ from PlaidBridgeOpenBankingApi.app.extensions import (
     socketio,
 )
 
-# Correct absolute imports for models
+# Absolute imports for models
 from PlaidBridgeOpenBankingApi.app.models.revoked_token import RevokedToken
 from PlaidBridgeOpenBankingApi.app.models.user import User
 
-__all__ = ["create_app", "socketio"]
+__all__ = ["create_app", "get_app", "socketio"]
 
 _logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Logging (PythonAnywhere‑safe)
+# Logging
 # =============================================================================
 def _setup_logging(app: Flask) -> None:
     app.logger.setLevel(logging.INFO)
@@ -86,7 +88,9 @@ def _register_error_handlers(flask_app: Flask) -> None:
             name = "Unprocessable Entity"
 
         if flask_app.config.get("ENV") == "production" and status >= 500:
-            description = "The server encountered an internal error. Please try again later."
+            description = (
+                "The server encountered an internal error. Please try again later."
+            )
             name = "Internal Server Error"
 
         _logger.log(
@@ -119,7 +123,9 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
         except ValueError:
             return db.session.get(User, user_id)
         except Exception as exc:
-            _logger.warning("User loader failed for id=%s: %s", user_id, exc, exc_info=True)
+            _logger.warning(
+                "User loader failed for id=%s: %s", user_id, exc, exc_info=True
+            )
             return None
 
 
@@ -138,7 +144,9 @@ def _ensure_db_tables(flask_app: Flask) -> None:
     try:
         inspector = inspect(db.engine)
         if "users" not in set(inspector.get_table_names()):
-            _logger.info("Essential tables missing; calling db.create_all() as fallback.")
+            _logger.info(
+                "Essential tables missing; calling db.create_all() as fallback."
+            )
             db.create_all()
     except Exception as exc:
         _logger.debug("DB inspection fallback skipped: %s", exc)
@@ -162,9 +170,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
         cfg = get_config_class(env_name)
         flask_app.config.from_object(cfg)
 
-    # -------------------------------------------------------------------------
-    # Force TestingConfig when running tests
-    # -------------------------------------------------------------------------
+    # 2. Testing overrides
     if flask_app.config.get("TESTING"):
         from PlaidBridgeOpenBankingApi.app.config import TestingConfig
 
@@ -173,9 +179,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
         flask_app.config["TEMPLATES_AUTO_RELOAD"] = True
         flask_app.jinja_env.cache = {}
 
-    # -------------------------------------------------------------------------
-    # Maintenance Mode Guard
-    # -------------------------------------------------------------------------
+    # 3. Maintenance mode guard
     @flask_app.before_request
     def check_for_maintenance():
         if flask_app.config.get("MAINTENANCE_MODE"):
@@ -192,7 +196,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                     503,
                 )
 
-    # 3. SQLAlchemy engine tuning
+    # 4. SQLAlchemy engine tuning
     uri = flask_app.config.get("SQLALCHEMY_DATABASE_URI", "")
     if uri.startswith("sqlite"):
         flask_app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"poolclass": None}
@@ -211,21 +215,19 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     flask_app.start_time = time.time()
 
-    # 4. Initialize extensions
+    # 5. Initialize extensions
     init_extensions(flask_app)
 
     # Register models
     import PlaidBridgeOpenBankingApi.app.models  # noqa: F401
 
-    # 5. JWT loaders
+    # 6. JWT + error handlers + login manager
     _register_jwt_loaders(flask_app)
-
-    # Core component registration
     _setup_logging(flask_app)
     _register_error_handlers(flask_app)
     _register_login_manager_loader(flask_app)
 
-    # 6. Admin blueprints
+    # 7. Admin blueprints
     from PlaidBridgeOpenBankingApi.app.blueprints.admin_routes import (
         admin_api_bp,
         admin_bp,
@@ -234,20 +236,20 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     flask_app.register_blueprint(admin_bp)
     flask_app.register_blueprint(admin_api_bp)
 
-    # 6.5 Tiles blueprint
+    # 7.5 Tiles blueprint
     from PlaidBridgeOpenBankingApi.app.routes.tiles import tiles_bp
 
     flask_app.register_blueprint(tiles_bp)
 
-    # 7. Auto-discovered blueprints
+    # 8. Auto-discovered blueprints
     _register_blueprints(flask_app)
 
-    # 8. Ensure tables exist
+    # 9. Ensure tables exist
     if flask_app.testing or os.environ.get("ALEMBIC_RUNNING") != "1":
         with flask_app.app_context():
             _ensure_db_tables(flask_app)
 
-    # 9. CLI commands
+    # 10. CLI commands
     try:
         from PlaidBridgeOpenBankingApi.app.cli import init_app as init_cli
 
@@ -255,11 +257,13 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception as exc:
         _logger.error("Failed to register CLI commands: %s", exc)
 
-    from PlaidBridgeOpenBankingApi.app.cli_commands.sweep_endpoints import sweep_endpoints
+    from PlaidBridgeOpenBankingApi.app.cli_commands.sweep_endpoints import (
+        sweep_endpoints,
+    )
 
     flask_app.cli.add_command(sweep_endpoints)
 
-    # 10. Root health-check route
+    # 11. Health check
     @flask_app.route("/health")
     def root_health_check():
         return {"status": "ok"}, 200
@@ -267,3 +271,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     return flask_app
 
 
+# =============================================================================
+# Legacy shim compatibility
+# =============================================================================
+from .flask_app import get_app
