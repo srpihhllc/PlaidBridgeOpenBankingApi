@@ -1,0 +1,110 @@
+openapi: 3.0.3
+info:
+  title: Financial Powerhouse API
+  version: "1.0.0"
+  description: >
+    REST API specification for the Financial Powerhouse Platform.
+    Includes compliance, fraud detection, account linking, PDF ingestion,
+    smart contract simulation, and financial scoring.
+
+servers:
+  - url: http://localhost:5000
+    description: Local Development
+
+paths:
+
+  /review_agreement:
+    post:
+      summary: AI compliance scan
+      responses:
+        "200":
+          description: Scan results
+
+  /compliance_report:
+    get:
+      summary: Generate compliance report
+      responses:
+        "200":
+          description: Report generated
+
+  /validate_transaction:
+    post:
+      summary: Fraud detection
+      responses:
+        "200":
+          description: Validation result
+
+  /link_borrower_account:
+    post:
+      summary: Link borrower account via Plaid
+      responses:
+        "200":
+          description: Account linked
+
+  /unlink_borrower_account:
+    post:
+      summary: Prevent unlinking if obligations remain
+      responses:
+        "200":
+          description: Unlinking status
+
+  /generate_link_token:
+    get:
+      summary: Generate Plaid Link token
+      responses:
+        "200":
+          description: Token generated
+
+  /upload_statement:
+    post:
+      summary: Upload PDF → extract transactions
+      responses:
+        "200":
+          description: Parsed transactions
+
+  /execute_contract/{id}:
+    post:
+      summary: Simulate smart contract execution
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Execution result
+
+  /financial_health/{id}:
+    get:
+      summary: Get financial health score
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Score returned
+
+  /convert_currency:
+    post:
+      summary: Convert currency
+      responses:
+        "200":
+          description: Conversion result
+
+  /biometric_auth:
+    post:
+      summary: Placeholder biometric endpoint
+      responses:
+        "200":
+          description: Placeholder response
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: API is healthy
