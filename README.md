@@ -1,4 +1,5 @@
-# 📚 Financial Powerhouse Platform — Documentation Index
+# Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Unified Fintech Monorepo)
 
 Welcome to the official documentation suite for the Financial Powerhouse Platform.  
 This directory contains all architecture, onboarding, operational, and API documentation for the entire monorepo.

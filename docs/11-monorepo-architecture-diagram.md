@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 🧱 Monorepo Architecture Diagram
 
 This diagram represents the unified architecture of the Financial Powerhouse Platform.
@@ -20,3 +26,8 @@ Code
 - Drizzle schema ensures consistent relational modeling.  
 - Alembic manages backend migrations.  
 - All layers share a unified documentation and CI/CD pipeline.
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

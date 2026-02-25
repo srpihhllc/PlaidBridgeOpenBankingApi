@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 🏗 Backend Architecture — Financial Powerhouse Platform
 
 The backend is the core enforcement engine of the Financial Powerhouse Platform.  
@@ -104,3 +110,8 @@ Code
 - Operator Handbook — `07-operator-handbook.md`  
 - API Reference — `09-api-reference.md`  
 - OpenAPI Spec — `10-openapi.yaml`  
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

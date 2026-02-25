@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 🧭 Operator Handbook — Financial Powerhouse Platform
 
 This handbook defines daily, weekly, and monthly operational responsibilities for platform operators.
@@ -58,3 +64,8 @@ This handbook defines daily, weekly, and monthly operational responsibilities fo
 - Secrets updated  
 - Logs clean  
 - Telemetry stable
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

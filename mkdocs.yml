@@ -26,6 +26,7 @@ plugins:
       default_handler: python
 
 nav:
+  - Naming Conventions: 02-naming-conventions.md
   - Home: index.md
   - System Architecture: docs/01-system-architecture.md
   - Platform Overview: docs/02-platform-overview.md

@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 📘 Financial Powerhouse Platform — Documentation Home
 ### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
 
@@ -73,3 +79,8 @@ Explore the sections on the left to dive deeper into the platform.
 **Platform Identity:** Financial Powerhouse Platform
 
 
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

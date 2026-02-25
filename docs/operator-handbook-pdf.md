@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # Operator Handbook (PDF Edition)
 
 ## 1. Purpose
@@ -67,3 +73,8 @@ This handbook defines the operational responsibilities for the Financial Powerho
 - Engineering on‑call rotation
 - Compliance contact
 - Security contact
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

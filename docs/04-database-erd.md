@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 📊 Database ERD — Financial Powerhouse Platform
 
 This document describes the relational structure of the platform’s PostgreSQL database.  
@@ -74,3 +80,8 @@ Code
 - All foreign keys enforce referential integrity.  
 - Migrations are managed via Alembic.  
 - Admin seed is validated by smoke tests.
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform
