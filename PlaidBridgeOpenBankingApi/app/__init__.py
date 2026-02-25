@@ -6,12 +6,17 @@
 Hardened Flask application factory for PlaidBridgeOpenBankingApi.
 Provides a stable, production-grade create_app() entrypoint and exposes
 get_app() for legacy shim compatibility.
-"""
 
+This module avoids module-level imports placed after executable code by
+using a lazy loader for the legacy get_app shim. That prevents E402
+("module level import not at top of file") while also avoiding circular
+import issues at import time.
+"""
 import logging
 import os
 import time
 from pathlib import Path
+from typing import Any, Callable
 
 from flask import Flask, jsonify, request
 from sqlalchemy import inspect
@@ -29,21 +34,35 @@ from .extensions import (
 from .models.revoked_token import RevokedToken
 from .models.user import User
 
-__all__ = ["create_app", "get_app", "socketio"]
-
 _logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Logging
+# Legacy shim compatibility (lazy import)
+# =============================================================================
+# To satisfy linters (E402) we must not place imports after executable code.
+# However, importing the legacy get_app at module import time can cause
+# circular import problems. Provide a lightweight lazy loader that performs
+# the actual import only when get_app is called.
+def _load_legacy_get_app() -> Callable[..., Flask]:
+    from .flask_app import get_app as _get_app  # local import avoids circular import
+    return _get_app
+
+
+def legacy_get_app(*args: Any, **kwargs: Any) -> Flask:
+    """
+    Lazy wrapper for the legacy get_app() function. Import happens on first call.
+    """
+    return _load_legacy_get_app()(*args, **kwargs)
+
+
+# =============================================================================
+# Hardened Flask application factory.
 # =============================================================================
 def _setup_logging(app: Flask) -> None:
     app.logger.setLevel(logging.INFO)
 
 
-# =============================================================================
-# Helpers
-# =============================================================================
 def _safe_status_code(code) -> int:
     try:
         return int(code)
@@ -145,9 +164,6 @@ def _ensure_db_tables(flask_app: Flask) -> None:
         _logger.debug("DB inspection fallback skipped: %s", exc)
 
 
-# =============================================================================
-# Application factory
-# =============================================================================
 def create_app(env_name: str = None, config_class=None) -> Flask:
     package_root = Path(__file__).resolve().parent
     flask_app = Flask(
@@ -211,7 +227,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # 5. Initialize extensions
     init_extensions(flask_app)
 
-    # Register models
+    # Register models (ensure model classes are imported)
     import PlaidBridgeOpenBankingApi.app.models  # noqa: F401
 
     # 6. JWT + error handlers + login manager
@@ -258,13 +274,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     return flask_app
 
-# =============================================================================
-# Legacy shim compatibility
-# =============================================================================
-from .flask_app import get_app as legacy_get_app
 
 # Public API surface
 get_app = legacy_get_app
-
 __all__ = ["create_app", "get_app", "socketio"]
-
