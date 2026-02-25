@@ -3,11 +3,20 @@
 # DESCRIPTION: Core Flask Extensions & Service Bindings (hardened)
 # =============================================================================
 
+"""
+Core Flask Extensions & Service Bindings (hardened).
+
+This module provides module-level extension instances and a safe
+init_extensions(app) entrypoint that initializes extensions in a
+defensive way (avoids double-registration, provides testing-friendly
+no-op limiter, and falls back to in-memory behavior when Redis is
+unavailable).
+"""
 from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from flask_jwt_extended import JWTManager
@@ -26,7 +35,7 @@ from app.utils.redis_utils import get_redis_client
 logger = logging.getLogger(__name__)
 
 # --- SQLAlchemy naming convention ---
-naming_convention = {
+naming_convention: Dict[str, str] = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
@@ -47,7 +56,7 @@ login_manager = LoginManager()
 csrf = CSRFProtect()
 
 # Backward-compatible module-level symbol for consumers that import it
-redis_client: object | None = None
+redis_client: Optional[object] = None
 
 
 # --- Safe No-op Limiter Stub ---
@@ -82,7 +91,7 @@ def _already_registered(app: Any, key: str) -> bool:
     return isinstance(exts, dict) and (key in exts)
 
 
-def _build_engine_options_from_env() -> dict:
+def _build_engine_options_from_env() -> Dict[str, Any]:
     try:
         return {
             "pool_pre_ping": True,
@@ -102,7 +111,9 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
         return _NoopLimiter()
 
     if not app.config.get("RATE_LIMIT_ENABLED", True):
-        app.logger.info("⏱️ Limiter disabled by configuration (RATE_LIMIT_ENABLED=False).")
+        app.logger.info(
+            "⏱️ Limiter disabled by configuration (RATE_LIMIT_ENABLED=False)."
+        )
         return _NoopLimiter()
 
     limiter_storage_uri = os.getenv("REDIS_STORAGE_URI") if redis_enabled else None
@@ -110,8 +121,8 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
     raw_config_limit = app.config.get("LIMITER_DEFAULTS")
     initial_limits: list[str] = []
 
-    # ⭐ FIXED: UP038 — use list | tuple instead of (list, tuple)
-    if isinstance(raw_config_limit, list | tuple):
+    # Accept either list or tuple from configuration
+    if isinstance(raw_config_limit, (list, tuple)):
         initial_limits = list(raw_config_limit)
     elif isinstance(raw_config_limit, str) and raw_config_limit.strip():
         initial_limits = [limit_text.strip() for limit_text in raw_config_limit.split(",")]
@@ -135,15 +146,23 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
             strategy=app.config.get("RATELIMIT_STRATEGY", "fixed-window"),
         )
         backend_type = "Redis" if redis_enabled else "in-memory"
-        app.logger.info(f"⏱️ Limiter created ({backend_type} backend, not yet initialized)")
+        app.logger.info(
+            "⏱️ Limiter created (%s backend, not yet initialized)", backend_type
+        )
         return limiter_instance
-    except Exception as e:
-        app.logger.error(f"❌ Limiter creation failed: {e} — falling back to no-op")
+    except Exception as exc:
+        app.logger.error("❌ Limiter creation failed: %s — falling back to no-op", exc)
         return _NoopLimiter()
 
 
 # --- Extension initialization ---
 def init_extensions(app: Any) -> None:
+    """
+    Initialize Flask extensions safely. This function is idempotent and
+    defensive: it checks app.extensions to avoid double registration and
+    provides sensible fallbacks when optional services (Redis) are not
+    available.
+    """
     global limiter, redis_client
 
     if not isinstance(getattr(app, "extensions", {}), dict):
@@ -179,8 +198,8 @@ def init_extensions(app: Any) -> None:
                 except Exception:
                     return None
 
-        except Exception as e:
-            app.logger.warning(f"⚠️ JWT handlers failed: {e}")
+        except Exception as exc:
+            app.logger.warning("⚠️ JWT handlers failed: %s", exc)
 
     if not _already_registered(app, "mail"):
         mail.init_app(app)
@@ -209,30 +228,38 @@ def init_extensions(app: Any) -> None:
             parsed = urlparse(redis_uri) if redis_uri else None
             safe_netloc = (parsed.hostname if parsed else None) or "unknown-host"
             scheme = (parsed.scheme if parsed else None) or "redis"
-            logger.info(f"🛰️ Connected to Redis host: {safe_netloc} (scheme: {scheme})")
+            logger.info(
+                "🛰️ Connected to Redis host: %s (scheme: %s)", safe_netloc, scheme
+            )
         else:
             app.logger.warning(
-                "⚠️ Redis unavailable — rate limiting and caching features will use in-memory backend."
+                "⚠️ Redis unavailable — rate limiting and caching features will "
+                "use in-memory backend."
             )
-    except Exception as e:
+    except Exception as exc:
         app.redis_client = None
         globals()["redis_client"] = None
         redis_enabled = False
-        app.logger.error(f"❌ Redis init failed: {e} — rate limiter will use in-memory backend")
+        app.logger.error(
+            "❌ Redis init failed: %s — rate limiter will use in-memory backend",
+            exc,
+        )
 
     try:
         limiter_instance = _init_limiter(app, redis_enabled)
         limiter_type = type(limiter_instance).__name__
-        app.logger.info(f"⏱️ Limiter instance type: {limiter_type}")
+        app.logger.info("⏱️ Limiter instance type: %s", limiter_type)
 
         if isinstance(limiter_instance, Limiter):
             limiter_instance.init_app(app)
-            app.logger.info("⏱️ Limiter registered with Flask (real Limiter instance)")
+            app.logger.info(
+                "⏱️ Limiter registered with Flask (real Limiter instance)"
+            )
         else:
             app.logger.info("⏱️ Limiter NOT registered with Flask (using _NoopLimiter)")
 
         limiter = limiter_instance
-    except Exception as e:
-        app.logger.error(f"❌ Unexpected error initializing limiter: {e}")
+    except Exception as exc:
+        app.logger.error("❌ Unexpected error initializing limiter: %s", exc)
         limiter = _NoopLimiter()
 
