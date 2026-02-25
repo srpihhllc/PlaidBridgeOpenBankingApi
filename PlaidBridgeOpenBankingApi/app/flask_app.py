@@ -31,11 +31,14 @@ except Exception:
 
 # PDF generator import
 try:
-    from PlaidBridgeOpenBankingApi.app.services.pdf_generator import generate_pdf_from_csv
+    from PlaidBridgeOpenBankingApi.app.services.pdf_generator import (
+        generate_pdf_from_csv,
+    )
 except Exception:
     def generate_pdf_from_csv(*args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError(
-            "generate_pdf_from_csv is not implemented in PlaidBridgeOpenBankingApi.app.services.pdf_generator"
+            "generate_pdf_from_csv is not implemented in "
+            "PlaidBridgeOpenBankingApi.app.services.pdf_generator"
         )
 
 
@@ -48,7 +51,9 @@ _module_app: Any | None = None
 
 if os.getenv("EXPORT_LEGACY_APP", "0") == "1":
     if create_package_app is None:
-        raise RuntimeError("create_app not importable; cannot construct legacy module app.")
+        raise RuntimeError(
+            "create_app not importable; cannot construct legacy module app."
+        )
     _module_app = create_package_app()
     _module_app.config.setdefault(
         "ENABLE_SERVICE_WORKER", _env_flag_true("ENABLE_SERVICE_WORKER", default="1")
