@@ -262,4 +262,3 @@ def init_extensions(app: Any) -> None:
     except Exception as exc:
         app.logger.error("❌ Unexpected error initializing limiter: %s", exc)
         limiter = _NoopLimiter()
-
