@@ -270,8 +270,16 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     return flask_app
 
-
 # =============================================================================
 # Legacy shim compatibility
 # =============================================================================
-from .flask_app import get_app
+from .flask_app import get_app as legacy_get_app
+
+# Export both the real factory and the shim accessor
+create_app = create_app  # real factory stays exported
+get_app = legacy_get_app
+
+__all__ = ["create_app", "get_app", "socketio"]
+
+
+
