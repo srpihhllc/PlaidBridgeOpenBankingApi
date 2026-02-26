@@ -1,342 +1,550 @@
----
+AGENTS.md — PlaidBridgeOpenBankingApi
+Architecture, Domain Model, Operator Rules, and AI Agent Guidance for the Full Monorepo
+1. Purpose
+This document provides architectural context and operator rules for AI agents and contributors working inside the PlaidBridgeOpenBankingApi monorepo. It describes how the backend, mobile app, documentation suite, CI/CD, and fintech domain logic fit together. Copilot should use this file as context, not instructions.
 
-# **AGENTS.md**  
-### *Architecture & Operator Guide for the PlaidBridgeOpenBankingApi Monorepo*
-
----
-
-# **1. Overview**
-
-This monorepo contains the full **Financial Powerhouse Platform**, including:
-
-- A hardened **Flask fintech API**  
-- A full **React Native / Expo mobile banking app**  
-- A complete **documentation suite** (MkDocs + GitHub Pages)  
-- CI/CD workflows  
-- Database migrations  
-- Operator tools  
-- Fraud detection, compliance scanning, and open banking integrations  
-
-Copilot should use this file as **context**, not instructions.  
-This document explains how the system works so Copilot can reason correctly across the entire repo.
-
----
-
-# **2. Monorepo Structure**
-
-```
+2. Monorepo Structure
+Code
 PlaidBridgeOpenBankingApi/
 │
-├── PlaidBridgeOpenBankingApi/      # Flask backend (Python)
+├── PlaidBridgeOpenBankingApi/                # Flask backend
 │   ├── app/
-│   ├── migrations/
-│   ├── .github/instructions/       # Modular Copilot rules
-│   ├── AGENTS.md                   # This file
-│   ├── run.py / wsgi.py
+│   │   ├── admin/                            # admin cockpit UI
+│   │   ├── agents/                           # agent orchestration
+│   │   ├── analytics/                        # analytics engines
+│   │   ├── api/                              # API modules (disputes, fintech, validation)
+│   │   ├── blueprints/                       # blueprint modules (admin, api_v1, auth, plaid, etc.)
+│   │   ├── cli/ / cli_commands/              # CLI tooling
+│   │   ├── cockpit/                          # cockpit dashboards
+│   │   ├── constants/                        # global constants
+│   │   ├── decorators/                       # decorators (auth, rate limit, etc.)
+│   │   ├── docs/                             # backend docs
+│   │   ├── dto/                              # request/response DTOs
+│   │   ├── filters/                          # Jinja filters
+│   │   ├── forms/                            # WTForms
+│   │   ├── letters/                          # letter generation
+│   │   ├── logging/                          # logging utilities
+│   │   ├── middleware/                       # middleware layers
+│   │   ├── models/                           # SQLAlchemy models (50+ domain models)
+│   │   ├── probes/                           # health probes
+│   │   ├── processors/                       # PDF, CSV, transaction processors
+│   │   ├── registry/                         # registry patterns
+│   │   ├── routes/                           # API endpoints (admin, api, cockpit, pulse, disputes, lenders, etc.)
+│   │   ├── scripts/                          # operational scripts
+│   │   ├── security/                         # API key auth, isolation, MFA
+│   │   ├── services/                         # business logic (fraud, compliance, lending, scoring, statements)
+│   │   ├── signals/                          # Flask signals
+│   │   ├── telemetry/                        # telemetry + tracing
+│   │   ├── templates/                        # Jinja templates
+│   │   ├── tests/                            # pytest suite
+│   │   ├── utils/                            # helpers
+│   │   └── views/                            # view-layer routes
+│   ├── migrations/                           # Alembic migrations
+│   ├── .github/instructions/                 # modular Copilot rules
+│   ├── AGENTS.md                             # this file
+│   ├── run.py                                # local entrypoint
+│   ├── wsgi.py                               # production entrypoint
 │   ├── requirements.txt
 │   ├── alembic.ini
 │   └── ...
 │
-├── mobile-app/                     # React Native / Expo mobile app
-│   ├── app/
+├── mobile-app/                               # React Native / Expo app
+│   ├── app/                                  # Expo Router screens
+│   ├── assets/images/
 │   ├── components/
-│   ├── constants/
-│   ├── lib/
-│   ├── drizzle/
-│   ├── server/
+│   ├── constants/                            # API config, theme, env
+│   ├── drizzle/                              # SQLite schema + migrations
+│   ├── hooks/
+│   ├── lib/                                  # API client, auth, utilities
+│   ├── scripts/
+│   ├── server/                               # TRPC dev server
 │   ├── shared/
+│   ├── tests/
+│   ├── BIOMETRIC_AUTHENTICATION.md
+│   ├── app.config.ts
+│   ├── design.md
+│   ├── drizzle.config.ts
+│   ├── package.json
+│   ├── tsconfig.json
 │   └── ...
 │
-├── docs/                           # MkDocs documentation suite
+├── docs/                                     # MkDocs documentation suite
 │   ├── 01-system-architecture.md
 │   ├── 03-backend-architecture.md
-│   ├── 12-mobile-architecture.md
+│   ├── 04-database-erd.md
+│   ├── 05-developer-onboarding.md
+│   ├── 06-ci-cd-pipeline.md
+│   ├── 07-operator-handbook.md
 │   ├── 09-api-reference.md
 │   ├── 10-openapi.yaml
-│   └── ...
+│   ├── 11-monorepo-architecture-diagram.md
+│   ├── 12-mobile-architecture.md
+│   └── index.md
 │
-├── .github/workflows/              # CI/CD
+├── .github/workflows/                        # CI/CD
 ├── Makefile
 ├── README.md
 └── ...
-```
+Copilot must treat this as a single unified platform, not separate projects.
 
-Copilot must understand that this is a **unified platform**, not separate projects.
+3. Backend Architecture
+The backend is a large-scale fintech API with:
 
----
+Application factory (create_app())
 
-# **3. Backend Architecture (Flask)**
+Centralized extension initialization
 
-The backend uses a hardened Flask architecture with:
+SQLAlchemy ORM with 50+ domain models
 
-- Application factory pattern  
-- Centralized extension initialization  
-- SQLAlchemy ORM  
-- Flask-Migrate (Alembic)  
-- JWT authentication  
-- Redis-backed rate limiting  
-- Structured logging  
-- Operator‑visible telemetry  
-- Fraud detection + compliance scanning  
-- Plaid integration  
+Alembic migrations
 
-### **Key backend files**
+JWT authentication
 
-```
-PlaidBridgeOpenBankingApi/app/
-    __init__.py          # create_app()
-    extensions.py        # all Flask extensions
-    models/              # SQLAlchemy models
-    routes/              # API endpoints
-    services/            # business logic
-    utils/               # helpers
-```
+Redis-backed rate limiting
 
-### **create_app() responsibilities**
+Telemetry + tracing
 
-- Load config  
-- Initialize extensions  
-- Register blueprints  
-- Register CLI commands  
-- Configure logging  
-- Apply security headers  
+Fraud detection
 
-### **init_extensions(app)** initializes:
+Compliance scanning
 
-- SQLAlchemy  
-- Migrate  
-- JWT  
-- Redis client  
-- Rate limiter  
-- Mail  
-- SocketIO  
-- LoginManager  
-- CSRF  
+PDF statement parsing
 
-Copilot should **never bypass** `init_extensions(app)`.
+Financial health scoring
 
----
+Lending cognition engine
 
-# **4. Rate Limiting Logic**
+Dispute resolution engine
 
-The limiter is initialized via `_init_limiter(app, redis_enabled)`.
+Plaid integration
+
+Treasury Prime integration (sandbox)
+
+Cockpit dashboards
+
+Admin UI
+
+Subscriber UI
+
+API key auth
+
+MFA (TOTP)
+
+Email + SMS services
+
+create_app() responsibilities
+Load config
+
+Initialize extensions
+
+Register blueprints (from app/blueprints/)
+
+Register CLI commands
+
+Configure logging
+
+Apply security headers
+
+Initialize telemetry
+
+Initialize rate limiter
+
+Initialize Redis
+
+init_extensions(app) initializes:
+SQLAlchemy
+
+Migrate
+
+JWT
+
+Redis client
+
+Rate limiter
+
+Mail
+
+SocketIO
+
+LoginManager
+
+CSRF
+
+Telemetry
+
+Copilot should never bypass init_extensions(app).
+
+4. Rate Limiting Logic
+The limiter is initialized via _init_limiter(app, redis_enabled).
 
 Rules:
 
-- If `TESTING=True` → `_NoopLimiter`
-- If `RATE_LIMIT_ENABLED=False` → `_NoopLimiter`
-- If Redis available → real limiter
-- If Redis fails → fallback to `_NoopLimiter`
+If TESTING=True → _NoopLimiter
 
-Copilot must preserve this defensive behavior.
+If RATE_LIMIT_ENABLED=False → _NoopLimiter
 
----
+If Redis available → real limiter
 
-# **5. Models**
+If Redis fails → fallback to _NoopLimiter
 
-Models follow:
+This fallback behavior must always be preserved.
 
-- SQLAlchemy declarative base  
-- Naming conventions from `extensions.py`  
-- Python 3.10+ typing  
-- No circular imports  
-- UUID or integer primary keys depending on domain  
+5. Models
+Models live in:
 
-Examples:
+Code
+app/models/
+Includes:
 
-```
-app/models/user.py
-app/models/underwriter.py
-app/models/revoked_token.py
-```
+Users, lenders, borrowers
 
----
+Loan agreements
 
-# **6. Routes & Blueprints**
+Ledger + credit ledger
 
-Routes live under:
+Bank accounts, institutions, statements
 
-```
+Transactions + vault transactions
+
+Fraud reports
+
+Disputes
+
+Complaints
+
+MFA codes
+
+Registry + schema events
+
+Timeline + timeline events
+
+Tradelines
+
+Subscriber profiles
+
+Audit logs
+
+Access tokens
+
+Plaid items
+
+Conventions:
+
+SQLAlchemy declarative base
+
+Naming conventions from extensions.py
+
+Python 3.10+ typing
+
+No circular imports
+
+UUID or integer PKs depending on domain
+
+6. Routes & Blueprints
+Routes live in:
+
+Code
 app/routes/
-```
+Blueprints live in:
+
+Code
+app/blueprints/
+Blueprints include:
+
+admin_routes.py
+
+api_routes.py
+
+api_v1_routes.py
+
+auth_routes.py
+
+plaid_routes.py
+
+subscriber_routes.py
+
+grants_routes.py
+
+liquidity_routes.py
+
+letter_routes.py
+
+debug_routes.py
+
+pulse_routes.py
+
+cfpb_routes.py
+
+todo_routes.py
 
 Rules:
 
-- Use Blueprints  
-- Keep handlers thin  
-- Business logic goes in `services/`  
-- Validate input  
-- Return JSON responses  
+Use Blueprints
 
----
+Keep handlers thin
 
-# **7. Services Layer**
+Business logic belongs in services/
 
-Business logic lives in:
+Validate input
 
-```
+Return JSON responses
+
+7. Services Layer
+Services live in:
+
+Code
 app/services/
-```
+Includes:
+
+Fraud detection
+
+Fraud analytics
+
+Compliance AI
+
+Lending cognition
+
+Statement service
+
+PDF parsing
+
+PDF generation
+
+Category analytics
+
+Transaction analysis
+
+Tradeline service
+
+Lender verification
+
+Card manager
+
+MFA service
+
+PII manager
+
+Payment auditor
+
+Symphony AI
+
+Registry service
+
+Balance service
 
 Guidelines:
 
-- No DB logic in routes  
-- Keep services testable  
-- Use dependency injection where possible  
+No DB logic in routes
 
----
+Keep services testable
 
-# **8. Plaid Integration**
+Use dependency injection where possible
 
+8. Plaid Integration
 Flow:
 
-1. Mobile app launches Plaid Link  
-2. Receives `public_token`  
-3. Sends to Flask: `/plaid/exchange`  
-4. Flask exchanges for:
-   - `access_token`
-   - `item_id`
-5. Flask stores tokens  
-6. Mobile app fetches accounts + transactions via Flask  
+Mobile app launches Plaid Link
 
-Mobile app **never** talks directly to Plaid.
+Receives public_token
 
----
+Sends to Flask: /plaid/exchange
 
-# **9. Fraud Detection & Compliance Engine**
+Flask exchanges for:
 
-Backend includes:
+access_token
 
-- AI-driven compliance scanning  
-- Fraud detection  
-- Account locking  
-- Transaction monitoring  
-- PDF statement parsing  
-- Financial health scoring  
+item_id
+
+Flask stores tokens
+
+Mobile app fetches accounts + transactions via Flask
+
+Mobile app never talks directly to Plaid.
+
+9. Fraud, Compliance, Lending, and Statements
+The backend includes:
+
+AI-driven compliance scanning
+
+Fraud detection + analytics
+
+Lending cognition engine
+
+Dispute resolution
+
+Complaint logging
+
+PDF statement parsing
+
+Bank transaction extraction
+
+Financial health scoring
+
+Smart contract simulation
+
+Currency conversion
+
+Biometric authentication placeholder
 
 Copilot must preserve:
 
-- operator visibility  
-- narratable decisions  
-- auditability  
+operator visibility
 
----
+narratable decisions
 
-# **10. Mobile App Architecture (React Native + Expo)**
+auditability
 
+10. Mobile App Architecture
 The mobile app lives in:
 
-```
+Code
 mobile-app/
-```
+Uses:
 
-It uses:
+Expo Router
 
-- Expo Router  
-- TypeScript  
-- SecureStore for JWT  
-- Fetch/Axios for API calls  
-- Drizzle + SQLite for local storage  
-- TRPC (optional local dev server)  
+TypeScript
 
-### **Mobile → Backend Communication**
+SecureStore for JWT
 
-Mobile app calls Flask via REST.
+Fetch/Axios for API calls
 
+Drizzle + SQLite
+
+TRPC dev server
+
+Mobile → Backend Communication
 API base URL lives in:
 
-```
+Code
 mobile-app/constants/config.ts
-```
-
 Must use LAN IP, not localhost.
 
-### **Authentication Flow**
+Authentication Flow
+Login → /auth/login
 
-1. Login → `/auth/login`  
-2. Receive JWT  
-3. Store in SecureStore  
-4. Attach to all requests  
-5. Backend validates + checks blocklist  
+Receive JWT
 
----
+Store in SecureStore
 
-# **11. Documentation Suite**
+Attach to all requests
 
+Backend validates + checks blocklist
+
+Mobile endpoints used
+/auth/login
+
+/auth/register
+
+/plaid/exchange
+
+/plaid/accounts
+
+/plaid/transactions
+
+/upload_statement
+
+/validate_transaction
+
+/financial_health
+
+/review_agreement
+
+/generate_link_token (legacy)
+
+11. Documentation Suite
 Docs live in:
 
-```
+Code
 docs/
-```
-
 Includes:
 
-- System architecture  
-- Backend architecture  
-- Mobile architecture  
-- ERD  
-- API reference  
-- OpenAPI spec  
-- CI/CD  
-- Operator handbook  
-- Release notes  
+System architecture
 
-MkDocs deploys to GitHub Pages via:
+Backend architecture
 
-```
+Mobile architecture
+
+ERD
+
+API reference
+
+OpenAPI spec
+
+CI/CD
+
+Operator handbook
+
+Release notes
+
+MkDocs deploys via:
+
+Code
 .github/workflows/docs.yml
-```
-
----
-
-# **12. CI/CD**
-
+12. CI/CD
 CI/CD includes:
 
-- Linting  
-- Testing  
-- Build  
-- Docs deployment  
-- Security checks  
-- Operator workflows  
+Linting (ruff, black)
 
----
+Testing (pytest)
 
-# **13. Developer Workflow**
+Coverage enforcement
 
-- Use `/plan` for multi-file changes  
-- Use `/delegate` for tangential tasks  
-- Always run:
-  - `ruff check .`
-  - `black .`
-  - `pytest -q`
-- Follow conventional commits  
-- Maintain cockpit-grade clarity in PRs  
+Redis up/down matrix
 
----
+Migration checks
 
-# **14. Adding New Features**
+Docs deployment
 
-1. Add Blueprint under `app/routes/`  
-2. Add service logic under `app/services/`  
-3. Add tests under `tests/`  
-4. Update models if needed  
-5. Generate migrations  
-6. Update docs  
-7. Update mobile app if endpoint affects UI  
+Security scanning
 
----
+Operator workflows
 
-# **15. Debugging Guidelines**
+13. Developer Workflow
+Use /plan for multi-file changes
 
-- Use structured logging  
-- Validate environment variables  
-- Check Redis connectivity  
-- Use `pytest -q` to isolate failures  
-- Use `/plan` for complex debugging  
+Use /delegate for tangential tasks
 
----
+Always run:
 
-# **End of AGENTS.md**
+ruff check .
 
----
+black .
+
+pytest -q
+
+Follow conventional commits
+
+Maintain cockpit-grade clarity in PRs
+
+14. Local Setup
+Backend
+Code
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+export FLASK_APP=PlaidBridgeOpenBankingApi.app:create_app
+flask run
+Mobile
+Code
+cd mobile-app
+npm install
+expo start
+15. Remediation & Monitoring
+Test Redis fallback
+
+Verify blueprint deduping
+
+Remove runtime artifacts
+
+Keep .gitignore updated
+
+Validate environment variables
+
+Review logs for sensitive data
+
+Run smoke tests
+
+Rotate secrets
+
+End of AGENTS.md
