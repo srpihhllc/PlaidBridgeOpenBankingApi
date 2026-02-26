@@ -121,8 +121,8 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
     raw_config_limit = app.config.get("LIMITER_DEFAULTS")
     initial_limits: list[str] = []
 
-    # Accept either list or tuple from configuration
-    if isinstance(raw_config_limit, (list, tuple)):
+    # Accept either list or tuple from configuration (use PEP 604 union type)
+    if isinstance(raw_config_limit, list | tuple):
         initial_limits = list(raw_config_limit)
     elif isinstance(raw_config_limit, str) and raw_config_limit.strip():
         initial_limits = [limit_text.strip() for limit_text in raw_config_limit.split(",")]
