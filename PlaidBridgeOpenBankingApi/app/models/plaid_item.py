@@ -20,7 +20,7 @@ class PlaidItem(db.Model):
     )
 
     plaid_item_id = db.Column(db.String(128), nullable=False)
-    access_token = db.Column(db.String(256), nullable=False)
+    access_token = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship("User", back_populates="plaid_items")
