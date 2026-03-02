@@ -15,3 +15,19 @@ def dump_routes():
     for line in sorted(output):
         print(line)
     print("=== End of Route Dump ===\n")
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call route_audit.run().
+    Runs dump_routes() inside the current_app context (script orchestrator
+    already creates an app or uses create_app where required).
+    """
+    try:
+        dump_routes()
+    except RuntimeError:
+        # If called outside an app context, create a real app and run inside it
+        from app import create_app
+
+        app = create_app()
+        with app.app_context():
+            dump_routes()
