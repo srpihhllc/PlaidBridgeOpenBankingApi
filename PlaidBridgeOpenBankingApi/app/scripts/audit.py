@@ -1,21 +1,18 @@
 # =============================================================================
 # FILE: app/scripts/audit.py
 # DESCRIPTION: Orchestrates all cockpit audits (nav, route, template, relationship, TTL, CLI).
-#              Runs them sequentially, prints summary, integrates blueprint/template manifest audit,
+#              Runs them sequentially, prints summary, integrates blueprint/template manifest,
 #              and emits Redis pulses for operator visibility.
 # =============================================================================
 
 import json
 import os
-
+from importlib import import_module
 from flask import Flask
 
 from app.blueprints import register_blueprints
-from app.cli_commands import cli_audit, ttl_audit
-from app.utils import nav_audit, relationship_audit, route_audit, template_audit
 from app.utils.redis_utils import get_redis_client
-
-# New import to create a real app and provide an app_context for audits that rely on current_app
+# keep create_app import for producing the app used by audits
 from app import create_app
 
 
@@ -80,24 +77,32 @@ def run_blueprint_template_audit(redis_client=None):
 
 def run_all_audits():
     """
-    Run all cockpit-grade audits sequentially.
-    Prints progress markers and emits Redis pulses for operator dashboards.
+    Run all cockpit-grade audits sequentially within a single Flask app context.
+    Imports audit modules lazily inside the context so modules that expect
+    current_app can safely access it.
     """
     # Create a real app (so modules using current_app work) and run audits inside its context.
     app = create_app()
     with app.app_context():
         print("🔍 Running cockpit audits...")
 
-        # NAV audit: nav_audit exposes audit_templates(app), not run()
-        print("\n=== NAV TEMPLATE AUDIT ===")
+        # NAV audit: import and run inside the context (nav_audit.audit_templates takes the app)
         try:
+            nav_audit = import_module("app.utils.nav_audit")
+            print("\n=== NAV TEMPLATE AUDIT ===")
             nav_report = nav_audit.audit_templates(app)
             print(json.dumps(nav_report, indent=2))
         except Exception as e:
             print(f"[ERROR] nav_audit.audit_templates failed: {e}")
 
-        # Run other audits (these modules are expected to expose a run() function)
-        def _safe_run(mod, name):
+        # Helper that imports modules lazily and runs their run() if present
+        def _safe_run(module_path: str, name: str):
+            try:
+                mod = import_module(module_path)
+            except Exception as e:
+                print(f"[ERROR] failed to import {module_path}: {e}")
+                return
+
             if hasattr(mod, "run"):
                 try:
                     print(f"\n▶ Running {name}.run() ...")
@@ -107,17 +112,17 @@ def run_all_audits():
             else:
                 print(f"[SKIP] {name} has no run() — skipping.")
 
-        _safe_run(route_audit, "route_audit")
-        _safe_run(template_audit, "template_audit")
-        _safe_run(relationship_audit, "relationship_audit")
-        _safe_run(ttl_audit, "ttl_audit")
-        _safe_run(cli_audit, "cli_audit")
+        # Run other audits (module paths)
+        _safe_run("app.utils.route_audit", "route_audit")
+        _safe_run("app.utils.template_audit", "template_audit")
+        _safe_run("app.utils.relationship_audit", "relationship_audit")
+        _safe_run("app.cli_commands.ttl_audit", "ttl_audit")
+        _safe_run("app.cli_commands.cli_audit", "cli_audit")
 
         # Redis client for emissions (outside the per-module runs we already did)
         redis_client = get_redis_client()
 
         # Run integrated blueprint/template manifest audit
-        # (this uses a lightweight Flask instance internally as before)
         run_blueprint_template_audit(redis_client)
 
         print("✅ All audits complete")
