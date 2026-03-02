@@ -90,3 +90,46 @@ def ttl_audit(domain: str):
             client=redis_client,
             meta={"domain": domain, "error": str(e)},
         )
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call ttl_audit.run().
+    The module defines a Click command object named `ttl_audit` (decorated
+    with @click.command). This wrapper finds the command's callback and
+    invokes it inside a Flask app context. Default domain is 'boot'.
+    """
+    # Lazy import to avoid overhead at import time
+    try:
+        from app import create_app
+    except Exception:
+        create_app = None  # type: ignore
+
+    # The name `ttl_audit` in this module is a Click Command object.
+    cmd = globals().get("ttl_audit")
+    callback = getattr(cmd, "callback", None)
+
+    def _call(domain="boot"):
+        if callable(callback):
+            try:
+                callback(domain)  # runs with the current app context (if present)
+            except TypeError:
+                # if signature mismatch, try no-arg invocation
+                try:
+                    callback()
+                except Exception as e:
+                    print(f"[ERROR] ttl_audit callback raised: {e}")
+        else:
+            print("[SKIP] ttl_audit callback not found — skipping.")
+
+    # Try to call inside an existing app context first
+    try:
+        _call("boot")
+        return
+    except RuntimeError:
+        # No current_app; create one and run inside its context
+        if not create_app:
+            print("[SKIP] create_app unavailable; cannot run ttl_audit.")
+            return
+        app = create_app()
+        with app.app_context():
+            _call("boot")
