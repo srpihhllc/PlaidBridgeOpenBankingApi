@@ -15,6 +15,9 @@ from app.cli_commands import cli_audit, ttl_audit
 from app.utils import nav_audit, relationship_audit, route_audit, template_audit
 from app.utils.redis_utils import get_redis_client
 
+# New import to create a real app and provide an app_context for audits that rely on current_app
+from app import create_app
+
 
 def collect_routes(app: Flask):
     """Collect all registered routes and their endpoint/template references."""
@@ -80,31 +83,52 @@ def run_all_audits():
     Run all cockpit-grade audits sequentially.
     Prints progress markers and emits Redis pulses for operator dashboards.
     """
-    print("🔍 Running cockpit audits...")
+    # Create a real app (so modules using current_app work) and run audits inside its context.
+    app = create_app()
+    with app.app_context():
+        print("🔍 Running cockpit audits...")
 
-    # Execute each audit module
-    nav_audit.run()
-    route_audit.run()
-    template_audit.run()
-    relationship_audit.run()
-    ttl_audit.run()
-    cli_audit.run()
-
-    # Redis client for emissions
-    redis_client = get_redis_client()
-
-    # Run integrated blueprint/template manifest audit
-    run_blueprint_template_audit(redis_client)
-
-    print("✅ All audits complete")
-
-    # Emit summary pulse into Redis for cockpit visualization
-    if redis_client:
+        # NAV audit: nav_audit exposes audit_templates(app), not run()
+        print("\n=== NAV TEMPLATE AUDIT ===")
         try:
-            redis_client.setex("audit:all_audits_summary", 300, "complete")
-            print("📡 Audit summary emitted to Redis (key=audit:all_audits_summary)")
+            nav_report = nav_audit.audit_templates(app)
+            print(json.dumps(nav_report, indent=2))
         except Exception as e:
-            print(f"⚠️ Failed to emit audit summary to Redis: {e}")
+            print(f"[ERROR] nav_audit.audit_templates failed: {e}")
+
+        # Run other audits (these modules are expected to expose a run() function)
+        def _safe_run(mod, name):
+            if hasattr(mod, "run"):
+                try:
+                    print(f"\n▶ Running {name}.run() ...")
+                    mod.run()
+                except Exception as e:
+                    print(f"[ERROR] {name}.run() raised: {e}")
+            else:
+                print(f"[SKIP] {name} has no run() — skipping.")
+
+        _safe_run(route_audit, "route_audit")
+        _safe_run(template_audit, "template_audit")
+        _safe_run(relationship_audit, "relationship_audit")
+        _safe_run(ttl_audit, "ttl_audit")
+        _safe_run(cli_audit, "cli_audit")
+
+        # Redis client for emissions (outside the per-module runs we already did)
+        redis_client = get_redis_client()
+
+        # Run integrated blueprint/template manifest audit
+        # (this uses a lightweight Flask instance internally as before)
+        run_blueprint_template_audit(redis_client)
+
+        print("✅ All audits complete")
+
+        # Emit summary pulse into Redis for cockpit visualization
+        if redis_client:
+            try:
+                redis_client.setex("audit:all_audits_summary", 300, "complete")
+                print("📡 Audit summary emitted to Redis (key=audit:all_audits_summary)")
+            except Exception as e:
+                print(f"⚠️ Failed to emit audit summary to Redis: {e}")
 
 
 if __name__ == "__main__":
