@@ -84,3 +84,17 @@ def audit_templates(app) -> dict[str, Any]:
         "referenced_endpoints": sorted(all_eps),
         "missing_endpoints": missing,
     }
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call nav_audit.run().
+    Creates a temporary app using the project's factory and runs the
+    template/navigation audit inside an application context, printing JSON.
+    """
+    from app import create_app
+    import json
+
+    app = create_app()
+    with app.app_context():
+        report = audit_templates(app)
+        print(json.dumps(report, indent=2))
