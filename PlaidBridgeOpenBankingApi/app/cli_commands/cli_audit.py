@@ -81,3 +81,6 @@ def cli_audit():
         meta={"violations": 0},
     )
     click.echo("✅ CLI Audit Passed — all commands are @click.command and no Groups found.")
+
+def run():
+    ...
