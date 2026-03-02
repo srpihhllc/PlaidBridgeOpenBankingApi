@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any
 from urllib.parse import urlparse
 
 from flask_jwt_extended import JWTManager
@@ -35,7 +35,7 @@ from app.utils.redis_utils import get_redis_client
 logger = logging.getLogger(__name__)
 
 # --- SQLAlchemy naming convention ---
-naming_convention: Dict[str, str] = {
+naming_convention: dict[str, str] = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
@@ -56,7 +56,7 @@ login_manager = LoginManager()
 csrf = CSRFProtect()
 
 # Backward-compatible module-level symbol for consumers that import it
-redis_client: Optional[object] = None
+redis_client: object | None = None
 
 
 # --- Safe No-op Limiter Stub ---
@@ -91,7 +91,7 @@ def _already_registered(app: Any, key: str) -> bool:
     return isinstance(exts, dict) and (key in exts)
 
 
-def _build_engine_options_from_env() -> Dict[str, Any]:
+def _build_engine_options_from_env() -> dict[str, Any]:
     try:
         return {
             "pool_pre_ping": True,

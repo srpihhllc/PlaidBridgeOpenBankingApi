@@ -15,8 +15,9 @@ import issues at import time.
 import logging
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from flask import Flask, jsonify, request
 from sqlalchemy import inspect

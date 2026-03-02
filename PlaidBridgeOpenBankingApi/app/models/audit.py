@@ -7,7 +7,9 @@
 #   from app.models.audit import AuditLog, FinancialAuditLog
 # work regardless of the underlying filenames.
 
-from app.models.audit_log import AuditLog  # noqa: F401
-from app.models.audit_log import FinancialAuditLog  # noqa: F401
+from app.models.audit_log import (
+    AuditLog,  # noqa: F401
+    FinancialAuditLog,  # noqa: F401
+)
 
 __all__ = ["AuditLog", "FinancialAuditLog"]

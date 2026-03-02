@@ -7,9 +7,8 @@
 import logging
 from datetime import datetime
 
-from app.utils.redis import redis_scan_json, redis_set_json
-
 from app.cockpit.telemetry.emitters.ttl import ttl_summary
+from app.utils.redis import redis_scan_json, redis_set_json
 
 TTL_DASHBOARD_KEY = "cockpit:ttl_dashboard"
 TTL_DASHBOARD_TTL_SECONDS = 60  # prevent stale tiles
