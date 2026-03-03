@@ -215,3 +215,113 @@ def audit_template_wiring(redis_client: redis.Redis) -> dict[str, int]:
         _logger.warning("⚠️ Could not update Redis aggregation: %s", agg_err)
 
     return summary
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call template_audit.run().
+    Attempts to obtain a real Redis client via app.utils.redis_utils.get_redis_client().
+    If none is available, supplies a no-op client with the methods this audit expects.
+    The wrapper will run inside an existing app context if present; otherwise it
+    creates a temporary app and runs the audit inside that context.
+    """
+    # Lazy imports to avoid overhead when module is imported but run() not used.
+    try:
+        from app.utils.redis_utils import get_redis_client  # type: ignore
+    except Exception:
+        get_redis_client = None  # type: ignore
+
+    def _make_noop_client():
+        class _Noop:
+            def hincrby(self, *a, **k):  # used for aggregation
+                return None
+
+            def setex(self, *a, **k):  # used by other telemetry helpers
+                return None
+
+            def set(self, *a, **k):
+                return None
+
+        return _Noop()
+
+    def _call(client):
+        try:
+            audit_template_wiring(client)
+        except Exception as e:
+            # Surface errors rather than crash the orchestrator
+            print(f"[ERROR] template_audit.audit_template_wiring raised: {e}")
+
+    # Try to run within current app context first
+    try:
+        redis_client = get_redis_client() if get_redis_client else None
+        if redis_client is None:
+            redis_client = _make_noop_client()
+        _call(redis_client)
+        return
+    except RuntimeError:
+        # No current_app; create one and run inside its context
+        from app import create_app
+
+        app = create_app()
+        with app.app_context():
+            redis_client = get_redis_client() if get_redis_client else None
+            if redis_client is None:
+                redis_client = _make_noop_client()
+            _call(redis_client)
+def run():
+    """
+    Run audit_template_wiring inside a Flask application context and with a
+    Redis client. Prefer an existing current_app; otherwise create one via
+    create_app(). If no Redis client is available, use a noop client.
+    """
+    # Lazy import helper (may not exist in some environments)
+    try:
+        from app.utils.redis_utils import get_redis_client  # type: ignore
+    except Exception:
+        get_redis_client = None  # type: ignore
+
+    def _make_noop_client():
+        class _Noop:
+            def hincrby(self, *a, **k):
+                return None
+            def setex(self, *a, **k):
+                return None
+            def set(self, *a, **k):
+                return None
+            def keys(self, *a, **k):
+                return []
+            def ttl(self, *a, **k):
+                return -2
+            def get(self, *a, **k):
+                return None
+        return _Noop()
+
+    def _call_with_client(client):
+        try:
+            audit_template_wiring(client)
+        except Exception as e:
+            # Surface error but don't raise (keeps orchestrator alive)
+            print(f"[ERROR] template_audit.audit_template_wiring raised: {e}")
+
+    # Try to use the existing app context first
+    try:
+        from flask import current_app as _current_app
+        _ = _current_app._get_current_object()  # raises if no context
+        redis_client = get_redis_client() if get_redis_client else None
+        if redis_client is None:
+            redis_client = _make_noop_client()
+        _call_with_client(redis_client)
+        return
+    except RuntimeError:
+        # No current_app: create a temporary app and run inside its context
+        try:
+            from app import create_app
+        except Exception:
+            print("[SKIP] create_app unavailable; cannot run template_audit.")
+            return
+
+        app = create_app()
+        with app.app_context():
+            redis_client = get_redis_client() if get_redis_client else None
+            if redis_client is None:
+                redis_client = _make_noop_client()
+            _call_with_client(redis_client)

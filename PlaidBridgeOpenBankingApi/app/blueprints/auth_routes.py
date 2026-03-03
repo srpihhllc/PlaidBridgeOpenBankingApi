@@ -471,7 +471,7 @@ def login_view():
             details={"email_attempted": email},
         )
         flash("Invalid email or password.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     # GET request → show login page
     return render_template("auth/login.html")
@@ -600,13 +600,13 @@ def mfa_prompt():
     if not user:
         flash("MFA session expired or missing. Please log in again.", "warning")
         session.pop("mfa_user_id", None)
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     if not (user.mfa_enabled or user.mfa_pending_setup):
         session.pop("mfa_user_id", None)
         log_identity_event(user.id, "MFA_PROMPT_INVALID_STATE", ip=ip, user_agent=user_agent)
         flash("MFA is not enabled or configured for this account.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     # Load Redis MFA code if present
     try:
@@ -647,7 +647,7 @@ def mfa_prompt():
         if is_rate_limited(rate_key, "mfa_prompt", limit=MFA_ATTEMPT_LIMIT, period=300):
             log_identity_event(user.id, "MFA_PROMPT_RATE_LIMIT", ip=ip, user_agent=user_agent)
             flash("Too many MFA attempts. Please wait before retrying.", "danger")
-            return redirect(url_for("auth.login"))
+            return render_template("auth/login.html")
 
         submitted_code = (form.code.data or "").strip()
 
@@ -869,7 +869,7 @@ def reset_request():
 
         flash("If an account exists, a password reset link has been sent.", "info")
         apply_rate_limit(ip, "password_reset_request", is_failure=True)
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     return render_template("auth/reset_request.html", form=form)
 
@@ -884,12 +884,12 @@ def reset_password():
 
     if not all([email, token, salt]):
         flash("Password reset link is invalid or expired.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     user = User.query.filter_by(email=email).first()
     if not user:
         flash("Password reset link is invalid or expired.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     redis = get_redis_client()
     hashed_email_key = hash_pii_for_key(email)
@@ -898,7 +898,7 @@ def reset_password():
     if not redis:
         log_identity_event(user.id, "PASSWORD_RESET_REDIS_FAILURE", ip=ip, user_agent=user_agent)
         flash("Internal error during reset verification.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     stored_token = None
     try:
@@ -915,7 +915,7 @@ def reset_password():
             details={"error": str(e)},
         )
         flash("Internal error during reset verification.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     if not stored_token or stored_token != token:
         try:
@@ -931,7 +931,7 @@ def reset_password():
             user_agent=user_agent,
         )
         flash("Password reset link is invalid or expired.", "danger")
-        return redirect(url_for("auth.login"))
+        return render_template("auth/login.html")
 
     form = PasswordResetForm()
     if form.validate_on_submit():
@@ -958,7 +958,7 @@ def reset_password():
                 )
             log_identity_event(user.id, "PASSWORD_RESET_SUCCESS", ip=ip, user_agent=user_agent)
             flash("Your password has been successfully reset. Please log in.", "success")
-            return redirect(url_for("auth.login"))
+            return render_template("auth/login.html")
         except Exception as exc:
             db.session.rollback()
             current_app.logger.exception("Failed to reset password for user %s", user.id)

@@ -1,92 +1,55 @@
-# =============================================================================
-# FILE: app/cli_commands/ttl_audit.py
-# DESCRIPTION: CLI command to audit Redis TTL telemetry keys by domain.
-#              Uses @with_appcontext to ensure a safe Flask context.
-# =============================================================================
-
-from collections import defaultdict
-
-import click
-from flask import current_app
-from flask.cli import with_appcontext
-
-from app.telemetry.ttl_emit import emit_schema_trace
-
-
-@click.command("ttl_audit")
-@click.option(
-    "--domain",
-    default="boot",
-    help="Telemetry domain to audit (boot, cli, migration, etc.)",
-)
-@with_appcontext
-def ttl_audit(domain: str):
+# (paste the file contents from above here)
+def run():
     """
-    Scans Redis for all ttl:{domain}:* keys and summarizes their health.
-    Emits a schema-compliant summary trace back into Redis for observability.
+    Compatibility wrapper so scripts/audit.py can call ttl_audit.run().
+
+    Implementation:
+    - Find the Click Command object `ttl_audit`, get its .callback (the
+      Click-wrapped function), unwrap to the original implementation via
+      __wrapped__, and call that original function inside a Flask
+      app_context (current_app if present, otherwise a temporary app).
+    - Use the default domain 'boot'.
     """
-    redis_client = getattr(current_app, "redis_client", None)
-    if not redis_client:
-        click.echo("❌ Redis client not configured.")
+    cmd = globals().get("ttl_audit")
+    if cmd is None:
+        print("[SKIP] ttl_audit command not found in module.")
         return
 
+    callback = getattr(cmd, "callback", None)
+    if not callable(callback):
+        print("[SKIP] ttl_audit.callback not callable; skipping.")
+        return
+
+    # Unwrap decorated function to underlying implementation
+    fn = callback
+    while hasattr(fn, "__wrapped__"):
+        fn = fn.__wrapped__
+
+    def _invoke(domain="boot"):
+        try:
+            fn(domain)
+        except TypeError:
+            # Fallback if signature differs (no-arg)
+            fn()
+
+    # Try to run inside existing Flask app context
     try:
-        pattern = f"ttl:{domain}:*"
-        keys = redis_client.keys(pattern)
-        if not keys:
-            click.echo(f"⚠️ No telemetry keys found under {pattern}")
+        # Access current_app to assert we're in an app context (raises if not)
+        from flask import current_app as _current_app  # local import to avoid top-level coupling
+        _ = _current_app._get_current_object()
+        _invoke("boot")
+        return
+    except RuntimeError:
+        # No current_app — create a temporary app and run inside its context
+        try:
+            from app import create_app
+        except Exception:
+            print("[SKIP] create_app unavailable; cannot run ttl_audit.")
             return
 
-        click.echo(f"📡 Found {len(keys)} telemetry keys under domain '{domain}':\n")
-
-        status_counts = defaultdict(int)
-
-        for key in sorted(keys):
-            ttl = redis_client.ttl(key)
-            value = redis_client.get(key)
-            status = "unknown"
-
-            if value:
-                try:
-                    decoded = value.decode("utf-8")
-                    status = decoded.split(":")[-1]
-                except Exception:
-                    status = "unreadable"
-
-            status_counts[status] += 1
-
-            click.echo(f"🔹 {key}")
-            click.echo(f"    TTL: {ttl}s | Status: {status}")
-            click.echo("")
-
-        # Summary
-        click.echo("📊 Telemetry Summary:")
-        for status, count in status_counts.items():
-            click.echo(f" - {status}: {count} keys")
-
-        # Emit schema-compliant audit summary trace
-        emit_schema_trace(
-            domain="cli",
-            event="ttl_audit",
-            detail="summary",
-            value=f"keys:{len(keys)}",
-            status="ok",
-            ttl=300,
-            client=redis_client,
-            meta={"domain": domain, "status_counts": dict(status_counts)},
-        )
-        click.echo(f"\n✨ Emitted audit summary trace for domain '{domain}'")
-
-    except Exception as e:
-        click.echo(f"❌ Failed to audit Redis TTL keys: {e}")
-        # Emit schema-compliant error trace
-        emit_schema_trace(
-            domain="cli",
-            event="ttl_audit",
-            detail="error",
-            value="failure",
-            status="error",
-            ttl=300,
-            client=redis_client,
-            meta={"domain": domain, "error": str(e)},
-        )
+        app = create_app()
+        with app.app_context():
+            try:
+                _invoke("boot")
+            except Exception as e:
+                print(f"[ERROR] ttl_audit underlying function raised: {e}")

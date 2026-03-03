@@ -30,3 +30,23 @@ def audit_back_populates():
                         f"back_populates='{target_attr}' "
                         f"but {target_cls.__name__} has no such attribute."
                     )
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call relationship_audit.run().
+    Runs audit_back_populates() inside an active Flask app context if one exists,
+    otherwise creates a temporary app to run the audit.
+    """
+    try:
+        # Try running inside current app context
+        audit_back_populates()
+    except RuntimeError:
+        # No current_app — create one and run inside its app_context
+        from app import create_app
+
+        app = create_app()
+        with app.app_context():
+            audit_back_populates()
+    except Exception as e:
+        # Surface other errors but don't crash the orchestrator
+        print(f"[ERROR] relationship_audit.audit_back_populates raised: {e}")
