@@ -14,6 +14,7 @@ using a lazy loader for the legacy get_app shim. That prevents E402
 ("module level import not at top of file") while also avoiding circular
 import issues at import time.
 """
+
 import logging
 import os
 import time
@@ -33,8 +34,6 @@ from .extensions import (
     login_manager,
     socketio,
 )
-from .models.revoked_token import RevokedToken
-from .models.user import User
 
 _logger = logging.getLogger(__name__)
 
@@ -42,25 +41,21 @@ _logger = logging.getLogger(__name__)
 # =============================================================================
 # Legacy shim compatibility (lazy import)
 # =============================================================================
-# To satisfy linters (E402) we must not place imports after executable code.
-# However, importing the legacy get_app at module import time can cause
-# circular import problems. Provide a lightweight lazy loader that performs
-# the actual import only when get_app is called.
+
 def _load_legacy_get_app() -> Callable[..., Flask]:
     from .flask_app import get_app as _get_app  # local import avoids circular import
     return _get_app
 
 
 def legacy_get_app(*args: Any, **kwargs: Any) -> Flask:
-    """
-    Lazy wrapper for the legacy get_app() function. Import happens on first call.
-    """
+    """Lazy wrapper for the legacy get_app() function."""
     return _load_legacy_get_app()(*args, **kwargs)
 
 
 # =============================================================================
-# Hardened Flask application factory.
+# Internal helpers
 # =============================================================================
+
 def _setup_logging(app: Flask) -> None:
     app.logger.setLevel(logging.INFO)
 
@@ -75,7 +70,6 @@ def _safe_status_code(code) -> int:
 def _register_blueprints(flask_app: Flask) -> None:
     try:
         from .blueprints import register_blueprints, validate_blueprints_graph
-
         register_blueprints(flask_app)
         validate_blueprints_graph(flask_app)
     except Exception as exc:
@@ -133,6 +127,7 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
         if user_id is None:
             return None
         try:
+            from .models.user import User  # lazy import
             return db.session.get(User, int(user_id))
         except ValueError:
             return db.session.get(User, user_id)
@@ -147,7 +142,10 @@ def _register_jwt_loaders(flask_app: Flask) -> None:
     @jwt.token_in_blocklist_loader
     def check_if_token_is_revoked(jwt_header, jwt_payload):
         jti = jwt_payload.get("jti")
-        return db.session.get(RevokedToken, jti) is not None if jti else False
+        if not jti:
+            return False
+        from .models.revoked_token import RevokedToken  # lazy import
+        return db.session.get(RevokedToken, jti) is not None
 
     @jwt.user_identity_loader
     def user_identity_lookup(identity):
@@ -165,6 +163,10 @@ def _ensure_db_tables(flask_app: Flask) -> None:
     except Exception as exc:
         _logger.debug("DB inspection fallback skipped: %s", exc)
 
+
+# =============================================================================
+# Hardened Flask application factory
+# =============================================================================
 
 def create_app(env_name: str = None, config_class=None) -> Flask:
     package_root = Path(__file__).resolve().parent
@@ -184,7 +186,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # 2. Testing overrides
     if flask_app.config.get("TESTING"):
         from .config import TestingConfig
-
         flask_app.config.from_object(TestingConfig)
         flask_app.config["SECRET_KEY"] = "test-secret"
         flask_app.config["TEMPLATES_AUTO_RELOAD"] = True
@@ -229,47 +230,44 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # 5. Initialize extensions
     init_extensions(flask_app)
 
-    # Register models (ensure model classes are imported)
-    import PlaidBridgeOpenBankingApi.app.models  # noqa: F401
+    # 6. Lazy model imports (prevents circular imports + double registration)
+    with flask_app.app_context():
+        from .models import revoked_token, user  # noqa: F401
 
-    # 6. JWT + error handlers + login manager
+    # 7. JWT + error handlers + login manager
     _register_jwt_loaders(flask_app)
     _setup_logging(flask_app)
     _register_error_handlers(flask_app)
     _register_login_manager_loader(flask_app)
 
-    # 7. Admin blueprints
+    # 8. Admin blueprints
     from .blueprints.admin_routes import admin_api_bp, admin_bp
-
     flask_app.register_blueprint(admin_bp)
     flask_app.register_blueprint(admin_api_bp)
 
-    # 7.5 Tiles blueprint
+    # 8.5 Tiles blueprint
     from .routes.tiles import tiles_bp
-
     flask_app.register_blueprint(tiles_bp)
 
-    # 8. Auto-discovered blueprints
+    # 9. Auto-discovered blueprints
     _register_blueprints(flask_app)
 
-    # 9. Ensure tables exist
+    # 10. Ensure tables exist
     if flask_app.testing or os.environ.get("ALEMBIC_RUNNING") != "1":
         with flask_app.app_context():
             _ensure_db_tables(flask_app)
 
-    # 10. CLI commands
+    # 11. CLI commands
     try:
         from .cli import init_app as init_cli
-
         init_cli(flask_app)
     except Exception as exc:
         _logger.error("Failed to register CLI commands: %s", exc)
 
     from .cli_commands.sweep_endpoints import sweep_endpoints
-
     flask_app.cli.add_command(sweep_endpoints)
 
-    # 11. Health check
+    # 12. Health check
     @flask_app.route("/health")
     def root_health_check():
         return {"status": "ok"}, 200
