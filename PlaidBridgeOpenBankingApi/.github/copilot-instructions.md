@@ -1,59 +1,104 @@
-# Copilot instructions for PlaidBridgeOpenBankingApi
+# Copilot Instructions — Financial Powerhouse Platform
 
-## Repo layout
-- `PlaidBridgeOpenBankingApi/` — Flask backend (Python 3.12)
-- `mobile-app/` — React Native / Expo app with tRPC server
+## Build, Test & Lint
 
-## Build / Test
-- Setup: `python -m pip install -r requirements.txt`
-- Run tests: `python -m pytest -q`
-- Lint: `ruff check .`
-- Fix formatting: `black .` then `ruff check --fix .`
+All commands use `make` with a `venv/` virtualenv (pip-tools managed):
 
-## Commands to run before committing
-- `ruff check .`
-- `black .`
-- `python -m pytest -q`
+```bash
+make dev          # Run Flask dev server (FLASK_ENV=development)
+make test         # pytest with coverage (≥85% required)
+make lint         # flake8 app/
+make typecheck    # mypy app/
+make format       # black + isort app/
+make check        # lint + typecheck + test
+make ci           # Full CI suite with XML coverage report
+make migrate      # alembic upgrade head
+make rollback     # alembic downgrade -1
+make update       # Recompile requirements.lock + requirements-dev.lock
+```
 
-## Code Style / Conventions
-- Target Python >= 3.10. Use PEP 604 union types when appropriate.
-- Use type hints for public functions.
-- Prefer small, well-tested functions (single responsibility).
-- Use structured logging via the standard logging module.
-- Keep line length <= 100 characters.
+**Run a single test file:**
+```bash
+venv/bin/pytest app/tests/test_auth_routes.py
+```
 
-## Backend conventions (Flask)
-- Use the app factory (`create_app`) and keep extensions as singletons in `app/extensions.py`.
-- Prefer blueprint auto-discovery with explicit ordering for critical blueprints.
-- Models in `app/models`, services in `app/services`, tests in `app/tests`.
-- MySQL in production, SQLite in tests.
-- Alembic migrations must follow SQLAlchemy naming conventions (MetaData naming).
-- Use `python -m alembic -c alembic.ini ...` when `alembic` is not on PATH.
+**Run tests by marker:**
+```bash
+venv/bin/pytest -m "auth"           # auth tests only
+venv/bin/pytest -m "not redis"      # skip tests requiring live Redis
+venv/bin/pytest -m "smoketest"      # quick lifecycle validation
+```
 
-## Auth & security
-- Dual auth: Flask-Login (session/web) and Flask-JWT-Extended (API).
-- JWT revocation uses blocklist pattern (`RevokedToken` model).
-- Rate limiting uses Redis when available, with in-memory fallback.
+Available markers: `auth`, `redis`, `plaid`, `providers`, `infra`, `migrations`, `smoketest`, `nightly`, `ci`.
 
-## Mobile app conventions
-- React Native + Expo Router; server uses tRPC with `publicProcedure`, `protectedProcedure`, `adminProcedure`.
-- Serialization with `superjson`.
-- Drizzle ORM for the server.
-- Use pnpm scripts for running, testing, and migrations.
+**Mobile app** (in `mobile-app/`):
+```bash
+pnpm dev          # Expo + tRPC server concurrently
+pnpm test         # vitest
+pnpm check        # tsc --noEmit
+pnpm lint         # expo lint
+pnpm db:push      # drizzle-kit generate + migrate
+```
 
-## Commit messages
-- Use Conventional Commits (e.g., `fix:`, `feat:`, `chore:`).
-- Prefix breaking changes with `BREAKING CHANGE:` in the body.
+Code style: **black + isort**, line-length **100**. Pre-commit hooks run black, flake8, isort, mypy, and a quick pytest on every commit.
 
-## Workflow / Branches
-- Create feature branches from `main`.
-- Run `ruff check . && python -m pytest -q` before opening PR.
-- Include a short description and testing notes in PRs.
+---
 
-## Security & Secrets
-- Never commit secrets or API keys.
-- If Copilot suggests secrets, remove and rotate them.
-- Use `.env` for local-only variables and add to `.gitignore`.
+## Architecture
 
-## When to use Plan mode
-- For multi-file refactors, use `/plan` and approve the plan before code generation.
+This is a **unified fintech monorepo** with two independently deployable layers:
+
+### Backend — Flask (`app/`)
+
+Application factory pattern: `from app import create_app`. The top-level `flask_app.py` is a thin shim for legacy imports; don't use it for new code.
+
+**Extension initialization** (`app/extensions.py`) — all Flask extensions (SQLAlchemy, JWT, LoginManager, SocketIO, Mail, CSRFProtect, Limiter) are module-level instances initialized once via `init_extensions(app)`. Import extensions from here, never re-instantiate them.
+
+**Blueprint auto-discovery** (`app/blueprints/__init__.py`) — blueprints are auto-discovered via `pkgutil` with explicit ordering for critical routes (`pulse_bp`, `main_bp`, `api_bp`, `api_v1_bp`, `auth_bp`, `admin_bp`). Add new blueprints as files in `app/blueprints/`.
+
+**Layer structure:**
+- `app/models/` — SQLAlchemy models (all inherit from `db.Model`)
+- `app/services/` — business logic (Plaid integration, PDF, fraud, MFA, etc.)
+- `app/blueprints/` — Flask routes/blueprints
+- `app/routes/` — additional route modules (cockpit, admin, API sub-packages)
+- `app/decorators/` — `roles_required`, `admin_required`, `super_admin_required` (re-exported from `access.py`)
+- `app/middleware/` — request ID injection, response wrapping
+- `app/security/` — API key auth, request isolation
+- `app/tests/` — all pytest tests (conftest.py provides `app`, `client`, `db_session` fixtures)
+
+**Auth model** — dual-path: JWT (priority for API calls) with Flask-Login session fallback. `roles_required()` decorator handles both transparently. JWT `sub` claim is always an integer user ID. Token revocation uses `RevokedToken` model checked via `jwt.token_in_blocklist_loader`.
+
+**Rate limiting** — `_NoopLimiter` is used automatically in `TESTING=True` or when `RATE_LIMIT_ENABLED=False`. Redis is used as backend when available; falls back to in-memory gracefully.
+
+**Database** — SQLAlchemy with deterministic FK naming convention (defined in `extensions.py`). Migrations via Alembic (`migrations/`). Pool settings configurable via env vars (`SQLALCHEMY_POOL_SIZE`, `SQLALCHEMY_POOL_RECYCLE`, etc.).
+
+### Mobile App — React Native / Expo (`mobile-app/`)
+
+- **Expo Router** (file-based routing), React 19, React Native
+- **tRPC** for type-safe API communication with the Express bridge server (`mobile-app/server/`)
+- **Drizzle ORM** with MySQL2 for local/server DB
+- **Biometric auth** via `expo-local-authentication`
+- Package manager: **pnpm**
+
+---
+
+## Key Conventions
+
+**SQLAlchemy naming convention** — all constraints use the deterministic convention from `extensions.py` (`ix_`, `uq_`, `fk_`, `pk_`, `ck_` prefixes). Alembic migrations must respect this or they will drift.
+
+**Testing config** — tests use `create_app(env_name="testing")`. The `TestingConfig` sets `RATE_LIMIT_ENABLED=False` and `WTF_CSRF_ENABLED=False`. Do not override these in individual tests; let the config handle it.
+
+**Lockfile discipline** — never edit `requirements.lock` or `requirements-dev.lock` by hand. Run `make update` after changing `requirements.txt` or `requirements-dev.txt`. Pre-commit will block commits if lockfile drift is detected.
+
+**Environment variables** — copy `.env.example` and populate. Required: `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_NAME`. Optional Redis: `REDIS_URL`, `REDIS_STORAGE_URI`.
+
+**Commit message format:**
+```text
+feat: short description
+fix: short description
+docs: short description
+```
+
+**Coverage gate** — pytest is configured with `--cov-fail-under=85`. PRs must maintain ≥85% coverage on `app/`.
+
+**Blueprint naming** — blueprint variables follow `<name>_bp` convention (e.g. `auth_bp`, `api_v1_bp`). The auto-discovery system picks up any `Blueprint` instance at module level in `app/blueprints/`.
