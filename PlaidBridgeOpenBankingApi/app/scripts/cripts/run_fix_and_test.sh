@@ -1,37 +1,67 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python3
+"""
+Safe edit: replace the redirect after the "Invalid email or password." flash
+with returning the rendered login template.
 
-# Run from repo root. Use Git Bash / PowerShell / CMD (bash required for this script).
-PY_SCRIPT="scripts/replace_invalid_login.py"
+Creates a timestamped backup:
+  PlaidBridgeOpenBankingApi/app/blueprints/auth_routes.py.fixbak.<ts>
+"""
+import re
+import shutil
+from pathlib import Path
+from datetime import datetime
 
-if [ ! -f "$PY_SCRIPT" ]; then
-  echo "Missing $PY_SCRIPT — create it first (see scripts/replace_invalid_login.py)"
-  exit 1
-fi
+FILE = Path("PlaidBridgeOpenBankingApi/app/blueprints/auth_routes.py")
+if not FILE.exists():
+    raise SystemExit(f"File not found: {FILE}")
 
-echo "1) Applying safe edit..."
-python "$PY_SCRIPT"
+# Backup
+ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+bak = FILE.with_name(FILE.name + f".fixbak.{ts}")
+shutil.copy2(FILE, bak)
+print("Backup written to:", bak)
 
-echo
-echo "2) Running the single failing test..."
-export PYTHONPATH="$PWD/PlaidBridgeOpenBankingApi"
-export PYTHONIOENCODING=utf-8
+text = FILE.read_text(encoding="utf-8", errors="replace")
 
-# Run test — if it fails this script exits with non-zero
-pytest -q app/tests/test_auth_routes.py::test_login_invalid_credentials -q
+# Find start of login_view definition
+m_def = re.search(r'(^\s*def\s+login_view\s*\(\s*\)\s*:\s*)', text, flags=re.M)
+if not m_def:
+    raise SystemExit("Could not locate login_view() definition")
 
-echo
-echo "3) Test passed — preparing commit."
+start_idx = m_def.start()
 
-# If an index.lock is present, stop and instruct user to remove it manually to avoid clobbering
-if [ -f .git/index.lock ]; then
-  echo "ERROR: .git/index.lock exists. Make sure no other git is running and remove it:"
-  echo "  rm -f .git/index.lock"
-  exit 2
-fi
+# Heuristic: find the next top-level @auth_bp.route or next "def " at column 0 after the start to mark end
+rest = text[start_idx:]
+m_next = re.search(r'\n\s*@auth_bp\.route\(|\n^def\s+', rest, flags=re.M)
+if m_next:
+    end_idx = start_idx + m_next.start()
+else:
+    end_idx = len(text)
 
-git add PlaidBridgeOpenBankingApi/app/blueprints/auth_routes.py
-git commit -m "fix(auth): re-render login form on invalid credentials (return 200 instead of redirect)" || true
-git push origin chore/add-nav-audit-run || true
+func_block = text[start_idx:end_idx]
 
-echo "Done. If the commit was pushed, the branch has the fix."
+# Replace only the redirect immediately after the specific flash inside this function
+new_block, nsubs = re.subn(
+    r'(flash\(\s*["\']Invalid email or password\.\s*["\']\s*,\s*["\']danger["\']\s*\)\s*)'
+    r'return\s+redirect\s*\(\s*url_for\s*\(\s*["\']auth\.login["\']\s*\)\s*\)\s*;?',
+    r'\1return render_template("auth/login.html")',
+    func_block,
+    count=1,
+    flags=re.S,
+)
+
+if nsubs:
+    new_text = text[:start_idx] + new_block + text[end_idx:]
+    FILE.write_text(new_text, encoding="utf-8")
+    print(f"Replaced {nsubs} redirect(s) inside login_view().")
+else:
+    print("No matching redirect found inside login_view() (maybe already replaced).")
+
+# Print a small context window for manual verification
+lines = FILE.read_text(encoding="utf-8").splitlines()
+start_line = max(1, text[:start_idx].count("\n") + 1)
+end_line = start_line + new_block.count("\n")
+print("\n---- context (login_view) ----")
+for i in range(start_line - 1, min(end_line + 2, len(lines))):
+    print(f"{i+1:4d}: {lines[i]}")
+print("---- end context ----")
