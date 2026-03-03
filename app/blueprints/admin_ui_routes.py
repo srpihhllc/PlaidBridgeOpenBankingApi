@@ -149,7 +149,7 @@ def verify_lender(lender_id):
         f"{'approved' if lender.is_verified else 'denied'}.",
         "info",
     )
-    return redirect(url_for("admin_ui.show_lenders"))
+    return redirect(url_for("admin.show_lenders"))
 
 
 # =============================================================================
@@ -194,7 +194,7 @@ def process_payment():
         amount = float(request.form["amount"])
     except (KeyError, ValueError):
         flash("Invalid payment request.", "warning")
-        return redirect(url_for("admin_ui.admin_home"))
+        return redirect(url_for("admin.admin_home"))
 
     ledger = MockLedger(id=1, user_id=1, card_id=card_id)
     ledger.balance_used = max(0.0, ledger.balance_used - amount)
@@ -209,7 +209,7 @@ def process_payment():
         unfreeze_card(card_id)
 
     flash(f"Processed payment of ${amount:.2f} for card {card_id}.", "success")
-    return redirect(url_for("admin_ui.view_credit_ledger", user_id=ledger.user_id))
+    return redirect(url_for("admin.view_credit_ledger", user_id=ledger.user_id))
 
 
 # =============================================================================
@@ -335,7 +335,7 @@ def sweep_expired_keys():
 
     removed_count = 5 if redis_client else 0
     flash(f"🧹 Purged {removed_count} temporary keys from caches.", "info")
-    return redirect(url_for("admin_ui.redis_panel"))
+    return redirect(url_for("admin.redis_panel"))
 
 
 @login_required

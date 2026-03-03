@@ -32,7 +32,7 @@
 </ul>
 
 <h3>🧾 Download as JSON</h3>
-<form method="GET" action="{{ url_for('admin.export_traces') }}">
+<form method="GET" action="{{ url_for('admin.export_trace', trace_id='all') }}">
   <button type="submit">Export Full Trace Log</button>
 </form>
 {% endblock %}
