@@ -257,4 +257,9 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     def root_health_check():
         return {"status": "ok"}, 200
 
+
+    # Expose the Flask app instance to Jinja globals (silences template_audit warning).
+    # Harmless: only adds a reference in the template globals for audit & templates that
+    # expect `app` to exist in Jinja globals.
+    flask_app.jinja_env.globals["app"] = flask_app
     return flask_app
