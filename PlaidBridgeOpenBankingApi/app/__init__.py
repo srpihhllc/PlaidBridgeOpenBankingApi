@@ -1,3 +1,5 @@
+# PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/__init__.py
+
 # =============================================================================
 # Hardened Flask application factory.
 # =============================================================================
@@ -278,3 +280,4 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 # Public API surface
 get_app = legacy_get_app
 __all__ = ["create_app", "get_app", "socketio"]
+
