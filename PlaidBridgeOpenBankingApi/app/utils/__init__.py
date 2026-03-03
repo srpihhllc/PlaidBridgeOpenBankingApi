@@ -1,11 +1,5 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/__init__.py
 
-# 1) Backup original and write new file
-FILE=PlaidBridgeOpenBankingApi/app/utils/__init__.py
-test -f "$FILE" || { echo "$FILE not found"; exit 1; }
-cp -v "$FILE" "$FILE.bak.$(date +%s)"
-
-cat > "$FILE" <<'PY'
 # Backwards-compat package surface for `from app.utils import ...`.
 # Export small, stable helpers from the package submodules so legacy
 # imports continue to work while implementations are being reorganized.
@@ -88,6 +82,7 @@ __all__ = [
     "notify_authorities",
     "time_since",
 ] + _SYMBOLS
+
 
 
 
