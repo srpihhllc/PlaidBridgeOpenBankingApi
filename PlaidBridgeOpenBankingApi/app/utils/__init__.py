@@ -89,57 +89,6 @@ __all__ = [
     "time_since",
 ] + _SYMBOLS
 
-# ---------------------------------------------------------------------------
-# Ensure audit runner modules are available via `app.utils` package attribute
-# (so code that does `from app.utils import nav_audit` continues to work).
-# We import them dynamically and expose module objects; failures are logged so
-# the package still imports even if some audit modules are missing.
-# ---------------------------------------------------------------------------
-try:
-    # Import audit submodules as module objects and expose them on the package.
-    # We prefer absolute import strings to avoid relative import quirks during
-    # partial refactors or when modules are moved.
-    nav_audit = importlib.import_module("app.utils.nav_audit")
-    route_audit = importlib.import_module("app.utils.route_audit")
-    template_audit = importlib.import_module("app.utils.template_audit")
-    relationship_audit = importlib.import_module("app.utils.relationship_audit")
-    redis_utils = importlib.import_module("app.utils.redis_utils")
 
-    # Extend __all__ so `from app.utils import nav_audit` works.
-    __all__ += [
-        "nav_audit",
-        "route_audit",
-        "template_audit",
-        "relationship_audit",
-        "redis_utils",
-    ]
-except Exception as _exc:  # pragma: no cover - import-time defensive logging
-    logger.warning("app.utils: could not import audit submodules: %s", _exc)
-PY
-
-# 2) Verify import surface
-export PYTHONPATH="$PWD/PlaidBridgeOpenBankingApi"
-python - <<'PY'
-import importlib
-m = importlib.import_module("app.utils")
-print("app.utils __file__:", getattr(m, "__file__", None))
-print("nav_audit present:", hasattr(m, "nav_audit"))
-try:
-    na = importlib.import_module("app.utils.nav_audit")
-    print("nav_audit module file:", getattr(na, "__file__", None), "has run?:", hasattr(na, "run"))
-except Exception as e:
-    print("nav_audit direct import failed:", e)
-PY
-
-# 3) Run audits and route diagnostic + focused test
-python -m app.scripts.audit | tee audit_output_after_init_fix.txt
-python scripts/diagnose_routes.py > route_diagnostic.csv 2> route_diagnostic.json
-head -n 200 route_diagnostic.csv
-pytest -q app/tests/test_auth_routes.py::test_login_invalid_credentials -q | tee test_login_invalid_credentials.txt
-
-# 4) Commit & push with your message (only if you're happy with the changes)
-git add PlaidBridgeOpenBankingApi/app/utils/__init__.py
-git commit -m "Add dynamic import for audit submodules in utils" -m "Dynamically import audit submodules and expose them in the app.utils package. Log warnings if any submodules fail to import."
-git push origin chore/add-nav-audit-run
 
  
