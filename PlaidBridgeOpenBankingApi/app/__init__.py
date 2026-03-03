@@ -257,4 +257,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     def root_health_check():
         return {"status": "ok"}, 200
 
+    flask_app.jinja_env.globals["app"] = flask_app
+
     return flask_app

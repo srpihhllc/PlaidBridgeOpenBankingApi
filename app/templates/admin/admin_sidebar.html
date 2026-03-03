@@ -5,23 +5,23 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-3 small">🧠 System</div>
 
-  <a href="{{ url_for('admin_ui.admin_home') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.admin_home' %}active{% endif %}">
+  <a href="{{ url_for('admin.admin_home') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.admin_home' %}active{% endif %}">
     🔍 Overview
   </a>
 
-  <a href="{{ url_for('admin_ui.system_heartbeat') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.system_heartbeat' %}active{% endif %}">
+  <a href="{{ url_for('admin.system_heartbeat') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.system_heartbeat' %}active{% endif %}">
     ❤️ Heartbeat
   </a>
 
-  <a href="{{ url_for('admin_ui.redis_panel') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.redis_panel' %}active{% endif %}">
+  <a href="{{ url_for('admin.redis_panel') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.redis_panel' %}active{% endif %}">
     🧊 Redis Panel
   </a>
 
-  <a href="{{ url_for('admin_ui.cache_health') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.cache_health' %}active{% endif %}">
+  <a href="{{ url_for('admin.cache_health') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.cache_health' %}active{% endif %}">
     🩺 Cache Health
   </a>
 
@@ -31,23 +31,23 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">🧬 Schema & Telemetry</div>
 
-  <a href="{{ url_for('admin_ui.schema_events') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.schema_events' %}active{% endif %}">
+  <a href="{{ url_for('admin.schema_events') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.schema_events' %}active{% endif %}">
     📜 Events
   </a>
 
-  <a href="{{ url_for('admin_ui.schema_versions') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.schema_versions' %}active{% endif %}">
+  <a href="{{ url_for('admin.schema_versions') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.schema_versions' %}active{% endif %}">
     🧪 Versions
   </a>
 
-  <a href="{{ url_for('admin_ui.schema_viewer') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.schema_viewer' %}active{% endif %}">
+  <a href="{{ url_for('admin.schema_viewer') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.schema_viewer' %}active{% endif %}">
     🔬 Viewer
   </a>
 
-  <a href="{{ url_for('admin_ui.route_list') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.route_list' %}active{% endif %}">
+  <a href="{{ url_for('admin.route_list') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.route_list' %}active{% endif %}">
     🗺️ Routes
   </a>
 
@@ -57,23 +57,23 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">📊 Activity & Stats</div>
 
-  <a href="{{ url_for('admin_ui.fraud_scanner') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.fraud_scanner' %}active{% endif %}">
+  <a href="{{ url_for('admin.fraud_scanner') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.fraud_scanner' %}active{% endif %}">
     🚨 Fraud Charts
   </a>
 
-  <a href="{{ url_for('admin_ui.agent_activity') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.agent_activity' %}active{% endif %}">
+  <a href="{{ url_for('admin.agent_activity') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.agent_activity' %}active{% endif %}">
     🧍 Agent Activity
   </a>
 
-  <a href="{{ url_for('admin_ui.rate_limits_dashboard') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.rate_limits_dashboard' %}active{% endif %}">
+  <a href="{{ url_for('admin.rate_limits_dashboard') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.rate_limits_dashboard' %}active{% endif %}">
     ⏱️ Rate Limits
   </a>
 
-  <a href="{{ url_for('admin_ui.log_viewer') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.log_viewer' %}active{% endif %}">
+  <a href="{{ url_for('admin.log_viewer') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.log_viewer' %}active{% endif %}">
     📁 Logs
   </a>
 
@@ -83,13 +83,13 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">📄 Statements</div>
 
-  <a href="{{ url_for('admin_ui.statements_timeline') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.statements_timeline' %}active{% endif %}">
+  <a href="{{ url_for('admin.statements_timeline') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.statements_timeline' %}active{% endif %}">
     📈 Timeline
   </a>
 
-  <a href="{{ url_for('admin_ui.statements_heatmap') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.statements_heatmap' %}active{% endif %}">
+  <a href="{{ url_for('admin.statements_heatmap') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.statements_heatmap' %}active{% endif %}">
     🔥 Heatmap
   </a>
 
@@ -99,23 +99,23 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">🧠 Neural Insights</div>
 
-  <a href="{{ url_for('admin_ui.admin_cortex') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.admin_cortex' %}active{% endif %}">
+  <a href="{{ url_for('admin.admin_cortex') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.admin_cortex' %}active{% endif %}">
     🧩 Cortex Map
   </a>
 
-  <a href="{{ url_for('admin_ui.system_map') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.system_map' %}active{% endif %}">
+  <a href="{{ url_for('admin.system_map') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.system_map' %}active{% endif %}">
     🗺️ System Map
   </a>
 
-  <a href="{{ url_for('admin_ui.brain_diagnosis') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.brain_diagnosis' %}active{% endif %}">
+  <a href="{{ url_for('admin.brain_diagnosis') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.brain_diagnosis' %}active{% endif %}">
     🧠 Brain Diagnosis
   </a>
 
-  <a href="{{ url_for('admin_ui.model_summary') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.model_summary' %}active{% endif %}">
+  <a href="{{ url_for('admin.model_summary') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.model_summary' %}active{% endif %}">
     🧾 Model Summary
   </a>
 
@@ -125,18 +125,18 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">🛠️ Tools</div>
 
-  <a href="{{ url_for('admin_ui.repair_result') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.repair_result' %}active{% endif %}">
+  <a href="{{ url_for('admin.repair_result') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.repair_result' %}active{% endif %}">
     🛠️ Repair Log
   </a>
 
-  <a href="{{ url_for('admin_ui.sql_panel') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.sql_panel' %}active{% endif %}">
+  <a href="{{ url_for('admin.sql_panel') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.sql_panel' %}active{% endif %}">
     💾 SQL Panel
   </a>
 
-  <a href="{{ url_for('admin_ui.trace_viewer') }}"
-     class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.trace_viewer' %}active{% endif %}">
+  <a href="{{ url_for('admin.trace_viewer') }}"
+     class="list-group-item list-group-item-action {% if request.endpoint == 'admin.trace_viewer' %}active{% endif %}">
     📍 Trace Viewer
   </a>
 
