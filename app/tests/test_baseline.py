@@ -75,9 +75,9 @@ USER_FK_TABLES = [
         lambda: {"id": str(uuid.uuid4()), "tok": "tokentest"},
     ),
     (
-        "audit_log",
+        "audit_logs",
         "user_id",
-        "INSERT INTO audit_log (user_id, action) VALUES (:uid, 'test_action')",
+        "INSERT INTO audit_logs (user_id, event_type, payload) VALUES (:uid, 'test_action', '{}')",
         lambda: {},
     ),
     (
@@ -145,9 +145,9 @@ USER_FK_TABLES = [
         lambda: {},
     ),
     (
-        "financial_audit_log",
+        "financial_audit_logs",
         "actor_id",
-        "INSERT INTO financial_audit_log (actor_id, action) VALUES (:uid, 'test_action')",
+        "INSERT INTO financial_audit_logs (actor_id, action_type, description) VALUES (:uid, 'test_action', 'desc')",
         lambda: {},
     ),
     (
