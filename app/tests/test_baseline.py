@@ -147,7 +147,7 @@ USER_FK_TABLES = [
     (
         "financial_audit_logs",
         "actor_id",
-        "INSERT INTO financial_audit_logs (actor_id, action_type, description) VALUES (:uid, 'test_action', 'desc')",
+        "INSERT INTO financial_audit_logs (actor_id, action_type, description, created_at) VALUES (:uid, 'test_action', 'desc', CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -516,3 +516,4 @@ def test_ensure_all_user_related_tables_have_cascades(app):
                         f"Table '{table_name}' has a FK to 'users' but is missing "
                         "ON DELETE CASCADE!"
                     )
+
