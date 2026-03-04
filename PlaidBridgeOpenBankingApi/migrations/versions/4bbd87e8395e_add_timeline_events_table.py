@@ -1,7 +1,7 @@
 """Add timeline_events table
 
 Revision ID: 4bbd87e8395e
-Revises: upgrade_todo_model
+Revises: bc6b0eacef38
 Create Date: 2026-01-10 22:40:10.087790
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
 revision = "4bbd87e8395e"
-down_revision = "upgrade_todo_model"
+down_revision = "bc6b0eacef38"
 branch_labels = None
 depends_on = None
 
@@ -176,3 +176,4 @@ def downgrade():
     )
     op.drop_table("timeline_events")
     # ### end Alembic commands ###
+   

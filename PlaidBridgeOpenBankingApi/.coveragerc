@@ -1,0 +1,12 @@
+[run]
+source = app
+omit =
+    app/cli/*
+    app/scripts/*
+    app/tests/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    def __repr__

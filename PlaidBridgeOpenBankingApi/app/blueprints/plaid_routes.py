@@ -10,6 +10,7 @@ from flask_login import current_user
 from app.extensions import db
 from app.models.plaid_item import PlaidItem
 from app.models.trace_events import TraceEvent
+from app.utils.rate_limit_guard import rate_limit_if_enabled
 
 # CORRECT: Import models directly from their files
 
@@ -89,11 +90,43 @@ def _get_plaid_client_and_log_error() -> Any:
         return None
 
 
+def _reject_non_subscriber(event_type: str):
+    if (
+        getattr(current_user, "is_admin", False)
+        or getattr(current_user, "is_super_admin", False)
+        or getattr(current_user, "role", None) == "lender"
+    ):
+        db.session.add(
+            TraceEvent(
+                event_type=event_type,
+                email=current_user.email,
+                ip=request.remote_addr,
+                detail="Non-subscriber attempted Plaid operation.",
+            )
+        )
+        db.session.commit()
+        return jsonify({"error": "Forbidden."}), 403
+    return None
+
+
 @plaid_bp.route("/create_link_token", methods=["POST"])
+@rate_limit_if_enabled("10/hour")
 def create_link_token():
     """Creates a Link token for Plaid's client-side library."""
     if not current_user.is_authenticated:
+        db.session.add(
+            TraceEvent(
+                event_type="PLAID_LINK_TOKEN_UNAUTH",
+                ip=request.remote_addr,
+                detail="Unauthenticated create_link_token attempt.",
+            )
+        )
+        db.session.commit()
         return jsonify({"error": "Authentication required."}), 401
+
+    forbidden = _reject_non_subscriber("PLAID_LINK_TOKEN_FORBIDDEN")
+    if forbidden:
+        return forbidden
 
     plaid_client = _get_plaid_client_and_log_error()
     if not plaid_client:
@@ -166,12 +199,26 @@ def create_link_token():
 
 
 @plaid_bp.route("/exchange_public_token", methods=["POST"])
+@rate_limit_if_enabled("10/hour")
 def exchange_public_token():
     """Exchanges a public token for an access token."""
     if not current_user.is_authenticated:
+        db.session.add(
+            TraceEvent(
+                event_type="PLAID_EXCHANGE_UNAUTH",
+                ip=request.remote_addr,
+                detail="Unauthenticated exchange_public_token attempt.",
+            )
+        )
+        db.session.commit()
         return jsonify({"error": "Authentication required."}), 401
 
-    public_token = request.json.get("public_token")
+    forbidden = _reject_non_subscriber("PLAID_EXCHANGE_FORBIDDEN")
+    if forbidden:
+        return forbidden
+
+    payload = request.get_json(silent=True) or {}
+    public_token = payload.get("public_token")
     if not public_token:
         return jsonify({"error": "Missing public token"}), 400
 
@@ -197,7 +244,9 @@ def exchange_public_token():
         institution_response = plaid_client.Institutions.get_by_id(institution_id)
         institution_name = institution_response.get("institution", {}).get("name")
 
-        existing_item = PlaidItem.query.filter_by(user_id=current_user.id, item_id=item_id).first()
+        existing_item = PlaidItem.query.filter_by(
+            user_id=current_user.id, plaid_item_id=item_id
+        ).first()
         if existing_item:
             db.session.add(
                 TraceEvent(
@@ -220,14 +269,14 @@ def exchange_public_token():
             return jsonify({"error": "Encryption key not found."}), 500
 
         f = Fernet(encryption_key.encode())
-        encrypted_access_token = f.encrypt(access_token.encode())
+        encrypted_access_token = f.encrypt(access_token.encode()).decode()
 
         # Store the encrypted token in the database.
         # The PlaidItem.access_token field must be large enough to hold the
         # encrypted string (e.g., a Text field).
         plaid_item = PlaidItem(
             access_token=encrypted_access_token,
-            item_id=item_id,
+            plaid_item_id=item_id,
             user_id=current_user.id,
         )
         db.session.add(plaid_item)
