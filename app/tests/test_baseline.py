@@ -248,7 +248,7 @@ USER_FK_TABLES = [
     (
         "timeline_events",
         "user_id",
-        "INSERT INTO timeline_events (user_id, event_type) VALUES (:uid, 'test_event')",
+        "INSERT INTO timeline_events (user_id, label) VALUES (:uid, 'test_event')",
         lambda: {},
     ),
     (
@@ -516,4 +516,5 @@ def test_ensure_all_user_related_tables_have_cascades(app):
                         f"Table '{table_name}' has a FK to 'users' but is missing "
                         "ON DELETE CASCADE!"
                     )
+
 
