@@ -1,4 +1,4 @@
-﻿[run]
+[run]
 source = app
 omit =
     app/cli/*
