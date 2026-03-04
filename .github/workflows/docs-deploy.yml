@@ -1,0 +1,39 @@
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - docs/infrastructure-upgrade
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install mkdocs
+        run: |
+          pip install mkdocs mkdocs-material mkdocstrings
+
+      - name: Build site
+        run: mkdocs build
+
+      - name: Deploy to GitHub Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Publish
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

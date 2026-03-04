@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+{% block title %}FinBrain Neural Console{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Neural Console Aesthetic */
+    .neural-header {
+        background: #0f172a;
+        border-radius: 12px;
+        border: 2px solid #1e293b;
+        color: #f8fafc;
+        transition: border-color 0.3s ease;
+    }
+    
+    .status-tile {
+        background: #1e293b;
+        border: 1px solid #334155;
+        border-radius: 8px;
+        padding: 15px;
+        transition: all 0.2s ease-in-out;
+        opacity: 1;
+        position: relative;
+    }
+
+    /* Refinement A & D: Loading states and transitions */
+    .status-tile.initializing {
+        opacity: 0.4;
+        filter: blur(1px);
+    }
+
+    /* Volatile Key Alert Styling */
+    .status-tile.warning {
+        border-color: #fbbf24 !important;
+        background: linear-gradient(135deg, #1e293b 0%, #451a03 100%);
+    }
+
+    .volatile-count {
+        font-size: 0.7rem;
+        color: #fbbf24;
+        display: none;
+        font-weight: bold;
+    }
+    .status-tile.warning .volatile-count { display: block; }
+
+    .status-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        background-color: #64748b;
+        transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .pulse {
+        animation: status-pulse 2s infinite;
+    }
+
+    @keyframes status-pulse {
+        0% { box-shadow: 0 0 0 0px rgba(0, 255, 136, 0.4); }
+        70% { box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+        100% { box-shadow: 0 0 0 0px rgba(0, 255, 136, 0); }
+    }
+
+    .latency-val { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; color: #94a3b8; }
+    .sync-badge { font-weight: bold; font-size: 0.8rem; }
+
+    /* Refinement C: Global Critical Alert */
+    .cockpit-critical { 
+        border-color: #ef4444 !important;
+        background: linear-gradient(to bottom, #450a0a, #0f172a) !important;
+    }
+    
+    .offline-banner {
+        display: none;
+        background: #ef4444;
+        color: white;
+        text-align: center;
+        padding: 4px;
+        font-size: 0.8rem;
+        font-weight: bold;
+    }
+    .cockpit-critical .offline-banner { display: block; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="offline-banner">🚨 GLOBAL INFRASTRUCTURE DISRUPTION DETECTED</div>
+
+<div class="container mt-4">
+  <div id="main-header" class="neural-header p-4 mb-4 shadow-lg">
+    <div class="row align-items-center">
+      <div class="col-md-4">
+        <h2 class="mb-0">🧠 FinBrain Neural Console</h2>
+        <p class="text-muted small mb-0">
+            Engine: <span id="app-version">...</span> | 
+            <span id="env-tag" class="badge bg-secondary">...</span>
+        </p>
+      </div>
+      
+      <div class="col-md-8">
+        <div class="row g-2">
+          <div class="col-sm-4">
+            <div id="infra-db" class="status-tile initializing">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="small text-uppercase fw-bold">Database</span>
+                <span class="status-dot"></span>
+              </div>
+              <div class="latency-val mt-1">INITIALIZING...</div>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div id="infra-redis" class="status-tile initializing">
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="small text-uppercase fw-bold">Cache/MFA</span>
+                <span class="status-dot"></span>
+              </div>
+              <div class="latency-val mt-1">INITIALIZING...</div>
+              <div class="volatile-count mt-1">⚠️ <span id="volatile-val">0</span> ZOMBIE SESSIONS</div>
+              <button id="purge-btn" class="btn btn-sm btn-outline-warning py-0 mt-2" 
+                      style="font-size: 0.6rem; display: none;" 
+                      onclick="CockpitObserver.purgeZombies()">
+                  PURGE ZOMBIES
+              </button>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div id="integrity-tile" class="status-tile initializing">
+              <span class="small text-uppercase fw-bold d-block">Migration Sync</span>
+              <span id="migration-sync-status" class="sync-badge">--</span>
+              <div class="small text-muted" style="font-size: 0.7rem;">DB REV: <span id="db-rev">...</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <ul class="nav nav-tabs mb-3" id="neuralTab" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#diagnostics" type="button">📊 Diagnostics</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#introspection" type="button">🧬 Introspection</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#repair" type="button">🛠️ Repair</button></li>
+    
+    <li class="nav-item ms-auto text-end">
+        <div class="text-muted small">Attempt: <span id="last-attempt">--:--:--</span></div>
+        <div class="text-success small fw-bold">Success: <span id="last-success">--:--:--</span></div>
+    </li>
+  </ul>
+
+  <div class="tab-content" id="neuralTabContent">
+    <div class="tab-pane fade show active" id="diagnostics">
+      <iframe src="{{ url_for('diagnostics.route_list') }}" width="100%" height="600" class="border rounded bg-white shadow-sm"></iframe>
+    </div>
+    <div class="tab-pane fade" id="introspection">
+      <iframe src="{{ url_for('introspection.cortex_map') }}" width="100%" height="600" class="border rounded bg-white"></iframe>
+    </div>
+    <div class="tab-pane fade" id="repair">
+      <iframe src="{{ url_for('repair.system_heartbeat') }}" width="100%" height="600" class="border rounded bg-white"></iframe>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CockpitObserver = {
+    async update() {
+        const timestamp = new Date().toLocaleTimeString();
+        document.getElementById('last-attempt').innerText = timestamp;
+
+        try {
+            const response = await fetch("{{ url_for('diagnostics.get_full_diagnostics') }}");
+            if (!response.ok) throw new Error('API Sync Failed');
+            
+            const data = await response.json();
+            
+            this.render(data);
+            document.getElementById('last-success').innerText = timestamp;
+            document.getElementById('main-header').classList.remove('cockpit-critical');
+        } catch (error) {
+            console.error('[Cockpit Error]', error);
+            document.getElementById('main-header').classList.add('cockpit-critical');
+        }
+    },
+
+    async purgeZombies() {
+        if (!confirm("Are you sure you want to surgically purge zombie sessions?")) return;
+        
+        const btn = document.getElementById('purge-btn');
+        const originalText = btn.innerText;
+        btn.innerText = "PURGING...";
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch("{{ url_for('repair.clear_zombie_sessions') }}", { 
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert(`Surgical Purge Complete: ${data.purged} keys removed.`);
+                await this.update(); 
+            } else {
+                alert("Purge failed: " + data.error);
+            }
+        } catch (e) {
+            alert("Network error during purge: " + e);
+        } finally {
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+    },
+
+    render(data) {
+        document.querySelectorAll('.status-tile').forEach(t => t.classList.remove('initializing'));
+
+        this.updateInfraTile('db', data.infra.database);
+        this.updateInfraTile('redis', data.infra.redis, data.stats.cache);
+        this.updateIntegrity(data.integrity);
+        this.updateMeta(data.meta);
+
+        if (!data.infra.database.online && !data.infra.redis.online) {
+            document.getElementById('main-header').classList.add('cockpit-critical');
+        }
+    },
+
+    updateInfraTile(id, infraData, cacheStats = null) {
+        const el = document.getElementById(`infra-${id}`);
+        const dot = el.querySelector('.status-dot');
+        const lat = el.querySelector('.latency-val');
+        
+        if (infraData.online) {
+            dot.style.backgroundColor = '#00ff88';
+            dot.classList.add('pulse');
+            lat.innerText = `${infraData.latency_ms} ms`;
+            lat.style.color = infraData.latency_ms > 150 ? '#fbbf24' : '#94a3b8';
+
+            // Volatile Key Detection Logic
+            if (id === 'redis' && cacheStats && cacheStats.volatile_alerts > 0) {
+                el.classList.add('warning');
+                document.getElementById('volatile-val').innerText = cacheStats.volatile_alerts;
+                document.getElementById('purge-btn').style.display = 'block';
+            } else if (id === 'redis') {
+                el.classList.remove('warning');
+                document.getElementById('purge-btn').style.display = 'none';
+            }
+
+        } else {
+            dot.style.backgroundColor = '#ef4444';
+            dot.classList.remove('pulse');
+            lat.innerText = 'OFFLINE';
+            lat.style.color = '#ef4444';
+            if (id === 'redis') {
+                el.classList.remove('warning');
+                document.getElementById('purge-btn').style.display = 'none';
+            }
+        }
+    },
+
+    updateIntegrity(integrity) {
+        const status = document.getElementById('migration-sync-status');
+        const rev = document.getElementById('db-rev');
+        
+        status.innerText = integrity.synced ? 'SYNCED' : 'DRIFT DETECTED';
+        status.style.color = integrity.synced ? '#00ff88' : '#fbbf24';
+        rev.innerText = (integrity.db_revision && integrity.db_revision !== 'N/A' && integrity.db_revision !== 'Unknown') 
+                        ? integrity.db_revision.substring(0, 8) 
+                        : 'N/A';
+    },
+
+    updateMeta(meta) {
+        document.getElementById('app-version').innerText = `v${meta.app_version}`;
+        const envTag = document.getElementById('env-tag');
+        envTag.innerText = meta.env.toUpperCase();
+        envTag.className = meta.env === 'production' ? 'badge bg-danger' : 'badge bg-primary';
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    CockpitObserver.update();
+    setInterval(() => CockpitObserver.update(), 20000); // 20s heartbeat
+});
+</script>
+{% endblock %}

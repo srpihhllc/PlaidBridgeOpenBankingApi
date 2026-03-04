@@ -1,0 +1,10 @@
+{% extends "admin_base.html" %}
+{% block title %}Flask Error Logs{% endblock %}
+{% block content %}
+  <h2>📬 Flask Log Viewer</h2>
+  <pre class="bg-light p-3 mt-3 border rounded" style="max-height: 600px; overflow-y: scroll;">
+    {% for line in log_lines %}
+{{ line.strip() }}
+    {% endfor %}
+  </pre>
+{% endblock %}

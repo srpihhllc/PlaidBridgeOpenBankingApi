@@ -1,0 +1,60 @@
+<!-- app/templates/tiles/trace_viewer_tile.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Trace Viewer Tile</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .trace-card {
+            background: white;
+            border-left: 6px solid #ccc;
+            margin-bottom: 15px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .trace-card.stale { border-color: #f39c12; }
+        .trace-card.excessive { border-color: #3498db; }
+        .trace-card.expired { border-color: #e74c3c; }
+        .trace-card.healthy { border-color: #2ecc71; }
+        .trace-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .trace-detail {
+            font-size: 0.95em;
+            color: #555;
+        }
+        .ttl-badge {
+            float: right;
+            font-size: 0.85em;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: #eee;
+        }
+    </style>
+</head>
+<body>
+    <h2>🔍 Trace Viewer</h2>
+
+    {% for trace in traces %}
+        <div class="trace-card {{ trace.freshness|lower }}">
+            <div class="trace-header">
+                {{ trace.event_type }} <span class="ttl-badge">{{ trace.freshness }} (TTL: {{ trace.ttl }})</span>
+            </div>
+            <div class="trace-detail">
+                <strong>Key:</strong> {{ trace.key }}<br>
+                <strong>Detail:</strong> {{ trace.detail }}<br>
+                <strong>Timestamp:</strong> {{ trace.timestamp }}
+            </div>
+        </div>
+    {% else %}
+        <p>No traces found.</p>
+    {% endfor %}
+</body>
+</html>

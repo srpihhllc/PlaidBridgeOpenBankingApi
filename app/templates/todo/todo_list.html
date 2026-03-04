@@ -1,0 +1,191 @@
+{% extends "sub/base_sub.html" %}
+{% block title %}Todo List{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4 text-light">
+
+  <!-- Header -->
+  <div class="row mb-4">
+    <div class="col">
+      <h2 class="text-light">Your Todos</h2>
+      <p class="text-muted">
+        Pending: {{ pending_count }} • Completed: {{ completed_count }} • Overdue: {{ overdue_count }}
+      </p>
+    </div>
+    <div class="col-auto text-end">
+      <a href="{{ url_for('sub_ui.dashboard') }}" class="btn btn-outline-light btn-sm">
+        ← Back to Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Add Todo -->
+  <div class="card bg-dark text-light mb-4">
+    <div class="card-header bg-black text-white">
+      <h5 class="mb-0">Add a New Todo</h5>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('todo.add_todo') }}" class="row g-3">
+        {{ csrf_token() }}
+
+        <!-- Text -->
+        <div class="col-md-4">
+          <input type="text"
+                 id="text"
+                 name="text"
+                 class="form-control bg-secondary text-light"
+                 placeholder="New todo..."
+                 required>
+        </div>
+
+        <!-- Priority -->
+        <div class="col-md-2">
+          <select name="priority" class="form-select bg-secondary text-light">
+            {% set default_priority = settings.default_priority if settings is defined else 'normal' %}
+            <option value="low" {% if default_priority == 'low' %}selected{% endif %}>Low</option>
+            <option value="normal" {% if default_priority == 'normal' %}selected{% endif %}>Normal</option>
+            <option value="high" {% if default_priority == 'high' %}selected{% endif %}>High</option>
+          </select>
+        </div>
+
+        <!-- Due date -->
+        <div class="col-md-2">
+          <input type="date"
+                 name="due_date"
+                 class="form-control bg-secondary text-light">
+        </div>
+
+        <!-- Category -->
+        <div class="col-md-2">
+          <input type="text"
+                 name="category"
+                 class="form-control bg-secondary text-light"
+                 placeholder="Category"
+                 value="{{ settings.default_category if settings and settings.default_category }}">
+        </div>
+
+        <!-- Add button -->
+        <div class="col-md-2 d-grid">
+          <button type="submit" class="btn btn-info">Add</button>
+        </div>
+
+        <!-- Notes -->
+        <div class="col-12 mt-2">
+          <textarea name="notes"
+                    class="form-control bg-secondary text-light"
+                    rows="2"
+                    placeholder="Notes (optional)"></textarea>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Filter/Sort Bar -->
+  <div class="card bg-dark text-light mb-3">
+    <div class="card-body d-flex justify-content-between align-items-center small">
+      <div>
+        <span class="text-muted">Filter:</span>
+        <strong>{{ settings.todo_filter if settings else 'all' }}</strong>
+
+        <span class="text-muted ms-3">Sort:</span>
+        <strong>{{ settings.todo_sort if settings else 'created' }}</strong>
+      </div>
+
+      <div class="text-muted">
+        (Change these in your Dashboard Settings)
+      </div>
+    </div>
+  </div>
+
+  <!-- Todo Items -->
+  <div class="card bg-dark text-light">
+    <div class="card-header bg-black text-white">
+      <h5 class="mb-0">Your Tasks</h5>
+    </div>
+
+    <ul class="list-group list-group-flush">
+
+      {% if todos %}
+        {% for todo in todos %}
+        <li class="list-group-item bg-dark text-light d-flex justify-content-between align-items-center">
+
+          <!-- Left side: checkbox + text + metadata -->
+          <div class="d-flex align-items-start flex-grow-1">
+
+            <!-- Toggle -->
+            <form method="POST"
+                  action="{{ url_for('todo.toggle', todo_id=todo.id) }}"
+                  class="me-2">
+              {{ csrf_token() }}
+              <input type="checkbox"
+                     name="completed"
+                     value="true"
+                     class="form-check-input"
+                     {% if todo.completed %}checked{% endif %}
+                     onchange="this.form.submit()">
+            </form>
+
+            <!-- Text + metadata -->
+            <div>
+              <div class="{% if todo.completed %}text-decoration-line-through text-muted{% endif %}">
+                {{ todo.text }}
+              </div>
+
+              <div class="small text-muted mt-1">
+
+                <!-- Priority badge -->
+                {% if todo.priority %}
+                  {% if todo.priority == 'high' %}
+                    <span class="badge bg-danger me-1">High</span>
+                  {% elif todo.priority == 'normal' %}
+                    <span class="badge bg-secondary me-1">Normal</span>
+                  {% else %}
+                    <span class="badge bg-dark border border-light me-1">Low</span>
+                  {% endif %}
+                {% endif %}
+
+                <!-- Due date badge -->
+                {% if todo.due_date %}
+                  {% if not todo.completed and todo.due_date < current_date %}
+                    <span class="badge bg-warning text-dark me-1">Overdue: {{ todo.due_date }}</span>
+                  {% else %}
+                    <span class="badge bg-info text-dark me-1">Due: {{ todo.due_date }}</span>
+                  {% endif %}
+                {% endif %}
+
+                <!-- Category -->
+                {% if todo.category %}
+                  <span class="badge bg-primary me-1">{{ todo.category }}</span>
+                {% endif %}
+
+                <!-- Notes -->
+                {% if todo.notes %}
+                  <span class="text-muted">• {{ todo.notes }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Delete -->
+          <form method="POST"
+                action="{{ url_for('todo.delete', todo_id=todo.id) }}">
+            {{ csrf_token() }}
+            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+          </form>
+
+        </li>
+        {% endfor %}
+
+      {% else %}
+        <li class="list-group-item bg-dark text-muted text-center py-4">
+          No todos yet — add one above!
+        </li>
+      {% endif %}
+
+    </ul>
+  </div>
+
+</div>
+{% endblock %}
+

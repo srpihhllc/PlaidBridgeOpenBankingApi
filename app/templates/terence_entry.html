@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}FinBrain Ignition | Operator Access{% endblock %}
+
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 85vh;">
+  <div class="card shadow-lg p-4"
+       style="background: rgba(22,22,22,0.85); border: 1px solid #555; width: 480px; border-radius: 8px; color: #e0e0e0;">
+
+    <h3 class="text-center mb-4" style="color: #00ffe7;">
+      🧠 FinBrain Ignition Console
+    </h3>
+
+    <p class="text-center mb-4">
+      “Cognition sequence detected. Operator access required to complete boot.”
+    </p>
+
+    <form action="{{ url_for('main.ignite_cortex') }}" method="POST">
+      <div class="form-group mb-3">
+        <label for="passcode">🔐 Entry Key</label>
+        <input type="password"
+               id="passcode"
+               name="passcode"
+               class="form-control"
+               placeholder="Enter root access phrase"
+               autocomplete="off">
+      </div>
+
+      <button type="submit" class="btn btn-outline-light w-100">
+        🚀 Ignite Cortex
+      </button>
+    </form>
+
+    <hr class="mt-4" style="border-color: #444;">
+
+    <small class="text-muted text-center d-block">
+      FinBrain • Version Seed → July 2025
+    </small>
+    <small class="text-muted text-center">
+      Registry → Terence Operator Protocol
+    </small>
+
+  </div>
+</div>
+{% endblock %}
+

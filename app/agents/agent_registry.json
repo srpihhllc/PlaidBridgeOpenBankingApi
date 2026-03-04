@@ -1,0 +1,60 @@
+{
+  "CreditSherpa": {
+    "description": "Pulls and consolidates credit reports across all major and alternative bureaus for financial verification.",
+    "tasks": [
+      "pull_transunion",
+      "pull_experian",
+      "pull_equinox",
+      "pull_alternative_bureaus"
+    ],
+    "persona": "cautious_analytical"
+  },
+  "DisputeForge": {
+    "description": "Generates dispute letters and formal violation complaints using FDPA and CFPB standards.",
+    "tasks": [
+      "generate_purchase_agreement_letter",
+      "detect_fdpa_violations",
+      "generate_cfpb_complaint"
+    ],
+    "persona": "aggressive_legalistic"
+  },
+  "DebtSentinel": {
+    "description": "Verifies debt collection practices against FDCPA and purchase agreement compliance standards.",
+    "tasks": [
+      "validate_collector_licensing",
+      "match_accounts_to_purchase_agreements",
+      "flag_unverified_debts"
+    ],
+    "persona": "vigilant_thorough"
+  },
+  "BureauRadar": {
+    "description": "Surveys alternative credit bureaus like LexisNexis and Innovis for shadow credit activity.",
+    "tasks": [
+      "check_lexisnexis_profile",
+      "pull_innovis_report",
+      "detect_shadow_entries"
+    ],
+    "persona": "stealth_investigator"
+  },
+  "DunStream": {
+    "description": "Submits verified tradelines and payment activity to Dun & Bradstreet to build enterprise credit.",
+    "tasks": [
+      "submit_tradeline",
+      "build_business_credit_profile",
+      "monitor_dnb_response"
+    ],
+    "persona": "strategic_enterprise"
+  },
+  "GrantCortex": {
+    "description": "Evaluates grant eligibility using fraud telemetry, financial velocity, and compliance metadata. Outputs reasoning with simulated risk calculations.",
+    "tasks": [
+      "evaluate_financial_velocity",
+      "check_fraud_incidence_rate",
+      "analyze_org_compliance_profile",
+      "simulate_grant_approval_risk"
+    ],
+    "persona": "compliance_strategist"
+  }
+}
+
+

@@ -1,0 +1,203 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/.github/workflows/ci.yml
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  lockfile-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-tools
+        run: pip install pip-tools
+
+      - name: Recompile lockfiles
+        run: |
+          pip-compile requirements.txt --output-file=requirements.lock
+          pip-compile requirements-dev.txt --output-file=requirements-dev.lock
+
+      - name: Check for drift
+        run: |
+          if [[ -n "$(git status --porcelain requirements.lock requirements-dev.lock)" ]]; then
+            echo "❌ Lockfiles are out of date. Run 'make update' and commit the changes."
+            git diff requirements.lock requirements-dev.lock
+            exit 1
+          else
+            echo "✅ Lockfiles are up to date."
+          fi
+
+  tests:
+    needs: lockfile-check
+    runs-on: ubuntu-latest
+    name: "Py${{ matrix.python-version }} • ${{ matrix.stage }}"
+    strategy:
+      matrix:
+        python-version: [ "3.10", "3.11", "3.12" ]
+        stage: [ "fast", "redis", "google", "microsoft", "plaid", "providers", "infra" ]
+    continue-on-error: ${{ matrix.stage == 'infra' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ hashFiles('requirements*.txt', 'requirements-dev.txt', 'requirements.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      # --- Quality Gate: fast stage only ---
+      - name: Run lint, typecheck, and tests via Makefile
+        if: matrix.stage == 'fast'
+        run: |
+          source .venv/bin/activate
+          make ci
+
+      # --- Other stages ---
+      - name: Run pytest (redis stage)
+        if: matrix.stage == 'redis'
+        run: |
+          source .venv/bin/activate
+          pytest -m redis --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+      - name: Run pytest (google stage)
+        if: matrix.stage == 'google'
+        run: |
+          source .venv/bin/activate
+          pytest -m google --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+      - name: Run pytest (microsoft stage)
+        if: matrix.stage == 'microsoft'
+        run: |
+          source .venv/bin/activate
+          pytest -m microsoft --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+      - name: Run pytest (plaid stage)
+        if: matrix.stage == 'plaid'
+        run: |
+          source .venv/bin/activate
+          pytest -m plaid --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+      - name: Run pytest (providers stage)
+        if: matrix.stage == 'providers'
+        run: |
+          source .venv/bin/activate
+          pytest -m providers --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+      - name: Run pytest (infra stage)
+        if: matrix.stage == 'infra'
+        run: |
+          source .venv/bin/activate
+          pytest -m infra --maxfail=1 --disable-warnings -q --junitxml=report.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-${{ matrix.python-version }}-${{ matrix.stage }}
+          path: report.xml
+
+      - name: Upload mypy report
+        if: always() && matrix.stage == 'fast'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mypy-report
+          path: mypy-report.txt
+
+      - name: Upload coverage
+        if: always() && matrix.stage == 'fast'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: tests
+    if: always()
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: reports
+
+      - name: Publish blocking test report
+        id: blocking
+        uses: dorny/test-reporter@v1
+        with:
+          name: "![blocking](https://img.shields.io/badge/Blocking-Critical-red) Blocking Suites (fast + providers + oauth)"
+          path: |
+            reports/**/junit-*-fast/*.xml
+            reports/**/junit-*-providers/*.xml
+            reports/**/junit-*-google/*.xml
+            reports/**/junit-*-microsoft/*.xml
+            reports/**/junit-*-plaid/*.xml
+          reporter: junit
+          fail-on-error: true
+
+      - name: Publish informational test report
+        uses: dorny/test-reporter@v1
+        with:
+          name: "![informational](https://img.shields.io/badge/Informational-Non--blocking-blue) Informational Suites (infra)"
+          path: |
+            reports/**/junit-*-infra/*.xml
+            reports/**/junit-*-redis/*.xml
+          reporter: junit
+          fail-on-error: false
+
+      - name: Append mypy results
+        run: |
+          if [ -f reports/mypy-report/mypy-report.txt ]; then
+            echo "### 📝 Mypy Type Check Results" >> $GITHUB_STEP_SUMMARY
+            cat reports/mypy-report/mypy-report.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 📝 Mypy Type Check Results" >> $GITHUB_STEP_SUMMARY
+            echo "No mypy report found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: All Clear Badge
+        if: success()
+        run: |
+          echo "![allclear](https://img.shields.io/badge/All%20Clear-Passing-green)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ All blocking suites passed. Safe to merge." >> $GITHUB_STEP_SUMMARY
+
+  allclear-check:
+    runs-on: ubuntu-latest
+    needs: summary
+    if: success()
+    steps:
+      - run: echo "All blocking suites passed ✅"
+
+
+

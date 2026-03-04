@@ -1,4 +1,11 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 📘 Financial Powerhouse Platform — Documentation Home
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
 
 Welcome to the official documentation for the **Financial Powerhouse Platform**, a unified, operator‑grade fintech monorepo combining:
 
@@ -65,3 +72,15 @@ This documentation suite is designed to be:
 - **Cockpit‑grade**  
 
 Explore the sections on the left to dive deeper into the platform.
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`  
+**Platform Identity:** Financial Powerhouse Platform
+
+
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

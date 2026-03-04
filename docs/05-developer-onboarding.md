@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 🧭 Developer Onboarding — Financial Powerhouse Platform
 
 Welcome to the Financial Powerhouse Platform.  
@@ -245,3 +251,8 @@ plugins:
 
 extra_css:
   - stylesheets/extra.css
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

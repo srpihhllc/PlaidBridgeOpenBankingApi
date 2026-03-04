@@ -1,0 +1,49 @@
+{# app/templates/tiles/blueprint_inspector.html #}
+{% extends "admin_cockpit.html" %}
+
+{% block content %}
+  <h2>Blueprint Inspector</h2>
+
+  {% if rules %}
+    <table class="table table-striped mb-4">
+      <thead class="table-dark">
+        <tr>
+          <th>Route</th>
+          <th>Endpoint</th>
+          <th>Methods</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for rule in rules %}
+          <tr>
+            <td><code>{{ rule.rule }}</code></td>
+            <td>{{ rule.endpoint }}</td>
+            <td>{{ rule.methods | join(", ") }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="alert alert-danger mt-3">
+      🚫 No route rules found. Flask map may be stale or blueprint misregistered.
+    </div>
+  {% endif %}
+
+  {% if blueprints %}
+    <div class="blueprint-inspector-tile">
+      <h3>Registered Blueprints</h3>
+      <ul class="list-group">
+        {% for bp in blueprints %}
+          <li class="list-group-item">
+            <strong>{{ bp.name }}</strong> — <code>{{ bp.url_prefix }}</code>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% else %}
+    <div class="alert alert-warning mt-3">
+      ⚠️ No blueprints registered. Check `import` and `app.register_blueprint(...)` trace overlays.
+    </div>
+  {% endif %}
+{% endblock %}
+

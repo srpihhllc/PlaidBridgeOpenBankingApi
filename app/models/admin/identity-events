@@ -1,0 +1,33 @@
+# app/models/admin/identity-events
+
+vent Type	Payload Example	Redis Key / Table
+LOGIN_SUCCESS	{ user_id, email, timestamp }	Redis list: auth_events
+LOGIN_FAIL	{ attempted_email, reason, IP }	Redis list: auth_events
+RESET_REQUEST	{ email, token, expires_at }	Redis list: reset_tokens
+RESET_USED	{ email, status, used_at }	Redis list: reset_tokens
+MFA_GENERATE	{ user_id, code, expires_at }	Redis: mfa_code:<user_id>
+MFA_FAIL	{ user_id, reason, IP, attempted_code }	Redis list: auth_events
+OAUTH_LOGIN	{ email, provider, token_status }	Redis list: auth_events
+✅ Render this in cockpit with filters by type, time, user, or route. Show last 50 entries, expandable.
+
+🔁 Real-Time Logging Hooks
+In auth_routes.py, insert:
+
+python
+from app.utils.telemetry import log_identity_event
+Use like this after login success:
+
+python
+log_identity_event("LOGIN_SUCCESS", user_id=user.id, email=user.email)
+Or after failed MFA:
+
+python
+log_identity_event("MFA_FAIL", user_id=user_id, reason="Incorrect code", attempted_code=submitted_code)
+These get pushed into Redis with TTL or persisted if configured.
+
+🛡️ Alert Cards (Optional)
+Tile will raise alert if:
+
+
+
+

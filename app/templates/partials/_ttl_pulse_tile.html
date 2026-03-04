@@ -1,0 +1,51 @@
+<!-- app/templates/partials/_ttl_pulse_tile.html -->
+<!-- This tile displays the health of core services like MySQL and Redis based on TTL events. -->
+<!-- It is designed to be included in a larger dashboard or cockpit page. -->
+<div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+    <div class="card h-100 shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>❤️‍🩹 TTL Pulse</span>
+            <!-- Dynamically show a status badge based on data availability -->
+            {% if data.ttl_pulse %}
+            <span class="badge {% if data.ttl_pulse.db_ping.status == 'success' and data.ttl_pulse.redis_ping.status == 'success' %}bg-success{% else %}bg-danger{% endif %}">
+                {% if data.ttl_pulse.db_ping.status == 'success' and data.ttl_pulse.redis_ping.status == 'success' %}Healthy{% else %}Unhealthy{% endif %}
+            </span>
+            {% else %}
+            <span class="badge bg-secondary">Loading...</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <h6 class="text-muted">Database Ping</h6>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="small {% if data.ttl_pulse.db_ping.status == 'success' %}text-success{% else %}text-danger{% endif %}">
+                    Status: {{ data.ttl_pulse.db_ping.status }}
+                </span>
+                <span class="small text-muted">
+                    {% if data.ttl_pulse.db_ping.timestamp %}
+                    Last Ping: {{ data.ttl_pulse.db_ping.timestamp }}
+                    {% else %}
+                    Last Ping: N/A
+                    {% endif %}
+                </span>
+            </div>
+
+            <h6 class="text-muted">Redis Ping</h6>
+            <div class="d-flex justify-content-between align-items-center">
+                <span class="small {% if data.ttl_pulse.redis_ping.status == 'success' %}text-success{% else %}text-danger{% endif %}">
+                    Status: {{ data.ttl_pulse.redis_ping.status }}
+                </span>
+                <span class="small text-muted">
+                    {% if data.ttl_pulse.redis_ping.timestamp %}
+                    Last Ping: {{ data.ttl_pulse.redis_ping.timestamp }}
+                    {% else %}
+                    Last Ping: N/A
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="card-footer text-muted small">
+            Source: Redis TTL cache
+        </div>
+    </div>
+</div>
+

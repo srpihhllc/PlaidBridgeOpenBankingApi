@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Identity Event Trace{% endblock %}
+{% block content %}
+<div class="container py-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+  <h2 class="mb-3">🧠 Identity Event Trace</h2>
+  <form method="get" class="mb-4 d-flex align-items-center" aria-labelledby="event-filter-legend">
+    <legend id="event-filter-legend" class="visually-hidden">Filter Security Events</legend>
+    <label for="event_type_select" class="form-label me-2 mb-0">Filter by Event Type:</label>
+    <select name="event_type" id="event_type_select" class="form-select w-auto" onchange="this.form.submit()">
+      <option value="">All</option>
+      {% for e in events | map(attribute='event_type') | unique %}
+        <option value="{{ e }}" {% if request.args.get('event_type') == e %}selected{% endif %}>{{ e }}</option>
+      {% endfor %}
+    </select>
+  </form>
+  <div class="table-responsive">
+    <table class="table table-sm table-bordered table-hover align-middle">
+      <thead class="table-dark">
+        <tr>
+          <th scope="col">Timestamp</th>
+          <th scope="col">Event</th>
+          <th scope="col">User ID</th>
+          <th scope="col">Email</th>
+          <th scope="col">IP</th>
+          <th scope="col">Meta</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          {% if not request.args.get('event_type') or request.args.get('event_type') == event.event_type %}
+            <tr class="{% if 'FAIL' in event.event_type %}table-danger{% elif 'SUCCESS' in event.event_type %}table-success{% else %}table-warning{% endif %}">
+              <td>{{ event.timestamp }}</td>
+              <td>{{ event.event_type }}</td>
+              <td>{{ event.user_id }}</td>
+              <td>{{ event.email }}</td>
+              <td>{{ event.ip }}</td>
+              <td>{{ event.meta }}</td>
+            </tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

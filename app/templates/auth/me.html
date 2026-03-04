@@ -1,0 +1,50 @@
+{# app/templates/auth/mfa_prompt.html #}
+{% extends "base.html" %}
+
+{% block title %}
+  🔐 MFA Prompt
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mt-4">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show text-break" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <h2 class="mb-4 text-center">🔐 MFA Verification</h2>
+
+  <form action="{{ url_for('auth.mfa_prompt') }}" method="POST" class="border p-4 rounded bg-light shadow-sm">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="mb-3">
+      <label for="code" class="form-label">Enter MFA Code</label>
+      <input type="text" id="code" name="code" class="form-control" required autofocus>
+    </div>
+    <button type="submit" class="btn btn-primary w-100">
+      Verify Code
+    </button>
+  </form>
+
+  {% if ttl and ttl > 0 %}
+    <div class="mt-3 text-center">
+      <span class="badge bg-success">
+        ✅ Recent MFA Verified ({{ ttl }}s remaining)
+      </span>
+    </div>
+  {% endif %}
+
+  <div class="mt-4 text-center">
+    <a href="{{ url_for('auth.login') }}" class="text-decoration-none">
+      Cancel and return to login
+    </a>
+  </div>
+</div>
+{% endblock %}

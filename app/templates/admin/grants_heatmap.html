@@ -1,0 +1,36 @@
+<!-- templates/admin/grants_heatmap.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Grants Heatmap</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Federal Grant Composition Activity</h2>
+  <canvas id="grantChart" width="600" height="300"></canvas>
+
+  <script>
+    fetch("/admin/grants_dashboard")
+      .then(res => res.json())
+      .then(data => {
+        const types = {};
+        data.grants.forEach(g => {
+          const type = g.grant_type || "unknown";
+          types[type] = (types[type] || 0) + 1;
+        });
+
+        new Chart(document.getElementById("grantChart"), {
+          type: "bar",
+          data: {
+            labels: Object.keys(types),
+            datasets: [{
+              label: "Grants Composed",
+              data: Object.values(types),
+              backgroundColor: "teal"
+            }]
+          }
+        });
+      });
+  </script>
+</body>
+</html>

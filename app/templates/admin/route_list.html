@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Route Map | FinBrain{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="mb-3">🧠 FinBrain Route Map</h2>
+  <table class="table table-bordered table-striped">
+    <thead class="thead-dark">
+      <tr>
+        <th>URL</th>
+        <th>Endpoint</th>
+        <th>Methods</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for route in routes %}
+      <tr>
+        <td><code>{{ route.url }}</code></td>
+        <td>{{ route.endpoint }}</td>
+        <td>{{ route.methods | join(', ') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

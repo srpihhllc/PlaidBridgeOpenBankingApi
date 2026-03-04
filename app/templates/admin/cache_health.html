@@ -1,0 +1,50 @@
+{% extends "admin_base.html" %}
+{% block title %}Cache Health{% endblock %}
+{% block content %}
+  <h2>🧪 Redis Cache Health</h2>
+
+  {% if sweep_alerts %}
+    <div class="alert alert-warning mt-3">
+      <strong>🚨 Attention:</strong>
+      <ul class="mb-0">
+        {% for alert in sweep_alerts %}
+          <li>{{ alert }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <form method="POST" action="{{ url_for('main.sweep_expired_keys') }}" class="mt-3">
+      <button type="submit" class="btn btn-danger btn-sm">🧹 Purge Suspect TTL-Free Keys</button>
+    </form>
+  {% endif %}
+
+  {% if cache_report %}
+    <table class="table mt-4">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>TTL</th>
+          <th>Size (bytes)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in cache_report %}
+          <tr>
+            <td>{{ entry.key }}</td>
+            <td>
+              {% if entry.ttl != "∞" and entry.ttl < 60 %}
+                <span class="text-danger">{{ entry.ttl }}s</span>
+              {% else %}
+                {{ entry.ttl }}
+              {% endif %}
+            </td>
+            <td>{{ entry.size }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="mt-3">No Redis keys found.</p>
+  {% endif %}
+{% endblock %}
+

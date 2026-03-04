@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Intake Freshness | FinBrain Cockpit{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+  <h2 class="mb-4">📦 Subscriber Intake Freshness</h2>
+
+  <table class="table table-hover table-bordered">
+    <thead class="table-dark">
+      <tr>
+        <th>Email</th>
+        <th>Business Name</th>
+        <th>EIN</th>
+        <th>TTL Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for user in traces %}
+      <tr>
+        <td>{{ user.email }}</td>
+        <td>{{ user.business }}</td>
+        <td>{{ user.ein }}</td>
+        <td>
+          {% if user.ttl > 0 %}
+            <span class="badge bg-success">Active — {{ user.ttl }}s</span>
+          {% else %}
+            <span class="badge bg-warning">Expired</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="operator-footer">
+    TTL traces powered by Redis &mdash; mock identity visibility live. 🧠📡
+  </div>
+</div>
+{% endblock %}

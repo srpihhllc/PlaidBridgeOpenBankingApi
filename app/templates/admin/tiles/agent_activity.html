@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Agent Audit Logs</h2>
+<ul>
+  {% for log in audits %}
+    <li>
+      <strong>{{ log['triggered_by'] }}</strong> →
+      {{ log['status'] }} at {{ log['timestamp'] }}
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}
