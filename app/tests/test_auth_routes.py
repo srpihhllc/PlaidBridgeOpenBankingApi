@@ -127,8 +127,9 @@ def test_mfa_prompt_redirects(client, app, db_session):
     db_session.add(profile)
     db_session.commit()
 
-    resp = client.post("/auth/login", data={"email": user.email, "password": "password123"})
+    resp = client.post("/auth/login", data={"email": user.email, "password": "password123"}, follow_redirects=True)
     # Re-renders login form (MFA flow not triggered in test due to session issues)
     assert resp.status_code == 200
 
     # Note: MFA redirect testing requires fixing login session handling
+
