@@ -51,6 +51,24 @@ htmlcov/
 .pre-commit-config.yaml~
 .pre-commit-hooks.yaml~
 
+# Node dependencies (should never be committed)
+node_modules/
+
+# Rotated/runtime log files
+*.log
+*.log.*
+
+# SQLite runtime databases
+*.db
+
+# SQL backup files
+*.sql
+
+# Runtime/temp files
+*.pyc
+__pycache__/
+
+
 
 
 

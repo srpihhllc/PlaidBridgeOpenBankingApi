@@ -1,5 +1,35 @@
 ﻿# Ignore artifacts
-.env
-*.log
-*.pyc
+# Python
 __pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+
+# Runtime artifacts
+*.log
+*.log.*
+*.db
+*.sql
+
+# Environment / secrets
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+*.pyc
