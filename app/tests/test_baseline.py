@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # FILE: /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_baseline.py
 # DESCRIPTION: Essential environment and database integrity checks.
 # Ensures the admin exists and verifies 31 Foreign Key relationships.
@@ -77,7 +77,7 @@ USER_FK_TABLES = [
     (
         "audit_logs",
         "user_id",
-        "INSERT INTO audit_logs (user_id, event_type, payload) VALUES (:uid, 'test_action', '{}')",
+        "INSERT INTO audit_logs (user_id, event_type, payload, created_at) VALUES (:uid, 'test_action', '{}', CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
