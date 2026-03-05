@@ -424,7 +424,7 @@ def test_bank_transactions_fk_and_cascade(app):
                 # copy existing data (if any), drop old table, re-enable foreign keys
                 conn_for_ddl.execute(sa.text("INSERT INTO bank_transactions SELECT * FROM old_bank_transactions;"))
                 conn_for_ddl.execute(sa.text("DROP TABLE old_bank_transactions;"))
-                conn_for_ddl.execute(sa.text("PRAGMA foreign_keys=ON;"))
+            conn_for_ddl.execute(sa.text("PRAGMA foreign_keys=ON;"))
         except Exception:
             # If anything goes wrong with the test-only DDL step, continue — the following test logic
             # is defensive and will assert if FK semantics are not enforced.

@@ -13,8 +13,8 @@ class BankTransaction(db.Model):
     __tablename__ = "bank_transactions"
 
     id = db.Column(db.Integer, primary_key=True)
-    from_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id"), nullable=True)
-    to_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id"), nullable=True)
+    from_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True)
+    to_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True)
 
     amount = db.Column(db.Float, nullable=False)
     txn_type = db.Column(db.String(32))  # transfer, ach, wire, internal
