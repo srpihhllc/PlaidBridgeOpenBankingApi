@@ -8,9 +8,9 @@ sys.path.insert(0, ".")
 from PlaidBridgeOpenBankingApi.app import create_app
 from PlaidBridgeOpenBankingApi.app.extensions import db
 
-# create the app, then set TESTING via config update so we don't pass a dict to create_app
-app = create_app()
-app.config.update({"TESTING": True})
+# Create the app using the 'testing' config name so the factory uses the test/SQLite settings.
+# The factory expects an environment name string (it calls .lower()), so pass "testing".
+app = create_app("testing")
 
 with app.app_context():
     # create tables as tests do
