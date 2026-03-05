@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/loan_utils.py
+# hypothesis_version: 6.142.4
+
+['default', 'grace period', 'interest rate', 'keyword_presence', 'matched_keywords', 'penalty', 'repayment', 'term', 'total_words']

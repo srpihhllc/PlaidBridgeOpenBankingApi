@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/seed_mock_transactions.py
+# hypothesis_version: 6.142.4
+
+['amount', 'category', 'category_hierarchy', 'cluster', 'date', 'description', 'fraud_score', 'is_pending', 'location', 'mcc', 'payment_meta']

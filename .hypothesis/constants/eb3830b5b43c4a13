@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/fraud_analytics.py
+# hypothesis_version: 6.142.4
+
+[-500, 'amount', 'bet', 'casino', 'crypto', 'description', 'gambling', 'id', 'overseas', 'score', 'wire']

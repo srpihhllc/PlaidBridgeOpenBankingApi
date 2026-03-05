@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/__init__.py
+# hypothesis_version: 6.142.4
+
+['cockpit_bp', 'drilldown_bp', 'fk_inspector_bp', 'success', 'trace_bp']

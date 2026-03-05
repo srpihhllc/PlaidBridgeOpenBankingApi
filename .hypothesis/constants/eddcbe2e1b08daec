@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/telemetry/emitters/ttl.py
+# hypothesis_version: 6.142.4
+
+[-300, 'emit_ttl_pulse', 'expires_at', 'fresh', 'meta', 'ok', 'remaining_seconds', 'status', 'ttl_summary', 'value']

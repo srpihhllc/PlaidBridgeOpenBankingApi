@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/babel/localtime/_unix.py
+# hypothesis_version: 6.142.4
+
+[b'TZif2', '#', '-gettimezone', '/', '/etc/localtime', '/zoneinfo/', ':', 'TZ', '^Time Zone: (.*)$', '_', 'darwin', 'etc/conf.d/clock', 'etc/localtime', 'etc/sysconfig/clock', 'etc/timezone', 'etctz', 'local', 'rb', 'systemsetup']

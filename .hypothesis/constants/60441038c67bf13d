@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/registry.py
+# hypothesis_version: 6.142.4
+
+[128, 'CASCADE', 'User', 'config_summary', 'created_at', 'empty', 'loaded', 'name', 'registries', 'registry_events', 'users.id']

@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/tiles/api_usage_tile.py
+# hypothesis_version: 6.142.4
+
+['/', '/cockpit/api-usage', 'Clear', 'api_usage_tile', 'api_usage_tile.html', 'apikey:account:usage']

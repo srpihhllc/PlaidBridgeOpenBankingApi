@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/fintech_api.py
+# hypothesis_version: 6.142.4
+
+['Content-Type', 'TINK_API_URL', 'TRUELAYER_API_URL', 'Tink', 'TrueLayer', 'application/json', 'error', 'https://api.tink.com']

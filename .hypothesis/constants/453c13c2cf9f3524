@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/access_token.py
+# hypothesis_version: 6.142.4
+
+[255, 'CASCADE', 'User', 'access_tokens', 'users.id']

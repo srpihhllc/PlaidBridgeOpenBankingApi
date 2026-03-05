@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/scripts/cli_template_tracer.py
+# hypothesis_version: 6.142.4
+
+[600, '-', 'AttributeError', 'Auth‑blocked', 'BadRequest', 'BuildError', 'Missing template', 'NoAuthorizationError', 'Other backend error', 'TemplateNotFound', 'Unauthorized', 'Unknown', 'endpoint', 'error', 'ok', 'status', 'trace-templates']

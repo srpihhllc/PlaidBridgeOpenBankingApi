@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/tiles/cli_inspector.py
+# hypothesis_version: 6.142.4
+
+[500, 503, '/tile/cli-inspector', ':', 'GET', 'Redis unavailable', 'command', 'commands', 'error', 'idle', 'last_run', 'status', 'tile_cli_inspector', 'ttl:cli:*', '—', '✓']

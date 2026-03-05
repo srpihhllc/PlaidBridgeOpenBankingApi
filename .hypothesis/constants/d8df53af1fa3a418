@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/repair.py
+# hypothesis_version: 6.142.4
+
+[200, 300, 500, '*', '/clear-zombies', '/repair', '/self_repair', '/system_heartbeat', 'POST', 'details', 'error', 'mfa', 'mfa_code:*', 'purged', 'rate', 'repair', 'session', 'success']

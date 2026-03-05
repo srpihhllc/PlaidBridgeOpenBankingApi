@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/redis_utils.py
+# hypothesis_version: 6.142.4
+
+[200, 3600, '1', '20', ':', '<unparseable-uri>', '@', 'API not configured', 'Authorization', 'Content-Type', 'DISABLE_REDIS', 'FLASK_ENV', 'REDIS_SOCKET_TIMEOUT', 'REDIS_STORAGE_URI', 'REFLECTORAI_API_KEY', 'application/json', 'data', 'decode_responses', 'error', 'ignore', 'max_connections', 'redis', 'redis+ssl', 'redis_client', 'rediss', 'seconds', 'sent', 'socket_timeout', 'ssl', 'status', 'success', 'testing', 'total', 'true', 'utf-8', 'yes']

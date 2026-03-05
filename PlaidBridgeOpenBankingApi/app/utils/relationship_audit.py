@@ -30,3 +30,11 @@ def audit_back_populates():
                         f"back_populates='{target_attr}' "
                         f"but {target_cls.__name__} has no such attribute."
                     )
+
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call relationship_audit.run().
+    Runs audit_back_populates() within the current application context.
+    """
+    audit_back_populates()

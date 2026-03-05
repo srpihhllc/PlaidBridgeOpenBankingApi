@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/tiles/mysql_auth_monitor.py
+# hypothesis_version: 6.142.4
+
+[503, 'GET', 'SELECT 1', 'details', 'error', 'latency_ms', 'max_row_buffer', 'mysql_monitor', 'n/a', 'status', 'success', '✅ connected', '❌ error']

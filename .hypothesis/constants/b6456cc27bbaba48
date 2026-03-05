@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/user_dashboard.py
+# hypothesis_version: 6.142.4
+
+['CASCADE', 'User', 'all', 'created', 'default_category', 'default_priority', 'extend_existing', 'layout', 'light', 'normal', 'show_activity_tile', 'show_balance_tile', 'show_today_widget', 'show_todo_tile', 'theme', 'todo_filter', 'todo_sort', 'two_column', 'user_dashboard', 'user_dashboards', 'users.id']

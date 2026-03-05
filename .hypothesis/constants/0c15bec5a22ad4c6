@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/grant_pulse.py
+# hypothesis_version: 6.142.4
+
+['Grant pulse executed', 'cockpit:grant-pulse', 'grant_type', 'grants_composed:*', 'unknown']

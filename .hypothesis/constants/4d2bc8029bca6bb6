@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/user.py
+# hypothesis_version: 6.142.4
+
+[0.0, 120, 128, 255, 256, 'AccessToken', 'AuditLog', 'BankAccount', 'BankInstitution', 'BankStatement', 'BorrowerCard', 'ComplaintLog', 'CreditLedger', 'DisputeLog', 'FinancialAuditLog', 'FraudReport', 'LedgerEntry', 'Lender', 'LoanAgreement', 'MFACode', 'PaymentLog', 'PlaidItem', 'Registry', 'SchemaEvent', 'SubscriberProfile', 'SystemVersion', 'TimelineEvent', 'Todo', 'TraceEvent', 'Tradeline', 'Transaction', 'UnderwriterAgent', 'UserDashboard', 'VaultTransaction', 'actor', 'admin', 'all, delete-orphan', 'borrower', 'dynamic', 'lender', 'subscriber', 'super_admin', 'user', 'users']

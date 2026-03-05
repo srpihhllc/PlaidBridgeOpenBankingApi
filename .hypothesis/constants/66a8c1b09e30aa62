@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/babel/localedata.py
+# hypothesis_version: 6.142.4
+
+['%s.dat', '.dat', '<%s %r>', '_', 'cache', 'locale-data', 'parent_exceptions', 'rb', 'root', 'win32']

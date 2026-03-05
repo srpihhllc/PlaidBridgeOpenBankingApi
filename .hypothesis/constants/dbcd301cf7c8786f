@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/template_tracer.py
+# hypothesis_version: 6.142.4
+
+[100, 400, '..', '/1', '/abc123', '/cockpit', '/dummy_event', '/dummy_token', '/template-tracer', '/test_item', '?file=docs/README.md', 'ERROR', 'False', 'GET', 'MISSING_TEMPLATE', 'N/A', 'OK', 'True', 'admin.export_trace', 'admin.preview_letter', 'api_v1.get_dispute', 'api_v1.get_tradeline', 'endpoint', 'error', 'expires_at', 'fresh', 'funds.flow', 'funds.view_fund', 'key', 'lenders.view_lender', 'letters.dispute_form', 'main.dispute_form', 'main.terence_entry', 'missing_template', 'n/a', 'oauth.callback', 'oauth.token', 'ok', 'plaid.link_item', 'redis_status', 'redis_ttl', 'redis_value', 'remaining_seconds', 'req_id', 'rule', 'static', 'status', 'status_code', 'subscriber.dashboard', 'template', 'templates', 'tiles.trace_viewer', 'tracer', '—']

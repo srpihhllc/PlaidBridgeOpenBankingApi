@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/babel/plural.py
+# hypothesis_version: 6.142.4
+
+[' if (%s): return %r', ' not', ' return %r', ' || ', '!=', '%', '%d);', '%r; })', '%s ? %d : ', '%s ? %r : ', '%s and %s', '%s is %s', '%s is not %s', '%s mod %s', '%s or %s', '%s%s %s %s', '%s(%s, %s)', '%s..%s', '%s: %s', '%|,|!=|=', '(!%s)', '(%s != %s)', '(%s %% %s)', '(%s && %s)', '(%s == %s)', '(%s and %s)', '(%s or %s)', '(%s || %s)', '(%s)', '(%s, %s)', '(not %s)', ',', ', ', '0', '<%s %r>', '<rule>', '=', '@', 'IN', 'MOD', 'MOD(%s, %s)', 'WITHIN', '[%s]', '\\.{2,3}|\\u2026', '\\d+', '\\s+', '_func', 'abstract', 'and', 'c', 'compile_', 'def evaluate(n):', 'e', 'ellipsis', 'evaluate', 'exec', 'extract_operands', 'f', 'few', 'i', 'in', 'is', 'isnot', 'many', 'mod', 'n', 'not', 'one', 'or', 'other', 'parseInt(n, 10)', 'range_list', 'relation', 'symbol', 't', 'tag %r defined twice', 'two', 'unknown tag %r', 'v', 'value', 'w', 'within', 'word', 'zero']

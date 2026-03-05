@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/fraud_report.py
+# hypothesis_version: 6.142.4
+
+['CASCADE', 'SET NULL', 'Transaction', 'User', 'category', 'created_at', 'description', 'evidence', 'fraud', 'fraud_reports', 'id', 'medium', 'open', 'resolved_at', 'severity', 'status', 'transaction_id', 'transactions.id', 'updated_at', 'user_id', 'users.id']

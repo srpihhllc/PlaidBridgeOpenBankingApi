@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/seed_todos.py
+# hypothesis_version: 6.142.4
+
+['Check fraud alerts', 'Complete onboarding', 'Update profile', 'Upload documents', 'Verify email', 'normal', 'seed-todos', '✅ Todos seeded.', '📝 Seeding todos...']

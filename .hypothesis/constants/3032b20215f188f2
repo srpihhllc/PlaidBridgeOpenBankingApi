@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/latency.py
+# hypothesis_version: 6.142.4
+
+[0.0, 300, 1000, 'endpoint', 'latency_ms', 'r', 'request_uuid', 'stage', 'start_ts', 'ttl_seconds']

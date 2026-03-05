@@ -43,6 +43,7 @@ backup/
 .pytest_cache/
 .coverage
 htmlcov/
+.hypothesis/
 
 # MyPy cache
 .mypy_cache/

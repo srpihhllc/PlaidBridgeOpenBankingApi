@@ -17,14 +17,21 @@ from flask import g, jsonify, request
 _logger = logging.getLogger(__name__)
 
 
-# ✅ FIX: Redefine inject_request_id as a no-argument before_request hook
-def inject_request_id() -> None:
+def inject_request_id(app=None) -> None:
     """
     Attach request_id and timing to every request for traceability.
-    - Generates a short UUID for each request.
-    - Logs start and end with duration and status code.
-    - Ensures request_id is always available via get_request_id().
+
+    When called with a Flask ``app`` argument, registers this function and
+    ``finalize_request_logging`` as before/after request hooks on that app.
+
+    When called with no arguments (i.e. by Flask as a before_request handler),
+    generates a short UUID for each request and logs the start of the request.
     """
+    if app is not None:
+        app.before_request(inject_request_id)
+        app.after_request(finalize_request_logging)
+        return
+
     try:
         g.request_id = str(uuid.uuid4())[:8]
         g.start_time = time.time()
@@ -66,7 +73,10 @@ def finalize_request_logging(response):
 
 def get_request_id() -> str:
     """Retrieve the current request_id, defaulting to 'N/A'."""
-    return getattr(g, "request_id", "N/A")
+    try:
+        return getattr(g, "request_id", "N/A")
+    except RuntimeError:
+        return "N/A"
 
 
 def success_response(
@@ -114,7 +124,8 @@ def log_mfa_attempt(user, method: str, expiration: datetime | None) -> None:
     """
     try:
         _logger.info(
-            "MFA code generated",
+            "MFA code generated method=%s",
+            method,
             extra={
                 "user_id": getattr(user, "id", None),
                 "email": getattr(user, "email", None),

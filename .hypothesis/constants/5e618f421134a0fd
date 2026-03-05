@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/pdf_generator.py
+# hypothesis_version: 6.142.4
+
+[120, '# ', '%Y-%m-%dT%H%M%SZ', '*', '**', '<[^>]+>', 'Cockpit Export', 'HTML Export', 'Helvetica', 'Helvetica-Bold', 'Markdown Export', '_', '__', '```', 'audit', 'filename', 'filepath', 'operator', 'pdf', 'system', 'timestamp']

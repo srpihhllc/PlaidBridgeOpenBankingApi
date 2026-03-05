@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/cfpb_routes.py
+# hypothesis_version: 6.142.4
+
+[200, 400, 404, 500, '/api/cfpb/complaint', 'Complaint generated', 'General', 'POST', 'PlaidBridge', 'Template not found', 'Unspecified', 'cfpb', 'cfpb:complaints', 'company', 'description', 'error', 'issue', 'message', 'pdf_base64', 'pdf_size_bytes', 'product', 'submitted', 'submitted_at', 'user_id', 'utf-8']

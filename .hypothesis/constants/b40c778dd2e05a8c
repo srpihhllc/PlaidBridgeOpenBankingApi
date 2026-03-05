@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/seed_admin.py
+# hypothesis_version: 6.142.4
+
+[0.0, '--email', '--interactive', '--password', '0000000000', 'Admin email', 'Admin password', 'AdminPass123!', 'Default Bank', 'admin', 'admin@example.com', 'admin_user', 'checking', 'seed-admin', 'stub-bank-001']

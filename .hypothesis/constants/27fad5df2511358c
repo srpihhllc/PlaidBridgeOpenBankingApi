@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/borrower_card.py
+# hypothesis_version: 6.142.4
+
+['CASCADE', 'User', 'active', 'borrower_cards', 'users.id']

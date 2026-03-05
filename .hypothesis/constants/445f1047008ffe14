@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/debug_routes.py
+# hypothesis_version: 6.142.4
+
+[500, '%Y-%m-%d %H:%M:%S', '/config', '/debug', '/test', '1.0', 'Configuration probe', 'DEBUG', 'ENV', 'api_version', 'debug', 'details', 'environment', 'error', 'flask_app_name', 'message', 'redis_available', 'redis_client', 'status', 'success', 'timestamp', 'unknown', 'utc_now']

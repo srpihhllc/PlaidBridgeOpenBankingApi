@@ -38,9 +38,9 @@ def emit_blueprint_inspector():
 
     # 3) Log an identity event for auditing in your telemetry store
     log_identity_event(
-        "BLUEPRINT_INSPECTOR_EMIT",
         user_id=0,
-        meta={
+        event_type="BLUEPRINT_INSPECTOR_EMIT",
+        details={
             "status": "emitted",
             "source": "cli",
             "total_blueprints": len(blueprint_map),

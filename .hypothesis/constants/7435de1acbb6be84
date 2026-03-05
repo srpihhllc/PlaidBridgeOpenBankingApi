@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/subscriber_routes.py
+# hypothesis_version: 6.142.4
+
+['***@', '***REDACTED***', '/', '/subscriber', '/update_profile', '@', 'POST', 'anon', 'business_phone', 'email', 'first_name', 'get_id', 'id', 'info', 'last_name', 'main.dashboard', 'password', 'phone', 'primary_phone', 'secret', 'ssn', 'sub_ui.sub_index', 'subscriber', 'success', 'tel', 'token', 'unknown']

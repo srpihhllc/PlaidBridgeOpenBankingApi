@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/letter_writer.py
+# hypothesis_version: 6.142.4
+
+['%B %d, %Y', '%Y%m%d_%H%M%S', 'L3_DISPUTE', 'N/A', 'Unknown Address', 'Unknown Lender', 'Unknown User', '[No letter content]', 'account_number', 'address', 'bundle_all_letters', 'date', 'dispute_details', 'dispute_reason', 'full_name', 'generate_letter_3', 'institution_name', 'lender_address', 'lender_name', 'log_id', 'mailing_address', 'user_address', 'user_name']

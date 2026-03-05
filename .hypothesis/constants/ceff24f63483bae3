@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/seed_mock_bank_transfers_summary.py
+# hypothesis_version: 6.142.4
+
+['%Y-%m-%d %H:%M', '--count', '--email', 'Amount', 'Channel', 'ID', 'Timestamp', 'Type', 'fancy_grid', '❌ User not found.']

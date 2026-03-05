@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/security/api_key_auth.py
+# hypothesis_version: 6.142.4
+
+[401, 403, '100/hour', 'DEFAULT_API_KEY', 'Invalid API key', 'X-API-Key', 'X-Client-ID', 'api_key', 'client_id', 'default_client', 'permissions', 'rate_limit', 'read', 'test_api_key']

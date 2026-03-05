@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/babel/support.py
+# hypothesis_version: 6.142.4
+
+[0.85, '%s\x04%s', '<%s: "%s">', '_args', '_attribute_error', '_func', '_is_cache_enabled', '_kwargs', '_output_charset', '_value', 'domain', 'enable_cache', 'long', 'medium', 'messages', 'name', 'project-id-version', 'rb', 'second']

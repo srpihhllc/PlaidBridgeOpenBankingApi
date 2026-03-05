@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/routes/tiles.py
+# hypothesis_version: 6.142.4
+
+[500, '/pulse', '/tiles', 'GET', 'error', 'failures', 'key', 'message', 'ok', 'pulse/error', 'pulse/fetch', 'status', 'tiles', 'ttl:failures:*', 'value']

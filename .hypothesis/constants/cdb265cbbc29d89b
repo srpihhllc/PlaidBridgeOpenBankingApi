@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/introspection.py
+# hypothesis_version: 6.142.4
+
+['/cortex_map', '/cortex_overlay.svg', '/diagnose_brain', '/introspection', ':', 'GET', 'Never', 'POST', 'client_ip', 'endpoint', 'hits', 'introspection', 'last_accessed', 'route_hits:*', 'route_usage:*', 'unknown']

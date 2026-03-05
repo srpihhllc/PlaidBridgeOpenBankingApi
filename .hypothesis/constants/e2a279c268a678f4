@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/mfa_service.py
+# hypothesis_version: 6.142.4
+
+[b'valid', 300, 100000, 999999, 'Your MFA Code', 'valid']

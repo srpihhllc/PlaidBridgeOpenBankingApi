@@ -3,3 +3,5 @@
 *.log
 *.pyc
 __pycache__/
+.coverage
+.hypothesis/

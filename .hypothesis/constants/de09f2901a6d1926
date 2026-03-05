@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/underwriter.py
+# hypothesis_version: 6.142.4
+
+[255, 'CASCADE', 'User', 'active', 'underwriter_agents', 'underwriter_profiles', 'users.id']
