@@ -8,7 +8,7 @@ sys.path.insert(0, ".")
 from PlaidBridgeOpenBankingApi.app import create_app
 from PlaidBridgeOpenBankingApi.app.extensions import db
 
-app = create_app({"TESTING": True})
+app = create_app()\r\napp.config.update({"TESTING": True})
 with app.app_context():
     # create tables as tests do
     db.create_all()
