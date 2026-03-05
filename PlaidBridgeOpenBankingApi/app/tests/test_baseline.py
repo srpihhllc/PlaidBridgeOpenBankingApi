@@ -75,9 +75,9 @@ USER_FK_TABLES = [
         lambda: {"id": str(uuid.uuid4()), "tok": "tokentest"},
     ),
     (
-        "audit_log",
+        "audit_logs",
         "user_id",
-        "INSERT INTO audit_log (user_id, action) VALUES (:uid, 'test_action')",
+        "INSERT INTO audit_logs (user_id, event_type, payload, created_at) VALUES (:uid, 'test_action', '{}', CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -145,9 +145,9 @@ USER_FK_TABLES = [
         lambda: {},
     ),
     (
-        "financial_audit_log",
+        "financial_audit_logs",
         "actor_id",
-        "INSERT INTO financial_audit_log (actor_id, action) VALUES (:uid, 'test_action')",
+        "INSERT INTO financial_audit_logs (actor_id, action_type, description, created_at) VALUES (:uid, 'test_action', 'desc', CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -248,13 +248,13 @@ USER_FK_TABLES = [
     (
         "timeline_events",
         "user_id",
-        "INSERT INTO timeline_events (user_id, event_type) VALUES (:uid, 'test_event')",
+        "INSERT INTO timeline_events (user_id, label) VALUES (:uid, 'test_event')",
         lambda: {},
     ),
     (
         "todos",
         "user_id",
-        "INSERT INTO todos (user_id, title) VALUES (:uid, 'test_todo')",
+        "INSERT INTO todos (user_id, text, completed, priority, created_at, updated_at) VALUES (:uid, 'test_todo', 0, 'normal', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -385,11 +385,30 @@ def test_bank_transactions_fk_and_cascade(app):
     """Verifies bank_transactions references valid accounts and cleans up on delete."""
     with app.app_context():
         db.create_all()  # Ensure tables are created
+        # Use a nested session transaction so changes are rolled back automatically
         with db.session.begin_nested():
+            # Acquire the session's Connection and use it for all raw SQL so PRAGMA applies.
             conn = db.session.connection()
+            conn.execute(sa.text("PRAGMA foreign_keys = ON;"))
+
             admin_id = get_admin_id(conn)
 
-            # Setup Parent Account
+            # If there's no seeded admin, create a minimal fallback admin user so
+            # this test can proceed and still validate FK/cascade behavior.
+            if admin_id is None:
+                fallback_id = str(uuid.uuid4())
+                fallback_user = User(
+                    id=fallback_id,
+                    username=f"test_admin_for_fk",
+                    email=f"test_admin_for_fk_{fallback_id}@example.invalid",
+                    password_hash="nosync",
+                    is_admin=True,
+                )
+                db.session.add(fallback_user)
+                db.session.flush()  # make it visible to raw SQL below
+                admin_id = fallback_id
+
+            # Setup Parent Account using the same Connection
             conn.execute(
                 sa.text(
                     "INSERT INTO bank_accounts (id, user_id, account_type, account_number, "
@@ -408,7 +427,7 @@ def test_bank_transactions_fk_and_cascade(app):
                 )
             )
 
-            # Invalid Insert (Bad Account ID)
+            # Invalid Insert (Bad Account ID) — should raise because FK enforces referential integrity
             with pytest.raises(sa.exc.IntegrityError):
                 conn.execute(
                     sa.text(
@@ -516,3 +535,8 @@ def test_ensure_all_user_related_tables_have_cascades(app):
                         f"Table '{table_name}' has a FK to 'users' but is missing "
                         "ON DELETE CASCADE!"
                     )
+
+
+
+
+
