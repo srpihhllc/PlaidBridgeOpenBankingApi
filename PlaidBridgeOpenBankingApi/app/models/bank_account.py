@@ -1,5 +1,5 @@
 ﻿from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, DateTime
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from app.extensions import db
 
@@ -7,7 +7,8 @@ class BankAccount(db.Model):
     __tablename__ = "bank_accounts"
 
     id = Column(Integer, primary_key=True)
-    user_id = Column(String(36), nullable=False)
+    # user_id must reference users.id so relationships can be resolved
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False)
     account_type = Column(String(32))
     account_number = Column(String(64))
     balance = Column(Float, default=0.0)
