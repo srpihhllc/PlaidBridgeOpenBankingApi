@@ -254,7 +254,7 @@ USER_FK_TABLES = [
     (
         "todos",
         "user_id",
-        "INSERT INTO todos (user_id, text, completed, created_at, updated_at) VALUES (:uid, 'test_todo', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        "INSERT INTO todos (user_id, text, completed, priority, created_at, updated_at) VALUES (:uid, 'test_todo', 0, 'normal', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -516,6 +516,7 @@ def test_ensure_all_user_related_tables_have_cascades(app):
                         f"Table '{table_name}' has a FK to 'users' but is missing "
                         "ON DELETE CASCADE!"
                     )
+
 
 
 
