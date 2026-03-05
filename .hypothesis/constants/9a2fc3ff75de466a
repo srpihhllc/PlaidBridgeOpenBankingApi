@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/admin/cockpit/trace/event_id.py
+# hypothesis_version: 6.142.4
+
+[404, 'trace_event']

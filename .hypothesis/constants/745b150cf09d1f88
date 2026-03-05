@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/seed_subscriber.py
+# hypothesis_version: 6.142.4
+
+[100.0, '--email', '--interactive', '--password', '--username', '0001112223', 'Demo Bank', 'Prompt for fields', 'Subscriber email', 'Subscriber password', 'Subscriber username', 'Test1234!', 'checking', 'demo-bank-001', 'seed-subscriber', 'subscriber', 'subscriber_user']

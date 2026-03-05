@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/loan_agreement.py
+# hypothesis_version: 6.142.4
+
+['CASCADE', 'User', 'active', 'extend_existing', 'joined', 'lent_loan_agreements', 'loan_agreement', 'users.id']

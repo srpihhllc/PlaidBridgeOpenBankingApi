@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/commands.py
+# hypothesis_version: 6.142.4
+
+[142, 300, '/', '/admin/console', '/api/v1/users', 'GET', 'POST, GET', '__main__', 'admin.console_view', 'api.users', 'cockpit:route-map', 'endpoint', 'index', 'methods', 'rule', 'success', 'ttl:boot:route_count']

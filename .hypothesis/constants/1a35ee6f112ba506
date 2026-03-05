@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli_commands/cli_template_inheritance.py
+# hypothesis_version: 6.142.4
+
+['REDIS_URL', 'template_inheritance']

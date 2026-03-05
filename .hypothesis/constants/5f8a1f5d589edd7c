@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/babel/numbers.py
+# hypothesis_version: 6.142.4
+
+[1000, '#', '%', '%s%s%s', '(?P<number>%s*)', '(?P<suffix>.*)', '+', ',', '-', '.', '0', ';', '<%s %r>', '@', '@0', 'DEFAULT', 'E', 'LC_NUMERIC', 'Unknown currency %r.', '[0-9@#.,E+]', '[^0-9@#.,]', 'all_currencies', 'currency', 'currency_fractions', 'decimal', 'exponential', 'from', 'group', 'minusSign', 'name', 'other', 'plusSign', 'standard', 'tender', 'territory_currencies', 'to', '{:f}', '¤', '¤¤', '¤¤¤', '‰']

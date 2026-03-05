@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/bank_transaction_generator.py
+# hypothesis_version: 6.142.4
+
+[2500, 'ACH', 'CCD', 'INTERNAL', 'PPD', 'TEL', 'WEB', 'WIRE', 'ach', 'internal', 'mobile', 'online', 'teller', 'wire']

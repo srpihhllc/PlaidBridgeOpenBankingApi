@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/extensions.py
+# hypothesis_version: 6.142.4
+
+[280, ',', '10', '200 per day', '280', '30', '5', '50 per hour', 'LIMITER_DEFAULTS', 'RATELIMIT_STRATEGY', 'RATE_LIMIT_ENABLED', 'REDIS_STORAGE_URI', 'REDIS_URL', 'Redis', 'SQLALCHEMY_POOL_SIZE', 'TESTING', 'ck', 'csrf', 'extensions', 'fixed-window', 'fk', 'in-memory', 'ix', 'jti', 'jwt', 'login', 'mail', 'max_overflow', 'migrate', 'pk', 'pk_%(table_name)s', 'pool_pre_ping', 'pool_recycle', 'pool_size', 'pool_timeout', 'redis', 'redis_client', 'socketio', 'sub', 'threading', 'unknown-host', 'uq', '✉️ Mail initialized.', '🔐 JWT initialized.']

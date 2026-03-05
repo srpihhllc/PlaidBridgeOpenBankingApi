@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/tiles/fk_constraint_inspector.py
+# hypothesis_version: 6.142.4
+
+['/', '/cockpit/fk', 'FK_INSPECTOR_FAIL', 'FK_INSPECTOR_OK', 'columns', 'constrained_columns', 'error', 'fk', 'fk_inspector_bp', 'issues', 'name', 'referred_table', 'table']

@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/api/validation.py
+# hypothesis_version: 6.142.4
+
+[422, 500, 'E_SCHEMA', 'E_VALIDATION', 'Malformed JSON body.', 'Request must be JSON', 'code', 'error', 'message', 'status']

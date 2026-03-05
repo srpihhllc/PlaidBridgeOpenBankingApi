@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/forms/mfa_forms.py
+# hypothesis_version: 6.142.4
+
+['Enable MFA', 'MFA Code', 'Setup Code', 'Verify']

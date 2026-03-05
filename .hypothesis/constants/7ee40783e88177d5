@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli_commands/cli_template_audit.py
+# hypothesis_version: 6.142.4
+
+[300, 600, 'cli', 'error', 'failure', 'ok', 'reason', 'redis_unavailable', 'source', 'success', 'summary', 'template_audit']

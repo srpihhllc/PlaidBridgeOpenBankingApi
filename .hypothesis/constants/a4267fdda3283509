@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/sms.py
+# hypothesis_version: 6.142.4
+
+[0.0, '????', '@', '@***', 'MFA_SEND_EMAIL_OK', 'MFA_SEND_NO_ADDRESS', 'MFA_SEND_OK', 'MFA_SEND_PERMANENT', 'MFA_SEND_SMS_OK', 'MFA_SEND_SMS_STUB', 'MFA_SEND_TRANSIENT', 'MFA_SEND_UNEXPECTED', 'attempt', 'email', 'error', 'id', 'mode', 'no delivery address', 'phone_last4', 'primary_phone', 'purpose', 'setup', 'sms', 'sms provider failure', 'telemetry: %s %s', 'user_id']

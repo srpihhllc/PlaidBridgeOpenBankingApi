@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/__init__.py
+# hypothesis_version: 6.142.4
+
+['blueprint_emit', 'cli_command_lattice', 'diagnostics_full', 'doctor', 'grant_pulse', 'init_app', 'reset_and_reseed', 'route_map_dump', 'seed_admin', 'seed_all', 'seed_everything', 'seed_fraud_cases', 'seed_lender', 'seed_subscriber', 'seed_timeline', 'seed_todos', 'statement_leaders', 'statement_pulse', 'sweep_endpoints', 'template_audit', 'template_block_audit', 'template_inheritance', 'test_cockpit_pdf', 'trace_templates']

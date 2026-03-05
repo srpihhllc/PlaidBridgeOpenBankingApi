@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/timeline_event.py
+# hypothesis_version: 6.142.4
+
+[255, 'CASCADE', 'User', 'timeline_events', 'users.id']

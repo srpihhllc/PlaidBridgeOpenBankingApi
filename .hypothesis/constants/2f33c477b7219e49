@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/api_response.py
+# hypothesis_version: 6.142.4
+
+[200, 400, 'E_UNKNOWN', 'Request successful.', 'data', 'error', 'error_code', 'generic', 'message', 'request_id', 'request_start_time', 'status', 'success', 'timestamp', 'unknown', 'version']

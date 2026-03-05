@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/bank_statement_generator.py
+# hypothesis_version: 6.142.4
+
+[-200.0, 1500.0, ' | ', '--pdf', '.jpeg', '.jpg', '.png', '.webp', '0.00', '123456789', '2025-08-01', '2025-08-05', 'Amount', 'Arial', 'B', 'Bank Statement', 'C', 'Date', 'Deposit', 'Description', 'First National Bank', 'Found Bank', 'FoundBankLogo.png', 'NM_LGL', 'NoLogo.png', 'Piermont Bank', 'PiermontBankLogo.png', 'S', 'Withdrawal', '__main__', 'amount', 'data', 'date', 'description', 'latin1', 'logos', 'static', 'tmp', '—']

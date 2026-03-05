@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/lender.py
+# hypothesis_version: 6.142.4
+
+[100, 150, 'CASCADE', 'User', 'address', 'bank_linked', 'business_name', 'created_at', 'id', 'institution_name', 'lender_profiles', 'lenders', 'license_number', 'linked_at', 'owner_name', 'pending', 'ssn_or_ein', 'user_id', 'users.id', 'verification_score', 'verification_status']

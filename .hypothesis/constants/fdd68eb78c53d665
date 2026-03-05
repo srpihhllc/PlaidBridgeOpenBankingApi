@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/forms/account_forms.py
+# hypothesis_version: 6.142.4
+
+[100, 255, 'Address', 'City', 'First Name', 'Last Name', 'State', 'Update Account', 'Zip Code']

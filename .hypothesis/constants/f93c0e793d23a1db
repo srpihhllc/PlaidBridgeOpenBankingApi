@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/template_inheritance_audit.py
+# hypothesis_version: 6.142.4
+
+[300, 600, '.html', '.jinja2', '/', '\\', 'admin', 'admin/', 'audit_fail', 'circular_inheritance', 'cli', 'cockpit', 'cockpit/', 'error', 'errors', 'global', 'ignore', 'inheritance_links', 'jinja_loader', 'missing_parents', 'ok', 'searchpath', 'sub/', 'subscriber', 'success', 'summary', 'template_inheritance', 'templates_scanned', 'utf-8']

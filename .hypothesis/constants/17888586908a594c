@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/pulse_routes.py
+# hypothesis_version: 6.142.4
+
+['/pulse', 'Cache-Control', 'GET', 'data', 'ok', 'public, max-age=5', 'pulse', 'status', 'token_id', 'vault_id']

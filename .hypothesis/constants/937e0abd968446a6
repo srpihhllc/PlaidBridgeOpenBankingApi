@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/services/mock_data_service.py
+# hypothesis_version: 6.142.4
+
+[0.0, 200, 250, 300, 500, 1000, 2000, 5000, 9999, '%Y-%m-%d', '021000021', 'ACH Credit', 'Amazon', 'Costco', 'Demo Community Bank', 'Found Bank', 'Lyft', 'Mock Federal Savings', 'Piermont Bank', 'Shell Gas', 'Starbucks', 'Stripe Payout', 'Target', 'USD', 'Uber', 'Walmart', 'Whole Foods', 'account', 'account_type', 'amount', 'analytics', 'available_balance', 'bank_name', 'category', 'category_totals', 'checking', 'credit_limit', 'currency', 'current_balance', 'date', 'description', 'expense_total', 'fuel', 'groceries', 'id', 'income', 'income_total', 'lender_user_id', 'misc', 'net_cash_flow', 'overdraft_limit', 'pdf_bytes', 'routing_number', 'subscriptions', 'transaction_count', 'uncategorized', 'utilities']

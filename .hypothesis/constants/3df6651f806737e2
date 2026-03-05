@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/constants/__init__.py
+# hypothesis_version: 6.142.4
+
+[300, '/admin/ignite-cortex', 'admin', 'app', 'boot', 'credit_admin', 'db_uri', 'debug', 'env', 'finance_admin', 'fraud_admin', 'log_level', 'login', 'logout', 'mfa_code', 'operator_mode', 'plaid_env', 'rate_limit', 'redis_uri', 'session', 'super_admin', 'testing', 'timezone', 'trace', 'tradeline_admin', 'version']

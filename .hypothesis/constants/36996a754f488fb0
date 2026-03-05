@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/utils.py
+# hypothesis_version: 6.142.4
+
+[401, 'Admin access denied', 'Authorization', 'E_AUTH_FAIL', 'code', 'danger', 'error', 'id', 'is_admin', 'main.home', 'message', 'role', 'status', 'user_id']

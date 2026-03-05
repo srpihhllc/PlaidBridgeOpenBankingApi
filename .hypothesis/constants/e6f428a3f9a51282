@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/credit_ledger.py
+# hypothesis_version: 6.142.4
+
+[0.0, 5000.0, 'CASCADE', 'User', 'credit_ledger', 'users.id']

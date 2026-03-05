@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/tiles/blueprint_inspector.py
+# hypothesis_version: 6.142.4
+
+[120, 500, '.', 'blueprint_inspector', 'emit_to_redis', 'endpoint', 'error', 'inspect_blueprints', 'message', 'methods', 'payload', 'redis_client', 'registered', 'routes', 'status', 'success', 'tile', 'url']

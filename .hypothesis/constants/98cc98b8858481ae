@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/forms/password_forms.py
+# hypothesis_version: 6.142.4
+
+['Change Password', 'Confirm New Password', 'Confirm Password', 'Current Password', 'Email', 'New Password', 'Passwords must match', 'Reset Password', 'confirm']

@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/bank_statement.py
+# hypothesis_version: 6.142.4
+
+[100, 'CASCADE', 'User', 'bank_statements', 'users.id']

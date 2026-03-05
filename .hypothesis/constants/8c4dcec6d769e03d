@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/decorators/__init__.py
+# hypothesis_version: 6.142.4
+
+['admin_required', 'log_identity_event', 'require_admin', 'roles_required', 'super_admin_required']

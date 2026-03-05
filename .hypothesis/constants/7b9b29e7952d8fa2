@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/constants/telemetry_keys.py
+# hypothesis_version: 6.142.4
+
+[900, 1800, 'ttl:boot:redis_ping']

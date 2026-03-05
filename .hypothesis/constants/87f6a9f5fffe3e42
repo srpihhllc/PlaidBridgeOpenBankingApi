@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils_legacy.py
+# hypothesis_version: 6.142.4
+
+[100, 200, 3600, 5000, 'API_TOKEN', 'Arial', 'Authorization', 'Bank Statement', 'C', 'Transactions:', 'account drained', 'active', 'amount', 'approved', 'contract_status', 'date', 'description', 'details', 'error', 'executed', 'failed', 'flagged', 'hidden fees', 'loan_agreement_id', 'notified', 'reason', 'replace', 'signature.png', 'srpihhllc', 'status', 'transactions', 'unauthorized payment', 'under_contract', 'utf-8', 'wb']

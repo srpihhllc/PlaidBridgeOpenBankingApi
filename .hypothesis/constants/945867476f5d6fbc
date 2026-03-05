@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/template_block_audit.py
+# hypothesis_version: 6.142.4
+
+[300, 600, '.html', '.jinja2', '/', '\\', 'admin', 'admin/', 'audit_fail', 'block_definitions', 'body', 'cli', 'cockpit', 'cockpit/', 'content', 'error', 'errors', 'global', 'head', 'ignore', 'jinja_loader', 'navbar', 'ok', 'scripts', 'searchpath', 'styles', 'sub', 'sub/', 'subscriber', 'success', 'summary', 'template_block_audit', 'templates_scanned', 'utf-8']

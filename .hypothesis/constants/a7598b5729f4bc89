@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/mfa_code.py
+# hypothesis_version: 6.142.4
+
+[600, 'CASCADE', 'User', 'code', 'created_at', 'expires_at', 'fail_count', 'id', 'joined', 'mfa_codes', 'time_remaining', 'user_id', 'users.id']

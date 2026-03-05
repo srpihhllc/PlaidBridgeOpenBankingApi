@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/complaint_log.py
+# hypothesis_version: 6.142.4
+
+['CASCADE', 'Transaction', 'User', 'complaint_logs', 'transactions.id', 'users.id']

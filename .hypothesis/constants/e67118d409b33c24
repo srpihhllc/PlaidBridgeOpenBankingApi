@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/models/trace_events.py
+# hypothesis_version: 6.142.4
+
+[120, 128, 'CASCADE', 'User', 'trace_events', 'users.id']

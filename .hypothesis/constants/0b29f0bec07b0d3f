@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/telemetry/ttl_emit.py
+# hypothesis_version: 6.142.4
+
+[0.1, -300, 'N/A', 'emit_boot_trace', 'emit_schema_trace', 'expires_at', 'flush_emit_queue', 'fresh', 'meta', 'ok', 'pipeline', 'remaining_seconds', 'safe_emit', 'seconds', 'set', 'setex', 'status', 'timestamp', 'trace_log', 'ttl_emit', 'ttl_seconds', 'ttl_summary', 'value']

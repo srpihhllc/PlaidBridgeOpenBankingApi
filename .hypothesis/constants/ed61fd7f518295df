@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/tiles/mutation_submit_tile.py
+# hypothesis_version: 6.142.4
+
+['/', '/cockpit/mutation', 'None', 'mutation:submit:last', 'mutation_submit_tile']

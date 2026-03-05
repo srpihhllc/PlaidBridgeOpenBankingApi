@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/diagnostics.py
+# hypothesis_version: 6.142.4
+
+[200, 1000, '*', '/console', '/db_health', '/diagnostics', '/full', '/routes', '1.0.0', 'APP_VERSION', 'DIAGNOSTICS_CLI_MODE', 'ENV', 'Error', 'HEAD', 'Handshake successful', 'MAINTENANCE_MODE', 'N/A', 'OPTIONS', 'SELECT 1', 'Stats unavailable', 'Unknown', 'admin/db_health.html', 'alembic.ini', 'alembic_head', 'app_version', 'cache', 'config_summary', 'database', 'db', 'db_revision', 'degraded', 'diagnostics', 'endpoint', 'env', 'error', 'generation_ms', 'infra', 'integrity', 'latency_ms', 'maintenance_mode', 'message', 'meta', 'methods', 'mfa', 'online', 'production', 'rate', 'redis', 'session', 'stats', 'synced', 'timestamp', 'total_keys', 'total_users', 'unapproved_users', 'url', 'volatile_alerts']

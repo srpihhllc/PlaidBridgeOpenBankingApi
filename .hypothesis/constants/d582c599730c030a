@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli/seed_mock_bank_transfers_audit.py
+# hypothesis_version: 6.142.4
+
+[5000, 'amount', 'category', 'credit', 'debit', 'direction', 'high', 'normal', 'risk_flag', 'timestamp', 'transaction_id']

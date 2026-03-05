@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/bad_method_probe_tile.py
+# hypothesis_version: 6.142.4
+
+[200, ':', 'GET', 'age_seconds', 'ip', 'method', 'path', 'probe_bp', 'referer', 'repeats', 'trace:bad_method:*', 'traces']

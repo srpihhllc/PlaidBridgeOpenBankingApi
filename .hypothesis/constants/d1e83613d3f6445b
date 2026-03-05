@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/user_helpers.py
+# hypothesis_version: 6.142.4
+
+['User role evaluated', 'admin', 'id', 'is_admin', 'role', 'user_id']

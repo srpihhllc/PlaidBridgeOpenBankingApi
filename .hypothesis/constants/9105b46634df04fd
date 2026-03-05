@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/__init__.py
+# hypothesis_version: 6.142.4
+
+[200, 280, 400, 401, 403, 404, 422, 500, 503, '/admin', '/diagnostics', '/health', '/static', '1', 'ALEMBIC_RUNNING', 'APP_VERSION', 'ENV', 'HTTP %s (%s): %s', 'HTTPException', 'MAINTENANCE_MODE', 'SECRET_KEY', 'Service Unavailable', 'TESTING', 'Unprocessable Entity', 'app_version', 'create_app', 'description', 'error', 'get_app', 'jti', 'max_overflow', 'msg', 'name', 'ok', 'pool_pre_ping', 'pool_recycle', 'pool_size', 'pool_timeout', 'poolclass', 'production', 'socketio', 'sqlite', 'static', 'status', 'templates', 'test-secret', 'users', 'view_functions']

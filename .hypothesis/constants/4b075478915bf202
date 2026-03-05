@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cockpit/routes/telemetry_dashboard.py
+# hypothesis_version: 6.142.4
+
+[100, '../../templates', '/cockpit/telemetry', 'ERROR', 'EXPIRED', 'N/A', 'OK', 'True', 'cockpit_bp', 'expires_at', 'fresh', 'key', 'redis_client', 'redis_status', 'redis_ttl', 'redis_value', 'remaining_seconds', 'utf-8']

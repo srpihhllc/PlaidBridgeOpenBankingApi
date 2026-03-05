@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/decorators/access.py
+# hypothesis_version: 6.142.4
+
+[403, 'Forbidden', 'ROLE_ACCESS_DENIED', 'admin', 'auth.login', 'error', 'id', 'info', 'is_admin', 'is_authenticated', 'msg', 'reason', 'required_roles', 'role', 'roles', 'super_admin']

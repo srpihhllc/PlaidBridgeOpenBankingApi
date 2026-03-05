@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/liquidity_routes.py
+# hypothesis_version: 6.142.4
+
+[24872.0, 100, 2100, 2800, 3200, 3900, 4100, 4172, 4700, '/dashboard', '/liquidity', 'Fri', 'Mon', 'Sat', 'Sun', 'Thu', 'Tue', 'Wed', 'liquidity_bp']

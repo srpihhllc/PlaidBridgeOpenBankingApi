@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/config.py
+# hypothesis_version: 6.142.4
+
+[280, ',', '..', '.env', '0.0.1', '1', '200 per day', '3306', '50 per hour', 'ALEMBIC_RUNNING', 'APP_NAME', 'APP_VERSION', 'DB_HOST', 'DB_NAME', 'DB_PASSWORD', 'DB_PORT', 'DB_USER', 'DEV_', 'DEV_JWT_SECRET', 'DEV_SECRET_KEY', 'FLASK_ENV', 'JWT_SECRET_KEY', 'SECRET_KEY', 'SELECT 1', 'TIMEZONE', 'UTC', 'app', 'csrf_enabled', 'db_host', 'db_name', 'db_user', 'debug', 'development', 'env', 'fixed-window', 'pool_pre_ping', 'pool_recycle', 'production', 'rate_limit_enabled', 'sqlite:///:memory:', 'testing', 'true', 'version', 'yes', '═']

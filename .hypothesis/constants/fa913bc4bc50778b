@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli_commands/diagnostics_cli.py
+# hypothesis_version: 6.142.4
+
+['\nWatcher stopped.', '%H:%M:%S', '--watch', '/__cli_diagnostics__', 'DIAGNOSTICS_CLI_MODE', 'clear', 'cls', 'cyan', 'database', 'diagnostics-full', 'error', 'infra', 'message', 'nt', 'online', 'red', 'type', 'yellow']

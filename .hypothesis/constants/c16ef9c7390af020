@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/blueprints/letter_routes.py
+# hypothesis_version: 6.142.4
+
+[200, 500, 'Content-Disposition', 'Content-Type', 'POST', 'application/pdf', 'error', 'letter', 'letters']

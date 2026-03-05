@@ -1,0 +1,4 @@
+# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli_commands/blueprint_drift_tracer.py
+# hypothesis_version: 6.142.4
+
+[300, '__main__', 'app.blueprints', 'blueprint_drift', 'blueprints', 'bp', 'cli', 'error', 'fail', 'failures', 'grant_writer', 'ok', 'pass', 'success']
