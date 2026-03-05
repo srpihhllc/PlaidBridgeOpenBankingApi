@@ -4,14 +4,14 @@ import sqlalchemy as sa
 # ensure repo root is importable
 sys.path.insert(0, ".")
 
-# Build the app using the testing config so we use the SQLite test DB settings
-from PlaidBridgeOpenBankingApi.app import create_app
+# Import factory the same way the application uses it (top-level 'app' package)
+from app import create_app
 
 # create app using the environment name the factory expects
 app = create_app("testing")
 
 # Import db AFTER the app factory to avoid duplicate-table mapping problems
-from PlaidBridgeOpenBankingApi.app.extensions import db
+from app.extensions import db
 
 with app.app_context():
     # create tables as tests do
