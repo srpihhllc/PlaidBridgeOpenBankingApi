@@ -14,6 +14,9 @@ class BankAccount(db.Model):
     balance = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Relationship back to User  User likely defines `bank_accounts`
+    user = relationship("User", back_populates="bank_accounts")
+
     # Use passive_deletes=True so SQLAlchemy defers deletes to the DB cascade.
     transactions_from = relationship(
         "BankTransaction",
