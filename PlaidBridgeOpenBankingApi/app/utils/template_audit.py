@@ -215,3 +215,16 @@ def audit_template_wiring(redis_client: redis.Redis) -> dict[str, int]:
         _logger.warning("⚠️ Could not update Redis aggregation: %s", agg_err)
 
     return summary
+
+
+def run():
+    """
+    Compatibility wrapper so scripts/audit.py can call template_audit.run().
+    Runs audit_template_wiring() within the current application context,
+    using a no-op Redis stub when no real client is available.
+    """
+    from app.utils.redis_utils import get_redis_client
+
+    redis_client = get_redis_client()
+    summary = audit_template_wiring(redis_client)
+    _logger.info("Template audit summary: %s", summary)
