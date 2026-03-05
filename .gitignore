@@ -53,3 +53,10 @@ htmlcov/
 
 
 mobile-app/node_modules/
+
+# ignore runtime deps
+node_modules/
+.venv/
+venv/
+.env
+
