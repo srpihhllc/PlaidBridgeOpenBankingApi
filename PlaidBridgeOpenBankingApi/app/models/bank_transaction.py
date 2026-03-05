@@ -13,8 +13,8 @@ class BankTransaction(db.Model):
     __tablename__ = "bank_transactions"
 
     id = db.Column(db.Integer, primary_key=True)
-    from_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id"), nullable=True)
-    to_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id"), nullable=True)
+    from_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True)
+    to_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True)
 
     amount = db.Column(db.Float, nullable=False)
     txn_type = db.Column(db.String(32))  # transfer, ach, wire, internal
@@ -34,6 +34,7 @@ class BankTransaction(db.Model):
         back_populates="outgoing_transactions",
         foreign_keys=[from_account_id],
         lazy=True,
+        passive_deletes=True,
     )
 
     to_account = db.relationship(
@@ -41,6 +42,7 @@ class BankTransaction(db.Model):
         back_populates="incoming_transactions",
         foreign_keys=[to_account_id],
         lazy=True,
+        passive_deletes=True,
     )
 
     def __repr__(self):
