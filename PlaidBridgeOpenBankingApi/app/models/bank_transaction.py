@@ -44,7 +44,7 @@ class BankTransaction(db.Model):
     receiving_routing = Column(String(9))
     payment_channel = Column(String(20))
 
-    # Relationships  leave passive_deletes=True so DB handles cascade semantics.
+    # Relationships — leave passive_deletes=True so DB handles cascade semantics.
     from_account = relationship(
         "BankAccount",
         foreign_keys=[from_account_id],
