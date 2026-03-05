@@ -49,3 +49,4 @@ class BankTransaction(db.Model):
             f"to={self.to_account_id} amount={self.amount}>"
         )
 
+
