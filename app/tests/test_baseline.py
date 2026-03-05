@@ -387,7 +387,26 @@ def test_bank_transactions_fk_and_cascade(app):
         db.create_all()  # Ensure tables are created
         with db.session.begin_nested():
             conn = db.session.connection()
+            # Ensure SQLite enforces foreign keys on this connection
+            conn.execute(sa.text("PRAGMA foreign_keys = ON;"))
+
             admin_id = get_admin_id(conn)
+
+            # If there's no seeded admin, create a minimal fallback admin user so
+            # this test can proceed and still validate FK/cascade behavior.
+            if admin_id is None:
+                # Use the ORM so that the inserted user is visible to the same DB session/connection.
+                fallback_id = str(uuid.uuid4())
+                fallback_user = User(
+                    id=fallback_id,
+                    username=f"test_admin_for_fk",
+                    email=f"test_admin_for_fk_{fallback_id}@example.invalid",
+                    password_hash="nosync",
+                    is_admin=True,
+                )
+                db.session.add(fallback_user)
+                db.session.flush()  # make it visible to raw SQL below
+                admin_id = fallback_id
 
             # Setup Parent Account
             conn.execute(
@@ -408,7 +427,7 @@ def test_bank_transactions_fk_and_cascade(app):
                 )
             )
 
-            # Invalid Insert (Bad Account ID)
+            # Invalid Insert (Bad Account ID) — should raise because FK enforces referential integrity
             with pytest.raises(sa.exc.IntegrityError):
                 conn.execute(
                     sa.text(
