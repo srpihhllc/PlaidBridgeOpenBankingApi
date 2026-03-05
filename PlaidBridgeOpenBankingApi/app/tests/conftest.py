@@ -1,6 +1,8 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/conftest.py
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy import event
 
 from app import create_app
 from app.extensions import db
@@ -19,6 +21,28 @@ def app():
     app.config["TESTING"] = True
 
     # DO NOT override RATE_LIMIT_ENABLED here - let TestingConfig handle it
+
+    # Register an engine-level connect listener so PRAGMA foreign_keys=ON is
+    # applied to every new DBAPI connection.  SQLite's FK enforcement is
+    # per-connection, so this must be done here (not just inside a test).
+    with app.app_context():
+        @event.listens_for(db.engine, "connect")
+        def set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+        # For SQLite with StaticPool (in-memory), the single DBAPI connection
+        # is created before this fixture runs, so also apply the PRAGMA to any
+        # already-established connection in the pool right now.
+        if app.config.get("SQLALCHEMY_DATABASE_URI", "").startswith("sqlite"):
+            raw = db.engine.raw_connection()
+            try:
+                cursor = raw.cursor()
+                cursor.execute("PRAGMA foreign_keys=ON")
+                cursor.close()
+            finally:
+                raw.close()
 
     return app
 
