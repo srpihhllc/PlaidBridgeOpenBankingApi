@@ -1,4 +1,0 @@
-# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/cli_commands/emit_blueprint_inspector.py
-# hypothesis_version: 6.142.4
-
-[3600, 'blueprint_inspector', 'cli', 'emitted', 'ok', 'source', 'status', 'summary', 'total_blueprints']

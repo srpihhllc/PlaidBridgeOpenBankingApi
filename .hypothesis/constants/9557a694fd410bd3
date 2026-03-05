@@ -1,4 +1,0 @@
-# file: /home/runner/work/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/PlaidBridgeOpenBankingApi/app/utils/template_audit.py
-# hypothesis_version: 6.142.4
-
-[300, 600, '.html', '.jinja2', 'app', 'audit_fail', 'cli', 'endpoints_found', 'error', 'errors', 'globals', 'ignore', 'jinja_env', 'jinja_loader', 'missing_app_context', 'missing_endpoints', 'ok', 'reason', 'searchpath', 'success', 'summary', 'template_audit', 'templates_scanned', 'utf-8']
