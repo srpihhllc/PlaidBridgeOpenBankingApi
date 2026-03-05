@@ -387,13 +387,11 @@ def test_bank_transactions_fk_and_cascade(app):
         db.create_all()  # Ensure tables are created
         # Use a nested session transaction so changes are rolled back automatically
         with db.session.begin_nested():
-            # Ensure the session's underlying connection enforces SQLite foreign keys.
-            # Run PRAGMA using the session so it applies to the same connection used below.
-            db.session.execute(sa.text("PRAGMA foreign_keys = ON;"))
+            # Acquire the session's Connection and use it for all raw SQL so PRAGMA applies.
+            conn = db.session.connection()
+            conn.execute(sa.text("PRAGMA foreign_keys = ON;"))
 
-            # Use the session connection for introspection/seed lookup
-            session_conn = db.session.connection()
-            admin_id = get_admin_id(session_conn)
+            admin_id = get_admin_id(conn)
 
             # If there's no seeded admin, create a minimal fallback admin user so
             # this test can proceed and still validate FK/cascade behavior.
@@ -410,8 +408,8 @@ def test_bank_transactions_fk_and_cascade(app):
                 db.session.flush()  # make it visible to raw SQL below
                 admin_id = fallback_id
 
-            # Setup Parent Account using the session (same connection)
-            db.session.execute(
+            # Setup Parent Account using the same Connection
+            conn.execute(
                 sa.text(
                     "INSERT INTO bank_accounts (id, user_id, account_type, account_number, "
                     "balance, created_at) VALUES (99031, :uid, 'checking', 'ACC_X', 10.0, "
@@ -421,7 +419,7 @@ def test_bank_transactions_fk_and_cascade(app):
             )
 
             # Setup Transaction (Child)
-            db.session.execute(
+            conn.execute(
                 sa.text(
                     "INSERT INTO bank_transactions (id, from_account_id, to_account_id, "
                     "amount, txn_type, method, timestamp) VALUES (99033, 99031, 99031, 5.0, "
@@ -431,7 +429,7 @@ def test_bank_transactions_fk_and_cascade(app):
 
             # Invalid Insert (Bad Account ID) — should raise because FK enforces referential integrity
             with pytest.raises(sa.exc.IntegrityError):
-                db.session.execute(
+                conn.execute(
                     sa.text(
                         "INSERT INTO bank_transactions (id, from_account_id, to_account_id, "
                         "amount) VALUES (99034, 999999, 99031, 5.0)"
@@ -439,8 +437,8 @@ def test_bank_transactions_fk_and_cascade(app):
                 )
 
             # Test CASCADE: Delete Parent, check if Child vanishes
-            db.session.execute(sa.text("DELETE FROM bank_accounts WHERE id=99031"))
-            child = db.session.execute(
+            conn.execute(sa.text("DELETE FROM bank_accounts WHERE id=99031"))
+            child = conn.execute(
                 sa.text("SELECT id FROM bank_transactions WHERE id=99033")
             ).fetchone()
             assert child is None, "CASCADE delete failed; orphan transaction remains."
