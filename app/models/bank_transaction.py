@@ -7,7 +7,7 @@ class BankTransaction(db.Model):
     __tablename__ = "bank_transactions"
 
     id = db.Column(db.Integer, primary_key=True)
-    # Add ondelete="CASCADE" so deletes on BankAccount cascade to transactions
+    # Ensure deletes on BankAccount cascade to transactions
     from_account_id = db.Column(
         db.Integer,
         db.ForeignKey("bank_accounts.id", ondelete="CASCADE"),
