@@ -1,4 +1,4 @@
-# =============================================================================
+﻿# =============================================================================
 # FILE: app/extensions.py
 # DESCRIPTION: Core Flask Extensions & Service Bindings (hardened)
 # =============================================================================
@@ -16,9 +16,13 @@ from __future__ import annotations
 
 import logging
 import os
-import sqlite3
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
+
+# --- sqlite + SQLAlchemy connect listener imports ---
+import sqlite3
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
@@ -29,26 +33,11 @@ from flask_migrate import Migrate
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
-from sqlalchemy import MetaData, event
-from sqlalchemy.engine import Engine
+from sqlalchemy import MetaData
 
 from PlaidBridgeOpenBankingApi.app.utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
-
-
-# --- SQLite foreign-key enforcement ---
-@event.listens_for(Engine, "connect")
-def _set_sqlite_pragma(dbapi_connection, connection_record):
-    try:
-        if isinstance(dbapi_connection, sqlite3.Connection):
-            cur = dbapi_connection.cursor()
-            cur.execute("PRAGMA foreign_keys = ON")
-            cur.close()
-    except Exception:
-        # Do not raise during connect; log if desired.
-        logger.debug("Failed to set PRAGMA foreign_keys on connect", exc_info=True)
-
 
 # --- SQLAlchemy naming convention ---
 naming_convention: Dict[str, str] = {
@@ -101,6 +90,23 @@ class _NoopLimiter:
 limiter: Limiter | _NoopLimiter | None = None
 
 
+# --- SQLite: enforce PRAGMA foreign_keys on every raw sqlite3 connection ---
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    """
+    Ensure SQLite enforces FK constraints on each DB-API connection.
+    This is safe and non-destructive; it only sets a connection-local PRAGMA.
+    """
+    try:
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            cur = dbapi_connection.cursor()
+            cur.execute("PRAGMA foreign_keys = ON")
+            cur.close()
+    except Exception:
+        # Log at debug level so CI/maintainers can diagnose failures without failing startup
+        logger.debug("Failed to set PRAGMA foreign_keys on sqlite connection", exc_info=True)
+
+
 # --- Helpers ---
 def _already_registered(app: Any, key: str) -> bool:
     exts = getattr(app, "extensions", {})
@@ -123,12 +129,12 @@ def _build_engine_options_from_env() -> Dict[str, Any]:
 
 def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
     if app.config.get("TESTING"):
-        app.logger.info("⏱️ Limiter disabled for testing (TESTING=True).")
+        app.logger.info(" Limiter disabled for testing (TESTING=True).")
         return _NoopLimiter()
 
     if not app.config.get("RATE_LIMIT_ENABLED", True):
         app.logger.info(
-            "⏱️ Limiter disabled by configuration (RATE_LIMIT_ENABLED=False)."
+            " Limiter disabled by configuration (RATE_LIMIT_ENABLED=False)."
         )
         return _NoopLimiter()
 
@@ -163,11 +169,11 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
         )
         backend_type = "Redis" if redis_enabled else "in-memory"
         app.logger.info(
-            "⏱️ Limiter created (%s backend, not yet initialized)", backend_type
+            " Limiter created (%s backend, not yet initialized)", backend_type
         )
         return limiter_instance
     except Exception as exc:
-        app.logger.error("❌ Limiter creation failed: %s — falling back to no-op", exc)
+        app.logger.error(" Limiter creation failed: %s  falling back to no-op", exc)
         return _NoopLimiter()
 
 
@@ -192,11 +198,11 @@ def init_extensions(app: Any) -> None:
     if not _already_registered(app, "migrate"):
         db.init_app(app)
         migrate.init_app(app, db)
-        app.logger.info("🗄️ SQLAlchemy and Migrate initialized.")
+        app.logger.info(" SQLAlchemy and Migrate initialized.")
 
     if not _already_registered(app, "jwt"):
         jwt.init_app(app)
-        app.logger.info("🔐 JWT initialized.")
+        app.logger.info(" JWT initialized.")
         try:
             from app.models.revoked_token import RevokedToken
             from app.models.user import User
@@ -215,23 +221,23 @@ def init_extensions(app: Any) -> None:
                     return None
 
         except Exception as exc:
-            app.logger.warning("⚠️ JWT handlers failed: %s", exc)
+            app.logger.warning(" JWT handlers failed: %s", exc)
 
     if not _already_registered(app, "mail"):
         mail.init_app(app)
-        app.logger.info("✉️ Mail initialized.")
+        app.logger.info(" Mail initialized.")
 
     if not _already_registered(app, "socketio"):
         socketio.init_app(app)
-        app.logger.info("🧵 SocketIO initialized.")
+        app.logger.info(" SocketIO initialized.")
 
     if not _already_registered(app, "login"):
         login_manager.init_app(app)
-        app.logger.info("👤 LoginManager initialized.")
+        app.logger.info(" LoginManager initialized.")
 
     if not _already_registered(app, "csrf"):
         csrf.init_app(app)
-        app.logger.info("🛡️ CSRFProtect initialized.")
+        app.logger.info(" CSRFProtect initialized.")
 
     redis_enabled = False
     try:
@@ -245,11 +251,11 @@ def init_extensions(app: Any) -> None:
             safe_netloc = (parsed.hostname if parsed else None) or "unknown-host"
             scheme = (parsed.scheme if parsed else None) or "redis"
             logger.info(
-                "🛰️ Connected to Redis host: %s (scheme: %s)", safe_netloc, scheme
+                " Connected to Redis host: %s (scheme: %s)", safe_netloc, scheme
             )
         else:
             app.logger.warning(
-                "⚠️ Redis unavailable — rate limiting and caching features will "
+                " Redis unavailable  rate limiting and caching features will "
                 "use in-memory backend."
             )
     except Exception as exc:
@@ -257,25 +263,24 @@ def init_extensions(app: Any) -> None:
         globals()["redis_client"] = None
         redis_enabled = False
         app.logger.error(
-            "❌ Redis init failed: %s — rate limiter will use in-memory backend",
+            " Redis init failed: %s  rate limiter will use in-memory backend",
             exc,
         )
 
     try:
         limiter_instance = _init_limiter(app, redis_enabled)
         limiter_type = type(limiter_instance).__name__
-        app.logger.info("⏱️ Limiter instance type: %s", limiter_type)
+        app.logger.info(" Limiter instance type: %s", limiter_type)
 
         if isinstance(limiter_instance, Limiter):
             limiter_instance.init_app(app)
             app.logger.info(
-                "⏱️ Limiter registered with Flask (real Limiter instance)"
+                " Limiter registered with Flask (real Limiter instance)"
             )
         else:
-            app.logger.info("⏱️ Limiter NOT registered with Flask (using _NoopLimiter)")
+            app.logger.info(" Limiter NOT registered with Flask (using _NoopLimiter)")
 
         limiter = limiter_instance
     except Exception as exc:
-        app.logger.error("❌ Unexpected error initializing limiter: %s", exc)
+        app.logger.error(" Unexpected error initializing limiter: %s", exc)
         limiter = _NoopLimiter()
-
