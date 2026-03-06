@@ -29,6 +29,9 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
+import sqlite3
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from PlaidBridgeOpenBankingApi.app.utils.redis_utils import get_redis_client
 
@@ -83,6 +86,7 @@ class _NoopLimiter:
 
 
 limiter: Limiter | _NoopLimiter | None = None
+
 
 
 # --- Helpers ---
@@ -262,4 +266,5 @@ def init_extensions(app: Any) -> None:
     except Exception as exc:
         app.logger.error("❌ Unexpected error initializing limiter: %s", exc)
         limiter = _NoopLimiter()
+
 
