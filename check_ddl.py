@@ -1,8 +1,11 @@
 ﻿import sys
+import pathlib
 import sqlalchemy as sa
 
-# ensure repo root is importable
-sys.path.insert(0, ".")
+# Ensure repo root and the PlaidBridgeOpenBankingApi package directory are importable
+repo_root = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(repo_root))  # repo root
+sys.path.insert(0, str(repo_root / "PlaidBridgeOpenBankingApi"))  # the package dir so "import app" works
 
 # Import factory the same way the application uses it (top-level 'app' package)
 from app import create_app

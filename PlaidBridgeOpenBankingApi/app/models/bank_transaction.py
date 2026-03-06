@@ -1,5 +1,5 @@
 ﻿from datetime import datetime
-from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, ForeignKeyConstraint
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKeyConstraint
 from sqlalchemy.orm import relationship
 from app.extensions import db
 
@@ -8,16 +8,12 @@ class BankTransaction(db.Model):
 
     id = Column(Integer, primary_key=True)
 
-    # Columns reference bank_accounts; keep ondelete on the Column-level as well
-    from_account_id = Column(
-        Integer, ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True
-    )
-    to_account_id = Column(
-        Integer, ForeignKey("bank_accounts.id", ondelete="CASCADE"), nullable=True
-    )
+    # Columns reference bank_accounts via explicit ForeignKeyConstraint below.
+    # Keep columns simple here; avoid Column-level ForeignKey to prevent duplicate constraints.
+    from_account_id = Column(Integer, nullable=True)
+    to_account_id = Column(Integer, nullable=True)
 
-    # Ensure SQLAlchemy emits explicit FK constraints with ON DELETE CASCADE by
-    # declaring them in __table_args__ as ForeignKeyConstraint entries.
+    # Explicit ForeignKeyConstraint entries (named, with ON DELETE CASCADE)
     __table_args__ = (
         ForeignKeyConstraint(
             ["from_account_id"],
@@ -44,7 +40,7 @@ class BankTransaction(db.Model):
     receiving_routing = Column(String(9))
     payment_channel = Column(String(20))
 
-    # Relationships — leave passive_deletes=True so DB handles cascade semantics.
+    # Relationships  leave passive_deletes=True so DB handles cascade semantics.
     from_account = relationship(
         "BankAccount",
         foreign_keys=[from_account_id],
