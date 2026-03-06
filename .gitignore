@@ -52,4 +52,21 @@ htmlcov/
 .pre-commit-hooks.yaml~
 
 
+
 mobile-app/node_modules/
+
+# Backup/test-output and hypothesis artifacts
+*.bak
+.pytest_cache/
+.hypothesis/
+check_ddl_output.txt
+pytest_no_cov_output.txt
+pytest_no_cov_override_output.txt
+pytest_output.txt
+pytest_output_sqlite.txt
+pytest_output_sqlite_nocov.txt
+inspect_*.py
+__pycache__/
+*.py[cod]
+venv/
+.env
