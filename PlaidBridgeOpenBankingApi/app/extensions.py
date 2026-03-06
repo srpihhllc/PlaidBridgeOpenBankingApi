@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
@@ -28,11 +29,26 @@ from flask_migrate import Migrate
 from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
-from sqlalchemy import MetaData
+from sqlalchemy import MetaData, event
+from sqlalchemy.engine import Engine
 
 from PlaidBridgeOpenBankingApi.app.utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+
+# --- SQLite foreign-key enforcement ---
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    try:
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            cur = dbapi_connection.cursor()
+            cur.execute("PRAGMA foreign_keys = ON")
+            cur.close()
+    except Exception:
+        # Do not raise during connect; log if desired.
+        logger.debug("Failed to set PRAGMA foreign_keys on connect", exc_info=True)
+
 
 # --- SQLAlchemy naming convention ---
 naming_convention: Dict[str, str] = {
