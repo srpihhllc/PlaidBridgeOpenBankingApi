@@ -1,50 +1,55 @@
-# =============================================================================
-# FILE: app/models/bank_transaction.py
-# DESCRIPTION: BankTransaction model. Uses integer FKs matching BankAccount.id,
-#              string-based relationship targets and column-based foreign_keys
-#              to avoid import-time coupling and circular imports.
-# =============================================================================
-from datetime import datetime
-
+﻿from datetime import datetime
+from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKeyConstraint
+from sqlalchemy.orm import relationship
 from app.extensions import db
-
 
 class BankTransaction(db.Model):
     __tablename__ = "bank_transactions"
 
-    id = db.Column(db.Integer, primary_key=True)
-    from_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id"), nullable=True)
-    to_account_id = db.Column(db.Integer, db.ForeignKey("bank_accounts.id"), nullable=True)
+    id = Column(Integer, primary_key=True)
 
-    amount = db.Column(db.Float, nullable=False)
-    txn_type = db.Column(db.String(32))  # transfer, ach, wire, internal
-    method = db.Column(db.String(64))  # online, teller, mobile
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    # Columns reference bank_accounts via explicit ForeignKeyConstraint below.
+    # Keep columns simple here; avoid Column-level ForeignKey to prevent duplicate constraints.
+    from_account_id = Column(Integer, nullable=True)
+    to_account_id = Column(Integer, nullable=True)
 
-    # 🔹 ACH / Wire metadata (optional but realistic)
-    ach_trace_number = db.Column(db.String(20), nullable=True)
-    ach_sec_code = db.Column(db.String(10), nullable=True)  # PPD, CCD, WEB, TEL
-    wire_reference = db.Column(db.String(50), nullable=True)
-    originating_routing = db.Column(db.String(9), nullable=True)
-    receiving_routing = db.Column(db.String(9), nullable=True)
-    payment_channel = db.Column(db.String(20), nullable=True)  # ACH, WIRE, INTERNAL
+    # Explicit ForeignKeyConstraint entries (named, with ON DELETE CASCADE)
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["from_account_id"],
+            ["bank_accounts.id"],
+            name="fk_bank_transactions_from_account_id_bank_accounts",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["to_account_id"],
+            ["bank_accounts.id"],
+            name="fk_bank_transactions_to_account_id_bank_accounts",
+            ondelete="CASCADE",
+        ),
+    )
 
-    from_account = db.relationship(
+    amount = Column(Float, nullable=False)
+    txn_type = Column(String(32))
+    method = Column(String(64))
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    ach_trace_number = Column(String(20))
+    ach_sec_code = Column(String(10))
+    wire_reference = Column(String(50))
+    originating_routing = Column(String(9))
+    receiving_routing = Column(String(9))
+    payment_channel = Column(String(20))
+
+    # Relationships  leave passive_deletes=True so DB handles cascade semantics.
+    from_account = relationship(
         "BankAccount",
-        back_populates="outgoing_transactions",
         foreign_keys=[from_account_id],
-        lazy=True,
+        back_populates="transactions_from",
+        passive_deletes=True,
     )
-
-    to_account = db.relationship(
+    to_account = relationship(
         "BankAccount",
-        back_populates="incoming_transactions",
         foreign_keys=[to_account_id],
-        lazy=True,
+        back_populates="transactions_to",
+        passive_deletes=True,
     )
-
-    def __repr__(self):
-        return (
-            f"<BankTransaction id={self.id} from={self.from_account_id} "
-            f"to={self.to_account_id} amount={self.amount}>"
-        )

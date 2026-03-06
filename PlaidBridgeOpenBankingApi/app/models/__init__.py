@@ -84,3 +84,6 @@ __all__ = [
     "FinancialAuditLog",
     "LedgerEntry",
 ]
+
+# Ensure audit_log model is registered
+from . import audit_log

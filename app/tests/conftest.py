@@ -1,9 +1,10 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/conftest.py
+﻿# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/conftest.py
 
 import pytest
 
 from app import create_app
 from app.extensions import db
+from sqlalchemy import event
 
 
 @pytest.fixture(scope="session")
@@ -17,6 +18,21 @@ def app():
     # (in case they get overridden somewhere)
     app.config["WTF_CSRF_ENABLED"] = False
     app.config["TESTING"] = True
+
+    # Ensure SQLite enforces foreign keys on every DBAPI connection created by SQLAlchemy.
+    # Register the listener while the app/engine are available so PRAGMA runs for all connections.
+    try:
+        with app.app_context():
+            if db.engine and db.engine.dialect.name == "sqlite":
+                event.listen(
+                    db.engine,
+                    "connect",
+                    lambda dbapi_conn, _rec: dbapi_conn.execute("PRAGMA foreign_keys=ON")
+                )
+    except Exception:
+        # If engine isn't ready or something unexpected occurs, tests still include
+        # defensive DDL/PRAGMA logic in individual tests.
+        pass
 
     # DO NOT override RATE_LIMIT_ENABLED here - let TestingConfig handle it
 
