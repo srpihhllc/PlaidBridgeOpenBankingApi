@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
 from sqlalchemy import MetaData, event
+from sqlalchemy.engine import Engine
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -175,22 +176,21 @@ def init_extensions(app: Any) -> None:
         migrate.init_app(app, db)
         app.logger.info("SQLAlchemy and Migrate initialized.")
 
-        # --- BEGIN: enable SQLite foreign keys on new connections ---
-        # Ensure DBAPI-level SQLite connections have foreign key enforcement enabled.
-        # Attach listener to the engine after db.init_app(app) so db.engine exists.
-        @event.listens_for(db.engine, "connect")
-        def _set_sqlite_pragma(dbapi_connection, connection_record):
-            try:
-                # Only act on sqlite3 connections (other DBAPI connections ignored)
-                if isinstance(dbapi_connection, sqlite3.Connection):
-                    cursor = dbapi_connection.cursor()
-                    cursor.execute("PRAGMA foreign_keys = ON;")
-                    cursor.close()
-            except Exception:
-                # Defensive: do not raise during app init if this cannot be applied
-                # (e.g. non-sqlite DBAPI). We want the app to continue starting.
-                pass
-        # --- END: enable SQLite foreign keys on new connections ---
+    # --- BEGIN: enable SQLite foreign keys on new connections ---
+    # Ensure DBAPI-level SQLite connections have foreign key enforcement enabled.
+    # Listen on the global SQLAlchemy Engine class (does not require Flask app context).
+    @event.listens_for(Engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, connection_record):
+        try:
+            # Only act on sqlite3 connections (other DBAPI connections ignored)
+            if isinstance(dbapi_connection, sqlite3.Connection):
+                cursor = dbapi_connection.cursor()
+                cursor.execute("PRAGMA foreign_keys = ON;")
+                cursor.close()
+        except Exception:
+            # Defensive: do not raise during app init if this cannot be applied
+            pass
+    # --- END: enable SQLite foreign keys on new connections ---
 
     if not _already_registered(app, "jwt"):
         jwt.init_app(app)
