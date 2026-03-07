@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # FILE: app/extensions.py
 # DESCRIPTION: Core Flask Extensions & Service Bindings (hardened)
 # =============================================================================
@@ -35,7 +35,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
 
-from PlaidBridgeOpenBankingApi.app.utils.redis_utils import get_redis_client
+from app.utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -284,3 +284,5 @@ def init_extensions(app: Any) -> None:
     except Exception as exc:
         app.logger.error(" Unexpected error initializing limiter: %s", exc)
         limiter = _NoopLimiter()
+
+
