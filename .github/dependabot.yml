@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # Python backend dependencies
+  - package-ecosystem: "pip"
+    directory: "/PlaidBridgeOpenBankingApi"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    reviewers:
+      - "srpihhllc"
+
+  # Mobile app npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/mobile-app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      security-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+          - "minor"
+    labels:
+      - "dependencies"
+      - "mobile"
+      - "security"
+    reviewers:
+      - "srpihhllc"
+    ignore:
+      # Ignore major version bumps for React Native ecosystem
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
