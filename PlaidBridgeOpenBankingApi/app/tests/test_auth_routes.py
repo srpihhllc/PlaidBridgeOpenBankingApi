@@ -32,9 +32,10 @@ def test_get_routes_render_templates(client, templates, route, template):
 
 def test_login_invalid_credentials(client, app):
     resp = client.post("/auth/login", data={"email": "bad@x.com", "password": "wrong"})
-    assert resp.status_code == 200  # Re-renders login form on invalid credentials
-
-    # No redirect expected for invalid login
+    assert resp.status_code in (302, 303)
+    with app.test_request_context():
+        expected_url = url_for("auth.login")
+    assert expected_url in resp.headers["Location"]
 
 
 def test_register_subscriber_missing_fields(client, templates):
