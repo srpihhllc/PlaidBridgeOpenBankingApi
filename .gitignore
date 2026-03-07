@@ -22,6 +22,8 @@ statements/  # Changed from uploads/ to statements/
 # Docker
 .dockerenv
 .env
+*.env
+*.env.*
 docker-compose.override.yml
 docker-compose.yml
 /tmp/

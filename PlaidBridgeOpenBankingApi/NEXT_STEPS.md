@@ -1,16 +1,26 @@
-# Senior Dev Action Items — immediate checklist
+# Senior Dev Action Items — March 2026
 
-## 🔴 Immediate (This Week)
-- [ ] Rotate secrets and remove tracked .env (git rm --cached .env + commit + push)
-- [ ] Add .coveragerc to exclude CLI/scripts/tests from coverage
-- [ ] Temporarily lower coverage gate or run CI without coverage-fail-under during remediation
+## Immediate (This Week)
+- [ ] Verify secret exposure risk and rotate any historical `.env` secrets if they were ever committed
+- [ ] Ensure `.env` stays untracked (`git ls-files .env` should return empty)
+- [ ] Review and merge PR #139 (WSGI/deploy fixes) if still open and valid
+- [x] Keep `.coveragerc` with `app/cli/*` and `app/scripts/*` omitted from denominator
+- [x] Lower coverage gate to temporary ramp target (`--cov-fail-under=40`)
 
-## 🟡 Short-term (1–2 sprints)
-- [ ] Add CI workflow to run tests + audits and upload artifacts
-- [ ] Write tests for P0 modules: app/__init__.py, app/blueprints/auth_routes.py, app/security_utilities.py
-- [ ] Fix filename issues and duplicates in tests (rename `tests_main_ routes.py`, remove duplicates)
+## Sprint 1 (Next 2 Weeks)
+- [ ] Write tests for `app/blueprints/auth_routes.py` (P0)
+- [ ] Write tests for `app/security_utilities.py` (P0)
+- [ ] Add app-factory focused coverage for `app/__init__.py` (P0)
+- [ ] Rename `app/tests/tests_main_ routes.py` to `app/tests/test_main_routes.py`
+- [ ] Remove or consolidate duplicate tests (`test_app.py` vs `test_balance.py`) after content diff
+- [ ] Raise gate from 40 to 55 once green
 
-## 🟢 Medium-term
-- [ ] Incrementally raise coverage (40% → 55% → 70% → 85%)
-- [ ] Add CODEOWNERS and branch protection
-- [ ] Integrate dependabot and security scans into PR process
+## Sprint 2-3
+- [ ] Cover `admin_routes.py`, `api_v1_routes.py`, and `fintech_routes.py`
+- [ ] Expand `app/services/*` business-logic tests
+- [ ] Raise gate to 70, then 85
+
+## Hardening
+- [ ] Keep CI workflows healthy (`.github/workflows/ci.yml`, `backend-ci.yml`, `mobile-ci.yml`)
+- [ ] Add/validate `CODEOWNERS` and branch protection rules
+- [ ] Add/validate `dependabot.yml`
