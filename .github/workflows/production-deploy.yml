@@ -123,7 +123,9 @@ jobs:
 
       - name: Run database migrations
         run: |
-          if [ -f PlaidBridgeOpenBankingApi/alembic.ini ]; then
+          if [ -f alembic.ini ]; then
+            alembic -c alembic.ini upgrade head
+          elif [ -f PlaidBridgeOpenBankingApi/alembic.ini ]; then
             alembic -c PlaidBridgeOpenBankingApi/alembic.ini upgrade head
           fi
 
