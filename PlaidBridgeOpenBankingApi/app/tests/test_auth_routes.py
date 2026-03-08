@@ -32,9 +32,10 @@ def test_get_routes_render_templates(client, templates, route, template):
 
 def test_login_invalid_credentials(client, app):
     resp = client.post("/auth/login", data={"email": "bad@x.com", "password": "wrong"})
-    assert resp.status_code == 200  # Re-renders login form on invalid credentials
-
-    # No redirect expected for invalid login
+    assert resp.status_code in (302, 303)
+    with app.test_request_context():
+        expected_url = url_for("auth.login")
+    assert expected_url in resp.headers["Location"]
 
 
 def test_register_subscriber_missing_fields(client, templates):
@@ -121,7 +122,8 @@ def test_mfa_prompt_redirects(client, app, db_session):
     db_session.commit()
 
     resp = client.post("/auth/login", data={"email": user.email, "password": "password123"})
-    # Re-renders login form (MFA flow not triggered in test due to session issues)
-    assert resp.status_code == 200
-
-    # Note: MFA redirect testing requires fixing login session handling
+    # When MFA is enabled, login redirects to MFA prompt
+    assert resp.status_code in (302, 303)
+    with app.test_request_context():
+        expected_url = url_for("auth.mfa_prompt")
+    assert expected_url in resp.headers["Location"]

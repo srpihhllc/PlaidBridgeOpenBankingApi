@@ -19,6 +19,11 @@ import os
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
+# --- sqlite + SQLAlchemy connect listener imports ---
+import sqlite3
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -29,11 +34,8 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
-import sqlite3
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
 
-from PlaidBridgeOpenBankingApi.app.utils.redis_utils import get_redis_client
+from app.utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,22 @@ class _NoopLimiter:
 
 limiter: Limiter | _NoopLimiter | None = None
 
+
+# --- SQLite: enforce PRAGMA foreign_keys on every raw sqlite3 connection ---
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    """
+    Ensure SQLite enforces FK constraints on each DB-API connection.
+    This is safe and non-destructive; it only sets a connection-local PRAGMA.
+    """
+    try:
+        if isinstance(dbapi_connection, sqlite3.Connection):
+            cur = dbapi_connection.cursor()
+            cur.execute("PRAGMA foreign_keys = ON")
+            cur.close()
+    except Exception:
+        # Log at debug level so CI/maintainers can diagnose failures without failing startup
+        logger.debug("Failed to set PRAGMA foreign_keys on sqlite connection", exc_info=True)
 
 
 # --- Helpers ---

@@ -387,6 +387,8 @@ def test_bank_transactions_fk_and_cascade(app):
         db.create_all()  # Ensure tables are created
         with db.session.begin_nested():
             conn = db.session.connection()
+            fk_flag = conn.execute(sa.text("PRAGMA foreign_keys")).scalar()
+            assert fk_flag == 1, f"SQLite FK enforcement is OFF (PRAGMA={fk_flag})"
             admin_id = get_admin_id(conn)
 
             # Setup Parent Account

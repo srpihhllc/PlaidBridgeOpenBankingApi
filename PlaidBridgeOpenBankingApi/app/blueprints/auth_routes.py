@@ -36,7 +36,7 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.routing import BuildError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import csrf, db
+from app.extensions import csrf, db, limiter
 from app.forms import (
     AccountUpdateForm,
     ChangePasswordForm,
@@ -236,6 +236,7 @@ def send_mfa_code(user: User, code: str | None = None) -> str:
 
 
 @auth_bp.route("/register_subscriber", methods=["GET", "POST"])
+@limiter.limit("10 per hour", methods=["POST"])
 def register_subscriber():
     """
     Operator- and production-ready subscriber registration.
@@ -380,6 +381,7 @@ def register_subscriber():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"], endpoint="login")
+@limiter.limit("5 per minute", methods=["POST"])
 def login_view():
     # Already authenticated → route based on role/admin flags
     if getattr(current_user, "is_authenticated", False):
@@ -801,6 +803,7 @@ def update_password():
 
 
 @auth_bp.route("/reset_request", methods=["GET", "POST"])
+@limiter.limit("3 per hour", methods=["POST"])
 def reset_request():
     if getattr(current_user, "is_authenticated", False):
         return redirect_for_role(current_user)

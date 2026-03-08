@@ -22,6 +22,8 @@ statements/  # Changed from uploads/ to statements/
 # Docker
 .dockerenv
 .env
+*.env
+*.env.*
 docker-compose.override.yml
 docker-compose.yml
 /tmp/
@@ -38,11 +40,24 @@ azure-functions-core-tools/
 
 # Backup or scratch dirs
 backup/
+*.bak
 
 # Test & coverage caches
 .pytest_cache/
+.hypothesis/
 .coverage
 htmlcov/
+
+# Test output files
+check_ddl_output.txt
+pytest_no_cov_output.txt
+pytest_no_cov_override_output.txt
+pytest_output.txt
+pytest_output_sqlite.txt
+pytest_output_sqlite_nocov.txt
+
+# Scratch inspection scripts
+inspect_*.py
 
 # MyPy cache
 .mypy_cache/
@@ -53,3 +68,8 @@ htmlcov/
 
 
 mobile-app/node_modules/
+
+# Ignore backups, local test output and caches
+pytest_output*.txt
+pytest_output*.log
+.venv/

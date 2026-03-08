@@ -27,4 +27,4 @@ types-redis
 types-sqlalchemy
 types-requests
 types-PyYAML
-types-setuptools
+types-setuptoolsFlask

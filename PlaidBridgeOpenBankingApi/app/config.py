@@ -200,6 +200,12 @@ class ProductionConfig(BaseConfig):
     RATELIMIT_ENABLED = True
     WTF_CSRF_ENABLED = True
 
+    # Session cookie security (OWASP recommendations)
+    SESSION_COOKIE_SECURE = True  # HTTPS only
+    SESSION_COOKIE_HTTPONLY = True  # Prevent XSS access to cookies
+    SESSION_COOKIE_SAMESITE = 'Lax'  # CSRF protection
+    PERMANENT_SESSION_LIFETIME = 3600  # 1 hour session timeout
+
     @classmethod
     def validate(cls):
         """Strict validation for production."""
