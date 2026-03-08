@@ -69,7 +69,7 @@ ordered-set==4.1.0
 packaging==25.0
 pandas==2.3.3
 pathspec==0.12.1
-pdfminer.six==20240706
+pdfminer.six==20220524
 pdfplumber==0.7.4
 pillow==12.1.1
 pip-tools==7.5.1
