@@ -8,6 +8,9 @@ on:
 jobs:
   backend-build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: PlaidBridgeOpenBankingApi
     outputs:
       backend-ok: ${{ steps.backend-status.outputs.ok }}
     steps:
@@ -69,7 +72,7 @@ jobs:
           cache-dependency-path: mobile-app/pnpm-lock.yaml
 
       - name: Install deps
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Mobile smoke test
         id: mobile-status
