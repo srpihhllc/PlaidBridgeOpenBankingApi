@@ -35,6 +35,8 @@ jobs:
 
       - name: Backend smoke test
         id: backend-status
+        env:
+          SQLALCHEMY_DATABASE_URI: sqlite:///ci_smoke_test.db
         run: |
           python - << 'EOF'
           try:
