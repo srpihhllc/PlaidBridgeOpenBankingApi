@@ -45,6 +45,11 @@ backup/
 .pytest_cache/
 .coverage
 htmlcov/
+.coverage.*
+pytest_run_latest.txt
+pytest_output*.txt
+bandit_report.json
+test_results.txt
 
 # MyPy cache
 .mypy_cache/
