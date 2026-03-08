@@ -209,7 +209,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                 )
 
     # 4. SQLAlchemy engine tuning
-    uri = flask_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    uri = flask_app.config.get("SQLALCHEMY_DATABASE_URI") or ""
     if uri.startswith("sqlite"):
         flask_app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"poolclass": None}
     else:

@@ -1,0 +1,81 @@
+# Ignore everything by default
+*
+
+# ============================================================
+# Include only production-necessary files
+# ============================================================
+
+# Application code
+!PlaidBridgeOpenBankingApi/
+!PlaidBridgeOpenBankingApi/app/
+PlaidBridgeOpenBankingApi/app/**/__pycache__
+PlaidBridgeOpenBankingApi/app/**/*.pyc
+PlaidBridgeOpenBankingApi/app/**/*.pyo
+PlaidBridgeOpenBankingApi/app/**/.pytest_cache
+
+# Database migrations
+!migrations/
+!alembic.ini
+
+# Dependencies
+!requirements.txt
+
+# Entry points
+!run.py
+!wsgi.py
+
+# Documentation (optional, exclude for smaller image)
+# !README.md
+# !docs/
+
+# Git metadata
+.git
+.github
+
+# Environment files (NEVER include)
+.env
+.env.*
+*.env
+
+# Development files
+.vscode
+.idea
+*.log
+*.db
+*.sqlite
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.coverage
+htmlcov
+.hypothesis
+
+# Test files
+tests/
+test_*.py
+*_test.py
+
+# Build artifacts
+*.egg-info
+dist/
+build/
+.eggs/
+
+# Node/Mobile app
+mobile-app/
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+
+# Backup and temp files
+*.sql
+*.bak
+*.tmp
+backup_*
+full_backup*
+limiter.db
+
+# Logs
+logs/
+app.log.*
