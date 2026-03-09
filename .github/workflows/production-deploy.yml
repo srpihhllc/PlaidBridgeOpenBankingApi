@@ -122,12 +122,9 @@ jobs:
           pip install pytest pytest-cov
 
       - name: Run database migrations
+        working-directory: PlaidBridgeOpenBankingApi
         run: |
-          if [ -f alembic.ini ]; then
-            alembic -c alembic.ini upgrade head
-          elif [ -f PlaidBridgeOpenBankingApi/alembic.ini ]; then
-            alembic -c PlaidBridgeOpenBankingApi/alembic.ini upgrade head
-          fi
+          alembic -c alembic.ini upgrade head
 
       - name: Run backend tests
         working-directory: PlaidBridgeOpenBankingApi

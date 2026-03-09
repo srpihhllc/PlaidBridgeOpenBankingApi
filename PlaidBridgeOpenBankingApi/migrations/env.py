@@ -37,8 +37,12 @@ else:
 # 1. Load Flask application environment (only if not skipping)
 # ---------------------------------------------------------------------------
 if not _SKIP_ALEMBIC:
-    # Set up the path so we can import 'app'
+    # Set up paths so imports consistently resolve to the package-local app module.
     PROJECT_HOME = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    APP_HOME = os.path.join(PROJECT_HOME, "PlaidBridgeOpenBankingApi")
+
+    if APP_HOME not in sys.path:
+        sys.path.insert(0, APP_HOME)
     if PROJECT_HOME not in sys.path:
         sys.path.insert(0, PROJECT_HOME)
 
@@ -46,12 +50,8 @@ if not _SKIP_ALEMBIC:
     load_dotenv(os.path.join(PROJECT_HOME, ".env"))
 
     def get_flask_app():
-        # CI checks out from repo root, while PythonAnywhere/local can run from package root.
-        try:
-            from PlaidBridgeOpenBankingApi.app import create_app
-        except ImportError:
-            from app import create_app
-
+        # Import from the canonical module path used by this codebase.
+        from app import create_app
         return create_app()
 
     flask_app = get_flask_app()
