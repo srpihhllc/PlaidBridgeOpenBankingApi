@@ -46,7 +46,11 @@ if not _SKIP_ALEMBIC:
     load_dotenv(os.path.join(PROJECT_HOME, ".env"))
 
     def get_flask_app():
-        from app import create_app
+        # CI checks out from repo root, while PythonAnywhere/local can run from package root.
+        try:
+            from PlaidBridgeOpenBankingApi.app import create_app
+        except ImportError:
+            from app import create_app
 
         return create_app()
 
