@@ -1,0 +1,49 @@
+Redis connection-failures counter is mocked.
+Redis connection-failures counter is mocked.
+Traceback (most recent call last):
+Testing User model import...
+  File "C:\Users\R\PlaidBridgeOpenBankingApi_repo_clone\test_imports_simple.py", line 12, in <module>
+    from PlaidBridgeOpenBankingApi.app.models.user import User
+  File "C:\Users\R\PlaidBridgeOpenBankingApi_repo_clone\PlaidBridgeOpenBankingApi\app\models\__init__.py", line 27, in <module>
+    from .bank_account import BankAccount
+  File "C:\Users\R\PlaidBridgeOpenBankingApi_repo_clone\PlaidBridgeOpenBankingApi\app\models\bank_account.py", line 13, in <module>
+    class BankAccount(db.Model):
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\flask_sqlalchemy\model.py", line 92, in __init__
+    super().__init__(name, bases, d, **kwargs)
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\flask_sqlalchemy\model.py", line 144, in __init__
+    super().__init__(name, bases, d, **kwargs)
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\decl_api.py", line 199, in __init__
+    _as_declarative(reg, cls, dict_)
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\decl_base.py", line 245, in _as_declarative
+    return _MapperConfig.setup_mapping(registry, cls, dict_, None, {})
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\decl_base.py", line 326, in setup_mapping
+    return _ClassScanMapperConfig(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\decl_base.py", line 577, in __init__
+    self._setup_table(table)
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\orm\decl_base.py", line 1762, in _setup_table
+    table_cls(
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\flask_sqlalchemy\model.py", line 171, in __table_cls__
+    return sa.Table(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in __new__
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\util\deprecations.py", line 281, in warned
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\sql\schema.py", line 429, in __new__
+    return cls._new(*args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\R\AppData\Roaming\Python\Python312\site-packages\sqlalchemy\sql\schema.py", line 461, in _new
+    raise exc.InvalidRequestError(
+sqlalchemy.exc.InvalidRequestError: Table 'bank_accounts' is already defined for this MetaData instance.  Specify 'extend_existing=True' to redefine options and columns on an existing Table object.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\R\PlaidBridgeOpenBankingApi_repo_clone\test_imports_simple.py", line 22, in <module>
+    print(f"\n\u274c Import failed: {type(e).__name__}: {e}")
+  File "C:\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 2: character maps to <undefined>

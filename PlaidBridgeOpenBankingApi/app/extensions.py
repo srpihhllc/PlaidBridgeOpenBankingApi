@@ -35,7 +35,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
 
-from app.utils.redis_utils import get_redis_client
+from .utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -204,8 +204,8 @@ def init_extensions(app: Any) -> None:
         jwt.init_app(app)
         app.logger.info("🔐 JWT initialized.")
         try:
-            from app.models.revoked_token import RevokedToken
-            from app.models.user import User
+            from .models.revoked_token import RevokedToken
+            from .models.user import User
 
             @jwt.token_in_blocklist_loader
             def check_if_token_revoked(jwt_header, jwt_payload):

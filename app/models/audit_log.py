@@ -6,7 +6,7 @@
 
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 # -------------------------------------------------------------------------
@@ -14,6 +14,8 @@ from app.extensions import db
 # -------------------------------------------------------------------------
 class FinancialAuditLog(db.Model):
     __tablename__ = "financial_audit_logs"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -44,6 +46,8 @@ class FinancialAuditLog(db.Model):
 # -------------------------------------------------------------------------
 class AuditLog(db.Model):
     __tablename__ = "audit_logs"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 

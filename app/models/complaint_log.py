@@ -1,10 +1,12 @@
 # app/models/complaint_log.py
 
-from app.extensions import db
+from ..extensions import db
 
 
 class ComplaintLog(db.Model):
     __tablename__ = "complaint_logs"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 

@@ -5,7 +5,7 @@
 
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class Registry(db.Model):

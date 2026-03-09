@@ -6,8 +6,8 @@
 
 from datetime import datetime
 
-from app import db
-from app.models.vault_transaction import VaultTransaction
+from ..extensions import db
+from .vault_transaction import VaultTransaction
 
 # Linter‑safe import anchor (prevents unused‑import warnings)
 _ = VaultTransaction.__tablename__
@@ -15,6 +15,8 @@ _ = VaultTransaction.__tablename__
 
 class LedgerEntry(db.Model):
     __tablename__ = "ledger_entries"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 

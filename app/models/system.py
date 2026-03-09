@@ -7,11 +7,13 @@
 
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class RateLimit(db.Model):
     __tablename__ = "rate_limits"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
     ip_address = db.Column(db.String(50), unique=True, nullable=False)
@@ -21,6 +23,8 @@ class RateLimit(db.Model):
 
 class SystemVersion(db.Model):
     __tablename__ = "system_versions"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -44,6 +48,8 @@ class SystemVersion(db.Model):
 
 class SystemBootLog(db.Model):
     __tablename__ = "system_boot_logs"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
     operator_id = db.Column(db.Integer)

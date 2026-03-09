@@ -1,10 +1,12 @@
 # app/models/credit_ledger.py
 
-from app.extensions import db
+from ..extensions import db
 
 
 class CreditLedger(db.Model):
     __tablename__ = "credit_ledger"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 

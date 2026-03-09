@@ -8,7 +8,7 @@ from datetime import datetime
 
 from sqlalchemy.orm import DeclarativeBase
 
-from app.extensions import db
+from ..extensions import db
 
 # Mypy-safe alias: db.Model behaves like a SQLAlchemy declarative base
 Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]

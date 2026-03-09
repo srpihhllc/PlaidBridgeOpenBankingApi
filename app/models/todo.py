@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import DeclarativeBase
 
-from app.extensions import db
+from ..extensions import db
 
 # Mypy-safe alias for Flask‑SQLAlchemy dynamic base
 Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
@@ -15,6 +15,8 @@ Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
 
 class Todo(Model):
     __tablename__ = "todos"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
