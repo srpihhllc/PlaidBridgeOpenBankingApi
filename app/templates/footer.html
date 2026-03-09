@@ -1,0 +1,11 @@
+<footer class="text-center py-3 bg-light">
+  &copy; {{ current_year }} PlaidBridge — All rights reserved.
+
+  {% if finbrain_started %}
+    <div class="mt-2">
+      🧠 FinBrain orchestrator booted {{ finbrain_started|timeago }} ago
+    </div>
+  {% endif %}
+</footer>
+
+

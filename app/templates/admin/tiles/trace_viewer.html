@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>🧠 FinBrain Telemetry Trace Viewer</h2>
+
+<h3>All Events</h3>
+<table border="1" cellpadding="6">
+  <tr><th>Agent</th><th>Service</th><th>Redis Key</th><th>UI Route</th><th>Timestamp</th></tr>
+  {% for event in traces %}
+  <tr>
+    <td>{{ event.agent }}</td>
+    <td>{{ event.service }}</td>
+    <td>{{ event.redis }}</td>
+    <td>{{ event.ui }}</td>
+    <td>{{ event.timestamp }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h3>GrantCortex Events</h3>
+<ul>
+  {% for event in agent_filter %}
+    <li>{{ event.agent }} → {{ event.service }} → {{ event.redis }} → {{ event.ui }}</li>
+  {% endfor %}
+</ul>
+
+<h3>💥 Suppressed Grants (Score ≤ 50)</h3>
+<ul>
+  {% for event in suppressions_only %}
+    <li>{{ event.redis }} → {{ event.ui }} @ {{ event.timestamp }}</li>
+  {% endfor %}
+</ul>
+
+<h3>🧾 Download as JSON</h3>
+<form method="GET" action="{{ url_for('admin.export_traces') }}">
+  <button type="submit">Export Full Trace Log</button>
+</form>
+{% endblock %}

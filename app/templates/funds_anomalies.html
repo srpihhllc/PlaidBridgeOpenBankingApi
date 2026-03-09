@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>Anomaly Flags for Vault Account {{ acct_id }}</h2>
+<p class="text-muted">AI-detected anomalies from recent deposit activity</p>
+
+{% if anomalies %}
+  <ul class="list-group mt-4">
+    {% for entry in anomalies %}
+    <li class="list-group-item">
+      <strong>Txn #{{ entry.txn_id }}</strong><br>
+      <small class="text-muted">{{ entry.timestamp }}</small><br>
+
+      {% for flag in entry.flags %}
+        {% if "High-Value" in flag %}
+          <span class="badge bg-danger me-1">{{ flag }}</span>
+        {% elif "Unknown Method" in flag %}
+          <span class="badge bg-warning me-1">{{ flag }}</span>
+        {% elif "Zero Balance" in flag %}
+          <span class="badge bg-info me-1">{{ flag }}</span>
+        {% else %}
+          <span class="badge bg-secondary me-1">{{ flag }}</span>
+        {% endif %}
+      {% endfor %}
+
+      <div class="mt-2">💰 Amount: <strong>${{ "%.2f"|format(entry.amount) }}</strong></div>
+    </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <p class="mt-4">✅ No anomalies flagged for this account.</p>
+{% endif %}
+
+{% endblock %}

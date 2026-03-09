@@ -1,0 +1,49 @@
+<!-- app/templates/admin/cockpit_route_registry.html -->
+{% extends "admin/base.html" %}
+
+{% block content %}
+<div class="container mx-auto p-8 max-w-7xl">
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">📡 Route Registry</h1>
+        <p class="text-gray-500 mt-2">
+            A live, comprehensive list of all registered Flask endpoints and their URL rules.
+        </p>
+    </header>
+
+    <section class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Registered Endpoints</h2>
+
+        {% if rules %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tl-lg">Endpoint</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Methods</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider rounded-tr-lg">Rule</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    {% for r in rules %}
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ r.endpoint }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {% for method in r.methods %}
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ method }}
+                            </span>
+                            {% endfor %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ r.rule }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-center text-gray-500 py-8">No Flask endpoints were found. This may indicate a blueprint registration issue.</p>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}
+

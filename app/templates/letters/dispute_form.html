@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dispute Submission</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    .form-group { margin-bottom: 1rem; }
+    label { display: block; font-weight: bold; margin-bottom: 0.5rem; }
+    input, textarea, select, button {
+      width: 100%; padding: 0.5rem; font-size: 1rem;
+    }
+    #status { margin-top: 1.5rem; padding: 1rem; border: 1px solid #ccc; }
+    .queued { color: orange; }
+    .sent { color: green; }
+    .failed { color: red; }
+  </style>
+</head>
+<body>
+  <h1>Submit a Dispute</h1>
+
+  <form id="disputeForm">
+    <div class="form-group">
+      <label for="accountNumber">Account Number</label>
+      <input type="text" id="accountNumber" name="accountNumber" required />
+    </div>
+
+    <div class="form-group">
+      <label for="transactionId">Transaction ID</label>
+      <input type="text" id="transactionId" name="transactionId" required />
+    </div>
+
+    <!-- ⭐ NEW: Bureau Selector -->
+    <div class="form-group">
+      <label for="bureau">Select Bureau</label>
+      <select id="bureau" name="bureau" required>
+        <option value="">-- Select Bureau --</option>
+        <option value="Experian">Experian</option>
+        <option value="Equifax">Equifax</option>
+        <option value="TransUnion">TransUnion</option>
+        <option value="Innovis">Innovis</option>
+        <option value="LexisNexis">LexisNexis</option>
+        <option value="LCI">LCI</option>
+        <option value="ARS">ARS</option>
+        <option value="Credco">Credco</option>
+        <option value="Clarity">Clarity</option>
+        <option value="DataX">DataX</option>
+        <option value="MicroBilt">MicroBilt</option>
+        <option value="FactorTrust">FactorTrust</option>
+        <option value="SageStream">SageStream</option>
+      </select>
+    </div>
+    <!-- END NEW -->
+
+    <div class="form-group">
+      <label for="reason">Reason for Dispute</label>
+      <textarea id="reason" name="reason" rows="4" required></textarea>
+    </div>
+
+    <button type="submit">Submit Dispute</button>
+  </form>
+
+  <div id="status">
+    <strong>Status:</strong> <span id="statusText">Idle</span>
+  </div>
+
+  <script>
+    const form = document.getElementById('disputeForm');
+    const statusText = document.getElementById('statusText');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      statusText.textContent = 'Submitting...';
+      statusText.className = '';
+
+      const payload = {
+        accountNumber: form.accountNumber.value.trim(),
+        transactionId: form.transactionId.value.trim(),
+        reason: form.reason.value.trim(),
+        bureau: form.bureau.value.trim()   // ⭐ NEW: include bureau in payload
+      };
+
+      try {
+        // Step 1: Create batch in backend (cockpit start_batch)
+        const batchRes = await fetch('/api/disputes/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ total: 1, origin: 'dispute_form' })
+        });
+        const { batch_id, job_id } = await batchRes.json();
+
+        // Step 2: Send dispute job to backend
+        const jobRes = await fetch('/api/disputes/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...payload, batch_id, job_id })
+        });
+
+        if (!jobRes.ok) throw new Error('Submission failed');
+
+        statusText.textContent = 'Queued';
+        statusText.className = 'queued';
+
+        // Step 3: Poll cockpit job status
+        const pollInterval = setInterval(async () => {
+          const statusRes = await fetch(`/api/cockpit/job-status/${job_id}`);
+          const { status } = await statusRes.json();
+
+          statusText.textContent = status;
+          statusText.className = status.toLowerCase();
+
+          if (['sent', 'failed'].includes(status.toLowerCase())) {
+            clearInterval(pollInterval);
+          }
+        }, 2000);
+
+      } catch (err) {
+        console.error(err);
+        statusText.textContent = 'Failed to submit';
+        statusText.className = 'failed';
+      }
+    });
+  </script>
+</body>
+</html>
+

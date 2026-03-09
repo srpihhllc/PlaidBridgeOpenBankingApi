@@ -1,0 +1,54 @@
+<!-- =============================================================================
+FILE: app/templates/partials/_mfa_health_tile.html
+DESCRIPTION: Cockpit tile for MFA health metrics.
+Consumes Redis TTL dashboard payload (cockpit:ttl_dashboard) and displays
+success vs. failures vs. lockouts in operator-friendly format.
+============================================================================= -->
+
+<div class="col-xl-4 col-lg-6 col-md-12 mb-4">
+  <div class="card h-100 shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>🔐 MFA Health</span>
+      {% if data.mfa %}
+      <span class="badge 
+        {% if data.mfa.locked_out > 0 %}bg-danger
+        {% elif data.mfa.failures > 0 %}bg-warning
+        {% else %}bg-success{% endif %}">
+        {% if data.mfa.locked_out > 0 %}Lockouts
+        {% elif data.mfa.failures > 0 %}Failures
+        {% else %}Healthy{% endif %}
+      </span>
+      {% else %}
+      <span class="badge bg-secondary">Loading...</span>
+      {% endif %}
+    </div>
+
+    <div class="card-body">
+      {% if data.mfa %}
+      <h6 class="text-muted">Active Codes</h6>
+      <p class="mb-3">
+        <span class="badge bg-info">{{ data.mfa.success }}</span>
+        currently valid MFA codes
+      </p>
+
+      <h6 class="text-muted">Failures</h6>
+      <p class="mb-3">
+        <span class="badge bg-warning">{{ data.mfa.failures }}</span>
+        failed attempts in last window
+      </p>
+
+      <h6 class="text-muted">Lockouts</h6>
+      <p>
+        <span class="badge bg-danger">{{ data.mfa.locked_out }}</span>
+        users locked out (≥3 fails)
+      </p>
+      {% else %}
+      <p class="text-muted">No MFA telemetry available.</p>
+      {% endif %}
+    </div>
+
+    <div class="card-footer text-muted small">
+      Source: Redis TTL dashboard ({{ TTL_DASHBOARD_KEY }})
+    </div>
+  </div>
+</div>

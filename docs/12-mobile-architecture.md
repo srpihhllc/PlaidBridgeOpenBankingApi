@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 📱 Mobile Architecture — React Native / Expo
 
 The mobile app is a full banking client built with Expo Router, TRPC, and Drizzle ORM.  
@@ -74,3 +80,8 @@ Covers:
 - Expo EAS (optional)  
 - OTA updates supported  
 - Environment variables loaded via `scripts/load-env.js`
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

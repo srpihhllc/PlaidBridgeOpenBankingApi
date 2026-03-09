@@ -1,0 +1,38 @@
+<!-- templates/admin/fraud_charts.html -->
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fraud Chart Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <h2>Fraud Risk Distribution</h2>
+  <canvas id="riskChart" width="400" height="200"></canvas>
+
+  <script>
+    fetch("/admin/fraud_dashboard")
+      .then(res => res.json())
+      .then(data => {
+        const buckets = { low: 0, medium: 0, high: 0 };
+        data.fraud_logs.forEach(log => {
+          const score = log.score || 0;
+          if (score >= 0.8) buckets.high++;
+          else if (score >= 0.5) buckets.medium++;
+          else buckets.low++;
+        });
+
+        new Chart(document.getElementById("riskChart"), {
+          type: "bar",
+          data: {
+            labels: ["Low", "Medium", "High"],
+            datasets: [{
+              label: "Fraud Risk Bucket",
+              data: [buckets.low, buckets.medium, buckets.high],
+              backgroundColor: ["green", "orange", "red"]
+            }]
+          }
+        });
+      });
+  </script>
+</body>
+</html>

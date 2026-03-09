@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 🛠 CI/CD Pipeline — GitHub Actions
 
 The platform uses a multi‑workflow CI/CD pipeline to ensure reliability, maintainability, and operator clarity.
@@ -54,3 +60,8 @@ The platform uses a multi‑workflow CI/CD pipeline to ensure reliability, maint
 - Required checks: backend, mobile, integrity  
 - Required reviews  
 - No direct pushes to `main`
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

@@ -1,0 +1,5 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/.editorconfig
+root = true
+
+[Makefile]
+indent_style = tab

@@ -1,0 +1,17 @@
+<div class="card border-success mb-4 shadow-sm">
+  <div class="card-header bg-success text-white">🔐 OAuth Configuration Sync</div>
+  <div class="card-body">
+    <p><strong>Google Project:</strong> SymphostructureAI</p>
+    <p><strong>Client ID:</strong> 937711740637-cbs0rukgqog61o8d7o33627gp3qk8mp8.apps.googleusercontent.com</p>
+    <p><strong>Redirect URI:</strong> <code>https://srpihhllc.pythonanywhere.com/auth/callback/google</code></p>
+    {% if oauth_config_synced %}
+      <p class="text-success">✅ Redirect URI is correctly registered with Google Cloud</p>
+    {% else %}
+      <p class="text-danger">❌ Redirect URI mismatch or not registered</p>
+      <p>Run update via Cloud Shell to fix:</p>
+      <pre>gcloud iam oauth-clients update \
+  937711740637-cbs0rukgqog61o8d7o33627gp3qk8mp8.apps.googleusercontent.com \
+  --allowed-redirect-uris="https://srpihhllc.pythonanywhere.com/auth/callback/google"</pre>
+    {% endif %}
+  </div>
+</div>

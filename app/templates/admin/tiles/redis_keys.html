@@ -1,0 +1,43 @@
+<div class="mb-3">
+  <h3 class="mb-3">🧊 Redis Key TTL Report</h3>
+
+  {% if redis_keys %}
+    <table class="table table-bordered table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Key</th>
+          <th>TTL (sec)</th>
+          <th>Size</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for item in redis_keys %}
+        <tr>
+          <td class="text-break">{{ item.key }}</td>
+          <td>{{ item.ttl }}</td>
+          <td>{{ item.size }}</td>
+          <td>
+            <form method="POST"
+                  action="{{ url_for('admin_ui.sweep_expired_keys') }}"
+                  class="d-inline">
+              <input type="hidden" name="key" value="{{ item.key }}">
+              <button type="submit"
+                      class="btn btn-sm btn-danger"
+                      onclick="return confirm('Delete this key?');">
+                🗑️ Delete
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  {% else %}
+    <div class="alert alert-info">
+      No Redis keys found for this query.
+    </div>
+  {% endif %}
+</div>

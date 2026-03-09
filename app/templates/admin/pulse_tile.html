@@ -1,0 +1,8 @@
+<div class="card">
+  <div class="card-header">Template Pulse</div>
+  <div class="card-body">
+    <p><strong>Last Audit:</strong> {{ timestamp.strftime('%H:%M:%S') }} UTC</p>
+    <p><strong>Errors:</strong> {{ results|selectattr("status", "equalto", "error")|list|length }}</p>
+    <a href="{{ url_for('tracer.template_tracer') }}" class="btn btn-sm btn-outline-primary">View Full Report</a>
+  </div>
+</div>

@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Drilldown: {{ file_path }}</title>
+    <style>
+        body { font-family: sans-serif; margin: 1rem; }
+        .codehilite { background: #f8f8f8; padding: 1rem; border-radius: 6px; }
+        {{ pygments_css|safe }}
+    </style>
+</head>
+<body>
+    <h2>📂 {{ file_path }}</h2>
+    <div class="codehilite">
+        {{ highlighted_code|safe }}
+    </div>
+</body>
+</html>

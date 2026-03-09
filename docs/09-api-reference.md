@@ -1,3 +1,9 @@
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
+# 📘 Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+
 # 📡 API Reference — Financial Powerhouse Platform
 
 This document provides a human‑readable reference for all REST endpoints in the backend API.
@@ -82,3 +88,8 @@ Liveness + readiness check.
 
 - OpenAPI Spec — `10-openapi.yaml`
 - Backend Architecture — `03-backend-architecture.md`
+
+---
+
+**Technical Identity:** `PlaidBridgeOpenBankingApi`
+**Platform Identity:** Financial Powerhouse Platform

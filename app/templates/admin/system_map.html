@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>FinBrain Orchestration Map</h2>
+
+<object data="{{ url_for('static', filename='docs/fintech-orchestration-v2.drawio.svg') }}"
+        type="image/svg+xml" width="100%" height="1000px">
+</object>
+
+{% if svg_highlight %}
+  <script>
+    const highlight = "{{ svg_highlight }}";
+    console.log("Highlighting SVG path:", highlight);
+    // Optional: animate or color-match shapes via ID or label text
+  </script>
+{% endif %}
+{% endblock %}
