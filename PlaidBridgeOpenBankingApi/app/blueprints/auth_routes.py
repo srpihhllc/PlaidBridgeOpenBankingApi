@@ -81,6 +81,16 @@ ROLE_REDIRECTS = {
 DEFAULT_REDIRECT = "sub_ui.sub_index"
 
 
+def _safe_limit(*args, **kwargs):
+    """Return limiter decorator if initialized, else a no-op decorator."""
+    if limiter is None or not hasattr(limiter, "limit"):
+        def _noop_decorator(func):
+            return func
+
+        return _noop_decorator
+    return limiter.limit(*args, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # SAFETY HELPER — required by login_view() for next= handling
 # ---------------------------------------------------------------------------
@@ -236,7 +246,7 @@ def send_mfa_code(user: User, code: str | None = None) -> str:
 
 
 @auth_bp.route("/register_subscriber", methods=["GET", "POST"])
-@limiter.limit("10 per hour", methods=["POST"])
+@_safe_limit("10 per hour", methods=["POST"])
 def register_subscriber():
     """
     Operator- and production-ready subscriber registration.
@@ -381,7 +391,7 @@ def register_subscriber():
 
 
 @auth_bp.route("/login", methods=["GET", "POST"], endpoint="login")
-@limiter.limit("5 per minute", methods=["POST"])
+@_safe_limit("5 per minute", methods=["POST"])
 def login_view():
     # Already authenticated → route based on role/admin flags
     if getattr(current_user, "is_authenticated", False):
@@ -803,7 +813,7 @@ def update_password():
 
 
 @auth_bp.route("/reset_request", methods=["GET", "POST"])
-@limiter.limit("3 per hour", methods=["POST"])
+@_safe_limit("3 per hour", methods=["POST"])
 def reset_request():
     if getattr(current_user, "is_authenticated", False):
         return redirect_for_role(current_user)
