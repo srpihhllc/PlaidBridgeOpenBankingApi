@@ -12,7 +12,7 @@ Usage:
     import app.models  # registers all mapped classes exactly once
 """
 
-from ..extensions import db
+from app.extensions import db
 
 # Base / independent models first
 from .access_token import AccessToken
