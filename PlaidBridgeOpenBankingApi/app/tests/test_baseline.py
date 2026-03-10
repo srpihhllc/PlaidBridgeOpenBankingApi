@@ -77,7 +77,8 @@ USER_FK_TABLES = [
     (
         "audit_logs",
         "user_id",
-        "INSERT INTO audit_logs (user_id, event_type, payload, created_at) VALUES (:uid, 'test_action', '{}', CURRENT_TIMESTAMP)",
+        "INSERT INTO audit_logs (user_id, event_type, payload, created_at) "
+        "VALUES (:uid, 'test_action', '{}', CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -147,7 +148,8 @@ USER_FK_TABLES = [
     (
         "financial_audit_logs",
         "actor_id",
-        "INSERT INTO financial_audit_logs (actor_id, action_type, description, created_at) VALUES (:uid, 'test_action', 'desc', CURRENT_TIMESTAMP)",
+        "INSERT INTO financial_audit_logs (actor_id, action_type, description, created_at) "
+        "VALUES (:uid, 'test_action', 'desc', CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
@@ -254,16 +256,15 @@ USER_FK_TABLES = [
     (
         "todos",
         "user_id",
-        "INSERT INTO todos (user_id, text, completed, priority, created_at, updated_at) VALUES (:uid, 'test_todo', 0, 'normal', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+        "INSERT INTO todos (user_id, text, completed, priority, created_at, updated_at) "
+        "VALUES (:uid, 'test_todo', 0, 'normal', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
         lambda: {},
     ),
     (
         "trace_events",
         "user_id",
-        (
-            "INSERT INTO trace_events (id, event_id, event_type, user_id) "
-            "VALUES (99018, 'evt', 'type', :uid)"
-        ),
+        "INSERT INTO trace_events (id, event_id, event_type, user_id) "
+        "VALUES (99018, 'evt', 'type', :uid)",
         lambda: {},
     ),
     (
@@ -590,6 +591,7 @@ def test_ensure_all_user_related_tables_have_cascades(app):
                         f"Table '{table_name}' has a FK to 'users' but is missing "
                         "ON DELETE CASCADE!"
                     )
+
 
 
 
