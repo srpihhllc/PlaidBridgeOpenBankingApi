@@ -1,4 +1,4 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/requirements.txt
+﻿# /home/srpihhllc/PlaidBridgeOpenBankingApi/requirements.txt
 
 alembic==1.16.5
 annotated-types==0.7.0
