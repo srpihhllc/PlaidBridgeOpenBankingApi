@@ -134,3 +134,4 @@ def test_mfa_prompt_redirects(client, app, db_session):
 
     # Note: MFA redirect testing requires fixing login session handling if you need to assert intermediate redirects
 
+
