@@ -120,18 +120,27 @@ def test_mfa_prompt_redirects(client, app, db_session):
     db_session.add(profile)
     db_session.commit()
 
-    # Follow redirects so the test client returns the final rendered page (MFA prompt or dashboard)
+    # Do NOT follow redirects so we can assert redirect-to-MFA or a direct 200 render.
     resp = client.post(
         "/auth/login",
         data={"email": user.email, "password": "password123"},
-        follow_redirects=True,
+        follow_redirects=False,
     )
-    # After following redirects we expect a final 200 OK render (login page or MFA prompt page)
-    assert resp.status_code == 200
 
-    # Optional: if you want to assert the MFA prompt specifically, uncomment and adapt:
-    # assert b"Enter verification code" in resp.data or b"MFA" in resp.data
+    # Accept either a direct render (200) or a redirect (302) to the MFA prompt.
+    assert resp.status_code in (200, 302)
+
+    # If we got a redirect, ensure it's to the MFA prompt endpoint.
+    if resp.status_code == 302:
+        location = resp.headers.get("Location", "")
+        assert "/auth/mfa_prompt" in location or "/auth/mfa" in location
+
+    # Optional: if you want to assert the MFA prompt specifically in a follow flow:
+    # resp2 = client.post("/auth/login", data={"email": user.email, "password": "password123"}, follow_redirects=True)
+    # assert resp2.status_code == 200
+    # assert b"Enter verification code" in resp2.data or b"MFA" in resp2.data
 
     # Note: MFA redirect testing requires fixing login session handling if you need to assert intermediate redirects
+
 
 
