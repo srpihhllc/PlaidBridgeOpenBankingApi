@@ -20,8 +20,10 @@ from flask import Flask, jsonify, request
 from sqlalchemy import inspect
 from werkzeug.exceptions import BadRequest, HTTPException
 
-from app.config import get_config_class
-from app.extensions import (
+# Use package-relative imports so `from app import create_app` resolves config
+# and extensions relative to the imported package instance regardless of PYTHONPATH.
+from .config import get_config_class
+from .extensions import (
     db,
     init_extensions,
     jwt,
@@ -53,7 +55,7 @@ def _safe_status_code(code) -> int:
 
 def _register_blueprints(flask_app: Flask) -> None:
     try:
-        from app.blueprints import register_blueprints, validate_blueprints_graph
+        from .blueprints import register_blueprints, validate_blueprints_graph
 
         register_blueprints(flask_app)
         validate_blueprints_graph(flask_app)
@@ -111,11 +113,11 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
         if user_id is None:
             return None
         try:
-            from app.models.user import User  # local import
+            from .models.user import User  # local import (package-relative)
             return db.session.get(User, int(user_id))
         except ValueError:
             try:
-                from app.models.user import User  # local import
+                from .models.user import User  # local import (package-relative)
                 return db.session.get(User, user_id)
             except Exception:
                 return None
@@ -131,7 +133,7 @@ def _register_jwt_loaders(flask_app: Flask) -> None:
         jti = jwt_payload.get("jti")
         if not jti:
             return False
-        from app.models.revoked_token import RevokedToken  # local import
+        from .models.revoked_token import RevokedToken  # local import (package-relative)
         return db.session.get(RevokedToken, jti) is not None
 
     @jwt.user_identity_loader
@@ -172,7 +174,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # ⭐ CRITICAL: Must happen BEFORE init_extensions() so limiter sees TESTING=True
     # -------------------------------------------------------------------------
     if flask_app.config.get("TESTING"):
-        from app.config import TestingConfig
+        from .config import TestingConfig
 
         flask_app.config.from_object(TestingConfig)
         flask_app.config["SECRET_KEY"] = "test-secret"
@@ -222,7 +224,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # Register all models so SQLAlchemy mappings exist for test collection and imports.
     # Do this after extensions are initialized so `db` is bound to the app.
-    import app.models  # noqa: F401
+    import .models  # noqa: F401 - package-relative import ensures correct module resolution
 
     # 5. JWT loaders
     _register_jwt_loaders(flask_app)
@@ -233,13 +235,13 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     _register_login_manager_loader(flask_app)
 
     # 6. Admin blueprints
-    from app.blueprints.admin_routes import admin_api_bp, admin_bp
+    from .blueprints.admin_routes import admin_api_bp, admin_bp
 
     flask_app.register_blueprint(admin_bp)
     flask_app.register_blueprint(admin_api_bp)
 
     # 6.5 Tiles blueprint (global /tiles/* endpoints)
-    from app.routes.tiles import tiles_bp
+    from .routes.tiles import tiles_bp
 
     flask_app.register_blueprint(tiles_bp)
 
@@ -254,13 +256,13 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # 9. CLI commands
     try:
-        from app.cli import init_app as init_cli
+        from .cli import init_app as init_cli
 
         init_cli(flask_app)
     except Exception as exc:
         _logger.error("Failed to register CLI commands: %s", exc)
 
-    from app.cli_commands.sweep_endpoints import sweep_endpoints
+    from .cli_commands.sweep_endpoints import sweep_endpoints
 
     flask_app.cli.add_command(sweep_endpoints)
 
