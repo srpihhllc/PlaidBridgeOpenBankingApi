@@ -1,3 +1,6 @@
+# Overwrite .github\workflows\ci-deploy.yml with the corrected YAML
+# Paste/execute this as a single block in PowerShell
+$yaml = @'
 name: CI / Prepare & Deploy
 
 on:
@@ -88,3 +91,7 @@ PY
         if: github.ref == 'refs/heads/main'
         run: |
           echo "DEPLOY PLACEHOLDER"
+'@
+
+# Write the YAML to the workflow file
+Set-Content -Path .github\workflows\ci-deploy.yml -Value $yaml -Encoding UTF8
