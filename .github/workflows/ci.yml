@@ -9,6 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+
     services:
       redis:
         image: redis:7
@@ -23,6 +24,17 @@ jobs:
         ports:
           - 5432:5432
 
+    env:
+      # Ensure Python imports resolve from the package directory (single import root)
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi
+      # Prevent create_app from running db.create_all() during test/migration runs
+      ALEMBIC_RUNNING: "1"
+      # Useful defaults for tests
+      DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+      FLASK_CONFIG: testing
+      PYTHONUNBUFFERED: "1"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,18 +47,44 @@ jobs:
       - name: Install deps
         working-directory: PlaidBridgeOpenBankingApi
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-                    if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install pytest pip-audit bandit coverage
+          if [ -f requirements.txt ]; then
+            pip install --no-cache-dir -r requirements.txt
+          else
+            echo "requirements.txt not found"
+          fi
+          if [ -f requirements-dev.txt ]; then
+            pip install --no-cache-dir -r requirements-dev.txt
+          else
+            echo "requirements-dev.txt not found"
+          fi
+          # Ensure minimal tools present so we get clearer errors if installs are missing
+          python -m pip install --no-cache-dir -q pytest pip-audit bandit coverage || true
+
+      - name: Verify installed packages
+        working-directory: PlaidBridgeOpenBankingApi
+        run: |
+          set -euo pipefail
+          echo "Python: $(which python)"
+          echo "Pip:    $(which pip)"
+          echo "Top installed packages:"
+          pip list --format=columns | sed -n '1,200p'
+          # quick import check for Flask
+          python - <<'PY'
+import importlib, sys
+try:
+    m = importlib.import_module('flask')
+    print("flask OK:", getattr(m, "__version__", "unknown"))
+except Exception as e:
+    print("flask import failed:", type(e).__name__, e)
+    sys.exit(2)
+PY
 
       - name: Run tests
         working-directory: PlaidBridgeOpenBankingApi
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/test_db
-          REDIS_URL: redis://localhost:6379/0
-          FLASK_CONFIG: testing
         run: |
+          set -euo pipefail
           python -m pytest -q -vv
 
       - name: Run pip-audit
@@ -63,4 +101,3 @@ jobs:
         with:
           name: pytest-output
           path: PlaidBridgeOpenBankingApi/pytest_output.txt
-
