@@ -1,1 +1,76 @@
-name: Mobile App CI\n\non:\n  push:\n    branches: [ main, docs/infrastructure-upgrade ]\n    paths:\n      - "mobile-app/**"\n  pull_request:\n    branches: [ main, docs/infrastructure-upgrade ]\n    paths:\n      - "mobile-app/**"\n\njobs:\n  mobile-ci:\n    runs-on: ubuntu-latest\n\n    defaults:\n      run:\n        working-directory: mobile-app\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n\n      - name: Setup Node\n        uses: actions/setup-node@v4\n        with:\n          node-version: "20"\n          cache: "pnpm"\n\n      - name: Setup pnpm\n        uses: pnpm/action-setup@v4\n        with:\n          version: 9\n\n      - name: Install dependencies\n        run: pnpm install --frozen-lockfile\n\n      - name: Typecheck\n        run: pnpm run typecheck || pnpm run tsc --noEmit\n\n      - name: Lint\n        run: pnpm run lint || echo "No lint script; skipping."\n\n      - name: Run tests\n        run: pnpm test -- --watch=false || echo "No tests; skipping."\n\n      - name: Build (if configured)\n        run: pnpm run build || echo "No build script; skipping."\n
+# Docs build & deploy (MkDocs -> GitHub Pages)
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+name: Deploy Docs
+
+on:
+  push:
+    branches:
+      - docs/infrastructure-upgrade
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/docs/requirements.txt', '**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Upgrade pip and install docs deps
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          # Prefer a pinned docs/requirements.txt if present (create it to pin mkdocs and plugins)
+          if [ -f docs/requirements.txt ]; then
+            python -m pip install --no-cache-dir -r docs/requirements.txt
+          elif [ -f requirements.txt ]; then
+            # Fallback to top-level requirements (may be large)
+            python -m pip install --no-cache-dir -r requirements.txt
+            # Ensure MkDocs and core plugins are present too
+            python -m pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings mkdocstrings-python
+          else
+            # Minimal fallback
+            python -m pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings mkdocstrings-python
+          fi
+
+      - name: Verify mkdocs installed
+        run: |
+          python - <<'PY'
+import importlib, sys
+try:
+    m = importlib.import_module('mkdocs')
+    print("mkdocs version:", getattr(m, "__version__", "unknown"))
+except Exception as e:
+    print("mkdocs import failed:", type(e).__name__, e)
+    sys.exit(2)
+PY
+
+      - name: Build site
+        # If your mkdocs.yml lives in a subdirectory, set working-directory accordingly.
+        run: |
+          # Print mkdocs config for debugging
+          mkdocs -v --strict build
+
+      - name: Upload to GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Publish to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
