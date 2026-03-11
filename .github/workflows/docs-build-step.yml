@@ -1,0 +1,5 @@
+      - name: Build site
+        run: |
+          set -euo pipefail
+          echo "Building MkDocs site (non-strict) — warnings will be printed but not treated as fatal"
+          mkdocs build 2>&1 | tee mkdocs-build.log
