@@ -224,7 +224,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # Register all models so SQLAlchemy mappings exist for test collection and imports.
     # Do this after extensions are initialized so `db` is bound to the app.
-    import .models  # noqa: F401 - package-relative import ensures correct module resolution
+    from . import models  # noqa: F401 - package-relative import ensures correct module resolution
 
     # 5. JWT loaders
     _register_jwt_loaders(flask_app)
