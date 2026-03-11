@@ -1,4 +1,3 @@
-# CI: create venv, run lint/tests, run alembic (safe), placeholder deploy
 name: CI / Prepare & Deploy
 
 on:
@@ -6,58 +5,87 @@ on:
     branches:
       - main
       - PlaidBridgeOpenBankingApi
-      - fix/*
+      - 'fix/*'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      # Ensure Python imports resolve to the repository root
       PYTHONPATH: ${{ github.workspace }}
-      # Prevent create_app from calling db.create_all during migrations
       ALEMBIC_RUNNING: "1"
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.12"
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
 
-    - name: Create and activate venv, upgrade pip
-      run: |
-        python -m venv .venv
-        . .venv/bin/activate
-        pip install --upgrade pip setuptools wheel
+      - name: Create venv and upgrade pip
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
 
-    - name: Install dependencies (requirements.txt if present, else minimal tooling)
-      run: |
-        . .venv/bin/activate
-        if [ -f requirements.txt ]; then
-          pip install -r requirements.txt
-        else
-          pip install ruff pytest alembic
-        fi
+      - name: Install dependencies (runtime + dev)
+        run: |
+          set -e
+          . .venv/bin/activate
+          echo "Installing runtime requirements (requirements.txt) if present..."
+          if [ -f requirements.txt ]; then
+            python -m pip install --no-cache-dir -r requirements.txt
+          else
+            echo "requirements.txt not found"
+          fi
+          echo "Installing dev/test requirements (requirements-dev.txt) if present..."
+          if [ -f requirements-dev.txt ]; then
+            python -m pip install --no-cache-dir -r requirements-dev.txt
+          else
+            echo "requirements-dev.txt not found"
+          fi
+          # If neither file existed or if essential test/runtime deps are missing,
+          # install minimal fallbacks to make the pipeline more robust.
+          python -m pip install --no-cache-dir -q flask pytest || true
 
-    - name: Run ruff (lint)
-      run: |
-        . .venv/bin/activate
-        pip install ruff
-        ruff check app || true
+      - name: Verify installed packages
+        run: |
+          . .venv/bin/activate
+          echo "Python:" $(which python)
+          echo "Pip:" $(which pip)
+          echo "=== pip list (top 200 chars per line) ==="
+          pip list --format=columns
+          echo "=== Check Flask import/version ==="
+          python - <<'PY'
+import importlib, sys
+try:
+    m = importlib.import_module('flask')
+    print("flask import OK:", getattr(m, "__version__", "unknown"))
+except Exception as e:
+    print("flask import FAILED:", type(e).__name__, e)
+    sys.exit(2)
+PY
 
-    - name: Run tests (skip pytest-cov plugin to avoid coverage config/encoding issues)
-      run: |
-        . .venv/bin/activate
-        python -m pytest -q -p no:pytest_cov
+      - name: Run ruff (lint) — non-blocking
+        run: |
+          . .venv/bin/activate
+          python -m pip install --no-cache-dir ruff
+          ruff check app || true
 
-    - name: Run Alembic migrations (check only)
-      run: |
-        . .venv/bin/activate
-        # ALEMBIC_RUNNING is set in job env to avoid create_all side-effects in create_app
-        python -m alembic -c migrations/alembic.ini upgrade head || echo "alembic step failed or no DB access; check logs"
+      - name: Run tests (skip pytest-cov plugin to avoid coverage config/encoding issues)
+        run: |
+          . .venv/bin/activate
+          python -m pytest -q -p no:pytest_cov
 
-    - name: Placeholder deploy step
-      if: always()
-      run: |
-        echo "Deploy step placeholder. Replace with your deploy commands (e.g., rsync, scp, kubectl, or cloud provider CLI)."
+      - name: Run Alembic migrations (check only)
+        run: |
+          . .venv/bin/activate
+          python -m alembic -c migrations/alembic.ini upgrade head || echo "alembic step failed or no DB access; check logs"
+
+      - name: Placeholder deploy step
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "DEPLOY PLACEHOLDER: replace these commands with your deploy actions (container build/push, rsync, cloud CLI, etc.)"
