@@ -1,6 +1,3 @@
-# Overwrite .github\workflows\ci-deploy.yml with the corrected YAML
-# Paste/execute this as a single block in PowerShell
-$yaml = @'
 name: CI / Prepare & Deploy
 
 on:
@@ -17,7 +14,8 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: ${{ github.workspace }}
+      # Ensure the Python import path includes the nested repository package
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi:${{ github.workspace }}
       ALEMBIC_RUNNING: "1"
     steps:
       - name: Checkout repository
@@ -50,7 +48,6 @@ jobs:
           else
             echo "requirements-dev.txt not found"
           fi
-          # Minimal fallback
           python -m pip install --no-cache-dir -q flask pytest || true
 
       - name: Verify installed packages
@@ -58,9 +55,7 @@ jobs:
           . .venv/bin/activate
           echo "Python: $(which python)"
           echo "Pip:    $(which pip)"
-          echo "=== pip list (top 200 chars per line) ==="
           pip list --format=columns
-          echo "=== Check Flask import/version ==="
           python - <<'PY'
 import importlib, sys
 try:
@@ -91,7 +86,3 @@ PY
         if: github.ref == 'refs/heads/main'
         run: |
           echo "DEPLOY PLACEHOLDER"
-'@
-
-# Write the YAML to the workflow file
-Set-Content -Path .github\workflows\ci-deploy.yml -Value $yaml -Encoding UTF8
