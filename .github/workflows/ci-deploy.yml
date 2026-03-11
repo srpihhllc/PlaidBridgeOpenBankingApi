@@ -47,15 +47,14 @@ jobs:
           else
             echo "requirements-dev.txt not found"
           fi
-          # If neither file existed or if essential test/runtime deps are missing,
-          # install minimal fallbacks to make the pipeline more robust.
+          # Minimal fallback
           python -m pip install --no-cache-dir -q flask pytest || true
 
       - name: Verify installed packages
         run: |
           . .venv/bin/activate
-          echo "Python:" $(which python)
-          echo "Pip:" $(which pip)
+          echo "Python: $(which python)"
+          echo "Pip:    $(which pip)"
           echo "=== pip list (top 200 chars per line) ==="
           pip list --format=columns
           echo "=== Check Flask import/version ==="
@@ -75,7 +74,7 @@ PY
           python -m pip install --no-cache-dir ruff
           ruff check app || true
 
-      - name: Run tests (skip pytest-cov plugin to avoid coverage config/encoding issues)
+      - name: Run tests (skip pytest-cov plugin)
         run: |
           . .venv/bin/activate
           python -m pytest -q -p no:pytest_cov
@@ -88,4 +87,4 @@ PY
       - name: Placeholder deploy step
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "DEPLOY PLACEHOLDER: replace these commands with your deploy actions (container build/push, rsync, cloud CLI, etc.)"
+          echo "DEPLOY PLACEHOLDER"
