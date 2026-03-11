@@ -133,3 +133,4 @@ def test_mfa_prompt_redirects(client, app, db_session):
     # assert b"Enter verification code" in resp.data or b"MFA" in resp.data
 
     # Note: MFA redirect testing requires fixing login session handling if you need to assert intermediate redirects
+
