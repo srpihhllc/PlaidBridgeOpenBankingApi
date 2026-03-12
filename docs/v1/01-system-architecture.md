@@ -1,7 +1,7 @@
-# 📘 Financial Powerhouse Platform — System Architecture
-### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
+# 📘 PlaidBridgeOpenBankingApi — System Architecture
+### (Financial Powerhouse Platform — Backend API & Unified Monorepo)
 
-This document describes the high‑level system architecture for the Financial Powerhouse Platform, a unified fintech monorepo combining backend services, a mobile app, and shared infrastructure.
+This document describes the high‑level system architecture for PlaidBridgeOpenBankingApi, a unified fintech monorepo combining backend services, a mobile app, and shared infrastructure.
 
 ---
 
