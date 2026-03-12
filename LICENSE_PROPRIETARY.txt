@@ -1,0 +1,13 @@
+Proprietary License Notice — SRPIHLLC / PlaidBridgeOpenBankingApi
+
+Certain components or assets in this repository may be subject to proprietary licensing.
+This file documents that proprietary parts require explicit authorization to use, copy,
+or redistribute. If proprietary components exist, they will be located under a
+dedicated directory named `proprietary/` and include a header indicating proprietary status.
+
+Default repository licensing:
+- Unless a file includes an explicit proprietary header, the default license for
+  source code in this repository is the MIT License (see LICENSE).
+
+If you require rights to proprietary components, contact SRPIHLLC for licensing terms.
+(Use legal counsel to produce enforceable text for production use.)
