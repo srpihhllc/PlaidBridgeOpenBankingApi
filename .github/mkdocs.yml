@@ -1,0 +1,43 @@
+site_name: Financial Powerhouse Platform
+site_description: Unified fintech monorepo documentation
+site_author: SRPIH LLC
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+
+nav:
+  - Overview: 01-system-architecture.md
+  - Backend Architecture: 03-backend-architecture.md
+  - Mobile Architecture: 12-mobile-architecture.md
+  - Database ERD: 04-database-erd.md
+  - Developer Onboarding: 05-developer-onboarding.md
+  - CI/CD Pipeline: 06-ci-cd-pipeline.md
+  - Operator Handbook: 07-operator-handbook.md
+  - Release Notes: 08-release-notes.md
+  - API Reference: 09-api-reference.md
+  - OpenAPI Spec: 10-openapi.yaml
+  - Monorepo Architecture Diagram: 11-monorepo-architecture-diagram.md
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+
+extra_css:
+  - stylesheets/extra.css
