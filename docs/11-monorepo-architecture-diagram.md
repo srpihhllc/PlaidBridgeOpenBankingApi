@@ -39,4 +39,5 @@ Provide a single visual representation of the monorepo structure and runtime/ser
 Example embed (Markdown):
 ```markdown
 ![Monorepo Architecture](images/monorepo-architecture-diagram.svg)
+```
 
