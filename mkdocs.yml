@@ -1,5 +1,6 @@
-site_name: Financial Powerhouse Platform
-site_description: Unified fintech monorepo documentation
+site_name: PlaidBridgeOpenBankingApi
+site_description: Financial Powerhouse Platform
+site_author: SRPIHLLC
 theme:
   name: material
   custom_dir: docs/
@@ -28,16 +29,16 @@ plugins:
 nav:
   - Naming Conventions: 02-naming-conventions.md
   - Home: index.md
-  - System Architecture: docs/01-system-architecture.md
-  - Platform Overview: docs/02-platform-overview.md
-  - Backend Architecture: docs/03-backend-architecture.md
-  - Database ERD: docs/04-database-erd.md
-  - Developer Onboarding: docs/05-developer-onboarding.md
-  - CI/CD Pipeline: docs/06-ci-cd-pipeline.md
-  - Operator Handbook: docs/07-operator-handbook.md
-  - Release Notes: docs/08-release-notes.md
-  - API Reference: docs/09-api-reference.md
-  - OpenAPI Spec: docs/10-openapi.yaml
-  - Architecture Diagram: docs/11-monorepo-architecture-diagram.md
+  - System Architecture: 01-system-architecture.md
+  - Platform Overview: 02-platform-overview.md
+  - Backend Architecture: 03-backend-architecture.md
+  - Database ERD: 04-database-erd.md
+  - Developer Onboarding: 05-developer-onboarding.md
+  - CI/CD Pipeline: 06-ci-cd-pipeline.md
+  - Operator Handbook: 07-operator-handbook.md
+  - Release Notes: 08-release-notes.md
+  - API Reference: 09-api-reference.md
+  - OpenAPI Spec: 10-openapi.yaml
+  - Architecture Diagram: 11-monorepo-architecture-diagram.md
   - Contributing: CONTRIBUTING.md
   - Changelog: CHANGELOG.md
