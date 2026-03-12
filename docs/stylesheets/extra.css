@@ -1,0 +1,27 @@
+/* Optional: enable webfont import for JetBrains Mono (uncomment if you want to load it)
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+*/
+
+/* Header style */
+.md-header {
+  background: #111827;
+}
+
+/* Navigation emphasis */
+.md-nav__title,
+.md-nav__link {
+  font-weight: 600;
+}
+
+/* Code font stack for code blocks and inline code */
+code,
+pre {
+  font-family: "JetBrains Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Stronger weights for headings in page content */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3 {
+  font-weight: 700;
+}
