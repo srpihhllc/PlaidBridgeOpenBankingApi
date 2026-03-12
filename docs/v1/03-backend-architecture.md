@@ -1,11 +1,16 @@
-# 🏗 Backend Architecture — Financial Powerhouse Platform
+ # 🏗 Backend Architecture — Financial Powerhouse Platform
+### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
 
-The backend is the core enforcement engine of the Financial Powerhouse Platform.  
-It handles compliance, fraud detection, smart contract simulation, financial scoring, PDF ingestion, and open banking integrations.
+The backend is the core enforcement engine of the Financial Powerhouse Platform. It handles compliance, fraud detection, smart contract simulation, financial scoring, PDF ingestion, and open banking integrations.
 
 ---
 
-# ⚙️ Technology Stack
+**Technical Identity:** `PlaidBridgeOpenBankingApi`  
+**Platform Identity:** Financial Powerhouse Platform
+
+---
+
+## ⚙️ Technology Stack
 
 - **Flask** — REST API framework  
 - **SQLAlchemy ORM** — relational modeling  
@@ -18,20 +23,21 @@ It handles compliance, fraud detection, smart contract simulation, financial sco
 
 ---
 
-# 🧩 High‑Level Architecture
+## 🧩 High‑Level Architecture
 
-Client → Flask API → Services → SQLAlchemy → PostgreSQL
-│
+Client → Flask API → Services → SQLAlchemy → PostgreSQL  
 └── Redis (rate limits, telemetry)
 
-Code
+Notes:
+- Keep business logic in services (thin controllers / route handlers).
+- Background workers (PDF parsing, contract simulation) should run as separate processes and communicate via a job queue.
 
 ---
 
-# 📂 Directory Structure
+## 📂 Directory Structure
 
 app/
-├── init.py
+├── __init__.py
 ├── config.py
 ├── models.py
 ├── routes/
@@ -39,68 +45,87 @@ app/
 ├── migrations/
 └── tests/
 
-Code
+Suggested additions:
+- app/services/workers.py (worker registration and job handlers)
+- app/utils/monitoring.py (health checks / telemetry helpers)
+- app/schemas/ (Pydantic or marshmallow schemas if used)
 
 ---
 
-# 🚦 Core Responsibilities
+## 🚦 Core Responsibilities
 
-### **Compliance Engine**
+### Compliance Engine
 - AI‑driven agreement scanning  
-- Auto‑lock on repeated violations  
+- Auto‑lock on repeated violations
 
-### **Fraud Detection**
+### Fraud Detection
 - Transaction anomaly detection  
-- Auto‑lock on suspicious activity  
+- Auto‑lock on suspicious activity
 
-### **Smart Contract Simulation**
+### Smart Contract Simulation
 - Deterministic execution  
-- Event‑driven state transitions  
+- Event‑driven state transitions
 
-### **Financial Health Scoring**
+### Financial Health Scoring
 - Transaction‑based scoring  
-- Risk modeling  
+- Risk modeling
 
-### **Open Banking**
+### Open Banking
 - Plaid OAuth  
 - Transaction ingestion  
-- PDF → transaction extraction  
+- PDF → transaction extraction
 
 ---
 
-# 🔐 Security Model
+## 🔐 Security Model
 
-- JWT authentication  
-- SECRET_KEY rotation  
-- Rate limiting via Redis  
-- Admin seed validation  
-- Strict FK integrity  
+- JWT authentication (access + refresh patterns)  
+- SECRET_KEY and JWT keys rotated per policy  
+- Rate limiting via Redis with safe failover  
+- Admin seed validation covered by CI smoke tests  
+- Strict FK integrity and DB constraints
+
+Security notes:
+- Never commit secrets — use environment variables or a secrets manager.
+- Add automated secret scanning in CI (git-secrets, truffleHog, etc.).
+- Consider short-lived service tokens and RBAC scopes for internal services.
 
 ---
 
-# 🧪 Testing Strategy
+## 🧪 Testing Strategy
 
-- 100% coverage enforced  
+- Enforce high coverage for critical components (compliance, fraud rules).  
 - CI smoke tests validate:
-  - admin seed  
-  - 27 FK relationships  
-  - cross‑table integrity  
+  - admin seed presence and correctness
+  - key FK relationships and cross-table integrity
+  - migration sanity checks (Alembic)
+- Unit tests for deterministic logic (scoring, contract simulation)
+- Integration tests for external integrations (Plaid, Treasury Prime) using sandbox credentials or recorded fixtures
 
 ---
 
-# 📡 Telemetry
+## 📡 Telemetry & Observability
 
-- Redis TTL traces  
-- Rate‑limit counters  
-- `/health` endpoint  
-- Audit logs for compliance + fraud  
+- Redis TTL traces and rate‑limit counters  
+- `/health` endpoint for liveness/readiness  
+- Audit logs for compliance and fraud events  
+- Instrument critical flows (agreement scans, account linking, contract runs) with traces and metrics  
+- Ensure logs include correlation IDs to follow a request across services
 
 ---
 
-# 📚 Related Documentation
+## Operational / Maintenance Notes
 
-- Database ERD — `04-database-erd.md`  
-- CI/CD Pipeline — `06-ci-cd-pipeline.md`  
-- Operator Handbook — `07-operator-handbook.md`  
-- API Reference — `09-api-reference.md`  
-- OpenAPI Spec — `10-openapi.yaml`  
+- Prefer additive, backward-compatible DB migrations (add columns → backfill �� switch → drop).  
+- Run `alembic revision` + tests in CI to ensure migrations are runnable.  
+- Document runbooks for long-running jobs (PDF parsing, contract simulation).  
+- Use feature flags for risky changes to compliance/fraud logic.
+
+---
+
+## How to update this document
+1. Edit docs/v1/03-backend-architecture.md with structural changes.  
+2. If you change architecture or add major services, include an updated diagram at docs/images/backend-architecture.svg or .png and reference it here.  
+3. Include a short note in the PR describing operational implications (migrations, secrets, rollout plan).
+
+---
