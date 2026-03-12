@@ -1,19 +1,12 @@
-# 📘 Financial Powerhouse Platform
-### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
-
-# 📘 Financial Powerhouse Platform
-### (PlaidBridgeOpenBankingApi — Backend API & Unified Monorepo)
-
 # 🧭 Developer Onboarding — Financial Powerhouse Platform
 
-Welcome to the Financial Powerhouse Platform.  
-This guide provides a complete onboarding path for backend, mobile, and full‑stack engineers.
+Welcome to the Financial Powerhouse Platform. This guide provides a complete onboarding path for backend, mobile, and full‑stack engineers.
 
 ---
 
-# 🚀 1. Prerequisites
+## 1. Prerequisites
 
-## Backend
+### Backend
 - Python 3.11+
 - Poetry
 - PostgreSQL 14+
@@ -21,7 +14,7 @@ This guide provides a complete onboarding path for backend, mobile, and full‑s
 - Plaid sandbox credentials
 - Treasury Prime sandbox credentials
 
-## Mobile
+### Mobile
 - Node 18+
 - pnpm 9+
 - Expo CLI
@@ -29,230 +22,131 @@ This guide provides a complete onboarding path for backend, mobile, and full‑s
 
 ---
 
-# 📦 2. Clone & Initialize the Repository
+## 2. Clone & Initialize the Repository
 
 ```bash
 git clone https://github.com/srpihhllc/PlaidBridgeOpenBankingApi.git
 cd PlaidBridgeOpenBankingApi
+```
 
-🏗 3. Backend Setup
-bash
+---
+
+## 3. Backend Setup
+
+Install dependencies, run migrations and start the dev server:
+
+```bash
 poetry install
 poetry run alembic upgrade head
 poetry run flask run
-Environment Variables (.env)
-Code
-SQLALCHEMY_DATABASE_URI=postgresql://...
+```
+
+Environment variables (.env or your environment manager):
+
+```env
+# .env.example (DO NOT commit secrets)
+SQLALCHEMY_DATABASE_URI=postgresql://user:pass@localhost:5432/dbname
 REDIS_URL=redis://localhost:6379
-JWT_SECRET_KEY=...
-SECRET_KEY=...
+JWT_SECRET_KEY=your_jwt_secret
+SECRET_KEY=your_flask_secret
 PLAID_CLIENT_ID=...
 PLAID_SECRET=...
 TREASURYPRIME_API_KEY=...
-📱 4. Mobile App Setup
-bash
+```
+
+Note: Use a secrets manager for production. Ensure `.env.example` contains placeholders only.
+
+---
+
+## 4. Mobile App Setup
+
+```bash
 cd mobile-app
 pnpm install
 pnpm start
-Environment variables are loaded via:
+```
 
-Code
-mobile-app/scripts/load-env.js
-🔌 5. TRPC Server
-The TRPC server runs automatically with the mobile app.
+Environment variables for the mobile app are loaded via:
+- mobile-app/scripts/load-env.js (or your shell/CI secrets manager)
+
+---
+
+## 5. TRPC Server
+
+The TRPC server lives in `server/` and runs with the mobile app in development.
 
 Key files:
+- `server/_core/trpc.ts`
+- `server/_core/context.ts`
+- `server/_core/oauth.ts`
+- `server/routers/*`
 
-server/_core/trpc.ts
+---
 
-server/_core/context.ts
+## 6. Database Migrations
 
-server/_core/oauth.ts
+Backend (Alembic):
 
-server/routers/*
-
-🗄 6. Database Migrations
-Backend (Alembic)
-bash
-poetry run alembic revision -m "change"
+```bash
+poetry run alembic revision -m "describe change"
 poetry run alembic upgrade head
-Mobile (Drizzle)
-bash
+```
+
+Mobile (Drizzle):
+
+```bash
 cd mobile-app
 pnpm drizzle:generate
 pnpm drizzle:migrate
-🧪 7. Testing
-Backend
-bash
+```
+
+Best practice: prefer additive, backward-compatible migrations (add columns, backfill, switch code, then drop legacy columns).
+
+---
+
+## 7. Testing
+
+Backend:
+
+```bash
 poetry run pytest --cov=app
-Mobile
-bash
+```
+
+Mobile:
+
+```bash
 cd mobile-app
 pnpm test
-🛡 8. Security Expectations
-No secrets in source control
+```
 
-JWT + SECRET_KEY rotated regularly
-
-Admin seed password must be changed in production
-
-OAuth secrets handled server‑side
-
-Redis must be secured in production
-
-🧭 9. Operator Expectations
-Run migrations before every deploy
-
-Validate admin seed
-
-Monitor Redis telemetry
-
-Review fraud/compliance logs
-
-Validate Plaid/Treasury Prime connectivity
-
-🎉 You are now fully onboarded.
-Code
+CI should run tests and require coverage thresholds as configured.
 
 ---
 
-# 📄 **`docs/08-release-notes.md`**
+## 8. Security Expectations
 
-```markdown
-# 📝 Release Notes — Financial Powerhouse Platform
-
-This document tracks major changes, features, and improvements across the platform.
-
----
-
-# 📦 Version 1.0.0 — Unified Monorepo Release
-
-### Added
-- Full React Native / Expo mobile banking app
-- Shared TypeScript TRPC server
-- Drizzle ORM schema + migrations
-- Flask backend API (compliance, fraud, contracts, telemetry)
-- Multi‑page documentation suite
-- CI/CD pipeline (backend + mobile + docs)
-- Operator handbook
-- System architecture documentation
-- Monorepo architecture diagram
-
-### Changed
-- Repository reorganized into a unified monorepo
-- Backend README rewritten for clarity
-- Mobile app integrated into main repo
-- Documentation standardized and versioned
-
-### Security
-- Sanitized `.env.example`
-- Enforced secret rotation requirements
-- Added admin seed validation tests
+- No secrets in source control; use `.gitignore` and a secrets manager.
+- Rotate JWT keys and `SECRET_KEY` regularly.
+- Admin seed password must be changed in production.
+- OAuth secrets handled server-side.
+- Redis must be secured in production (VPC, auth, firewall rules).
 
 ---
 
-# 📦 Version 1.1.0 — Telemetry & Observability Upgrade
+## 9. Operator Expectations
 
-### Added
-- Redis TTL traces
-- Rate‑limit counters
-- Audit logs for compliance + fraud
-- `/health` endpoint enhancements
-
-### Changed
-- Improved error handling
-- Updated telemetry schema
-- Added operator dashboards (internal)
+- Run migrations before each deploy.
+- Validate admin seed via CI smoke tests.
+- Monitor Redis telemetry and rate-limit metrics.
+- Review fraud/compliance logs regularly.
+- Validate Plaid/Treasury Prime connectivity after deployments.
 
 ---
 
-# 📦 Version 1.2.0 — Compliance & Fraud Enhancements
-
-### Added
-- AI‑driven agreement scanning improvements
-- Fraud pattern detection upgrades
-- Auto‑lock logic refinements
-
-### Changed
-- Updated scoring algorithms
-- Improved PDF parsing accuracy
+## Quick Links & Tips
+- For a visual ERD export, add `docs/images/database-erd.png` and reference it in `docs/04-database-erd.md`.
+- Keep onboarding steps in sync with `mkdocs.yml` nav.
 
 ---
 
-# 📦 Version 1.3.0 — Developer Experience Upgrade
-
-### Added
-- Drizzle schema snapshots
-- Mobile app onboarding improvements
-- TRPC router refactors
-
-### Changed
-- Faster CI pipeline
-- Improved test coverage enforcement
-
----
-
-# 🧩 Release Notes Format
-
-Each release includes:
-- Added  
-- Changed  
-- Deprecated  
-- Removed  
-- Fixed  
-- Security  
-
----
-
-# 🎉 End of Release Notes
-📄 mkdocs.yml — Full Documentation Site Configuration
-yaml
-site_name: Financial Powerhouse Platform
-site_description: Unified fintech monorepo documentation
-site_author: SRPIH LLC
-
-theme:
-  name: material
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - content.code.copy
-    - toc.integrate
-    - navigation.top
-    - search.suggest
-    - search.highlight
-
-nav:
-  - Overview: 01-system-architecture.md
-  - Backend Architecture: 03-backend-architecture.md
-  - Mobile Architecture: 12-mobile-architecture.md
-  - Database ERD: 04-database-erd.md
-  - Developer Onboarding: 05-developer-onboarding.md
-  - CI/CD Pipeline: 06-ci-cd-pipeline.md
-  - Operator Handbook: 07-operator-handbook.md
-  - Release Notes: 08-release-notes.md
-  - API Reference: 09-api-reference.md
-  - OpenAPI Spec: 10-openapi.yaml
-  - Monorepo Architecture Diagram: 11-monorepo-architecture-diagram.md
-
-markdown_extensions:
-  - admonition
-  - codehilite
-  - toc:
-      permalink: true
-  - pymdownx.superfences
-  - pymdownx.details
-  - pymdownx.tabbed
-
-plugins:
-  - search
-  - mkdocstrings:
-      default_handler: python
-
-extra_css:
-  - stylesheets/extra.css
-
----
-
-**Technical Identity:** `PlaidBridgeOpenBankingApi`
-**Platform Identity:** Financial Powerhouse Platform
+Congratulations — you should now be set up to develop and run the platform locally.
