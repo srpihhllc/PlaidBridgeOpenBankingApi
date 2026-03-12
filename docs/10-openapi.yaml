@@ -6,78 +6,311 @@ info:
     REST API specification for the Financial Powerhouse Platform.
     Includes compliance, fraud detection, account linking, PDF ingestion,
     smart contract simulation, and financial scoring.
+  contact:
+    name: Platform Engineering
+    email: ops@example.com
 
 servers:
   - url: http://localhost:5000
     description: Local Development
+  - url: https://api.example.com
+    description: Production (replace with real host)
+
+tags:
+  - name: auth
+    description: Authentication and health
+  - name: compliance
+    description: Agreement scanning and compliance reports
+  - name: fraud
+    description: Transaction validation and fraud detection
+  - name: accounts
+    description: Plaid account linking
+  - name: statements
+    description: Statement/PDF ingestion and parsing
+  - name: contracts
+    description: Smart contract simulation and execution
+  - name: finance
+    description: Financial health and utilities
 
 paths:
+  /health:
+    get:
+      tags:
+        - auth
+      summary: Health check
+      responses:
+        "200":
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /auth/login:
+    post:
+      tags:
+        - auth
+      summary: Authenticate and return JWTs
+      requestBody:
+        description: Credentials
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "400":
+          $ref: '#/components/responses/BadRequest'
 
   /review_agreement:
     post:
+      tags:
+        - compliance
       summary: AI compliance scan
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Agreement text or URL to stored agreement
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewAgreementRequest'
       responses:
         "200":
           description: Scan results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewAgreementResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalError'
 
   /compliance_report:
     get:
+      tags:
+        - compliance
       summary: Generate compliance report
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: borrower_id
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Report generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceReport'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /validate_transaction:
     post:
+      tags:
+        - fraud
       summary: Fraud detection
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Transaction payload to validate
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Transaction'
       responses:
         "200":
           description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionValidationResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /link_borrower_account:
     post:
+      tags:
+        - accounts
       summary: Link borrower account via Plaid
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Plaid public_token exchange payload
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LinkAccountRequest'
       responses:
         "200":
           description: Account linked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkedAccount'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /unlink_borrower_account:
     post:
-      summary: Prevent unlinking if obligations remain
+      tags:
+        - accounts
+      summary: Unlink a borrower's linked account (business rules may prevent unlink)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                borrower_id:
+                  type: string
+                linked_account_id:
+                  type: string
       responses:
         "200":
           description: Unlinking status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UnlinkResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "403":
+          description: Forbidden - obligations prevent unlinking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /generate_link_token:
     get:
+      tags:
+        - accounts
       summary: Generate Plaid Link token
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: borrower_id
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Token generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  link_token:
+                    type: string
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /upload_statement:
     post:
+      tags:
+        - statements
       summary: Upload PDF → extract transactions
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                borrower_id:
+                  type: string
+                statement:
+                  type: string
+                  format: binary
       responses:
         "200":
           description: Parsed transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParsedStatementResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "413":
+          description: Payload Too Large
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /execute_contract/{id}:
     post:
+      tags:
+        - contracts
       summary: Simulate smart contract execution
+      security:
+        - bearerAuth: []
       parameters:
         - in: path
           name: id
           required: true
           schema:
             type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Execution parameters (varies by contract)
       responses:
         "200":
           description: Execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractExecutionResult'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /financial_health/{id}:
     get:
+      tags:
+        - finance
       summary: Get financial health score
+      security:
+        - bearerAuth: []
       parameters:
         - in: path
           name: id
@@ -87,24 +320,291 @@ paths:
       responses:
         "200":
           description: Score returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinancialHealthResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /convert_currency:
     post:
+      tags:
+        - finance
       summary: Convert currency
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from_currency:
+                  type: string
+                to_currency:
+                  type: string
+                amount:
+                  type: number
       responses:
         "200":
           description: Conversion result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  converted_amount:
+                    type: number
+                  rate:
+                    type: number
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
   /biometric_auth:
     post:
+      tags:
+        - auth
       summary: Placeholder biometric endpoint
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                borrower_id:
+                  type: string
+                biometric_payload:
+                  type: string
       responses:
         "200":
           description: Placeholder response
+        "401":
+          $ref: '#/components/responses/Unauthorized'
 
-  /health:
-    get:
-      summary: Health check
-      responses:
-        "200":
-          description: API is healthy
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalError:
+      description: Internal Server Error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+      required:
+        - message
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "ok"
+        components:
+          type: object
+          additionalProperties:
+            type: string
+
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        refresh_token:
+          type: string
+        expires_in:
+          type: integer
+
+    ReviewAgreementRequest:
+      type: object
+      properties:
+        borrower_id:
+          type: string
+        agreement_text:
+          type: string
+        agreement_url:
+          type: string
+      description: Provide either agreement_text or agreement_url.
+
+    ReviewAgreementResponse:
+      type: object
+      properties:
+        ai_flags:
+          type: array
+          items:
+            type: string
+        summary:
+          type: string
+        severity:
+          type: string
+          example: "low"
+
+    ComplianceReport:
+      type: object
+      properties:
+        borrower_id:
+          type: string
+        generated_at:
+          type: string
+          format: date-time
+        findings:
+          type: array
+          items:
+            type: object
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        borrower_id:
+          type: string
+        amount:
+          type: number
+        category:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+
+    TransactionValidationResponse:
+      type: object
+      properties:
+        risk_score:
+          type: number
+        action:
+          type: string
+          example: allow
+        reasons:
+          type: array
+          items:
+            type: string
+
+    LinkAccountRequest:
+      type: object
+      properties:
+        borrower_id:
+          type: string
+        public_token:
+          type: string
+        metadata:
+          type: object
+      required:
+        - borrower_id
+        - public_token
+
+    LinkedAccount:
+      type: object
+      properties:
+        id:
+          type: string
+        borrower_id:
+          type: string
+        plaid_account_id:
+          type: string
+        institution:
+          type: string
+        status:
+          type: string
+
+    UnlinkResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+
+    ParsedStatementResponse:
+      type: object
+      properties:
+        borrower_id:
+          type: string
+        parsed_at:
+          type: string
+          format: date-time
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ContractExecutionResult:
+      type: object
+      properties:
+        contract_id:
+          type: string
+        result:
+          type: object
+        events:
+          type: array
+          items:
+            type: object
+
+    FinancialHealthResponse:
+      type: object
+      properties:
+        borrower_id:
+          type: string
+        score:
+          type: number
+        factors:
+          type: array
+          items:
+            type: object
+
+security:
+  - bearerAuth: []
+
