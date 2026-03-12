@@ -1,92 +1,74 @@
-# Operator Handbook — Financial Powerhouse Platform (PDF Edition)
+# 🧭 Operator Handbook — Financial Powerhouse Platform
 
-This handbook defines the operational responsibilities for the Financial Powerhouse Platform across daily, weekly, and monthly cadences.
+This handbook defines daily, weekly, and monthly operational responsibilities for platform operators and provides concise runbooks for common checks and incident response.
+
+---
+
+## Overview
+Operators are responsible for system availability, telemetry, security posture, and integrations (Plaid, Treasury Prime). Follow the checks below and escalate according to the incident response procedure.
 
 Technical Identity: `PlaidBridgeOpenBankingApi`  
 Platform Identity: Financial Powerhouse Platform
 
 ---
 
-## 1. Purpose
-Define operator responsibilities and runbooks for daily, weekly, and monthly maintenance and incident response.
+## 🟢 Daily Tasks
+- Check `/health`
+  - Verify HTTP 200 and basic service metrics.
+- Review fraud and compliance logs for high-severity alerts.
+- Monitor Redis telemetry and rate-limit counters.
+- Verify Plaid and Treasury Prime connectivity (sanity checks).
+- Review application error logs and backlog for spikes.
+- Confirm that scheduled jobs (if any) completed successfully.
 
 ---
 
-## 2. System Overview
-- Flask backend API (compliance, fraud, contracts, telemetry)  
-- React Native / Expo mobile app  
-- TRPC server (shared TypeScript)  
-- PostgreSQL + Drizzle ORM  
-- Redis telemetry and rate limiting  
-- GitHub Actions CI/CD
+## 🟡 Weekly Tasks
+- Rotate JWT and `SECRET_KEY` if required by policy (or verify rotation schedule).
+- Review recent migrations for correctness and any pending rollbacks.
+- Run smoke tests against staging.
+- Validate admin seed presence and credentials (do not store secrets in plaintext).
+- Review recurring alerts for noise and adjust thresholds.
 
 ---
 
-## 3. Daily Checklist
-1. Verify the `/health` endpoint returns HTTP 200.
-2. Inspect Redis telemetry for:
-   - Rate‑limit anomalies
-   - TTL trace outliers
-3. Review fraud auto‑locks and compliance flags.
-4. Confirm CI pipeline is green on the `main` branch.
-5. Scan recent error logs for spikes or new stack traces.
+## 🔵 Monthly Tasks
+- Full secrets rotation (rotate API keys, DB credentials, third-party keys).
+- Audit database integrity (consistency checks, FK validity, row counts for key tables).
+- Review rate-limit counters and capacity planning metrics.
+- Validate PDF parser accuracy against sample statements (spot-check).
+- Review access logs and audit trails for suspicious activity.
 
 ---
 
-## 4. Weekly Checklist
-1. Rotate JWT and `SECRET_KEY` if required by policy (or verify rotation schedule).
-2. Review audit logs for:
-   - Manual overrides
-   - Failed or pending migrations
-   - Suspicious access patterns
-3. Run the full test suites:
-   - Backend: `poetry run pytest --cov=app`
-   - Mobile: `cd mobile-app && pnpm test`
-4. Validate that scheduled jobs completed successfully.
+## 🚨 Incident Response (Runbook)
+1. Triage
+   - Pull recent logs and alerts.
+   - Identify impacted services, scope (number of users/borrowers), and severity.
+2. Containment
+   - For fraud-related incidents: lock affected borrower accounts (auto-lock or manual).
+   - If secrets are suspected compromised: rotate secrets immediately and revoke tokens.
+3. Mitigation
+   - Run the full smoke test suite against staging and (if safe) production read-only endpoints.
+   - Apply emergency fix if available (follow hotfix PR process).
+4. Recovery
+   - Restore affected services, confirm with smoke tests and monitoring.
+   - Gradually re-enable locked accounts after verification if appropriate.
+5. Postmortem
+   - Document timeline, root cause, remedial actions, and next steps.
+   - Create follow-up tickets for long-term fixes.
 
 ---
 
-## 5. Monthly Checklist
-1. Review ERD and check for schema drift versus migrations.
-2. Validate onboarding and operator docs are current.
-3. Review release notes and plan the next version cadence.
-4. Audit third‑party dependencies for security advisories and apply patches as appropriate.
+## 🧪 Smoke Test Checklist
+- `/health` returns OK (200)
+- DB connection is healthy
+- Redis connection is healthy
+- Plaid sandbox reachable (run a minimal auth/account call)
+- Treasury Prime reachable (run a minimal API call)
+- Admin seed present and valid
+- Background jobs processed (if applicable)
 
----
-
-## 6. Incident Response (High Level)
-
-### Triage
-- Identify impacted services (API, mobile, TRPC, DB, Redis).
-- Determine scope (users affected, data impact, uptime SLA).
-
-### Contain
-- Lock affected borrower accounts (auto-lock or manual).
-- Disable or throttle risky flows if needed.
-
-### Recover
-- Restore from backups if data corruption occurred.
-- Apply hotfixes following the hotfix PR process and verify in staging before production rollout.
-
-### Post‑mortem
-- Document timeline and root cause.
-- Add tests, telemetry, and runbook improvements to prevent recurrence.
-- Create follow-up tickets with owners and SLAs for fixes.
-
----
-
-## 7. Contact & Escalation
-- Engineering on‑call rotation: (populate)
-- Compliance contact: (populate)
-- Security contact: (populate)
-
-Store contact lists securely (not in plaintext in the repository).
-
----
-
-## Appendix — Quick Commands
-
-Validate backend tests and coverage:
+Example quick check (curl):
 ```bash
-poetry install
-poetry run pytest --cov=app
+curl -fS --max-time 5 https://api.example.com/health || echo "health check failed"
