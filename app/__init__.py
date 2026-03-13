@@ -1,14 +1,6 @@
-# =============================================================================
-# Hardened Flask application factory.
-# =============================================================================
-
-"""
-Hardened Flask application factory.
-
-This file contains the canonical create_app factory. It intentionally avoids
-importing application models at module import time to prevent duplicate SQLAlchemy
-registrations when the package is imported under multiple roots.
-"""
+# Hardened Flask application factory with Limiter initialization fix.
+# Rewritten to avoid passing the Flask `app` as a positional argument to Limiter
+# at import time. Uses the init_app pattern which is compatible across versions.
 
 from __future__ import annotations
 import logging
@@ -19,6 +11,10 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 from sqlalchemy import inspect
 from werkzeug.exceptions import BadRequest, HTTPException
+
+# Rate limiter (create the Limiter instance without an app; call init_app later)
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # Use package-relative imports so `from app import create_app` resolves config
 # and extensions relative to the imported package instance regardless of PYTHONPATH.
@@ -35,6 +31,16 @@ __all__ = ["create_app", "socketio"]
 
 _logger = logging.getLogger(__name__)
 
+# =============================================================================
+# Create Limiter instance with named args only (no app passed here).
+# Use init_app(app) later inside create_app so we don't attempt to reference
+# Flask app at import time and to avoid positional-argument ambiguity.
+# =============================================================================
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+)
 
 # =============================================================================
 # Logging (PythonAnywhere‑safe)
@@ -202,7 +208,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # 3. SQLAlchemy engine tuning
     uri = flask_app.config.get("SQLALCHEMY_DATABASE_URI", "")
-    if uri.startswith("sqlite"):
+    if uri and uri.startswith("sqlite"):
         flask_app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"poolclass": None}
     else:
         flask_app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -222,6 +228,16 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # 4. Initialize extensions (NOW after TESTING config is set)
     init_extensions(flask_app)
 
+    # Initialize limiter AFTER extensions and AFTER the app exists.
+    # This avoids passing `app` at import time (fixes TypeError from positional args).
+    try:
+        limiter.init_app(flask_app)
+        flask_app.logger.info("⏱️ Limiter initialized via init_app()")
+    except Exception as exc:
+        # If limiter initialization fails, log the error but allow the app to continue.
+        # This ensures import-time errors don't crash the web process.
+        flask_app.logger.error("Failed to init limiter: %s", exc, exc_info=True)
+
     # Register all models so SQLAlchemy mappings exist for test collection and imports.
     # Do this after extensions are initialized so `db` is bound to the app.
     from . import models  # noqa: F401 - package-relative import ensures correct module resolution
@@ -235,15 +251,22 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     _register_login_manager_loader(flask_app)
 
     # 6. Admin blueprints
-    from .blueprints.admin_routes import admin_api_bp, admin_bp
+    try:
+        from .blueprints.admin_routes import admin_api_bp, admin_bp
 
-    flask_app.register_blueprint(admin_bp)
-    flask_app.register_blueprint(admin_api_bp)
+        flask_app.register_blueprint(admin_bp)
+        flask_app.register_blueprint(admin_api_bp)
+    except Exception as exc:
+        flask_app.logger.error("Failed to register admin blueprints: %s", exc, exc_info=True)
+        raise
 
     # 6.5 Tiles blueprint (global /tiles/* endpoints)
-    from .routes.tiles import tiles_bp
+    try:
+        from .routes.tiles import tiles_bp
 
-    flask_app.register_blueprint(tiles_bp)
+        flask_app.register_blueprint(tiles_bp)
+    except Exception as exc:
+        flask_app.logger.warning("Tiles blueprint not loaded: %s", exc, exc_info=True)
 
     # 7. Auto-discovered blueprints
     _register_blueprints(flask_app)
@@ -262,9 +285,12 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception as exc:
         _logger.error("Failed to register CLI commands: %s", exc)
 
-    from .cli_commands.sweep_endpoints import sweep_endpoints
+    try:
+        from .cli_commands.sweep_endpoints import sweep_endpoints
 
-    flask_app.cli.add_command(sweep_endpoints)
+        flask_app.cli.add_command(sweep_endpoints)
+    except Exception as exc:
+        _logger.debug("Sweep endpoints CLI not available: %s", exc)
 
     # 10. Root health-check route for platform probes
     @flask_app.route("/health")
