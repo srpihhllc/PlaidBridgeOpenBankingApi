@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class AccessToken(db.Model):
@@ -12,6 +12,7 @@ class AccessToken(db.Model):
     """
 
     __tablename__ = "access_tokens"
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 

@@ -1,3 +1,4 @@
+# Docs build & deploy (MkDocs -> GitHub Pages)
 permissions:
   contents: read
   pages: write
@@ -12,6 +13,7 @@ on:
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,19 +23,54 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install mkdocs
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/docs/requirements.txt', '**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Upgrade pip and install docs deps
         run: |
-          pip install mkdocs mkdocs-material mkdocstrings
+          python -m pip install --upgrade pip setuptools wheel
+          # Prefer a pinned docs/requirements.txt if present (create it to pin mkdocs and plugins)
+          if [ -f docs/requirements.txt ]; then
+            python -m pip install --no-cache-dir -r docs/requirements.txt
+          elif [ -f requirements.txt ]; then
+            # Fallback to top-level requirements (may be large)
+            python -m pip install --no-cache-dir -r requirements.txt
+            # Ensure MkDocs and core plugins are present too
+            python -m pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings mkdocstrings-python
+          else
+            # Minimal fallback
+            python -m pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings mkdocstrings-python
+          fi
+
+      - name: Verify mkdocs installed
+        run: |
+          python - <<'PY'
+import importlib, sys
+try:
+    m = importlib.import_module('mkdocs')
+    print("mkdocs version:", getattr(m, "__version__", "unknown"))
+except Exception as e:
+    print("mkdocs import failed:", type(e).__name__, e)
+    sys.exit(2)
+PY
 
       - name: Build site
-        run: mkdocs build
+        # If your mkdocs.yml lives in a subdirectory, set working-directory accordingly.
+        run: |
+          # Print mkdocs config for debugging
+          mkdocs -v --strict build
 
-      - name: Deploy to GitHub Pages
+      - name: Upload to GitHub Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
           path: site
 
-      - name: Publish
+      - name: Publish to GitHub Pages
         uses: actions/deploy-pages@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}

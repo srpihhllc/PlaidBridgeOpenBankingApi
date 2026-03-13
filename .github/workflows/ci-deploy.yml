@@ -1,0 +1,88 @@
+name: CI / Prepare & Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - PlaidBridgeOpenBankingApi
+      - 'fix/*'
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Ensure the Python import path includes the nested repository package
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi:${{ github.workspace }}
+      ALEMBIC_RUNNING: "1"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Create venv and upgrade pip
+        run: |
+          python -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+
+      - name: Install dependencies (runtime + dev)
+        run: |
+          set -e
+          . .venv/bin/activate
+          echo "Installing runtime requirements (requirements.txt) if present..."
+          if [ -f requirements.txt ]; then
+            python -m pip install --no-cache-dir -r requirements.txt
+          else
+            echo "requirements.txt not found"
+          fi
+          echo "Installing dev/test requirements (requirements-dev.txt) if present..."
+          if [ -f requirements-dev.txt ]; then
+            python -m pip install --no-cache-dir -r requirements-dev.txt
+          else
+            echo "requirements-dev.txt not found"
+          fi
+          python -m pip install --no-cache-dir -q flask pytest || true
+
+      - name: Verify installed packages
+        run: |
+          . .venv/bin/activate
+          echo "Python: $(which python)"
+          echo "Pip:    $(which pip)"
+          pip list --format=columns
+          python - <<'PY'
+import importlib, sys
+try:
+    m = importlib.import_module('flask')
+    print("flask import OK:", getattr(m, "__version__", "unknown"))
+except Exception as e:
+    print("flask import FAILED:", type(e).__name__, e)
+    sys.exit(2)
+PY
+
+      - name: Run ruff (lint) — non-blocking
+        run: |
+          . .venv/bin/activate
+          python -m pip install --no-cache-dir ruff
+          ruff check app || true
+
+      - name: Run tests (skip pytest-cov plugin)
+        run: |
+          . .venv/bin/activate
+          python -m pytest -q -p no:pytest_cov
+
+      - name: Run Alembic migrations (check only)
+        run: |
+          . .venv/bin/activate
+          python -m alembic -c migrations/alembic.ini upgrade head || echo "alembic step failed or no DB access; check logs"
+
+      - name: Placeholder deploy step
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "DEPLOY PLACEHOLDER"

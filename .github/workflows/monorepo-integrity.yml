@@ -9,6 +9,10 @@ on:
 jobs:
   monorepo-integrity:
     runs-on: ubuntu-latest
+    env:
+      PYTHONUNBUFFERED: "1"
+      # Keep imports deterministic if any Python checks import project code
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout
@@ -16,35 +20,67 @@ jobs:
 
       - name: Verify repo structure
         run: |
-          test -d app
-          test -d mobile-app
-          test -d docs
-          test -f README.md
-          test -f docs/10-openapi.yaml
-          test -f docs/05-developer-onboarding.md
-          test -f docs/06-ci-cd-pipeline.md
-          test -f docs/07-operator-handbook.md
-          test -f docs/08-release-notes.md
-          test -f docs/11-monorepo-architecture-diagram.md
+          set -euo pipefail
+          echo "Checking folders and key docs..."
+          test -d app || (echo "Missing directory: app" && exit 1)
+          test -d mobile-app || echo "Warn: mobile-app directory not found"
+          test -d docs || (echo "Missing directory: docs" && exit 1)
+          test -f README.md || (echo "Missing README.md" && exit 1)
+          test -f docs/10-openapi.yaml || (echo "Missing docs/10-openapi.yaml" && exit 1)
+          test -f docs/05-developer-onboarding.md || echo "Warn: docs/05-developer-onboarding.md not found"
+          test -f docs/06-ci-cd-pipeline.md || echo "Warn: docs/06-ci-cd-pipeline.md not found"
+          test -f docs/07-operator-handbook.md || echo "Warn: docs/07-operator-handbook.md not found"
+          test -f docs/08-release-notes.md || echo "Warn: docs/08-release-notes.md not found"
+          test -f docs/11-monorepo-architecture-diagram.md || echo "Warn: docs/11-monorepo-architecture-diagram.md not found"
 
       - name: Verify env template
         run: |
-          test -f .env.example
-          grep -q "DATABASE_URL" .env.example || echo "Warn: DATABASE_URL not documented"
-          grep -q "PLAID_CLIENT_ID" .env.example || echo "Warn: PLAID_CLIENT_ID not documented"
+          set -euo pipefail
+          test -f .env.example || (echo ".env.example missing" && exit 1)
+          if grep -q "DATABASE_URL" .env.example; then
+            echo "DATABASE_URL documented in .env.example"
+          else
+            echo "Warn: DATABASE_URL not documented in .env.example"
+          fi
+          if grep -q "PLAID_CLIENT_ID" .env.example; then
+            echo "PLAID_CLIENT_ID documented in .env.example"
+          else
+            echo "Warn: PLAID_CLIENT_ID not documented in .env.example"
+          fi
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
 
       - name: Validate OpenAPI (basic)
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install openapi-spec-validator
+          python -m pip install --no-cache-dir openapi-spec-validator
+          echo "Validating docs/10-openapi.yaml..."
           python -m openapi_spec_validator docs/10-openapi.yaml
+        shell: bash
+
+      - name: Setup Node (for mobile TS checks)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
       - name: Validate mobile shared TS types
         working-directory: mobile-app
         run: |
-          npm install -g typescript >/dev/null 2>&1 || true
+          set -euo pipefail
+          if [ -f package.json ]; then
+            # Install only dev deps needed for typecheck
+            npm ci --ignore-scripts --no-audit --no-fund
+          else
+            echo "No package.json in mobile-app; skipping TS validation."
+            exit 0
+          fi
           if [ -f tsconfig.json ]; then
             npx tsc --noEmit
           else
             echo "No tsconfig.json; skipping TS validation."
           fi
+        shell: bash

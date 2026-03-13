@@ -12,13 +12,15 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import db
+from ..extensions import db
 
 Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
 
 
 class User(UserMixin, Model):
     __tablename__ = "users"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     # -------------------------------------------------------------------------
     # Core identity fields
@@ -364,4 +366,4 @@ class User(UserMixin, Model):
     )
 
 
-from app.models.ledger import LedgerEntry  # noqa: F401,E402
+from .ledger import LedgerEntry  # noqa: F401,E402

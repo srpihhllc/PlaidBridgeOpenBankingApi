@@ -7,11 +7,13 @@
 import uuid
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class FraudReport(db.Model):
     __tablename__ = "fraud_reports"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 

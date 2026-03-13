@@ -2,11 +2,12 @@
 
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class PlaidItem(db.Model):
     __tablename__ = "plaid_items"
+    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

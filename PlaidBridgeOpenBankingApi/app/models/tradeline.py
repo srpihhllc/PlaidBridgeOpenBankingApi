@@ -4,11 +4,13 @@
 #              and cockpit‑grade relationship clarity.
 # =============================================================================
 
-from app.extensions import db
+from ..extensions import db
 
 
 class Tradeline(db.Model):
     __tablename__ = "tradelines"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 

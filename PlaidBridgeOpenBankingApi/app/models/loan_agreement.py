@@ -5,11 +5,12 @@
 # =============================================================================
 from datetime import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class LoanAgreement(db.Model):
     __tablename__ = "loan_agreement"
+    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

@@ -69,7 +69,7 @@ ordered-set==4.1.0
 packaging==25.0
 pandas==2.3.3
 pathspec==0.12.1
-pdfminer.six==20240706
+pdfminer.six==20220524
 pdfplumber==0.7.4
 pillow==12.1.1
 pip-tools==7.5.1
@@ -95,7 +95,7 @@ python-dotenv==1.2.1
 python-engineio==4.12.3
 python-http-client==3.3.7
 python-socketio==5.14.1
-PyPDF2==3.0.2
+PyPDF2==3.0.1
 pytz==2025.2
 PyYAML==6.0.3
 qrcode==8.2
@@ -118,10 +118,10 @@ tqdm==4.67.1
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 tzdata==2025.2
-urllib3==2.5.5
+urllib3==2.2.3
 virtualenv==20.28.1
 Wand==0.6.13
-Werkzeug==3.2.0
+Werkzeug==3.1.6
 wheel==0.46.0
 wrapt==1.17.3
 wsproto==1.2.0

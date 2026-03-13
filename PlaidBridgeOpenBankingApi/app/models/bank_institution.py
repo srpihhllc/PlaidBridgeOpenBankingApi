@@ -1,10 +1,11 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/bank_institution.py
 
-from app.extensions import db
+from ..extensions import db
 
 
 class BankInstitution(db.Model):
     __tablename__ = "bank_institutions"
+    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

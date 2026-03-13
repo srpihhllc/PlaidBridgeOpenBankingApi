@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.extensions import db
+from ..extensions import db
 
 logger = logging.getLogger(__name__)
 

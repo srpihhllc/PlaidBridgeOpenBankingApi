@@ -6,11 +6,13 @@
 
 import datetime
 
-from app.extensions import db
+from ..extensions import db
 
 
 class SchemaEvent(db.Model):
     __tablename__ = "schema_event"
+    __table_args__ = {"extend_existing": True}
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 

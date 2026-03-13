@@ -73,3 +73,5 @@ mobile-app/node_modules/
 pytest_output*.txt
 pytest_output*.log
 .venv/
+site/
+site_backup/

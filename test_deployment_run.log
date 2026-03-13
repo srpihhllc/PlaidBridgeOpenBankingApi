@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "C:\Users\R\PlaidBridgeOpenBankingApi_repo_clone\test_deployment.py", line 276, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "C:\Users\R\PlaidBridgeOpenBankingApi_repo_clone\test_deployment.py", line 234, in main
+    print("\n" + "\U0001f680" * 30)
+  File "C:\Python312\Lib\encodings\cp1252.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 2-31: character maps to <undefined>
