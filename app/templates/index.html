@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block title %}Welcome | PlaidBridge{% endblock %}
+
+{% block content %}
+<!-- Central Container Card -->
+<div class="max-w-xl mx-auto p-8 mt-12 bg-white rounded-xl shadow-2xl border border-blue-100">
+
+    <div class="text-center">
+        <!-- Telemetry Status Badge -->
+        {% if redis_ttl and redis_ttl > 0 %}
+            <p class="mb-4">
+                <span class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold bg-green-100 text-green-800 shadow-md">
+                    🧠 Boot Fresh — {{ redis_ttl }}s
+                </span>
+            </p>
+        {% else %}
+            <p class="mb-4">
+                <span class="inline-flex items-center px-4 py-1.5 rounded-full text-sm font-semibold bg-red-100 text-red-800 shadow-md">
+                    System Trace Expired
+                </span>
+            </p>
+        {% endif %}
+
+        <!-- Main Heading -->
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-4">
+            🏦 Welcome to PlaidBridge Open Banking
+        </h1>
+        <p class="text-lg text-gray-600 mb-10">
+            Your gateway to secure, AI-powered financial insights.
+        </p>
+
+        <!-- Dynamic Action Buttons -->
+        {% if current_user and current_user.is_authenticated %}
+            {% if current_user.is_admin %}
+                <!-- Corrected admin link -->
+                <a href="{{ url_for('admin_ui.admin_home') }}"
+                   class="block w-full py-3 px-8 text-lg font-semibold rounded-lg shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition duration-150 transform hover:scale-[1.01]">
+                    Manage the Platform
+                </a>
+            {% else %}
+                <a href="{{ url_for('main.dashboard') }}"
+                   class="block w-full py-3 px-8 text-lg font-semibold rounded-lg shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 transition duration-150 transform hover:scale-[1.01]">
+                    View My Accounts
+                </a>
+            {% endif %}
+        {% else %}
+            <a href="{{ url_for('main.subscriber_entry') }}"
+               class="block w-full py-3 px-8 text-lg font-semibold rounded-lg shadow-lg text-blue-600 border-2 border-blue-500 bg-white hover:bg-blue-50 focus:ring-4 focus:ring-blue-300 transition duration-150 transform hover:scale-[1.01]">
+                Get Started
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- FinBrain Section -->
+    <div class="mt-12 pt-6 border-t border-gray-200">
+        <h2 class="text-2xl font-bold text-gray-800 mb-2 flex items-center justify-center">
+            🧠 FinBrain is Alive
+        </h2>
+        <p class="text-md text-gray-500">
+            This is the orchestration cortex landing page — where agents connect, grants evolve, and cognition traces begin.
+        </p>
+    </div>
+</div>
+{% endblock %}
