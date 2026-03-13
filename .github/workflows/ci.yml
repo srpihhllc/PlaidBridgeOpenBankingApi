@@ -1,3 +1,16 @@
+# Updated CI workflow: adds a conservative MkDocs build step that uses the
+# authoritative config at .github/mkdocs.yml. This runs after test dependency
+# installation and package verification and builds docs from the PlaidBridgeOpenBankingApi docs/.
+#
+# Rationale:
+# - The repository's canonical MkDocs config is in .github/mkdocs.yml.
+# - CI runners run commands from the repo root; we want mkdocs to use that config
+#   but build docs that live under PlaidBridgeOpenBankingApi/docs.
+# - This step invokes mkdocs with an absolute config path and sets working-directory
+#   to PlaidBridgeOpenBankingApi so MkDocs locates the docs/ directory correctly.
+# - Installing mkdocs inside the venv ensures builds are reproducible and avoids
+#   relying on runner global packages.
+#
 name: CI
 
 on:
@@ -87,6 +100,17 @@ PY
           set -euo pipefail
           python -m pytest -q -vv
 
+      - name: Build docs (MkDocs)
+        # Run from the PlaidBridgeOpenBankingApi directory so mkdocs finds the docs/ folder there.
+        working-directory: PlaidBridgeOpenBankingApi
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          # Install mkdocs and the material theme + mkdocstrings so the build matches local dev.
+          pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings
+          # Use the authoritative config file located at .github/mkdocs.yml (absolute path).
+          mkdocs build --config-file "${{ github.workspace }}/.github/mkdocs.yml" --strict
+
       - name: Run pip-audit
         working-directory: PlaidBridgeOpenBankingApi
         run: pip-audit --progress=off --format=columns || true
@@ -101,3 +125,4 @@ PY
         with:
           name: pytest-output
           path: PlaidBridgeOpenBankingApi/pytest_output.txt
+
