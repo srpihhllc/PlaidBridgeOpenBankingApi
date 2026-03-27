@@ -83,7 +83,7 @@ document.getElementById("operatorForm").addEventListener("submit", async (e) => 
   const json = await res.json();
 
   if (json.status === "ok") {
-    window.location.href = "{{ url_for('admin_ui.admin_home') }}";
+    window.location.href = "{{ url_for('admin.admin_home') }}";
   } else {
     alert(json.message || "Invalid operator code");
   }
