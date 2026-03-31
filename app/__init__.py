@@ -48,6 +48,8 @@ __all__ = [
     "register_healthcheck",
     "unregister_healthcheck",
     "add_route_prune_whitelist",
+    "_cleanup_premature_oauth_registrations",
+    "_enforce_route_uniqueness",
 ]
 
 _logger = logging.getLogger(__name__)
@@ -87,6 +89,107 @@ def add_route_prune_whitelist(ep: str) -> None:
         _logger.debug("Added %s to ROUTE_PRUNE_WHITELIST", ep)
     except Exception:
         _logger.debug("Failed to extend ROUTE_PRUNE_WHITELIST with %s", ep, exc_info=True)
+
+
+# ============================================================================
+# Defensive helper: Remove any oauth.* endpoints registered prematurely (import-time side-effects)
+# so blueprint registration can proceed without duplicate route errors.
+# This is safe to call multiple times and is a no-op if nothing to clean up.
+# Used in app factory and test setup.
+# ============================================================================
+def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
+    """
+    Remove oauth.* view functions and any associated url_map rules that clearly
+    look like import-time, premature registrations.
+
+    Safety:
+      - Intended for startup only (called from create_app()). The function best-effort
+        checks create_app sentinel or TESTING flag and respects the
+        flask_app.config["ALLOW_PREMATURE_CLEANUP"] flag.
+      - Conservative predicate: only considers endpoints that start with 'oauth.'
+        and whose view function module contains 'oauth' or 'oauth_routes'.
+      - Does not raise; logs debug/info about what it changed.
+    """
+    try:
+        # Startup-only guard: require sentinel created by create_app() or TESTING flag.
+        if not globals().get("_CREATE_APP_INVOKED", False) and not flask_app.config.get("TESTING", False):
+            _logger.debug("Premature oauth cleanup skipped: create_app() sentinel not set and not TESTING")
+            return
+
+        # Config opt-out
+        if not flask_app.config.get("ALLOW_PREMATURE_CLEANUP", DEFAULT_ALLOW_PREMATURE_CLEANUP):
+            _logger.debug("Premature oauth cleanup skipped by ALLOW_PREMATURE_CLEANUP flag")
+            return
+
+        # If oauth blueprint already registered, nothing to do.
+        if "oauth" in (flask_app.blueprints or {}):
+            return
+
+        # Candidate endpoints that look like oauth.* registrations
+        candidates = [ep for ep in list(getattr(flask_app, "view_functions", {}).keys()) if ep.startswith("oauth.")]
+        if not candidates:
+            return
+
+        removed = 0
+
+        def _safe_remove_rule_obj(r) -> bool:
+            try:
+                if hasattr(flask_app.url_map, "_rules"):
+                    try:
+                        flask_app.url_map._rules.remove(r)
+                    except Exception:
+                        pass
+                return True
+            except Exception:
+                return False
+
+        for ep in candidates:
+            try:
+                view_fn = flask_app.view_functions.get(ep)
+                # If no view function, skip
+                if not view_fn:
+                    _logger.debug("Skipping cleanup for %s: no view function found", ep)
+                    continue
+
+                # Conservative module check: only remove when the view function's module
+                # name contains 'oauth' or 'oauth_routes' — reduces accidental removals.
+                mod_name = getattr(view_fn, "__module__", "") or ""
+                if "oauth" not in mod_name and "oauth_routes" not in mod_name:
+                    _logger.debug("Skipping premature cleanup for %s (module=%s)", ep, mod_name)
+                    continue
+
+                popped = False
+                try:
+                    if ep in flask_app.view_functions:
+                        flask_app.view_functions.pop(ep, None)
+                        popped = True
+                except Exception:
+                    _logger.debug("Failed to pop premature view_function %s", ep, exc_info=True)
+
+                rules_removed = False
+                try:
+                    if hasattr(flask_app.url_map, "_rules"):
+                        for r in list(getattr(flask_app.url_map, "_rules", [])):
+                            if (r.endpoint or "") == ep:
+                                if _safe_remove_rule_obj(r):
+                                    rules_removed = True
+                    if hasattr(flask_app.url_map, "_rules_by_endpoint"):
+                        if flask_app.url_map._rules_by_endpoint.pop(ep, None) is not None:
+                            rules_removed = True
+                except Exception:
+                    _logger.debug("Failed to remove url_map rules for premature endpoint %s", ep, exc_info=True)
+
+                if popped or rules_removed:
+                    removed += 1
+            except Exception:
+                _logger.debug("Error while attempting to cleanup premature endpoint %s", ep, exc_info=True)
+
+        if removed:
+            _logger.info("Cleaned up %d premature oauth.* endpoint(s)", removed)
+        else:
+            _logger.debug("No premature oauth.* endpoints were removed")
+    except Exception:
+        _logger.debug("Premature oauth registration cleanup failed", exc_info=True)
 
 
 # ============================================================================
@@ -432,6 +535,8 @@ def _ensure_db_tables(flask_app: Flask) -> None:
         _logger.debug("DB inspection fallback skipped: %s", exc)
 
 
+# ============================================================================
+# Masking & diagnostics helpers
 # ============================================================================
 def _mask_db_url(url_str: Optional[str]) -> Optional[str]:
     if not url_str:
@@ -958,6 +1063,105 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
             pass
 
 
+def _enforce_route_uniqueness(flask_app: Flask) -> None:
+    """
+    Startup-only enforcement that prunes exact duplicate Rule objects
+    (same rule and same endpoint identity) to avoid confusing tests and runtime routing.
+
+    Safety and hardening:
+      - No-op if flask_app.config["ALLOW_PREMATURE_CLEANUP"] is explicitly False.
+      - Skips pruning for whitelisted endpoints (e.g., oauth callback aliases).
+      - Uses conservative identity-based removal and rebuilds internal mappings carefully.
+      - Counts and logs the number of removed Rule objects. Never raises.
+      - Intended for use during create_app() startup only.
+    """
+    try:
+        # Startup-only guard
+        if not globals().get("_CREATE_APP_INVOKED", False) and not flask_app.config.get("TESTING", False):
+            _logger.debug("Route uniqueness enforcement skipped: create_app() sentinel not set and not TESTING")
+            return
+
+        if not flask_app.config.get("ALLOW_PREMATURE_CLEANUP", DEFAULT_ALLOW_PREMATURE_CLEANUP):
+            _logger.debug("Route uniqueness enforcement skipped by ALLOW_PREMATURE_CLEANUP flag")
+            return
+
+        # Build map of (rule.rule, methods) -> list(Rule)
+        rules_by_key: Dict[Tuple[str, Tuple[str, ...]], list] = {}
+        for r in list(flask_app.url_map.iter_rules()):
+            methods = tuple(sorted(set(r.methods or []) - {"HEAD", "OPTIONS"}))
+            key = (r.rule, methods)
+            rules_by_key.setdefault(key, []).append(r)
+
+        removed_total = 0
+        whitelist = tuple(ROUTE_PRUNE_WHITELIST)
+
+        def _safe_remove_rule_obj(r) -> bool:
+            try:
+                if hasattr(flask_app.url_map, "_rules"):
+                    try:
+                        flask_app.url_map._rules.remove(r)
+                    except Exception:
+                        pass
+                return True
+            except Exception:
+                return False
+
+        for key, rules in rules_by_key.items():
+            if len(rules) <= 1:
+                continue
+
+            primary = rules[0]
+            primary_ep = getattr(primary, "endpoint", "") or ""
+            # Skip whitelisted endpoints
+            if any(primary_ep.startswith(w) for w in whitelist):
+                _logger.debug("Skipping uniqueness pruning for whitelisted endpoint %s", primary_ep)
+                continue
+
+            # Find duplicates (same endpoint name) among the remaining rules
+            duplicates = [r for r in rules[1:] if (r.endpoint or "") == primary_ep]
+            if not duplicates:
+                continue
+
+            for r in duplicates:
+                try:
+                    removed_ok = False
+                    if _safe_remove_rule_obj(r):
+                        removed_ok = True
+                    if hasattr(flask_app.url_map, "_rules_by_endpoint"):
+                        lst = flask_app.url_map._rules_by_endpoint.get(primary_ep)
+                        if lst:
+                            try:
+                                new_lst = [x for x in lst if x is not r]
+                                if new_lst:
+                                    flask_app.url_map._rules_by_endpoint[primary_ep] = new_lst
+                                else:
+                                    flask_app.url_map._rules_by_endpoint.pop(primary_ep, None)
+                                removed_ok = True
+                            except Exception:
+                                pass
+                    if removed_ok:
+                        removed_total += 1
+                except Exception:
+                    _logger.debug("Failed to prune duplicate rule %s for endpoint %s", key[0], primary_ep, exc_info=True)
+
+        # Rebuild mapping if we removed anything
+        if removed_total and hasattr(flask_app.url_map, "_rules") and hasattr(flask_app.url_map, "_rules_by_endpoint"):
+            try:
+                new_map: Dict[str, list] = {}
+                for r in list(flask_app.url_map._rules):
+                    new_map.setdefault(r.endpoint, []).append(r)
+                flask_app.url_map._rules_by_endpoint = new_map
+            except Exception:
+                _logger.debug("Failed to rebuild url_map._rules_by_endpoint after pruning", exc_info=True)
+
+        if removed_total:
+            _logger.info("Pruned %d duplicate route rule(s) to enforce uniqueness", removed_total)
+        else:
+            _logger.debug("No duplicate route rules pruned by enforce_route_uniqueness")
+    except Exception:
+        _logger.debug("Route uniqueness enforcement failed", exc_info=True)
+
+
 # ============================================================================
 # Application factory
 def create_app(env_name: str = None, config_class=None) -> Flask:
@@ -1329,39 +1533,33 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     return flask_app
 
-
 # -----------------------------------------------------------------------------
 # Final fallback guard — append this EXACT block at the very end of app/__init__.py
 # Activates only when FLASK_ENV == "production" AND create_app() was NOT invoked.
 # Does NOT overwrite an existing module-level `app` created by create_app().
 # -----------------------------------------------------------------------------
-import os as _os
-import logging as _logging
-import json as _json
-from datetime import datetime as _dt
-
-_fallback_logger = globals().get("_logger") or _logging.getLogger(__name__)
+_fallback_logger = globals().get("_logger") or logging.getLogger(__name__)
 
 _create_app_invoked = bool(globals().get("_CREATE_APP_INVOKED", False))
-
-if _os.getenv("PYTEST_CURRENT_TEST"):
+if os.getenv("PYTEST_CURRENT_TEST"):
     _create_app_invoked = True
-
-if _os.getenv("FLASK_ENV") == "production":
+if os.getenv("FLASK_ENV") == "production":
     _create_app_invoked = False
 
-if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
+if os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
     try:
         from flask import Flask as _Flask, jsonify as _jsonify
 
         fallback_app = _Flask("fallback_app")
 
+        # Minimal safe config
         try:
             fallback_app.config["PROPAGATE_EXCEPTIONS"] = False
             fallback_app.config["TESTING"] = False
         except Exception:
             pass
 
+        # Try to initialize extensions defensively
         try:
             init_extensions(fallback_app)
         except Exception:
@@ -1384,6 +1582,7 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
             except Exception:
                 pass
 
+        # Best-effort register small helpers
         try:
             _register_jwt_loaders(fallback_app)
         except Exception:
@@ -1407,26 +1606,27 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
 
         _diagnostic_payload = {
             "event": "fallback_app_created",
-            "timestamp": _dt.utcnow().isoformat() + "Z",
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "safe_mode": True,
             "fallback_mode": True,
             "create_app_invoked": _create_app_invoked,
             "reason": "FLASK_ENV=production at import time",
         }
 
+        # Emit prominent logs but never raise
         try:
             _fallback_logger.critical("UNSAFE FALLBACK APP CREATED")
         except Exception:
             pass
         try:
-            _logging.getLogger().critical("UNSAFE FALLBACK APP CREATED")
+            logging.getLogger().critical("UNSAFE FALLBACK APP CREATED")
         except Exception:
             pass
 
         try:
-            _msg = "Fallback diagnostics: %s" % (_json.dumps(_diagnostic_payload, sort_keys=True))
+            _msg = "Fallback diagnostics: %s" % (json.dumps(_diagnostic_payload, sort_keys=True))
             _fallback_logger.critical(_msg)
-            _logging.getLogger().critical(_msg)
+            logging.getLogger().critical(_msg)
         except Exception:
             pass
 
@@ -1435,7 +1635,7 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
                 "Operator hint: This fallback app indicates FLASK_ENV=production was set before create_app() was invoked. "
                 "Ensure your WSGI server calls create_app() and does not import the package root directly."
             )
-            _logging.getLogger().critical(
+            logging.getLogger().critical(
                 "Operator hint: This fallback app indicates FLASK_ENV=production was set before create_app() was invoked. "
                 "Ensure your WSGI server calls create_app() and does not import the package root directly."
             )
@@ -1444,10 +1644,11 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
 
         try:
             _fallback_logger.critical("WARNING: create_app() was never invoked — running in SAFE MODE fallback.")
-            _logging.getLogger().critical("WARNING: create_app() was never invoked — running in SAFE MODE fallback.")
+            logging.getLogger().critical("WARNING: create_app() was never invoked — running in SAFE MODE fallback.")
         except Exception:
             pass
 
+        # Minimal diagnostic endpoints for the fallback app
         @fallback_app.route("/diagnostics", methods=["GET"])
         def _fallback_diagnostics():
             return _jsonify(_diagnostic_payload), 200
@@ -1457,7 +1658,7 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
             return _jsonify(
                 {
                     "healthy": False,
-                    "timestamp": _dt.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
                     "uptime": 0,
                     "checks": {"fallback": {"ok": False, "reason": "fallback_mode"}},
                 }
@@ -1521,6 +1722,7 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
                 pass
             return response
 
+        # WSGI entrypoint and module-level fallback app export
         def fallback_wsgi_app(environ, start_response):
             return fallback_app.wsgi_app(environ, start_response)
 
@@ -1530,3 +1732,5 @@ if _os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
 
     except Exception as _exc:
         _fallback_logger.critical("FAILED TO CREATE UNSAFE FALLBACK APP: %s", _exc, exc_info=True)
+
+
