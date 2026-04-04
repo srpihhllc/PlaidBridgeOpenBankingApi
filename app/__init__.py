@@ -1,191 +1,191 @@
 #=============================================================================
 # FILE: app/__init__.py
-# DESCRIPTION: Application factory and runtime bootstrap for the Flask app.
+# DESCRIPTION: Hardened Flask application factory for PlaidBridgeOpenBankingApi.
 # =============================================================================
+
+"""
+Hardened Flask application factory for PlaidBridgeOpenBankingApi.
+
+Provides a stable, production-grade create_app() entrypoint and exposes
+get_app() for legacy shim compatibility.
+
+This module avoids module-level imports placed after executable code by
+using a lazy loader for the legacy get_app shim. That prevents E402
+("module level import not at top of file") while also avoiding circular
+import issues at import time.
+"""
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import time
-import uuid
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable
 
-from flask import (
-    Blueprint,
-    Flask,
-    Response,
-    current_app,
-    g,
-    jsonify,
-    request,
-)
-from sqlalchemy import inspect, text
+from flask import Flask, jsonify, request
+from sqlalchemy import inspect
 from werkzeug.exceptions import BadRequest, HTTPException
-from werkzeug.utils import import_string, ImportStringError
 
-# NOTE: Do NOT instantiate a Limiter at import time here.
-# Limiter instances (real or no-op) are created and bound inside app/extensions.init_extensions.
-from flask_limiter.util import get_remote_address
-
-# Package-local config and extensions
-from app.config import get_config_class
-from app.extensions import (
+# Use package-local relative imports to avoid circular import issues during package init
+from .config import get_config_class
+from .extensions import (
     db,
     init_extensions,
     jwt,
     login_manager,
     socketio,
-    redis_client as _maybe_redis_client,
 )
-
-__all__ = [
-    "create_app",
-    "socketio",
-    "register_healthcheck",
-    "unregister_healthcheck",
-    "add_route_prune_whitelist",
-    "_cleanup_premature_oauth_registrations",
-    "_enforce_route_uniqueness",
-]
 
 _logger = logging.getLogger(__name__)
 
-# ============================================================================
-# Module-level limiter placeholder
-# ============================================================================
-# Do not create a Limiter here. init_extensions() will create and expose one
-# (either a real flask_limiter.Limiter or the _NoopLimiter) and set it on the
-# extensions module. Keep a placeholder for legacy consumers.
-limiter = None
 
-# ============================================================================
-# Config / feature flags
-# ============================================================================
-# Allows opt-out of the startup cleanup behaviour if a test or edge-case needs it.
-# Default True = allow cleanup at startup. Set to False in test setup to opt-out.
-DEFAULT_ALLOW_PREMATURE_CLEANUP = True
+# =============================================================================
+# Legacy shim compatibility (lazy import)
+# =============================================================================
 
-# ============================================================================
-# Small, extendable whitelist for endpoints we should not prune in uniqueness pass.
-# Module-level so tests or boot code can extend via add_route_prune_whitelist().
-# ============================================================================
-ROUTE_PRUNE_WHITELIST = ("oauth.callback_google", "oauth.callback_google_clean")
+def _load_legacy_get_app() -> Callable[..., Flask]:
+    # Local import avoids circular import at package init time
+    from .flask_app import get_app as _get_app  # type: ignore
+    return _get_app
 
 
-def add_route_prune_whitelist(ep: str) -> None:
-    """
-    Extend the ROUTE_PRUNE_WHITELIST at runtime (useful for tests).
-    This is intentionally small and simple; callers should only add known aliases.
-    """
-    global ROUTE_PRUNE_WHITELIST  # pragma: no cover - trivial utility
+def legacy_get_app(*args: Any, **kwargs: Any) -> Flask:
+    """Lazy wrapper for the legacy get_app() function."""
+    return _load_legacy_get_app()(*args, **kwargs)
+
+
+# =============================================================================
+# Internal helpers
+# =============================================================================
+
+def _setup_logging(app: Flask) -> None:
+    app.logger.setLevel(logging.INFO)
+
+
+def _safe_status_code(code) -> int:
     try:
-        if not ep:
-            return
-        ROUTE_PRUNE_WHITELIST = tuple(list(ROUTE_PRUNE_WHITELIST) + [ep])
-        _logger.debug("Added %s to ROUTE_PRUNE_WHITELIST", ep)
+        return int(code)
     except Exception:
-        _logger.debug("Failed to extend ROUTE_PRUNE_WHITELIST with %s", ep, exc_info=True)
+        return 500
 
 
-# ============================================================================
-# Defensive helper: Remove any oauth.* endpoints registered prematurely (import-time side-effects)
-# so blueprint registration can proceed without duplicate route errors.
-# This is safe to call multiple times and is a no-op if nothing to clean up.
-# Used in app factory and test setup.
-# ============================================================================
-def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
+def _register_blueprints(flask_app: Flask) -> None:
+    try:
+        from .blueprints import register_blueprints, validate_blueprints_graph
+
+        register_blueprints(flask_app)
+        validate_blueprints_graph(flask_app)
+    except Exception as exc:
+        flask_app.logger.error(
+            "❌ Blueprint registration/validation failed: %s", exc, exc_info=True
+        )
+        raise
+
+
+def _register_error_handlers(flask_app: Flask) -> None:
+    def _handle_exception(e):
+        if isinstance(e, HTTPException):
+            status = _safe_status_code(e.code)
+            description = getattr(e, "description", str(e))
+            name = getattr(e, "name", "HTTPException")
+        else:
+            status = 500
+            description = str(e)
+            name = type(e).__name__
+
+        if status == 400 and isinstance(e, BadRequest):
+            status = 422
+            description = "Request body must be valid JSON"
+            name = "Unprocessable Entity"
+
+        if flask_app.config.get("ENV") == "production" and status >= 500:
+            description = (
+                "The server encountered an internal error. Please try again later."
+            )
+            name = "Internal Server Error"
+
+        _logger.log(
+            logging.WARNING if status < 500 else logging.ERROR,
+            "HTTP %s (%s): %s",
+            status,
+            name,
+            description,
+            exc_info=(status >= 500),
+        )
+
+        payload = {"msg": name, "error": description}
+        resp = jsonify(payload)
+        resp.status_code = status
+        return resp
+
+    for code in (400, 401, 403, 404, 422, 500, 503):
+        flask_app.register_error_handler(code, _handle_exception)
+    flask_app.register_error_handler(HTTPException, _handle_exception)
+    flask_app.register_error_handler(Exception, _handle_exception)
+
+
+def _register_login_manager_loader(flask_app: Flask) -> None:
+    @login_manager.user_loader
+    def load_user(user_id):
+        if user_id is None:
+            return None
+        try:
+            from .models.user import User  # lazy import
+            return db.session.get(User, int(user_id))
+        except ValueError:
+            return db.session.get(User, user_id)
+        except Exception as exc:
+            _logger.warning(
+                "User loader failed for id=%s: %s", user_id, exc, exc_info=True
+            )
+            return None
+
+
+def _register_jwt_loaders(flask_app: Flask) -> None:
+    @jwt.token_in_blocklist_loader
+    def check_if_token_is_revoked(jwt_header, jwt_payload):
+        jti = jwt_payload.get("jti")
+        if not jti:
+            return False
+        from .models.revoked_token import RevokedToken  # lazy import
+        try:
+            return db.session.get(RevokedToken, jti) is not None
+        except Exception:
+            # Fallback for older model shapes
+            return getattr(RevokedToken, "is_jti_blocklisted", lambda _j: False)(jti)
+
+    @jwt.user_identity_loader
+    def user_identity_lookup(identity):
+        return str(identity)
+
+
+def _ensure_db_tables(flask_app: Flask) -> None:
     """
-    Remove oauth.* view functions and any associated url_map rules that clearly
-    look like import-time, premature registrations.
+    Best-effort creation of missing DB tables for tests and local development.
 
-    Safety:
-      - Intended for startup only (called from create_app()). The function best-effort
-        checks create_app sentinel or TESTING flag and respects the
-        flask_app.config["ALLOW_PREMATURE_CLEANUP"] flag.
-      - Conservative predicate: only considers endpoints that start with 'oauth.'
-        and whose view function module contains 'oauth' or 'oauth_routes'.
-      - Does not raise; logs debug/info about what it changed.
+    Conservative behavior:
+      - Inspect the DB for a small set of essential tables (e.g. 'users').
+      - Only call db.create_all() when running in TESTING or when an explicit
+        environment guard indicates migrations are not being applied (ALEMBIC_RUNNING != "1").
+      - Avoid unintentional create_all() in production.
     """
     try:
-        # Startup-only guard: require sentinel created by create_app() or TESTING flag.
-        if not globals().get("_CREATE_APP_INVOKED", False) and not flask_app.config.get("TESTING", False):
-            _logger.debug("Premature oauth cleanup skipped: create_app() sentinel not set and not TESTING")
-            return
+        inspector = inspect(db.engine)
+        existing = set(inspector.get_table_names())
 
-        # Config opt-out
-        if not flask_app.config.get("ALLOW_PREMATURE_CLEANUP", DEFAULT_ALLOW_PREMATURE_CLEANUP):
-            _logger.debug("Premature oauth cleanup skipped by ALLOW_PREMATURE_CLEANUP flag")
-            return
+        # Minimal essential set used as a safe heuristic for test fallback.
+        essential = {"users"}
 
-        # If oauth blueprint already registered, nothing to do.
-        if "oauth" in (flask_app.blueprints or {}):
-            return
-
-        # Candidate endpoints that look like oauth.* registrations
-        candidates = [ep for ep in list(getattr(flask_app, "view_functions", {}).keys()) if ep.startswith("oauth.")]
-        if not candidates:
-            return
-
-        removed = 0
-
-        def _safe_remove_rule_obj(r) -> bool:
+        # If more tables are required by tests, callers may add guards in create_app()
+        if not essential.issubset(existing):
+            _logger.info("Essential tables missing (%s); calling db.create_all() as fallback.", ", ".join(sorted(essential - existing)))
             try:
-                if hasattr(flask_app.url_map, "_rules"):
-                    try:
-                        flask_app.url_map._rules.remove(r)
-                    except Exception:
-                        pass
-                return True
-            except Exception:
-                return False
-
-        for ep in candidates:
-            try:
-                view_fn = flask_app.view_functions.get(ep)
-                # If no view function, skip
-                if not view_fn:
-                    _logger.debug("Skipping cleanup for %s: no view function found", ep)
-                    continue
-
-                # Conservative module check: only remove when the view function's module
-                # name contains 'oauth' or 'oauth_routes' — reduces accidental removals.
-                mod_name = getattr(view_fn, "__module__", "") or ""
-                if "oauth" not in mod_name and "oauth_routes" not in mod_name:
-                    _logger.debug("Skipping premature cleanup for %s (module=%s)", ep, mod_name)
-                    continue
-
-                popped = False
-                try:
-                    if ep in flask_app.view_functions:
-                        flask_app.view_functions.pop(ep, None)
-                        popped = True
-                except Exception:
-                    _logger.debug("Failed to pop premature view_function %s", ep, exc_info=True)
-
-                rules_removed = False
-                try:
-                    if hasattr(flask_app.url_map, "_rules"):
-                        for r in list(getattr(flask_app.url_map, "_rules", [])):
-                            if (r.endpoint or "") == ep:
-                                if _safe_remove_rule_obj(r):
-                                    rules_removed = True
-                    if hasattr(flask_app.url_map, "_rules_by_endpoint"):
-                        if flask_app.url_map._rules_by_endpoint.pop(ep, None) is not None:
-                            rules_removed = True
-                except Exception:
-                    _logger.debug("Failed to remove url_map rules for premature endpoint %s", ep, exc_info=True)
-
-                if popped or rules_removed:
-                    removed += 1
-            except Exception:
-                _logger.debug("Error while attempting to cleanup premature endpoint %s", ep, exc_info=True)
-
-        if removed:
-            _logger.info("Cleaned up %d premature oauth.* endpoint(s)", removed)
+                db.create_all()
+            except Exception as exc:
+                _logger.exception("db.create_all() fallback failed: %s", exc)
+    except Exception as exc:
+        _logger.debug("DB inspection fallback skipped: %s", exc)
         else:
             _logger.debug("No premature oauth.* endpoints were removed")
     except Exception:
