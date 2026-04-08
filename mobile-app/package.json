@@ -32,7 +32,7 @@
     "axios": "^1.7.9",
     "cookie": "^1.0.2",
     "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.44.5",
+    "drizzle-orm": "^0.45.2",
     "expo": "~54.0.29",
     "expo-av": "~16.0.8",
     "expo-constants": "~18.0.12",
