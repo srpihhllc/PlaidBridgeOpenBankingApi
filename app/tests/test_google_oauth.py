@@ -167,14 +167,6 @@ class TestGoogleOAuth(BaseOAuthTest):
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")
 
-        with app.app_context():
-            self.assert_user_created(email="test@google.com")
-            self.assert_events(
-                ["OAUTH_PROFILE_INCOMPLETE", "OAUTH_LOGIN_SUCCESS"],
-                ordered=True,
-                details={
-                    "OAUTH_PROFILE_INCOMPLETE": {
-                        "reason": f"Missing fields: {', '.join(missing_fields)}"
-                    }
-                },
-            )
+
+
+

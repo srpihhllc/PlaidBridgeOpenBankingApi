@@ -156,26 +156,35 @@ def _validate_required_fields(required_keys: list[str], payload: dict) -> list[s
     return [k for k in required_keys if payload.get(k) is None]
 
 
-def _validate_schema(schema: dict[str, type], payload: dict) -> list[str]:
+def _validate_schema(schema: dict, payload: dict) -> list[str]:
     """
-    schema: { "field_name": expected_type }
+    schema: { "field_name": type_or_tuple_of_types }
     Returns list of fields that fail type checks.
+
+    Supports tuple types (e.g. (int, str)) for fields that accept multiple types.
+    JSON integers (e.g. card_id sent as int from the test client) are accepted
+    wherever int is listed in the expected types.
     """
     invalid = []
     for field, expected_type in schema.items():
         if field not in payload:
-            continue  # missing handled separately
+            continue  # missing fields handled separately
         value = payload[field]
         if value is None:
             invalid.append(field)
             continue
-        # Allow numeric strings for float/int fields; we cast later.
-        if expected_type in (int, float) and isinstance(value, str):
+
+        # Normalise to a tuple so isinstance always receives a tuple
+        types = expected_type if isinstance(expected_type, tuple) else (expected_type,)
+
+        # For purely numeric type expectations, allow numeric strings (cast test)
+        numeric_types = {int, float}
+        if all(t in numeric_types for t in types) and isinstance(value, str):
             try:
-                expected_type(value)  # test cast
+                float(value)  # test cast — accept any numeric string
             except Exception:
                 invalid.append(field)
-        elif not isinstance(value, expected_type):
+        elif not isinstance(value, types):
             invalid.append(field)
     return invalid
 
@@ -296,7 +305,7 @@ def _log_webhook_identity(event_type: str):
 # =============================================================================
 @webhooks_bp.route("/ach", methods=["POST"])
 def ach_listener():
-    raw_body = request.get_data(cache=False) or b""
+    raw_body = request.get_data(cache=True) or b""
     payload = request.get_json(silent=True) or {}
 
     _log_webhook_identity("WEBHOOK_ACH_RECEIVED")
@@ -356,9 +365,10 @@ def ach_listener():
             extra={"missing_fields": missing},
         )
 
+    # card_id accepts int (auto-increment PK) or str; amount accepts int/float/str
     schema = {
         "borrower_id": str,
-        "card_id": str,
+        "card_id": (int, str),
         "amount": (int, float, str),
     }
     invalid = _validate_schema(schema, payload)
@@ -457,7 +467,7 @@ def ach_listener():
 # =============================================================================
 @webhooks_bp.route("/plaid", methods=["POST"])
 def plaid_listener():
-    raw_body = request.get_data(cache=False) or b""
+    raw_body = request.get_data(cache=True) or b""
     payload = request.get_json(silent=True) or {}
 
     _log_webhook_identity("WEBHOOK_PLAID_RECEIVED")
@@ -519,9 +529,10 @@ def plaid_listener():
             extra={"missing_fields": missing},
         )
 
+    # card_id accepts int (auto-increment PK) or str; amount accepts int/float/str
     schema = {
         "borrower_id": str,
-        "card_id": str,
+        "card_id": (int, str),
         "amount": (int, float, str),
     }
     invalid = _validate_schema(schema, payload)
@@ -620,7 +631,7 @@ def plaid_listener():
 # =============================================================================
 @webhooks_bp.route("/reconcile", methods=["POST"])
 def reconcile_payments():
-    raw_body = request.get_data(cache=False) or b""
+    raw_body = request.get_data(cache=True) or b""
     payload = request.get_json(silent=True) or {}
 
     _log_webhook_identity("WEBHOOK_RECONCILE_ATTEMPT")
@@ -666,10 +677,11 @@ def reconcile_payments():
             extra={"missing_fields": missing},
         )
 
+    # card_id accepts int (auto-increment PK) or str
     schema = {
         "txn_id": (int, str),
         "borrower_id": str,
-        "card_id": str,
+        "card_id": (int, str),
     }
     invalid = _validate_schema(schema, payload)
     if invalid:

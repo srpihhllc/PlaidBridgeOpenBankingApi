@@ -11,12 +11,15 @@ SNAPSHOT_FILE = Path(__file__).parent / "route_snapshot.json"
 def test_route_snapshot(app):
     """Ensure the API route map matches the stored snapshot."""
     current = sorted(
-        {
-            "rule": rule.rule,
-            "methods": sorted(m for m in rule.methods if m not in {"HEAD", "OPTIONS"}),
-            "endpoint": rule.endpoint,
-        }
-        for rule in app.url_map.iter_rules()
+        (
+            {
+                "rule": rule.rule,
+                "methods": sorted(m for m in rule.methods if m not in {"HEAD", "OPTIONS"}),
+                "endpoint": rule.endpoint,
+            }
+            for rule in app.url_map.iter_rules()
+        ),
+        key=lambda d: (d["rule"], d["endpoint"], d["methods"]),
     )
 
     if not SNAPSHOT_FILE.exists():

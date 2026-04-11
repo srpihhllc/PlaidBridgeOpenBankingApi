@@ -1,7 +1,0 @@
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('{{ url_for("static", filename="sw.js") }}')
-    .then(() => console.log('Service worker registered: /static/sw.js'))
-    .catch((e) => console.warn('Service worker registration failed', e));
-}
-</script>

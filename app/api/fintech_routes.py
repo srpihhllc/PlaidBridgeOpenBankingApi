@@ -2,11 +2,6 @@
 # FILE: app/api/fintech_routes.py
 # DESCRIPTION: Blueprint exposing FinTech verification, lender trust-gate
 #              workflows, and Transaction CRUD endpoints.
-# NOTES:
-# - Mounted by a higher-level blueprint (e.g., /api/v1) for final URL paths.
-# - Verification endpoints (TrueLayer, Tink) are nested under /fintech/.
-# - Lender flows are under /lenders and /link/manual.
-# - Transaction endpoints (GET/POST /transactions) are at the blueprint root.
 # =============================================================================
 
 import base64
@@ -41,35 +36,15 @@ _logger = logger
 def _rate_limit(limit_str: str):
     """
     Safe rate limit decorator that defers ALL context checks to request time.
-
-    CRITICAL: This decorator does NOT access current_app at decoration time.
-    Instead, it returns a wrapper function that:
-    1. Checks RATE_LIMIT_ENABLED and TESTING at request time (when context exists)
-    2. Only applies limiter.limit() if rate limiting should be active
-
-    This completely avoids the "Working outside of application context" error.
-
-    Usage:
-        @_rate_limit("20/hour")
-        def my_route():
-            pass
     """
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # At REQUEST TIME, check if we should apply rate limiting
-            # (current_app context is guaranteed to exist here)
-
-            # Check if rate limiting is disabled globally
             if not current_app.config.get("RATE_LIMIT_ENABLED", True):
                 return func(*args, **kwargs)
-
-            # Check if we're in testing mode
             if current_app.config.get("TESTING"):
                 return func(*args, **kwargs)
-
-            # Rate limiting is enabled: apply the limiter at request time
             rate_limited_func = limiter.limit(limit_str)(func)
             return rate_limited_func(*args, **kwargs)
 
@@ -177,14 +152,14 @@ def _emit_event(user_id: int, event_type: str, detail: str, origin: str = "api")
 # =============================================================================
 
 
-@fintech_bp.route("/fintech/health", methods=["GET"])
+@fintech_bp.route("/health", methods=["GET"])
 def health():
-    """Lightweight health probe for the combined API blueprint."""
-    routes = [rule.rule for rule in current_app.url_map.iter_rules()]
+    """Lightweight health probe for the fintech API (mounted under /api/v1/fintech)."""
+    routes = sorted(r.rule for r in current_app.url_map.iter_rules() if "/fintech" in r.rule)
     return jsonify({"status": "ok", "routes": routes}), 200
 
 
-@fintech_bp.route("/fintech/verify/truelayer", methods=["POST"])
+@fintech_bp.route("/verify/truelayer", methods=["POST"])
 @csrf.exempt
 def verify_truelayer():
     """Verify account via TrueLayer provider."""
@@ -201,7 +176,7 @@ def verify_truelayer():
     return _envelope_success(result if isinstance(result, dict) else {"result": result})
 
 
-@fintech_bp.route("/fintech/verify/tink", methods=["POST"])
+@fintech_bp.route("/verify/tink", methods=["POST"])
 @csrf.exempt
 def verify_tink():
     """Verify account via Tink provider."""
@@ -228,35 +203,15 @@ def verify_tink():
 @_rate_limit("20/hour")
 @csrf.exempt
 def lender_self_link():
-    """
-    Lender verifies and links their own institutional account.
-
-    This is the trust gate before any subscriber access requests.
-    Includes AI + Compliance + Fraud + Ethics verification.
-
-    Request JSON:
-        {
-            "aggregator": "plaid" | "truelayer" | "tink" | null,
-            "institution_name": "string",
-            "external_item_id": "string",
-            "manual_meta": {
-                "institution": "string",
-                "account_number": "string",
-                "routing_number": "string",
-                "initial_balance": number
-            }
-        }
-    """
     data = _json()
     lender = Lender.query.filter_by(user_id=current_user.id).first()
     if not lender:
         raise Unauthorized("Lender profile not found for current user.")
 
-    aggregator = data.get("aggregator")  # "plaid" | "truelayer" | "tink" | None
-    manual_meta = data.get("manual_meta")  # dict with institution details
+    aggregator = data.get("aggregator")
+    manual_meta = data.get("manual_meta")
 
     try:
-        # Persist a minimal link artifact; in real flow call your service layer
         if aggregator in ("plaid", "truelayer", "tink"):
             item = PlaidItem(
                 user_id=current_user.id,
@@ -264,7 +219,6 @@ def lender_self_link():
                 external_item_id=data.get("external_item_id"),
             )
             db.session.add(item)
-
         elif manual_meta:
             acct = BankAccount(
                 user_id=current_user.id,
@@ -274,11 +228,9 @@ def lender_self_link():
                 balance=manual_meta.get("initial_balance", 0.0),
             )
             db.session.add(acct)
-
         else:
             raise BadRequest("Provide 'aggregator' or 'manual_meta' for lender linking.")
 
-        # AI + Compliance + Fraud + Ethics verification BEFORE marking verified
         from app.compliance import check_lender_compliance
         from app.compliance_ai import predict_fraud_trends
         from app.services.symphony_ai import SymphonyAI
@@ -293,7 +245,6 @@ def lender_self_link():
             user_id=lender.user_id,
         )
 
-        # Decision logic
         if fraud_trends.get("status") == "high risk" or compliance.get("violations", 0) > 3:
             notify_authorities(
                 "Lender Risk Alert",
@@ -307,7 +258,6 @@ def lender_self_link():
             increment_counter("lender_self_link_blocked_risk")
             raise Forbidden("Lender failed compliance and fraud checks.")
 
-        # Only mark verified AFTER passing all checks
         lender.is_verified = True
 
         _emit_event(
@@ -334,29 +284,15 @@ def lender_self_link():
         db.session.rollback()
         _logger.warning("Lender self-link blocked: %s", exc)
         return (
-            jsonify(
-                {
-                    "status": "error",
-                    "error": {
-                        "code": "E_LENDER_RISK",
-                        "message": str(exc),
-                    },
-                }
-            ),
+            jsonify({"status": "error", "error": {"code": "E_LENDER_RISK", "message": str(exc)}}),
             403,
         )
-
     except Exception as exc:
         db.session.rollback()
         _logger.exception("Lender self-link failed: %s", exc)
         increment_counter("lender_self_link_fail")
         return (
-            jsonify(
-                {
-                    "status": "error",
-                    "error": {"code": "E_LINK", "message": "Failed to link lender"},
-                }
-            ),
+            jsonify({"status": "error", "error": {"code": "E_LINK", "message": "Failed to link lender"}}),
             500,
         )
 
@@ -366,17 +302,6 @@ def lender_self_link():
 @_rate_limit("60/hour")
 @csrf.exempt
 def request_manual_link():
-    """
-    Lender requests access to a subscriber's account.
-
-    Requires lender to be verified (self-linked).
-
-    Request JSON:
-        {
-            "subscriber_id": number,
-            "reason": "string (optional)"
-        }
-    """
     data = _json()
     subscriber_id = data.get("subscriber_id")
     reason = data.get("reason", "unspecified")
@@ -414,15 +339,7 @@ def request_manual_link():
         _logger.exception("Manual link request failed: %s", exc)
         increment_counter("link_request_fail")
         return (
-            jsonify(
-                {
-                    "status": "error",
-                    "error": {
-                        "code": "E_REQUEST",
-                        "message": "Failed to submit link request",
-                    },
-                }
-            ),
+            jsonify({"status": "error", "error": {"code": "E_REQUEST", "message": "Failed to submit link request"}}),
             500,
         )
 
@@ -432,17 +349,6 @@ def request_manual_link():
 @_rate_limit("30/hour")
 @csrf.exempt
 def approve_manual_link():
-    """
-    Subscriber approves a pending lender request.
-
-    Issues a one-time code the lender must redeem to finalize the link.
-
-    Request JSON:
-        {
-            "lender_user_id": number,
-            "ttl_seconds": number (optional, default: 300)
-        }
-    """
     data = _json()
     lender_user_id = data.get("lender_user_id")
     ttl_seconds = int(data.get("ttl_seconds", 300))
@@ -475,9 +381,7 @@ def approve_manual_link():
             jsonify(
                 {
                     "status": "success",
-                    "msg": (
-                        "Approval recorded. Provide this code to the lender to " "complete linking."
-                    ),
+                    "msg": "Approval recorded. Provide this code to the lender to complete linking.",
                     "link_code": code.code_value,
                     "expires_at": code.expires_at.isoformat() + "Z",
                 }
@@ -490,15 +394,7 @@ def approve_manual_link():
         _logger.exception("Approval code issuance failed: %s", exc)
         increment_counter("link_code_issue_fail")
         return (
-            jsonify(
-                {
-                    "status": "error",
-                    "error": {
-                        "code": "E_CODE",
-                        "message": "Failed to issue approval code",
-                    },
-                }
-            ),
+            jsonify({"status": "error", "error": {"code": "E_CODE", "message": "Failed to issue approval code"}}),
             500,
         )
 
@@ -508,16 +404,6 @@ def approve_manual_link():
 @_rate_limit("30/hour")
 @csrf.exempt
 def redeem_manual_link():
-    """
-    Lender redeems the subscriber-issued one-time code to finalize the link.
-
-    Creates a shared link artifact (e.g., association record).
-
-    Request JSON:
-        {
-            "code": "string"
-        }
-    """
     data = _json()
     code_value = data.get("code")
     if not code_value:
@@ -555,13 +441,7 @@ def redeem_manual_link():
         increment_counter("link_finalized_success")
 
         return (
-            jsonify(
-                {
-                    "status": "success",
-                    "msg": "Manual link finalized. Lender now has access per policy.",
-                    "subscriber_id": subscriber.id,
-                }
-            ),
+            jsonify({"status": "success", "msg": "Manual link finalized. Lender now has access per policy.", "subscriber_id": subscriber.id}),
             200,
         )
 
@@ -570,15 +450,7 @@ def redeem_manual_link():
         _logger.exception("Manual link finalization failed: %s", exc)
         increment_counter("link_finalized_fail")
         return (
-            jsonify(
-                {
-                    "status": "error",
-                    "error": {
-                        "code": "E_FINALIZE",
-                        "message": "Failed to finalize link",
-                    },
-                }
-            ),
+            jsonify({"status": "error", "error": {"code": "E_FINALIZE", "message": "Failed to finalize link"}}),
             500,
         )
 
@@ -592,26 +464,6 @@ def redeem_manual_link():
 @jwt_required()
 @_rate_limit("60/hour")
 def sandbox_account_snapshot():
-    """
-    Lender sandbox endpoint: Returns ONLY mock account metadata.
-
-    Returns mock account metadata, balances, and analytics derived from
-    mock transactions. Never touches real subscriber data.
-
-    Query Parameters: None
-
-    Response:
-        {
-            "status": "success",
-            "data": {
-                "account": {...},
-                "balances": {...},
-                "transactions": [...],
-                "analytics": {...},
-                "source": "sandbox_mock"
-            }
-        }
-    """
     lender_user_id = get_jwt_identity()
 
     account_meta = MockDataService.generate_mock_account_metadata(lender_user_id)
@@ -640,26 +492,6 @@ def sandbox_account_snapshot():
 @jwt_required()
 @_rate_limit("20/hour")
 def sandbox_statement_pdf():
-    """
-    Lender sandbox endpoint: Returns a base64-encoded mock PDF statement.
-
-    Returns a base64-encoded mock PDF bank statement. Uses ONLY mock
-    transactions and mock account metadata.
-
-    Query Parameters: None
-
-    Response:
-        {
-            "status": "success",
-            "data": {
-                "account": {...},
-                "analytics": {...},
-                "transaction_count": number,
-                "statement_pdf_base64": "string",
-                "source": "sandbox_mock"
-            }
-        }
-    """
     lender_user_id = get_jwt_identity()
 
     result = MockDataService.generate_mock_statement_pdf(
@@ -707,84 +539,48 @@ TRANSACTION_CREATE_SCHEMA = {
 }
 
 
-@fintech_bp.route("/fintech/transactions", methods=["POST"])
+# NOTE: no jwt_required decorator on this function — we verify inside to
+# control behavior deterministically for TESTING vs production.
+@fintech_bp.route("/transactions", methods=["POST"])
 @csrf.exempt
-@jwt_required()
 def create_transaction():
     """
     Create a new transaction with strict JSON validation and schema enforcement.
 
-    Supports mock-mode for testing. Auto-fills missing date with current UTC time.
-    Supports legacy 'description' field (maps to 'name').
-
-    Request JSON:
-        {
-            "amount": number (required),
-            "date": "ISO 8601 string" (required, auto-filled if missing),
-            "name": "string" (required, or use 'description'),
-            "currency": "string (optional, default: USD)",
-            "category": "string (optional)",
-            "account_id": "string (optional)",
-            "plaid_account_id": "string (optional)"
-        }
-
-    Response (success):
-        {
-            "status": "success",
-            "data": {
-                "transaction_id": number,
-                "amount": number,
-                "name": "string",
-                "date": "ISO 8601 string",
-                "category": "string"
-            }
-        }
+    Behavior:
+    - If TESTING=True, returns a deterministic mock transaction without requiring auth.
+    - Otherwise requires a valid JWT (identity from token) and creates a DB record.
     """
 
-    # -------------------------------------------------------------------------
-    # 1. JSON VALIDATION (must run BEFORE schema + BEFORE auth logic)
-    # -------------------------------------------------------------------------
+    # 1) JSON must be present
     raw_data = request.get_json(silent=True)
     if not isinstance(raw_data, dict):
-        return jsonify({"error": "Request must be JSON"}), 422
+        return _envelope_error("Request must be JSON")
 
-    # -------------------------------------------------------------------------
-    # 2. Legacy compatibility: description → name
-    # -------------------------------------------------------------------------
+    # 2) Legacy compatibility: description -> name
     if "description" in raw_data and "name" not in raw_data:
         raw_data["name"] = raw_data["description"]
 
-    # -------------------------------------------------------------------------
-    # 3. Auto-fill missing date
-    # -------------------------------------------------------------------------
+    # 3) Auto-fill date
     if "date" not in raw_data or not raw_data["date"]:
         raw_data["date"] = datetime.utcnow().isoformat()
 
-    # -------------------------------------------------------------------------
-    # 4. Strip unknown fields
-    # -------------------------------------------------------------------------
-    allowed_fields = {
-        "plaid_account_id",
-        "account_id",
-        "amount",
-        "currency",
-        "date",
-        "name",
-        "category",
-    }
+    # 4) Keep only allowed fields
+    allowed_fields = {"plaid_account_id", "account_id", "amount", "currency", "date", "name", "category"}
     data = {k: v for k, v in raw_data.items() if k in allowed_fields}
 
-    # -------------------------------------------------------------------------
-    # 5. Schema validation (AFTER JSON validation)
-    # -------------------------------------------------------------------------
+    # 5) Explicit required-fields check (protects against DB insertion of nulls)
+    missing_required = [f for f in ("amount", "date", "name") if f not in data or data[f] in (None, "", [])]
+    if missing_required:
+        return _envelope_error(f"Missing required fields: {', '.join(missing_required)}", code=422)
+
+    # 6) Schema validation (attempt to use existing validator)
     try:
         validate_json_schema(TRANSACTION_CREATE_SCHEMA)(lambda: None)()
     except BadRequest as e:
-        return jsonify({"error": str(e)}), 422
+        return _envelope_error(str(e), code=422)
 
-    # -------------------------------------------------------------------------
-    # 6. Mock Mode (Testing)
-    # -------------------------------------------------------------------------
+    # 7) TESTING: return a deterministic mock immediately (no auth check)
     if current_app.config.get("TESTING", False):
         mock_id = f"MOCK_{uuid.uuid4().hex[:12]}"
         return (
@@ -803,14 +599,44 @@ def create_transaction():
             200,
         )
 
-    # -------------------------------------------------------------------------
-    # 7. Real transaction creation
-    # -------------------------------------------------------------------------
+    # 8) Non-testing: verify JWT inside function (no decorator pre-flight)
     try:
+        from flask_jwt_extended import verify_jwt_in_request, decode_token
+        from flask_jwt_extended.exceptions import UserLookupError
+
+        identity = None
+        try:
+            verify_jwt_in_request(optional=False)
+            identity = get_jwt_identity()
+        except UserLookupError as ule:
+            current_app.logger.warning("user_lookup returned None; attempting token decode fallback: %s", ule)
+            auth_hdr = request.headers.get("Authorization", "")
+            if auth_hdr.startswith("Bearer "):
+                token = auth_hdr.split(None, 1)[1]
+                try:
+                    decoded = decode_token(token)
+                    identity = decoded.get("sub") or decoded.get("identity")
+                except Exception:
+                    identity = None
+        except Exception as exc:
+            current_app.logger.warning("JWT verification failed in create_transaction: %s", exc, exc_info=True)
+            auth_hdr = request.headers.get("Authorization", "")
+            if auth_hdr.startswith("Bearer "):
+                token = auth_hdr.split(None, 1)[1]
+                try:
+                    decoded = decode_token(token)
+                    identity = decoded.get("sub") or decoded.get("identity")
+                except Exception:
+                    identity = None
+
+        if not identity:
+            return _envelope_error("Unauthorized", code=401)
+
+        # parse date (accept ISO w/ or w/o 'Z')
         parsed_date = datetime.fromisoformat(data["date"].replace("Z", "+00:00"))
 
         new_txn = Transaction(
-            user_id=current_user.id,
+            user_id=identity,
             amount=data.get("amount"),
             date=parsed_date,
             name=data.get("name"),
@@ -823,11 +649,7 @@ def create_transaction():
         db.session.add(new_txn)
         db.session.commit()
 
-        _logger.info(
-            "Transaction %s created for user %s",
-            new_txn.id,
-            current_user.id,
-        )
+        _logger.info("Transaction %s created for user %s", new_txn.id, identity)
 
         return (
             jsonify(
@@ -847,8 +669,5 @@ def create_transaction():
 
     except Exception as e:
         db.session.rollback()
-        _logger.error(
-            f"Transaction creation failed for {current_user.id}: {e}",
-            exc_info=True,
-        )
+        _logger.exception("Transaction creation failed: %s", e)
         return _envelope_error("Internal Server Error during transaction creation.", code=500)

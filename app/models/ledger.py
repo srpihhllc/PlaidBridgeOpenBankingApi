@@ -44,7 +44,7 @@ class LedgerEntry(db.Model):
     reconciled = db.Column(db.Boolean, default=False)
 
     # Reverse relationship to User
-    borrower = db.relationship("User", back_populates="ledger_entries")
+    borrower = db.relationship("User", back_populates="ledger_entries", foreign_keys=[borrower_id])
 
     def __repr__(self):
         return (

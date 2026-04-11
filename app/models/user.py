@@ -20,7 +20,6 @@ Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
 class User(UserMixin, Model):
     __tablename__ = "users"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     # -------------------------------------------------------------------------
     # Core identity fields
@@ -41,7 +40,11 @@ class User(UserMixin, Model):
 
     username = db.Column(db.String(64), index=True, unique=True, nullable=True)
     email = db.Column(db.String(120), index=True, unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=False)
+    password_hash = db.Column(
+        db.String(256),
+        nullable=False,
+        default=lambda: generate_password_hash(uuid.uuid4().hex),
+    )
 
     role = db.Column(db.String(64), nullable=True)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
@@ -57,6 +60,9 @@ class User(UserMixin, Model):
     mfa_enabled = db.Column(db.Boolean, default=False, nullable=False, index=True)
     mfa_pending_setup = db.Column(db.Boolean, default=False, nullable=False, index=True)
     totp_secret = db.Column(db.String(64), nullable=True, index=True)
+
+    # ⭐ NEW — persistent MFA failure counter
+    mfa_failures = db.Column(db.Integer, default=0, nullable=False)
 
     # -------------------------------------------------------------------------
     # Audit timestamps
@@ -269,6 +275,14 @@ class User(UserMixin, Model):
         passive_deletes=True,
     )
 
+    # Cockpit-grade audit log entries produced by/for this user (AuditLog)
+    audit_events = db.relationship(
+        "AuditLog",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+
     borrowed_loan_agreements = db.relationship(
         "LoanAgreement",
         back_populates="borrower",
@@ -286,26 +300,16 @@ class User(UserMixin, Model):
         passive_deletes=True,
     )
 
+    # Reverse relationship for ledger entries (LedgerEntry.borrower -> User.ledger_entries)
     ledger_entries = db.relationship(
         "LedgerEntry",
         back_populates="borrower",
-        foreign_keys="[LedgerEntry.borrower_id]",
         lazy="dynamic",
         passive_deletes=True,
     )
 
     timeline_events = db.relationship(
         "TimelineEvent",
-        back_populates="user",
-        lazy="dynamic",
-        passive_deletes=True,
-    )
-
-    # -------------------------------------------------------------------------
-    # AuditLog (User ↔ AuditLog)
-    # -------------------------------------------------------------------------
-    audit_events = db.relationship(
-        "AuditLog",
         back_populates="user",
         lazy="dynamic",
         passive_deletes=True,

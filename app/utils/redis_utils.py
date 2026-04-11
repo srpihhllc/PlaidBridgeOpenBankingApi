@@ -61,9 +61,12 @@ def _get_utc_timestamp() -> str:
 def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
     """
     Normalize Redis URI to avoid passing unsupported kwargs to redis-py:
-    - If scheme is 'redis' but query contains ssl=true, promote to 'rediss' and drop ssl query.
-    - If scheme is 'redis+ssl', normalize to 'rediss'.
-    - Never inject 'ssl' into client kwargs; rely on scheme exclusively.
+    - If scheme is 'redis+ssl' -> 'rediss'
+    - If scheme is 'redis' and query contains ssl=true, promote to 'rediss'
+    - If credentials are provided but username is missing (e.g. redis://:pass@host:port),
+      insert a safe default username ("default") so redis-py and some hosted providers
+      that require a username/password form work correctly.
+    - Remove 'ssl' from the query string so TLS is inferred from the scheme only.
 
     Returns:
       (normalized_uri, tls_enabled)
@@ -78,7 +81,7 @@ def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
     if scheme.lower() == "redis+ssl":
         scheme = "rediss"
 
-    # Promote to rediss when ?ssl=true on redis://
+    # Parse and sanitize query params, possibly promoting tls
     q = dict(parse_qsl(parsed.query, keep_blank_values=True))
     ssl_q = q.pop("ssl", "").strip().lower()  # remove ssl from query if present
 
@@ -87,12 +90,32 @@ def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
         scheme = "rediss"
         promote_tls = True
 
+    # If credentials exist but username is empty (e.g. ":password@host"),
+    # insert a default username ("default") for compatibility with ACL-enabled Redis.
+    username = parsed.username
+    password = parsed.password
+    hostname = parsed.hostname or ""
+    port = parsed.port
+
+    netloc = parsed.netloc
+    # parsed.netloc contains the original <user[:pass]@host[:port]> string
+    # We will rebuild netloc when necessary.
+    if username is None and password:
+        # Build a netloc with "default:<password>@host[:port]"
+        if port:
+            netloc = f"default:{password}@{hostname}:{port}"
+        else:
+            netloc = f"default:{password}@{hostname}"
+    else:
+        # Use original netloc (but ensure no trailing/leading empties)
+        netloc = parsed.netloc
+
     # Rebuild URL without 'ssl' query param
     new_query = urlencode(q, doseq=True)
     normalized = urlunparse(
         (
             scheme,
-            parsed.netloc,
+            netloc,
             parsed.path or "",
             parsed.params or "",
             new_query,
@@ -107,18 +130,29 @@ def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
 def _masked_endpoint(uri: str) -> str:
     """
     Mask credentials in a URI for safe logging:
-    rediss://user:****@host:port/db
+    Examples:
+      - rediss://user:****@host:port/db
+      - redis://default:****@host/db
+
+    Works when username is missing but password present (in which case we show
+    the inserted default username).
     """
     try:
         p = urlparse(uri)
-        netloc = p.netloc
-        if "@" in netloc and ":" in netloc.split("@")[0]:
-            creds, hostpart = netloc.split("@", 1)
-            user = creds.split(":", 1)[0]
-            masked = f"{user}:****@{hostpart}"
+        username = p.username
+        password = p.password
+        host = p.hostname or ""
+        port = f":{p.port}" if p.port else ""
+        path = p.path or ""
+
+        if username or password:
+            # When username is missing but password present, show 'default:****'
+            display_user = username if username else "default"
+            return f"{p.scheme}://{display_user}:****@{host}{port}{path}"
         else:
-            masked = netloc
-        return f"{p.scheme}://{masked}{p.path or ''}"
+            # No credentials
+            netloc = p.netloc or ""
+            return f"{p.scheme}://{netloc}{path}"
     except Exception:
         return "<unparseable-uri>"
 

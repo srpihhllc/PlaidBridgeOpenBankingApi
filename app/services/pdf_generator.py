@@ -3,9 +3,11 @@
 # DESCRIPTION: Cockpit-grade PDF generation with Markdown support.
 # =============================================================================
 
+from __future__ import annotations
+
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 # -----------------------------------------------------------------------------
 # Optional Markdown import with typed fallback
@@ -71,13 +73,22 @@ def _minimal_markdown_to_text(markdown: str) -> str:
 # =============================================================================
 # Core PDF helpers
 # =============================================================================
-def ensure_export_dir():
-    """Ensures the directory for PDF exports exists."""
-    if not os.path.exists(EXPORT_DIR):
-        os.makedirs(EXPORT_DIR)
+def ensure_export_dir(directory: Optional[str] = None) -> None:
+    """Ensures the directory for PDF exports exists (best-effort)."""
+    dir_to_make = directory or EXPORT_DIR
+    try:
+        os.makedirs(dir_to_make, exist_ok=True)
+    except Exception:
+        # best-effort: if we cannot create the requested directory, fall back to global EXPORT_DIR
+        if dir_to_make != EXPORT_DIR:
+            try:
+                os.makedirs(EXPORT_DIR, exist_ok=True)
+            except Exception:
+                # If that fails, ignore — later operations will raise if writing is impossible
+                pass
 
 
-def generate_filename(prefix="audit", ext="pdf"):
+def generate_filename(prefix: str = "audit", ext: str = "pdf") -> str:
     """Generates a unique filename based on a prefix and timestamp."""
     timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H%M%SZ")
     return f"{prefix}_{timestamp}.{ext}"
@@ -85,16 +96,34 @@ def generate_filename(prefix="audit", ext="pdf"):
 
 def build_pdf(
     content_lines: list[str],
-    title="Cockpit Export",
-    operator="system",
-    filename=None,
-):
+    title: str = "Cockpit Export",
+    operator: str = "system",
+    filename: Optional[str] = None,
+    export_dir: Optional[str] = None,
+) -> dict:
     """
     Builds a PDF document from a list of strings, with basic formatting.
+
+    Parameters:
+      - content_lines: list of lines to render.
+      - title: PDF title.
+      - operator: operator metadata to record.
+      - filename: optional filename to use (otherwise generated).
+      - export_dir: optional directory to write the PDF into. If not provided,
+                    falls back to global EXPORT_DIR.
     """
-    ensure_export_dir()
+    out_dir = export_dir or EXPORT_DIR
+
+    # Ensure the output directory exists (best-effort).
+    ensure_export_dir(out_dir)
+
+    # If out_dir still doesn't exist, fallback to EXPORT_DIR
+    if not os.path.exists(out_dir):
+        out_dir = EXPORT_DIR
+        ensure_export_dir(out_dir)
+
     filename = filename or generate_filename()
-    filepath = os.path.join(EXPORT_DIR, filename)
+    filepath = os.path.join(out_dir, filename)
 
     c = canvas.Canvas(filepath, pagesize=LETTER)
     width, height = LETTER
@@ -118,7 +147,11 @@ def build_pdf(
     c.save()
 
     # TTL pulse log
-    log_pdf_export_pulse(filename=filename, operator=operator)
+    try:
+        log_pdf_export_pulse(filename=filename, operator=operator)
+    except Exception:
+        # Best-effort telemetry; never fail the export due to telemetry errors.
+        pass
 
     return {
         "filename": filename,
@@ -135,20 +168,22 @@ def generate_pdf_from_markdown(
     markdown_text: str,
     title: str = "Markdown Export",
     operator: str = "system",
-):
+    export_dir: Optional[str] = None,
+) -> dict:
     """
     Converts markdown to plain text (minimal) and generates a PDF.
     """
     text = _minimal_markdown_to_text(markdown_text)
     lines = [line for line in text.split("\n") if line.strip()]
-    return build_pdf(lines, title=title, operator=operator)
+    return build_pdf(lines, title=title, operator=operator, export_dir=export_dir)
 
 
 def generate_pdf_from_html(
     html_text: str,
     title: str = "HTML Export",
     operator: str = "system",
-):
+    export_dir: Optional[str] = None,
+) -> dict:
     """
     Extremely minimal HTML → text converter for test compatibility.
     Strips tags and collapses whitespace.
@@ -158,13 +193,18 @@ def generate_pdf_from_html(
     # Remove HTML tags
     text = re.sub(r"<[^>]+>", "", html_text)
     lines = [line.strip() for line in text.split("\n") if line.strip()]
-    return build_pdf(lines, title=title, operator=operator)
+    return build_pdf(lines, title=title, operator=operator, export_dir=export_dir)
 
 
-def render_pdf_from_markdown(markdown_content: str, title: str, operator: str) -> dict:
+def render_pdf_from_markdown(
+    markdown_content: str,
+    title: str,
+    operator: str = "system",
+    export_dir: Optional[str] = None,
+) -> dict:
     """
     Legacy wrapper used by older parts of the app.
     """
     content_lines = markdown_content.split("\n")
     content_lines = [line.strip() for line in content_lines if line.strip()]
-    return build_pdf(content_lines, title=title, operator=operator)
+    return build_pdf(content_lines, title=title, operator=operator, export_dir=export_dir)

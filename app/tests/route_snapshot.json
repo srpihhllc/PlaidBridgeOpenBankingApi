@@ -1,0 +1,1574 @@
+[
+  {
+    "rule": "/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.home"
+  },
+  {
+    "rule": "/admin/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.admin_index"
+  },
+  {
+    "rule": "/admin/advanced_telemetry",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.advanced_telemetry"
+  },
+  {
+    "rule": "/admin/agent_activity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.agent_activity"
+  },
+  {
+    "rule": "/admin/api/v1/audit",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_api.audit_viewer_api"
+  },
+  {
+    "rule": "/admin/api/v1/operator_code/generate",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_api.operator_code_generate"
+  },
+  {
+    "rule": "/admin/api/v1/operator_code/invalidate",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_api.operator_code_invalidate"
+  },
+  {
+    "rule": "/admin/api/v1/operator_entry",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_api.operator_entry"
+  },
+  {
+    "rule": "/admin/api/v1/traces/recent",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_api.api_get_recent_traces"
+  },
+  {
+    "rule": "/admin/api/v1/users",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_api.admin_list_users"
+  },
+  {
+    "rule": "/admin/api/v1/users/<int:user_id>",
+    "methods": [
+      "DELETE"
+    ],
+    "endpoint": "admin_api.admin_delete_user"
+  },
+  {
+    "rule": "/admin/api_usage",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.api_usage"
+  },
+  {
+    "rule": "/admin/approval_queue",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.approval_queue"
+  },
+  {
+    "rule": "/admin/audit_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.audit_viewer"
+  },
+  {
+    "rule": "/admin/brain_diagnosis",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.brain_diagnosis"
+  },
+  {
+    "rule": "/admin/cache_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.cache_health"
+  },
+  {
+    "rule": "/admin/cockpit",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.admin_cockpit"
+  },
+  {
+    "rule": "/admin/cockpit/lender_risk_day_detail",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.lender_risk_day_detail"
+  },
+  {
+    "rule": "/admin/cockpit/lender_risk_day_invalid",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.lender_risk_day_invalid"
+  },
+  {
+    "rule": "/admin/cockpit/lender_risk_overview",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.lender_risk_overview"
+  },
+  {
+    "rule": "/admin/cockpit/trace/<event_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "trace_event.trace_detail"
+  },
+  {
+    "rule": "/admin/cockpit/trace_detail",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.cockpit_trace_detail"
+  },
+  {
+    "rule": "/admin/cockpit/trace_not_found",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.cockpit_trace_not_found"
+  },
+  {
+    "rule": "/admin/cortex",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.admin_cortex"
+  },
+  {
+    "rule": "/admin/dashboard_anomalies",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.dashboard_anomalies"
+  },
+  {
+    "rule": "/admin/dashboard_liquidity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.dashboard_liquidity"
+  },
+  {
+    "rule": "/admin/dispute_logs/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.view_dispute_logs"
+  },
+  {
+    "rule": "/admin/export_trace/<string:trace_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.export_trace"
+  },
+  {
+    "rule": "/admin/fraud_scanner",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.fraud_scanner"
+  },
+  {
+    "rule": "/admin/identity_events",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.identity_events"
+  },
+  {
+    "rule": "/admin/ignition_trace",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.ignition_trace"
+  },
+  {
+    "rule": "/admin/lenders",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.show_lenders"
+  },
+  {
+    "rule": "/admin/lenders/<int:lender_id>/verify",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin.verify_lender"
+  },
+  {
+    "rule": "/admin/log_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.log_viewer"
+  },
+  {
+    "rule": "/admin/login_trace_monitor",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.login_trace_monitor"
+  },
+  {
+    "rule": "/admin/me",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.me_dashboard"
+  },
+  {
+    "rule": "/admin/model_summary",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.model_summary"
+  },
+  {
+    "rule": "/admin/mutation_submit",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.mutation_submit"
+  },
+  {
+    "rule": "/admin/neural_console",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.neural_console"
+  },
+  {
+    "rule": "/admin/operator-login",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.operator_login"
+  },
+  {
+    "rule": "/admin/payment_processor",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin.process_payment"
+  },
+  {
+    "rule": "/admin/preview_letter/<int:log_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.preview_letter"
+  },
+  {
+    "rule": "/admin/rate_limits",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.rate_limits_dashboard"
+  },
+  {
+    "rule": "/admin/redis_panel",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.redis_panel"
+  },
+  {
+    "rule": "/admin/registry",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.registry"
+  },
+  {
+    "rule": "/admin/repair_result",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.repair_result"
+  },
+  {
+    "rule": "/admin/route_list",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.route_list"
+  },
+  {
+    "rule": "/admin/schema_diagram",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.schema_diagram"
+  },
+  {
+    "rule": "/admin/schema_events",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.schema_events"
+  },
+  {
+    "rule": "/admin/schema_versions",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.schema_versions"
+  },
+  {
+    "rule": "/admin/sql_panel",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.sql_panel"
+  },
+  {
+    "rule": "/admin/statements_heatmap",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.statements_heatmap"
+  },
+  {
+    "rule": "/admin/statements_timeline",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.statements_timeline"
+  },
+  {
+    "rule": "/admin/sweep_expired_keys",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin.sweep_expired_keys"
+  },
+  {
+    "rule": "/admin/system_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.system_health"
+  },
+  {
+    "rule": "/admin/system_heartbeat",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.system_heartbeat"
+  },
+  {
+    "rule": "/admin/system_map",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.system_map"
+  },
+  {
+    "rule": "/admin/tile/agent_activity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_agent_activity"
+  },
+  {
+    "rule": "/admin/tile/credit_ledger/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_credit_ledger"
+  },
+  {
+    "rule": "/admin/tile/exposure/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_exposure"
+  },
+  {
+    "rule": "/admin/tile/fraud_chart",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_fraud_chart"
+  },
+  {
+    "rule": "/admin/tile/log_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_log_viewer"
+  },
+  {
+    "rule": "/admin/tile/rate_limits",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_rate_limits"
+  },
+  {
+    "rule": "/admin/tile/redis_keys",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_redis_keys"
+  },
+  {
+    "rule": "/admin/tile/schema_events",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_schema_events"
+  },
+  {
+    "rule": "/admin/tile/schema_versions",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_schema_versions"
+  },
+  {
+    "rule": "/admin/tile/sql_panel",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_sql_panel"
+  },
+  {
+    "rule": "/admin/tile/statements_heatmap",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_statements_heatmap"
+  },
+  {
+    "rule": "/admin/tile/statements_timeline",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_statements_timeline"
+  },
+  {
+    "rule": "/admin/tile/trace_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_trace_viewer"
+  },
+  {
+    "rule": "/admin/trace_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.trace_viewer"
+  },
+  {
+    "rule": "/admin/tradelines_panel",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tradelines_panel"
+  },
+  {
+    "rule": "/admin/view_credit_ledger/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.view_credit_ledger"
+  },
+  {
+    "rule": "/api/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.ping"
+  },
+  {
+    "rule": "/api/api/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.health_check"
+  },
+  {
+    "rule": "/api/cfpb/complaint",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "cfpb.submit_complaint"
+  },
+  {
+    "rule": "/api/dashboard_settings/dark_mode",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.set_dark_mode"
+  },
+  {
+    "rule": "/api/generate_link_token",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "compat.api_generate_link_token"
+  },
+  {
+    "rule": "/api/generate_statement",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "compat.api_generate_statement"
+  },
+  {
+    "rule": "/api/grants/compose/<grant_type>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "grants.compose_grant_endpoint"
+  },
+  {
+    "rule": "/api/login",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "compat.api_login"
+  },
+  {
+    "rule": "/api/operator/debug_flags",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.operator_debug_flags"
+  },
+  {
+    "rule": "/api/operator/disable",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.operator_disable"
+  },
+  {
+    "rule": "/api/operator/dto/<string:dto_name>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.operator_dto_inspect"
+  },
+  {
+    "rule": "/api/operator/enable",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.operator_enable"
+  },
+  {
+    "rule": "/api/operator/env",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.operator_env"
+  },
+  {
+    "rule": "/api/operator/force_template_audit",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.operator_force_template_audit"
+  },
+  {
+    "rule": "/api/operator/redis/<path:key>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.operator_redis_inspect"
+  },
+  {
+    "rule": "/api/operator/services",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.operator_service_registry"
+  },
+  {
+    "rule": "/api/ping",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.ping"
+  },
+  {
+    "rule": "/api/public/stats",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.public_stats"
+  },
+  {
+    "rule": "/api/register",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "compat.api_register"
+  },
+  {
+    "rule": "/api/v1/auth/login",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.login"
+  },
+  {
+    "rule": "/api/v1/auth/mfa/setup",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.mfa_setup"
+  },
+  {
+    "rule": "/api/v1/auth/mfa/verify",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.mfa_verify"
+  },
+  {
+    "rule": "/api/v1/auth/register",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.register"
+  },
+  {
+    "rule": "/api/v1/auth/token/refresh",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.refresh_token"
+  },
+  {
+    "rule": "/api/v1/core/transactions",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.create_transaction"
+  },
+  {
+    "rule": "/api/v1/fintech/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.health"
+  },
+  {
+    "rule": "/api/v1/fintech/lenders/link",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.lender_self_link"
+  },
+  {
+    "rule": "/api/v1/fintech/link/manual/approve",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.approve_manual_link"
+  },
+  {
+    "rule": "/api/v1/fintech/link/manual/redeem",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.redeem_manual_link"
+  },
+  {
+    "rule": "/api/v1/fintech/link/manual/request",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.request_manual_link"
+  },
+  {
+    "rule": "/api/v1/fintech/sandbox/account_snapshot",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.sandbox_account_snapshot"
+  },
+  {
+    "rule": "/api/v1/fintech/sandbox/statement/pdf",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.sandbox_statement_pdf"
+  },
+  {
+    "rule": "/api/v1/fintech/transactions",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.create_transaction"
+  },
+  {
+    "rule": "/api/v1/fintech/verify/tink",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.verify_tink"
+  },
+  {
+    "rule": "/api/v1/fintech/verify/truelayer",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.fintech_api_bp.verify_truelayer"
+  },
+  {
+    "rule": "/api/v1/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.v1_health"
+  },
+  {
+    "rule": "/api/v1/ping",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.ping"
+  },
+  {
+    "rule": "/api/v1/public/stats",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.public_stats"
+  },
+  {
+    "rule": "/api/v1/tradelines",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.create_tradeline"
+  },
+  {
+    "rule": "/api/v1/tradelines",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.list_tradelines"
+  },
+  {
+    "rule": "/api/v1/tradelines/<int:tradeline_id>",
+    "methods": [
+      "DELETE"
+    ],
+    "endpoint": "api_v1.delete_tradeline"
+  },
+  {
+    "rule": "/api/v1/tradelines/<int:tradeline_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.get_tradeline"
+  },
+  {
+    "rule": "/api/v1/tradelines/<int:tradeline_id>",
+    "methods": [
+      "PUT"
+    ],
+    "endpoint": "api_v1.update_tradeline"
+  },
+  {
+    "rule": "/auth/account_settings",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.account_settings"
+  },
+  {
+    "rule": "/auth/api/logout",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "auth.api_logout"
+  },
+  {
+    "rule": "/auth/api/refresh",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "auth.api_refresh"
+  },
+  {
+    "rule": "/auth/api/token",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "auth.api_token"
+  },
+  {
+    "rule": "/auth/auth/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.auth_health"
+  },
+  {
+    "rule": "/auth/change_password",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.change_password"
+  },
+  {
+    "rule": "/auth/forgot_password",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.forgot_password_alias"
+  },
+  {
+    "rule": "/auth/identity-events",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.identity_events_view"
+  },
+  {
+    "rule": "/auth/login",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.login"
+  },
+  {
+    "rule": "/auth/login_operator",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.login_operator"
+  },
+  {
+    "rule": "/auth/login_subscriber",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.login_subscriber"
+  },
+  {
+    "rule": "/auth/logout",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.logout"
+  },
+  {
+    "rule": "/auth/me",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.me_dashboard"
+  },
+  {
+    "rule": "/auth/me_dashboard",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.me_dashboard_static"
+  },
+  {
+    "rule": "/auth/mfa_prompt",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.mfa_prompt"
+  },
+  {
+    "rule": "/auth/probe",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.probe"
+  },
+  {
+    "rule": "/auth/register_subscriber",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.register_subscriber"
+  },
+  {
+    "rule": "/auth/reset_password",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.reset_password"
+  },
+  {
+    "rule": "/auth/reset_request",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.reset_request"
+  },
+  {
+    "rule": "/auth/subscriber_login",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "auth.subscriber_login"
+  },
+  {
+    "rule": "/auth/update_password",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.update_password"
+  },
+  {
+    "rule": "/callback/<provider>",
+    "methods": [],
+    "endpoint": "oauth.callback_<provider>_clean"
+  },
+  {
+    "rule": "/callback/<provider>",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "oauth.callback_provider_legacy"
+  },
+  {
+    "rule": "/callback/google",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "oauth.callback_google"
+  },
+  {
+    "rule": "/callback/google",
+    "methods": [],
+    "endpoint": "oauth.callback_google_clean"
+  },
+  {
+    "rule": "/callback/microsoft",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "oauth.callback_microsoft"
+  },
+  {
+    "rule": "/callback/microsoft",
+    "methods": [],
+    "endpoint": "oauth.callback_microsoft_clean"
+  },
+  {
+    "rule": "/callback/plaid",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "oauth.callback_plaid"
+  },
+  {
+    "rule": "/callback/plaid",
+    "methods": [],
+    "endpoint": "oauth.callback_plaid_clean"
+  },
+  {
+    "rule": "/cockpit/bad_method_probe",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "probe_bp.bad_method_probe_tile"
+  },
+  {
+    "rule": "/cockpit/drilldown",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "drilldown.drilldown_view"
+  },
+  {
+    "rule": "/cockpit/fk/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fk_inspector_bp.index"
+  },
+  {
+    "rule": "/cockpit/telemetry",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "cockpit_bp.telemetry_dashboard"
+  },
+  {
+    "rule": "/create_link_token",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "plaid.create_link_token"
+  },
+  {
+    "rule": "/dashboard",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.dashboard"
+  },
+  {
+    "rule": "/dashboard/liquidity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "liquidity_bp.liquidity_dashboard"
+  },
+  {
+    "rule": "/debug/config",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "debug.debug_config"
+  },
+  {
+    "rule": "/debug/test",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "debug.debug_test"
+  },
+  {
+    "rule": "/dependency-graph",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "dependency_graph"
+  },
+  {
+    "rule": "/diagnostics",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics"
+  },
+  {
+    "rule": "/diagnostics/console",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.neural_console"
+  },
+  {
+    "rule": "/diagnostics/db_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.db_health"
+  },
+  {
+    "rule": "/diagnostics/full",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.get_full_diagnostics"
+  },
+  {
+    "rule": "/diagnostics/routes",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.route_list"
+  },
+  {
+    "rule": "/dispute-form",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.dispute_form"
+  },
+  {
+    "rule": "/dummy_invalid",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "dummy_invalid"
+  },
+  {
+    "rule": "/dummy_malformed",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "dummy_malformed"
+  },
+  {
+    "rule": "/dummy_valid",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "dummy_valid"
+  },
+  {
+    "rule": "/dummy_violation",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "dummy_violation"
+  },
+  {
+    "rule": "/exchange_public_token",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "plaid.exchange_public_token"
+  },
+  {
+    "rule": "/favicon.ico",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.favicon"
+  },
+  {
+    "rule": "/generate_cfpb_complaint/<template_name>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "cfpb.generate_cfpb_pdf"
+  },
+  {
+    "rule": "/generate_letter/<template_name>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "letters.generate_letter"
+  },
+  {
+    "rule": "/generate_letter_pdf/<template_name>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "letters.generate_letter_pdf"
+  },
+  {
+    "rule": "/get_started",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "main.subscriber_entry"
+  },
+  {
+    "rule": "/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_api_bp.health"
+  },
+  {
+    "rule": "/healthz",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "healthz"
+  },
+  {
+    "rule": "/ignite-cortex",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "main.ignite_cortex"
+  },
+  {
+    "rule": "/introspection/cortex_map",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "introspection.cortex_map"
+  },
+  {
+    "rule": "/introspection/cortex_overlay.svg",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "introspection.cortex_overlay"
+  },
+  {
+    "rule": "/introspection/diagnose_brain",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "introspection.diagnose_brain"
+  },
+  {
+    "rule": "/lenders/link",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.lender_self_link"
+  },
+  {
+    "rule": "/link/manual/approve",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.approve_manual_link"
+  },
+  {
+    "rule": "/link/manual/redeem",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.redeem_manual_link"
+  },
+  {
+    "rule": "/link/manual/request",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.request_manual_link"
+  },
+  {
+    "rule": "/login",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "main.subscriber_login"
+  },
+  {
+    "rule": "/login/<provider>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "oauth.login_initiate"
+  },
+  {
+    "rule": "/logout",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.logout"
+  },
+  {
+    "rule": "/oauth/callback/<provider>",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "oauth.callback_provider"
+  },
+  {
+    "rule": "/oauth/login/<provider>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "oauth.login_initiate"
+  },
+  {
+    "rule": "/pulse/access_token/<int:token_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "pulse.access_token_pulse"
+  },
+  {
+    "rule": "/pulse/vault/<int:vault_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "pulse.vault_pulse"
+  },
+  {
+    "rule": "/register_subscriber",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "main.register_subscriber_redirect"
+  },
+  {
+    "rule": "/repair/clear-zombies",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "repair.clear_zombie_sessions"
+  },
+  {
+    "rule": "/repair/self_repair",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "repair.self_repair"
+  },
+  {
+    "rule": "/repair/system_heartbeat",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "repair.system_heartbeat"
+  },
+  {
+    "rule": "/sandbox/account_snapshot",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_api_bp.sandbox_account_snapshot"
+  },
+  {
+    "rule": "/sandbox/statement/pdf",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_api_bp.sandbox_statement_pdf"
+  },
+  {
+    "rule": "/static/<path:filename>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "static"
+  },
+  {
+    "rule": "/sub/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.sub_index"
+  },
+  {
+    "rule": "/sub/audit/report",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.audit_report"
+  },
+  {
+    "rule": "/sub/audit_trace",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.audit_trace"
+  },
+  {
+    "rule": "/sub/dashboard",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.dashboard"
+  },
+  {
+    "rule": "/sub/debug/dto",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.debug_dto"
+  },
+  {
+    "rule": "/sub/fraud/drilldown",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.fraud_drilldown"
+  },
+  {
+    "rule": "/sub/navbar_probe",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.navbar_probe"
+  },
+  {
+    "rule": "/sub/settings",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.settings"
+  },
+  {
+    "rule": "/sub/tile/diagnostics",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.tile_diagnostics"
+  },
+  {
+    "rule": "/sub/todos/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "todo.list"
+  },
+  {
+    "rule": "/sub/todos/add",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "todo.add_todo"
+  },
+  {
+    "rule": "/sub/todos/delete/<int:todo_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "todo.delete"
+  },
+  {
+    "rule": "/sub/todos/toggle/<int:todo_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "todo.toggle"
+  },
+  {
+    "rule": "/sub/todos/update/<int:todo_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "todo.update_todo"
+  },
+  {
+    "rule": "/sub/vaults",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.vault_dashboard"
+  },
+  {
+    "rule": "/subscriber/dashboard",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.subscriber_dashboard"
+  },
+  {
+    "rule": "/subscriber/update_profile",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "subscriber.update_profile"
+  },
+  {
+    "rule": "/terence_entry",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.terence_entry"
+  },
+  {
+    "rule": "/tiles/blueprint_drift_overlay/pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "tiles.blueprint_drift_overlay_pulse"
+  },
+  {
+    "rule": "/tiles/pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "tiles.pulse_status"
+  },
+  {
+    "rule": "/transactions",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.create_transaction"
+  },
+  {
+    "rule": "/upload-pdf",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "main.upload_pdf"
+  },
+  {
+    "rule": "/verify/tink",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.verify_tink"
+  },
+  {
+    "rule": "/verify/truelayer",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_api_bp.verify_truelayer"
+  },
+  {
+    "rule": "/webhooks/ach",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "webhooks.ach_listener"
+  },
+  {
+    "rule": "/webhooks/plaid",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "webhooks.plaid_listener"
+  },
+  {
+    "rule": "/webhooks/reconcile",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "webhooks.reconcile_payments"
+  },
+  {
+    "rule": "/welcome_back",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "main.welcome_back"
+  }
+]

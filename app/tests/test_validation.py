@@ -1,46 +1,18 @@
 # =============================================================================
 # FILE: app/tests/test_validation.py
 # DESCRIPTION: Unit tests for the bulletproof JSON schema validator decorator.
+# Dummy routes are registered in conftest.py inside the session-scoped `app`
+# fixture, before any request is handled, so Flask allows route registration.
 # =============================================================================
 import pytest
 from flask import jsonify
 
 from app.api.validation import validate_json_schema
 
-schema = {
-    "type": "object",
-    "properties": {"foo": {"type": "string"}},
-    "required": ["foo"],
-}
-
-
-# Register all dummy routes once before any tests run
-@pytest.fixture(scope="module", autouse=True)
-def register_dummy_routes(app):
-    @app.route("/dummy_invalid", methods=["POST"])
-    @validate_json_schema(schema)
-    def dummy_invalid():
-        return jsonify({"status": "ok"}), 200
-
-    @app.route("/dummy_malformed", methods=["POST"])
-    @validate_json_schema(schema)
-    def dummy_malformed():
-        return jsonify({"status": "ok"}), 200
-
-    @app.route("/dummy_violation", methods=["POST"])
-    @validate_json_schema(schema)
-    def dummy_violation():
-        return jsonify({"status": "ok"}), 200
-
-    @app.route("/dummy_valid", methods=["POST"])
-    @validate_json_schema(schema)
-    def dummy_valid():
-        return jsonify({"status": "ok"}), 200
-
 
 def test_validate_json_schema_invalid_json(client):
     """
-    Posting non‑JSON with application/json header should return 422
+    Posting non-JSON with application/json header should return 422
     with 'Malformed JSON body.' message.
     """
     resp = client.post(

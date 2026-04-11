@@ -247,18 +247,52 @@ def ttl_summary() -> dict[str, Any]:
     return summary
 
 
-def emit_boot_trace(
-    *,
-    domain: str,
-    event: str,
-    detail: str,
-    value: str | None = None,
-    status: str = "ok",
-    ttl: int = 60,
-    client: Any | None = None,
-    meta: dict[str, Any] | None = None,
-) -> Any:
-    """Boot/migration pulse wrapper."""
+def emit_boot_trace(*args: Any, **kwargs: Any) -> Any:
+    """
+    Boot/migration pulse wrapper.
+
+    Backwards-compatible behavior:
+      - If caller provides a pre-built 'key' kwarg (legacy/test form), forward it
+        directly to ttl_emit. Accept both 'client' and legacy 'r' for the client.
+      - Otherwise, accept domain/event/detail (either kw or positional) and build key.
+    """
+    # Legacy/test passthrough: accept 'key' and optional 'r'
+    if "key" in kwargs:
+        key = kwargs.get("key")
+        client = kwargs.get("client", kwargs.get("r", None))
+        value = kwargs.get("value", None)
+        status = kwargs.get("status", "ok")
+        ttl = kwargs.get("ttl", 60)
+        meta = kwargs.get("meta", None)
+        return ttl_emit(
+            key=key,
+            value=value,
+            status=status,
+            ttl=ttl,
+            client=client,
+            meta=meta,
+        )
+
+    # Otherwise build from domain/event/detail (support positional fallback)
+    domain = kwargs.get("domain")
+    event = kwargs.get("event")
+    detail = kwargs.get("detail")
+    if domain is None and len(args) >= 1:
+        domain = args[0]
+    if event is None and len(args) >= 2:
+        event = args[1]
+    if detail is None and len(args) >= 3:
+        detail = args[2]
+
+    if not (domain and event and detail):
+        raise TypeError("emit_boot_trace requires either a 'key' kwarg or domain/event/detail")
+
+    value = kwargs.get("value", None)
+    status = kwargs.get("status", "ok")
+    ttl = kwargs.get("ttl", 60)
+    client = kwargs.get("client", kwargs.get("r", None))
+    meta = kwargs.get("meta", None)
+
     key = f"ttl:boot:{domain}:{event}:{detail}"
     return ttl_emit(
         key=key,

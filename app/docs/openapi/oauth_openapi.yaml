@@ -1,0 +1,118 @@
+openapi: "3.1.0"
+info:
+  title: OAuth Callback API
+  version: "1.0.0"
+  description: |
+    Unified OAuth endpoints for Google, Apple, and Microsoft.
+paths:
+  /oauth/login/{provider}:
+    get:
+      summary: Initiate OAuth login (redirects to provider)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, apple, microsoft]
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to provider authorization endpoint
+  /oauth/callback/{provider}:
+    get:
+      summary: OAuth callback (unified)
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [google, apple, microsoft]
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to dashboard on success
+        '401':
+          description: Unauthorized / missing profile/email or access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '502':
+          description: Provider exchange or profile fetch failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        id_token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+        refresh_token:
+          type: string
+    Profile:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        sub:
+          type: string
+        name:
+          type: string
+    TraceEvent:
+      type: object
+      properties:
+        event_id:
+          type: string
+        event_type:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        user_id:
+          type: string
+        email:
+          type: string
+          format: email
+        ip:
+          type: string
+        meta:
+          type: object
+        detail:
+          type: string
+    Error:
+      type: object
+      properties:
+        msg:
+          type: string
+        error:
+          type: string

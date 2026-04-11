@@ -22,6 +22,12 @@ TTL_SUCCESS = int(os.getenv("TTL_SUCCESS_SECONDS", 300))
 TTL_FAILURE = int(os.getenv("TTL_FAILURE_SECONDS", 600))
 APP_ID = os.getenv("APP_ID", "default_app")
 
+# Runtime mode for telemetry behavior:
+#  - "auto": prefer Redis when available; otherwise mock (default)
+#  - "redis": require Redis (log errors if unavailable)
+#  - "mock": never attempt Redis, always log mock
+TELEMETRY_MODE = os.getenv("TELEMETRY_MODE", "auto").lower()
+
 # Metric registry (mock)
 _METRIC_LOOKUP: dict[str, "MockMetric"] = {}
 
@@ -40,14 +46,14 @@ if not MOCK_MODE:
         _REDIS_AVAILABLE = True
     except Exception as e:
         logger.warning(
-            f"Failed to import prometheus_client/redis_utils: {e}. " "Falling back to MOCK_MODE."
+            f"Failed to import prometheus_client/redis_utils: {e}. Falling back to MOCK_MODE."
         )
         MOCK_MODE = True
         PROMETHEUS_CLIENT_ENABLED = False
         _REDIS_AVAILABLE = False
 else:
     # In mock mode we still want get_redis_client symbolically available for type-checkers,
-    # but at runtime we will never call it when _REDIS_AVAILABLE is False.
+    # but at runtime we will never call it when no client is available.
     try:
         from app.utils.redis_utils import get_redis_client  # type: ignore[import]
     except Exception:  # pragma: no cover - purely defensive
@@ -288,11 +294,46 @@ def time_metric(name: str, labels: dict[str, str] | None = None) -> Callable[[F]
 
 
 # =============================================================================
+# Helper: runtime Redis acquisition
+# =============================================================================
+def _acquire_redis_client() -> Any | None:
+    """
+    Try to obtain a Redis client from the app-level factory first (preferred),
+    then fall back to a local safe client. Return None if no client can be
+    established.
+    """
+    rc = None
+    try:
+        rc = get_redis_client()
+    except Exception as e:
+        logger.debug("get_redis_client() raised: %s", e)
+        rc = None
+
+    if rc:
+        return rc
+
+    # Fall back to safe local client (non-import-time side effects)
+    try:
+        return _get_safe_redis_client()
+    except Exception as e:
+        logger.debug("_get_safe_redis_client() failed: %s", e)
+        return None
+
+
+# =============================================================================
 # TTL pulses and failures
 # =============================================================================
 def ttl_pulse_emit(
-    key: str, status: str, ttl_seconds: int, meta: dict[str, Any] | None = None
+    key: str,
+    status: str,
+    ttl_seconds: int,
+    meta: dict[str, Any] | None = None,
+    client: Any | None = None,
 ) -> None:
+    """
+    Emit a TTL payload to Redis (or mock/log). Optional client parameter allows
+    callers to provide an explicit Redis client.
+    """
     payload = {
         "status": status,
         "timestamp": time.time(),
@@ -300,28 +341,43 @@ def ttl_pulse_emit(
         "source": "telemetry",
         "app_id": APP_ID,
     }
-    if MOCK_MODE or not _REDIS_AVAILABLE:
+
+    # Respect explicit mock mode
+    if TELEMETRY_MODE == "mock":
         logger.info(
-            "TTL_EMIT (Mock): %s status=%s ttl=%ss payload=%s",
+            "TTL_EMIT (Mock mode): %s status=%s ttl=%ss payload=%s",
             key,
             status,
             ttl_seconds,
             json.dumps(payload),
         )
         return
+
+    # Use supplied client if provided, otherwise obtain at runtime
+    redis = client or _acquire_redis_client()
+    if not redis:
+        # No Redis available
+        if TELEMETRY_MODE == "redis":
+            logger.error("TTL_EMIT: TELEMETRY_MODE=redis but Redis unavailable for key=%s", key)
+        else:
+            logger.info(
+                "TTL_EMIT (No Redis): %s status=%s ttl=%ss payload=%s",
+                key,
+                status,
+                ttl_seconds,
+                json.dumps(payload),
+            )
+        return
+
     try:
-        redis = get_redis_client()
-        if redis is None:
-            logger.error("TTL_EMIT: Redis client is None; skipping emit.")
-            return
         try:
             redis.setex(key, ttl_seconds, json.dumps(payload))
         except TypeError:
-            # fallback for clients that use different signature
+            # fallback for clients that use a different signature
             redis.set(key, json.dumps(payload), ex=ttl_seconds)
         logger.debug(f"TTL_EMIT (Redis): {key} ttl={ttl_seconds}s")
     except Exception as e:
-        logger.error(f"CRITICAL: TTL emit failed for key '{key}': {e}")
+        logger.error(f"CRITICAL: TTL emit failed for key '{key}': {e}", exc_info=True)
         try:
             set_metric("redis_health_status", 0, labels={"app_id": APP_ID})
         except Exception:
@@ -368,6 +424,13 @@ def log_identity_event(
     user_agent: str | None = None,
     details: Any | None = None,
 ) -> None:
+    """
+    Record an identity event.
+    Behavior is controlled by TELEMETRY_MODE:
+      - auto (default): try Redis if available, otherwise log (mock).
+      - redis: require Redis; log error if absent.
+      - mock: never attempt Redis, only log.
+    """
     try:
         inc_metric("identity_events_total", labels={"event_type": event_type})
     except Exception:
@@ -383,31 +446,81 @@ def log_identity_event(
         "app_id": APP_ID,
     }
 
-    if MOCK_MODE or not _REDIS_AVAILABLE:
-        logger.info(f"Identity Event (Mock): {json.dumps(event)}")
+    # Respect explicit mock mode
+    if TELEMETRY_MODE == "mock":
+        logger.info("Identity Event (Mock mode): %s", json.dumps(event))
+        return
+
+    # Attempt runtime acquisition of Redis client
+    redis = _acquire_redis_client()
+    if not redis:
+        # No Redis available
+        if TELEMETRY_MODE == "redis":
+            logger.error(
+                "Identity event: TELEMETRY_MODE=redis but Redis unavailable for event=%s",
+                event_type,
+            )
+        else:
+            logger.info("Identity Event (No Redis): %s", json.dumps(event))
         return
 
     try:
-        redis = get_redis_client()
-        if redis is None:
-            logger.error("Identity event: Redis client is None; skipping stream push.")
-            return
+        # Push to identity stream used by tests/helpers
         redis.lpush("identity_events_stream", json.dumps(event))
         try:
             redis.ltrim("identity_events_stream", 0, 4999)
         except Exception:
-            # Some redis clients may not implement ltrim in the same way; ignore if unavailable
+            # Non-critical: some clients may not implement ltrim
             pass
+
         ttl_pulse_emit(
             f"ttl_pulse:identity_activity:{APP_ID}",
             "SUCCESS",
             TTL_SUCCESS,
             meta={"last_event": event_type},
+            client=redis,
         )
-        logger.debug(f"Identity event logged: {event_type}")
+        logger.debug("Identity event logged: %s", event_type)
     except Exception as e:
-        logger.error(f"CRITICAL: Identity event stream failure: {e}")
-        ttl_pulse_emit(f"ttl_pulse:telemetry_failure:{APP_ID}", "FAILURE", TTL_FAILURE)
+        # Non-fatal — record health metric and attempt fallback queueing for diagnostics
+        logger.error(
+            "CRITICAL: Identity event stream failure for %s: %s", event_type, e, exc_info=True
+        )
+        try:
+            set_metric("redis_health_status", 0, labels={"app_id": APP_ID})
+        except Exception:
+            pass
+
+        # Best-effort enqueue a lightweight fallback payload if possible
+        try:
+            payload = json.dumps(
+                {
+                    "id": str(time.time()),
+                    "event_type": event_type,
+                    "timestamp": event["timestamp"],
+                    "detail": meta,
+                }
+            )
+            try:
+                # Try close-to-app-level redis client if available
+                from flask import current_app
+
+                r = (
+                    current_app.extensions.get("redis_client")
+                    if current_app and hasattr(current_app, "extensions")
+                    else None
+                ) or getattr(current_app, "redis_client", None)
+            except Exception:
+                r = None
+            if r:
+                r.rpush("telemetry_fallback_queue", payload)
+                logger.info("Queued identity event to telemetry_fallback_queue")
+        except Exception:
+            logger.debug("Fallback queueing for identity event failed", exc_info=True)
+
+        ttl_pulse_emit(
+            f"ttl_pulse:telemetry_failure:{APP_ID}", "FAILURE", TTL_FAILURE, client=None
+        )
 
 
 def record_lifecycle_event(
@@ -452,8 +565,7 @@ def record_lifecycle_event(
                 did_push = True
             except Exception:
                 logger.debug(
-                    "record_lifecycle_event: could not push temporary app context; "
-                    "proceeding without it"
+                    "record_lifecycle_event: could not push temporary app context; proceeding without it"
                 )
 
         context = "system_startup" if evt == "restart" else "system_shutdown"
@@ -462,7 +574,7 @@ def record_lifecycle_event(
 
         if not MOCK_MODE and _REDIS_AVAILABLE:
             try:
-                redis = get_redis_client()
+                redis = _acquire_redis_client()
                 if redis:
                     was_set = redis.set(
                         dedupe_key,

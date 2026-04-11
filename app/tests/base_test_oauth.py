@@ -7,6 +7,8 @@
 import pytest
 from flask import Flask
 
+from sqlalchemy import text
+
 from app import create_app, db
 from app.models import PlaidItem, User
 from app.models.trace_events import TraceEvent
@@ -26,6 +28,8 @@ class BaseOAuthTest:
                 "TESTING": True,
                 "WTF_CSRF_ENABLED": False,
                 "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+                # Allow url_for() calls outside an active request in tests
+                "SERVER_NAME": "localhost",
             }
         )
         with app.app_context():
@@ -35,7 +39,25 @@ class BaseOAuthTest:
             finally:
                 db.session.rollback()
                 db.session.remove()
-                db.drop_all()
+
+                # If using MySQL/MariaDB in other environments, disable FK checks
+                # while dropping tables to avoid "cannot drop table referenced by FK"
+                # errors during teardown. For sqlite/in-memory this will just run
+                # db.drop_all().
+                engine_name = getattr(db.engine, "name", None) or db.engine.dialect.name
+                if engine_name in ("mysql", "mariadb"):
+                    conn = db.engine.connect()
+                    trans = conn.begin()
+                    try:
+                        # SET FOREIGN_KEY_CHECKS is connection-scoped; run drop on same conn
+                        conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
+                        db.metadata.drop_all(bind=conn)
+                        conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
+                        trans.commit()
+                    finally:
+                        conn.close()
+                else:
+                    db.drop_all()
 
     @pytest.fixture
     def client(self, app: Flask):

@@ -1,3 +1,5 @@
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/flask_app.py
+
 # Top-level shim for legacy imports (project root)
 #
 # This file proxies to app/flask_app.py so statements like:
@@ -18,7 +20,6 @@ try:
         compute_new_balance,
         correct_discrepancies,
         export_csv,
-        generate_pdf_from_csv,
         get_app,
         import_csv,
         parse_pdf,
@@ -44,7 +45,6 @@ __all__ = [
     "export_csv",
     "import_csv",
     "save_statements_as_csv",
-    "generate_pdf_from_csv",
     "compute_new_balance",
     "update_account_balance",
     "account_balance",

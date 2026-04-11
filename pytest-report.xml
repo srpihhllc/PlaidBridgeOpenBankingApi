@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="18" time="15.400" timestamp="2026-03-19T00:19:47.865117+00:00" hostname="green-liveconsole3"><testcase classname="app.tests.api.test_transactions_endpoint" name="test_api_transactions_json_required" time="1.399" /><testcase classname="app.tests.api.test_transactions_endpoint" name="test_api_transactions_queueing_success" time="0.087" /><testcase classname="app.tests.api.test_transactions_endpoint" name="test_api_transactions_auth_only_smoke_test" time="0.091" /><testcase classname="app.tests.probes.test_health_probe" name="test_probes_health_endpoint" time="0.070" /><testcase classname="app.tests.test_admin_routes" name="test_admin_access_required" time="0.080" /><testcase classname="app.tests.test_admin_routes" name="test_admin_delete_user_cascade_api" time="0.235" /><testcase classname="app.tests.test_app" name="test_index" time="0.746" /><testcase classname="app.tests.test_app" name="test_login" time="0.615" /><testcase classname="app.tests.test_app" name="test_logout" time="0.635" /><testcase classname="app.tests.test_app" name="test_health_check" time="0.497" /><testcase classname="app.tests.test_app" name="test_upload_pdf_no_file" time="0.493" /><testcase classname="app.tests.test_app" name="test_upload_pdf_invalid_format" time="0.524" /><testcase classname="app.tests.test_app" name="test_parse_pdf" time="0.483" /><testcase classname="app.tests.test_app" name="test_correct_discrepancies" time="0.617" /><testcase classname="app.tests.test_app" name="test_save_statements_as_csv" time="0.490" /><testcase classname="app.tests.test_app" name="test_generate_pdf_from_csv" time="0.769" /><testcase classname="app.tests.test_app" name="test_update_account_balance" time="0.589" /><testcase classname="app.tests.test_apple_oauth" name="test_apple_oauth_end_to_end" time="1.288"><failure message="AssertionError: assert ['OAUTH_PROFI...OGIN_SUCCESS'] == ['OAUTH_LOGIN..._ESTABLISHED']&#10;  &#10;  At index 0 diff: #x1B[0m#x1B[33m'#x1B[39;49;00m#x1B[33mOAUTH_PROFILE_INCOMPLETE#x1B[39;49;00m#x1B[33m'#x1B[39;49;00m#x1B[90m#x1B[39;49;00m != #x1B[0m#x1B[33m'#x1B[39;49;00m#x1B[33mOAUTH_LOGIN_SUCCESS#x1B[39;49;00m#x1B[33m'#x1B[39;49;00m#x1B[90m#x1B[39;49;00m&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x74068ef2c3b0&gt;, client = &lt;FlaskClient &lt;Flask 'flask_app'&gt;&gt;
+app = &lt;Flask 'flask_app'&gt;
+apple_jwk_and_token = {'id_token': 'eyJhbGciOiJSUzI1NiIsImtpZCI6InRlc3Qta2lkLTEiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2FwcGxlaWQuYXBwbGUuY...dNYz82/p8dOQnE8bumENojpDuYiQ0dopyUlCYNgRL7HS1U8q89qZtXFUsbGxTq\nBKzZ+tR3gWxJgpm8ta6VphU=\n-----END PRIVATE KEY-----\n'}
+
+    def test_apple_oauth_end_to_end(monkeypatch, client, app, apple_jwk_and_token):
+        """
+        End-to-end test:
+          - Monkeypatch OAuthProvider.exchange_code to return a response containing id_token
+          - Call the callback endpoint via POST form (Apple form_post)
+          - Assert redirect and that user and TraceEvent rows were created as expected
+        """
+        token_response = {"id_token": apple_jwk_and_token["id_token"], "access_token": "unused-for-apple"}
+        profile_response = {"email": "test@apple.example", "sub": "apple-sub-123", "name": "Apple Tester"}
+    
+        # Monkeypatch OAuthProvider.exchange_code to return our token_response
+        def mock_exchange(self, code):
+            assert code == "abc123"
+            return token_response
+    
+        # Let provider.fetch_profile run normally (it will verify id_token using the monkeypatched JWKS)
+        monkeypatch.setattr("app.oauth.provider.OAuthProvider.exchange_code", mock_exchange)
+    
+        # Call the unified callback as a form POST (Apple form_post)
+        resp = client.post(
+            url_for("oauth.callback_provider", provider=ProviderName.APPLE.value),
+            data={"code": "abc123"},
+        )
+    
+        assert resp.status_code in (302, 303)
+        assert resp.headers["Location"].endswith("/dashboard")
+    
+        # Verify user and TraceEvents were created
+        with app.app_context():
+            from app.models import User, TraceEvent
+    
+            u = User.query.filter_by(email=profile_response["email"]).first()
+            # Our provider.fetch_profile decodes id_token and returns email; _create_or_get_user will create the user
+            assert u is not None
+    
+            # Two ordered trace events should exist for this user
+            events = TraceEvent.query.filter_by(user_id=u.id).order_by(TraceEvent.id).all()
+            types = [e.event_type for e in events]
+&gt;           assert types[:2] == ["OAUTH_LOGIN_SUCCESS", "SESSION_ESTABLISHED"]
+E           AssertionError: assert ['OAUTH_PROFI...OGIN_SUCCESS'] == ['OAUTH_LOGIN..._ESTABLISHED']
+E             
+E             At index 0 diff: #x1B[0m#x1B[33m'#x1B[39;49;00m#x1B[33mOAUTH_PROFILE_INCOMPLETE#x1B[39;49;00m#x1B[33m'#x1B[39;49;00m#x1B[90m#x1B[39;49;00m != #x1B[0m#x1B[33m'#x1B[39;49;00m#x1B[33mOAUTH_LOGIN_SUCCESS#x1B[39;49;00m#x1B[33m'#x1B[39;49;00m#x1B[90m#x1B[39;49;00m
+E             Use -v to get more diff
+
+app/tests/test_apple_oauth.py:130: AssertionError</failure></testcase></testsuite></testsuites>

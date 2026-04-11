@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 from sqlalchemy.orm import DeclarativeBase
 
-from ..extensions import db
+from app.extensions import db
 
 # Mypy-safe alias for Flask‑SQLAlchemy dynamic base
 Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
@@ -58,3 +58,4 @@ class Todo(Model):
 
     def __repr__(self):
         return f"<Todo id={self.id} user_id={self.user_id} text={self.text!r}>"
+

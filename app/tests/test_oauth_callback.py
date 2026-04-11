@@ -1,29 +1,33 @@
 # =============================================================================
 # FILE: app/tests/test_oauth_callback.py
-# DESCRIPTION: Tests for Google OAuth callback flows.
+# DESCRIPTION: Tests for Google OAuth callback flows against unified oauth_routes.
 # =============================================================================
 
 import pytest
 from flask import url_for
 from requests.exceptions import HTTPError, Timeout
 
-from app import create_app, db
+from app import create_app
+from app.extensions import db
 from app.models import User
 from app.models.trace_events import TraceEvent
 
 
 @pytest.fixture
 def app():
-    """Provide a Flask app with in-memory SQLite for testing."""
-    app = create_app()
-    app.config.update(
-        TESTING=True,
+    """Provide a Flask app with in-memory SQLite for testing Google OAuth callbacks."""
+    application = create_app(env_name="testing")
+    application.config.update(
+        TESTING=False,  # use production-style callback path, not the TESTING short-circuit
         WTF_CSRF_ENABLED=False,
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
+        GOOGLE_CLIENT_ID="test-client-id",
+        GOOGLE_CLIENT_SECRET="test-client-secret",
+        GOOGLE_REDIRECT_URI="http://localhost/oauth/callback/google",
     )
-    with app.app_context():
+    with application.app_context():
         db.create_all()
-        yield app
+        yield application
         db.session.remove()
         db.drop_all()
 
@@ -87,7 +91,11 @@ def test_google_success(monkeypatch, client, app):
                 return None
 
             def json(self):
-                return {"email": "test@example.com", "sub": "123", "name": "Tester"}
+                return {
+                    "email": "test@example.com",
+                    "sub": "123",
+                    "name": "Tester",
+                }
 
         return Resp()
 
@@ -106,7 +114,10 @@ def test_google_success(monkeypatch, client, app):
     "mock_exception",
     [
         pytest.param(Timeout("Read timed out."), id="timeout"),
-        pytest.param(HTTPError("500 Server Error: Internal Server Error"), id="http-error-500"),
+        pytest.param(
+            HTTPError("500 Server Error: Internal Server Error"),
+            id="http-error-500",
+        ),
         pytest.param(Exception("Malformed JSON response."), id="malformed-json"),
     ],
 )
@@ -124,7 +135,7 @@ def test_google_token_failure_variants(monkeypatch, client, app, mock_exception)
     with app.app_context():
         events = assert_events(["OAUTH_TOKEN_ERROR"])
         assert_no_user()
-        assert mock_exception.args[0] in events[0].details.get("error")
+        assert mock_exception.args[0] in events[0].details.get("error", "")
 
 
 def test_google_profile_missing_email(monkeypatch, client, app):
@@ -160,11 +171,11 @@ def test_google_profile_missing_email(monkeypatch, client, app):
     with app.app_context():
         events = assert_events(["OAUTH_LOGIN_FAILURE"])
         assert_no_user()
-        assert "Profile payload missing email" in events[0].details.get("reason")
+        assert "Profile payload missing email" in events[0].details.get("reason", "")
 
 
-def test_google_invalid_id_token(monkeypatch, client, app):
-    """Simulate an invalid ID token during Google OAuth callback."""
+def test_google_profile_error_invalid_id_token(monkeypatch, client, app):
+    """Simulate an invalid ID token during Google OAuth callback (profile fetch error)."""
 
     def mock_post(url, data=None, timeout=10):
         class Resp:
@@ -179,33 +190,30 @@ def test_google_invalid_id_token(monkeypatch, client, app):
     monkeypatch.setattr("requests.post", mock_post)
 
     def mock_get(url, headers=None, timeout=10):
-        raise AssertionError("Profile endpoint should not be called when ID token is invalid")
+        # In the unified provider, ID token verification happens inside fetch_profile,
+        # so we simulate that by raising from the profile call.
+        raise Exception("ID token validation failed")
 
     monkeypatch.setattr("requests.get", mock_get)
 
-    def mock_verify(token, request, audience):
-        raise Exception("Invalid ID token")
-
-    monkeypatch.setattr("google.oauth2.id_token.verify_oauth2_token", mock_verify)
-
     resp = client.get(url_for("oauth.callback_google", code="abc123"))
-    assert resp.status_code == 401
+    assert resp.status_code == 502  # profile fetch failure path
 
     with app.app_context():
-        events = assert_events(["OAUTH_IDTOKEN_INVALID"])
+        events = assert_events(["OAUTH_PROFILE_ERROR"])
         assert_no_user()
-        assert "ID token validation failed" in events[0].details.get("reason")
+        assert "ID token validation failed" in events[0].details.get("error", "")
 
 
 @pytest.mark.parametrize(
-    "profile_payload",
+    "profile_payload, missing_fields",
     [
-        pytest.param({"email": "test@example.com"}, id="missing-sub-and-name"),
-        pytest.param({"email": "test@example.com", "sub": "123"}, id="missing-name"),
-        pytest.param({"email": "test@example.com", "name": "User"}, id="missing-sub"),
+        pytest.param({"email": "test@example.com"}, ["sub", "name"], id="missing-sub-and-name"),
+        pytest.param({"email": "test@example.com", "sub": "123"}, ["name"], id="missing-name"),
+        pytest.param({"email": "test@example.com", "name": "User"}, ["sub"], id="missing-sub"),
     ],
 )
-def test_google_profile_incomplete_variants(monkeypatch, client, app, profile_payload):
+def test_google_profile_incomplete_variants(monkeypatch, client, app, profile_payload, missing_fields):
     """Simulate Google profile responses missing optional fields."""
 
     def mock_post(url, data=None, timeout=10):
@@ -238,4 +246,11 @@ def test_google_profile_incomplete_variants(monkeypatch, client, app, profile_pa
 
     with app.app_context():
         assert_user_created()
-        assert_events(["OAUTH_PROFILE_INCOMPLETE", "OAUTH_LOGIN_SUCCESS"], ordered=True)
+        events = assert_events(
+            ["OAUTH_PROFILE_INCOMPLETE", "OAUTH_LOGIN_SUCCESS", "SESSION_ESTABLISHED"],
+            ordered=True,
+        )
+        reason = events[0].details.get("reason", "")
+        for field in missing_fields:
+            assert field in reason
+

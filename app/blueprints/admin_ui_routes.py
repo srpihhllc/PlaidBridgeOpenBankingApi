@@ -1,4 +1,7 @@
-# app/blueprints/admin_ui_routes.py
+# File: app/blueprints/admin_ui_routes.py
+# =============================================================================
+# DESCRIPTION: Admin UI routes with cockpit wiring and tiles.
+# =============================================================================
 
 import io
 import json
@@ -73,6 +76,63 @@ def operator_login():
 @admin_ui_bp.route("/cockpit")
 def admin_cockpit():
     return render_template("cockpit/cockpit_dashboard.html")
+
+
+# =============================================================================
+# ADMIN COCKPIT — LENDER RISK PAGES (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/cockpit/lender_risk_day_detail")
+def lender_risk_day_detail():
+    return render_template("admin/cockpit/lender_risk_day_detail.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/cockpit/lender_risk_day_invalid")
+def lender_risk_day_invalid():
+    return render_template("admin/cockpit/lender_risk_day_invalid.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/cockpit/lender_risk_overview")
+def lender_risk_overview():
+    return render_template("admin/cockpit/lender_risk_overview.html")
+
+
+# =============================================================================
+# Neural Console (Admin) (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/neural_console")
+def neural_console():
+    return render_template("admin/neural_console.html")
+
+
+# =============================================================================
+# COCKPIT TRACE DETAIL PAGES (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/cockpit/trace_detail")
+def cockpit_trace_detail():
+    return render_template("cockpit/trace_detail.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/cockpit/trace_not_found")
+def cockpit_trace_not_found():
+    return render_template("cockpit/trace_not_found.html")
 
 
 # =============================================================================
@@ -665,6 +725,18 @@ def system_map():
 
 
 # =============================================================================
+# SYSTEM HEALTH PAGE (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/system_health")
+def system_health():
+    return render_template("system_health.html")
+
+
+# =============================================================================
 # SCHEMA & TELEMETRY
 # =============================================================================
 
@@ -703,6 +775,25 @@ def agent_activity():
 
 
 # =============================================================================
+# DASHBOARD PAGES (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/dashboard_anomalies")
+def dashboard_anomalies():
+    return render_template("dashboard_anomalies.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/dashboard_liquidity")
+def dashboard_liquidity():
+    return render_template("dashboard_liquidity.html")
+
+
+# =============================================================================
 # STATEMENTS
 # =============================================================================
 
@@ -738,6 +829,65 @@ def brain_diagnosis():
 @admin_ui_bp.route("/model_summary")
 def model_summary():
     return render_template("model_summary.html")
+
+
+# =============================================================================
+# IDENTITY / MISC ADMIN PAGES (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/identity_events")
+def identity_events():
+    return render_template("identity_events.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/ignition_trace")
+def ignition_trace():
+    return render_template("ignition_trace.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/login_trace_monitor")
+def login_trace_monitor():
+    return render_template("login_trace_monitor.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/me")
+def me_dashboard():
+    return render_template("me.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/mutation_submit")
+def mutation_submit():
+    return render_template("mutation_submit_tile.html")
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/registry")
+def registry():
+    return render_template("registry.html")
+
+
+# =============================================================================
+# MISC: API USAGE (page that shows api usage tile) (ADDED)
+# =============================================================================
+
+
+@login_required
+@admin_required
+@admin_ui_bp.route("/api_usage")
+def api_usage():
+    return render_template("api_usage_tile.html")
 
 
 # =============================================================================

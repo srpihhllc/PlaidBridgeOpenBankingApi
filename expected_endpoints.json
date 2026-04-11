@@ -1,0 +1,11 @@
+[
+  "main.home",
+  "subscriber_login",
+  "main.dashboard",
+  "compat.api_register",
+  "compat.api_login",
+  "compat.api_generate_link_token",
+  "compat.api_generate_statement",
+  "api.api_health",
+  "auth.mfa_prompt"
+]

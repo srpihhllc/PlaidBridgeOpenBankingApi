@@ -1,6 +1,6 @@
 # =============================================================================
 # FILE: app/blueprints/api_v1_routes.py
-# DESCRIPTION: Version 1 of JWT-protected JSON endpoints
+# DESCRIPTION: Version 1 of JWT-protected JSON endpoints (tightened/defensive)
 # =============================================================================
 
 import logging
@@ -8,6 +8,7 @@ import random
 import re
 from datetime import datetime, timedelta
 from uuid import uuid4
+from typing import Tuple, Any
 
 from dateutil.parser import parse
 from flasgger import swag_from
@@ -47,13 +48,13 @@ def verify_mfa_code(user_id: int, secret: str, code: str) -> bool:
 
 
 # -------------------------------------------------------------------------
-# Create a versioned blueprint
+# Create a versioned blueprint (explicit prefix; keeps routes scoped)
 api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
-# =============================================================================
-# FILE: app/blueprints/api_v1_routes.py
-# =============================================================================
 
+# =============================================================================
+# Endpoints
+# =============================================================================
 
 @api_v1_bp.route("/core/transactions", methods=["POST"])
 @csrf.exempt
@@ -73,16 +74,16 @@ def create_transaction():
 
     try:
         verify_jwt_in_request()
-        print("JWT OK:", get_jwt())
+        logger.debug("JWT OK: %s", get_jwt())
     except Exception as e:
-        print("JWT FAIL:", type(e).__name__, str(e))
+        logger.debug("JWT FAIL: %s %s", type(e).__name__, str(e))
         raise
 
-    # 3. Parse JSON
-    data = request.get_json() or {}
+    # 3. Parse JSON defensively
+    data = request.get_json(silent=True) or {}
 
     # ⭐ THE GUARANTEED FIX: Schema Validation Gate
-    # The smoke test sends {} and expects 422. We must enforce these fields.
+    # The smoke test sends {} and expects 422. Enforce these fields.
     required_fields = ("amount", "description", "account_id")
     if not all(k in data and data[k] for k in required_fields):
         return error_response(
@@ -104,13 +105,13 @@ def create_transaction():
 api_v1_bp.register_blueprint(fintech_bp, url_prefix="/fintech")
 
 
-# --- GLOBAL ERROR HANDLERS ---
+# --- BLUEPRINT‑SCOPED ERROR HANDLERS ---
 def handle_api_exception(
     exc: HTTPException, status_code: int, error_code: str, message: str
-) -> tuple[Response, int]:
+) -> Tuple[Response, int]:
     """Helper for logging and consistent error response format."""
     log_message = (
-        f"API Error {status_code}: " f"{getattr(exc, 'description', message)} Path: {request.path}"
+        f"API Error {status_code}: {getattr(exc, 'description', message)} Path: {request.path}"
     )
     logger.warning(log_message)
     try:
@@ -129,37 +130,54 @@ def handle_api_exception(
     )
 
 
-# Register BadRequest globally so all JSON parsing errors are remapped to 422
-@api_v1_bp.app_errorhandler(BadRequest)
+# Register BadRequest as blueprint-scoped so JSON parsing errors are remapped to 422
+@api_v1_bp.errorhandler(BadRequest)
 def bad_request_error(exc):
     return handle_api_exception(
         exc, 422, "E_VALIDATION", "Invalid data format or missing required fields."
     )
 
 
-@api_v1_bp.app_errorhandler(401)
+@api_v1_bp.errorhandler(401)
 def unauthorized_error(exc):
     return handle_api_exception(exc, 401, "E_UNAUTHORIZED", "Authentication required.")
 
 
-@api_v1_bp.app_errorhandler(403)
+@api_v1_bp.errorhandler(403)
 def forbidden_error(exc):
     return handle_api_exception(exc, 403, "E_FORBIDDEN", "Permission denied.")
 
 
-@api_v1_bp.app_errorhandler(404)
+@api_v1_bp.errorhandler(404)
 def not_found_error(exc):
+    """
+    Defensive safety: if the request path does not start with this blueprint's
+    url_prefix, re-raise the exception so another blueprint or the global handler
+    can respond. This prevents api_v1_bp's 404 handler from swallowing routes
+    clearly outside /api/v1 when registration order is wrong.
+    """
+    try:
+        bp_prefix = api_v1_bp.url_prefix or ""
+        # Normalize trailing slash for comparison
+        prefix_normalized = bp_prefix.rstrip("/") or "/"
+        if not request.path.startswith(prefix_normalized):
+            # Let higher-level handlers own this 404 (re-raise)
+            raise exc
+    except Exception:
+        # If anything goes wrong in the guard, re-raise to avoid silent interception.
+        raise exc
+
     return handle_api_exception(exc, 404, "E_NOT_FOUND", "The requested resource was not found.")
 
 
-@api_v1_bp.app_errorhandler(422)
+@api_v1_bp.errorhandler(422)
 def validation_error(exc):
     return handle_api_exception(
         exc, 422, "E_VALIDATION", "Invalid data format or missing required fields."
     )
 
 
-@api_v1_bp.app_errorhandler(500)
+@api_v1_bp.errorhandler(500)
 def internal_server_error(exc):
     log_message = (
         "SERVER ERROR 500: "
@@ -175,12 +193,7 @@ def internal_server_error(exc):
         db.session.rollback()
     except Exception:
         logger.debug("db.session.rollback() failed in 500 handler", exc_info=True)
-    return error_response(
-        "E_SERVER_ERROR",
-        message="An unexpected server error occurred.",
-        http_status_code=500,
-        data={"error_type": exc.__class__.__name__},
-    )
+    return handle_api_exception(exc, 500, "E_SERVER_ERROR", "An unexpected server error occurred.")
 
 
 # --- PUBLIC UTILITY ENDPOINTS ---
@@ -291,7 +304,7 @@ def public_stats():
 )
 def register():
     """Register a new user (with stricter validation)."""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
     email = data.get("email")
     password = data.get("password")
     username = data.get("username")
@@ -381,7 +394,7 @@ def register():
 )
 def login():
     """User login and JWT token issuance (with approval + MFA + audit hardening)."""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
 
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
@@ -502,8 +515,6 @@ def refresh_token():
 
 
 # --- MFA Endpoints (Migrated working structure) ---
-
-
 @api_v1_bp.route("/auth/mfa/setup", methods=["POST"])
 @jwt_required()
 @rate_limit_if_enabled("5/hour")
@@ -534,7 +545,6 @@ def mfa_setup():
     try:
         # Generate a new secret and store it temporarily
         secret = generate_mfa_secret(user_id)
-        # In a real app, you would generate a TOTP URI here
 
         # Log setup initiation
         db.session.add(
@@ -555,7 +565,8 @@ def mfa_setup():
             {
                 "mfa_secret": secret,
                 "next_step": (
-                    "Verify the code generated by your authenticator app using " "/auth/mfa/verify."
+                    "Verify the code generated by your authenticator app using "
+                    "/auth/mfa/verify."
                 ),
             },
             message="MFA setup initiated. Scan the secret and verify the first code.",
@@ -602,7 +613,7 @@ def mfa_setup():
 def mfa_verify():
     """Verifies the MFA code and enables MFA for the user."""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     mfa_code = data.get("mfa_code")
     mfa_secret = data.get("mfa_secret")
 
@@ -645,8 +656,7 @@ def mfa_verify():
         except SQLAlchemyError as exc:
             db.session.rollback()
             logger.error(
-                f"DB Error during MFA verification for user {user.id}: {exc}",
-                exc_info=True,
+                f"DB Error during MFA verification for user {user.id}: {exc}", exc_info=True
             )
             return error_response(
                 "E_DB_ERROR",
@@ -664,8 +674,6 @@ def mfa_verify():
 
 
 # --- TRADELINE CRUD ENDPOINTS (using limit/offset for pagination) ---
-
-
 @api_v1_bp.route("/tradelines", methods=["GET"])
 @jwt_required()
 @rate_limit_if_enabled("60/minute")
@@ -744,7 +752,7 @@ def list_tradelines():
 def create_tradeline():
     """Creates a new tradeline for the authenticated user."""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     # Simple validation example
     if not all(k in data for k in ["account_number", "balance", "date_opened"]):
@@ -839,7 +847,7 @@ def get_tradeline(tradeline_id):
 def update_tradeline(tradeline_id):
     """Updates an existing tradeline with ownership check."""
     user_id = get_jwt_identity()
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
 
     tradeline = Tradeline.query.filter_by(id=tradeline_id, user_id=user_id).first()
 

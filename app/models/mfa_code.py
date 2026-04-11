@@ -120,11 +120,28 @@ class MFACode(db.Model):
     # -------------------------------------------------------------------------
     def is_valid(self) -> bool:
         """Return True if the code has not expired."""
+        # Defensive: if expires_at not set, treat as expired
+        if self.expires_at is None:
+            return False
         return datetime.utcnow() < self.expires_at
 
     def time_remaining(self) -> int:
         """Seconds remaining until expiry. Returns 0 when expired."""
-        remaining = int((self.expires_at - datetime.utcnow()).total_seconds())
+        from datetime import datetime, timezone
+
+        # Defensive: if expires_at not set, treat as expired
+        if self.expires_at is None:
+            return 0
+
+        # Normalize to aware UTC datetimes for safe subtraction
+        expires = self.expires_at
+        now = datetime.now(timezone.utc)
+
+        if expires.tzinfo is None:
+            # assume naive datetimes are in UTC
+            expires = expires.replace(tzinfo=timezone.utc)
+
+        remaining = int((expires - now).total_seconds())
         return max(0, remaining)
 
     def increment_fail(self, commit: bool = True) -> None:
@@ -235,8 +252,8 @@ class MFACode(db.Model):
             {
                 "id": r.id,
                 "code": r.code,
-                "created_at": r.created_at.isoformat(),
-                "expires_at": r.expires_at.isoformat(),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "expires_at": r.expires_at.isoformat() if r.expires_at else None,
                 "time_remaining": r.time_remaining(),
                 "fail_count": r.fail_count,
             }
@@ -261,9 +278,10 @@ class MFACode(db.Model):
         }
 
     def __repr__(self) -> str:
+        expires_iso = self.expires_at.isoformat() if self.expires_at else None
         return (
             f"<MFACode id={self.id} user_id={self.user_id} "
-            f"expires_at={self.expires_at.isoformat()}>"
+            f"expires_at={expires_iso}>"
         )
 
 

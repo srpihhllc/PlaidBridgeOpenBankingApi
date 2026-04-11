@@ -31,10 +31,17 @@ def test_get_routes_render_templates(client, templates, route, template):
 
 
 def test_login_invalid_credentials(client, app):
-    resp = client.post("/auth/login", data={"email": "bad@x.com", "password": "wrong"})
-    assert resp.status_code == 200  # Re-renders login form on invalid credentials
+    # The app redirects on invalid credentials; follow the redirect so the test
+    # can assert that the login page is rendered again (status 200).
+    resp = client.post(
+        "/auth/login",
+        data={"email": "bad@x.com", "password": "wrong"},
+        follow_redirects=True,
+    )
+    assert resp.status_code == 200  # After following redirect, login page rendered
 
-    # No redirect expected for invalid login
+    # Check for presence of login form or an indicative phrase.
+    assert b"Login" in resp.data or b"Invalid" in resp.data or b"email" in resp.data
 
 
 def test_register_subscriber_missing_fields(client, templates):
@@ -120,22 +127,19 @@ def test_mfa_prompt_redirects(client, app, db_session):
     db_session.add(profile)
     db_session.commit()
 
-    resp = client.post("/auth/login", data={"email": user.email, "password": "password123"})
-    # The app may either re-render the login form (200) or redirect to an MFA prompt (302).
-    # Accept both behaviors to keep the test stable across environments where the MFA flow
-    # may be executed (e.g., real redirect to MFA prompt) or not.
-    assert resp.status_code in (200, 302)
-    if resp.status_code == 302:
-        # Ensure there's a Location header when redirecting (don't hardcode exact path).
-        assert resp.headers.get("Location")
+    # Expect the login POST to redirect to MFA prompt (PRG pattern).
+    with client.application.test_request_context():
+        mfa_prompt_url = url_for("auth.mfa_prompt")
 
-    # Optional: if you want to assert the MFA prompt specifically in a follow flow:
-    # resp2 = client.post("/auth/login", data={"email": user.email, "password": "password123"}, follow_redirects=True)
-    # assert resp2.status_code == 200
-    # assert b"Enter verification code" in resp2.data or b"MFA" in resp2.data
+    resp = client.post(
+        "/auth/login",
+        data={"email": user.email, "password": "password123"},
+        follow_redirects=False,
+    )
 
-    # Note: MFA redirect testing requires fixing login session handling if you need to assert intermediate redirects
+    # Assert redirect to MFA prompt
+    assert resp.status_code in (302, 303)
+    assert mfa_prompt_url in resp.headers["Location"]
 
-
-
-
+    # Note: MFA flow end-to-end testing (including following redirects and verifying
+    # the prompt renders) requires stable session handling in tests.

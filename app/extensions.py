@@ -77,6 +77,7 @@ class _NoopLimiter:
         return None
 
 
+# Module-level limiter symbol (populated in init_extensions)
 limiter: Limiter | _NoopLimiter | None = None
 
 
@@ -116,9 +117,22 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
     Returns:
         Limiter | _NoopLimiter: A real Limiter instance or a no-op fallback.
     """
-    # ⭐ CRITICAL: Testing mode is HIGHEST PRIORITY - check first, return immediately
-    if app.config.get("TESTING"):
-        app.logger.info("⏱️ Limiter disabled for testing (TESTING=True).")
+    # ⭐ CRITICAL: Testing mode is HIGHEST PRIORITY - check first, return immediately.
+    # Also detect pytest environment variables so tests running under pytest do not
+    # accidentally get a real Redis-backed limiter.
+    is_testing_flag = bool(app.config.get("TESTING"))
+    # Common pytest env indicators
+    is_pytest_env = bool(
+        os.getenv("PYTEST_CURRENT_TEST")
+        or os.getenv("PYTEST_RUNNING")
+        or os.getenv("PYTEST_ADDOPTS")
+    )
+    if is_testing_flag or is_pytest_env:
+        app.logger.info(
+            "⏱️ Limiter disabled for testing (TESTING=%s, PYTEST=%s).",
+            is_testing_flag,
+            is_pytest_env,
+        )
         return _NoopLimiter()
 
     # Rate limiting disabled globally
@@ -160,7 +174,9 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
             strategy=app.config.get("RATELIMIT_STRATEGY", "fixed-window"),
         )
         backend_type = "Redis" if redis_enabled else "in-memory"
-        app.logger.info(f"⏱️ Limiter created ({backend_type} backend, not yet initialized)")
+        app.logger.info(
+            f"⏱️ Limiter created ({backend_type} backend, not yet initialized)"
+        )
         return limiter_instance
     except Exception as e:
         app.logger.error(f"❌ Limiter creation failed: {e} — falling back to no-op")
@@ -205,9 +221,12 @@ def init_extensions(app: Any) -> None:
         app.logger.info("🗄️ SQLAlchemy and Migrate initialized.")
 
     # JWT
-    if not _already_registered(app, "jwt"):
+    # Use the actual library registration key for the guard to avoid false negatives,
+    # but always provide a 'jwt' alias for tests and consumers that expect it.
+    if not _already_registered(app, "flask-jwt-extended"):
         jwt.init_app(app)
         app.logger.info("🔐 JWT initialized.")
+
         try:
             from .models.revoked_token import RevokedToken
             from .models.user import User
@@ -235,6 +254,14 @@ def init_extensions(app: Any) -> None:
         except Exception as e:
             app.logger.warning(f"⚠️ JWT handlers failed: {e}")
 
+    # ⭐ ALWAYS enforce the test-required alias for backwards compatibility.
+    # Some environments or versions may register under 'flask-jwt-extended' only;
+    # tests and some code expect 'jwt' as the key, so ensure it exists.
+    try:
+        app.extensions["jwt"] = jwt
+    except Exception:
+        app.logger.debug("Failed to set app.extensions['jwt']", exc_info=True)
+
     # Mail
     if not _already_registered(app, "mail"):
         mail.init_app(app)
@@ -256,14 +283,13 @@ def init_extensions(app: Any) -> None:
         app.logger.info("🛡️ CSRFProtect initialized.")
 
     # Redis client (MUST come before limiter, as limiter depends on redis_client)
-    redis_enabled = False
+    rc = None
     try:
         rc = get_redis_client()
         app.redis_client = rc
         # Update module-level symbol for import-time consumers
         globals()["redis_client"] = rc
         if rc:
-            redis_enabled = True
             redis_uri = os.getenv("REDIS_STORAGE_URI", "") or os.getenv("REDIS_URL", "")
             parsed = urlparse(redis_uri) if redis_uri else None
             safe_netloc = (parsed.hostname if parsed else None) or "unknown-host"
@@ -277,13 +303,33 @@ def init_extensions(app: Any) -> None:
     except Exception as e:
         app.redis_client = None
         globals()["redis_client"] = None
-        redis_enabled = False
+        rc = None
         app.logger.error(f"❌ Redis init failed: {e} — rate limiter will use in-memory backend")
 
     # Limiter (AFTER Redis initialization, since it depends on redis_client)
     # CRITICAL: Only call init_app() if we have a real Limiter, not a _NoopLimiter
+    # Log the decision variables used to choose the limiter type so tests/CI can debug.
     try:
-        limiter_instance = _init_limiter(app, redis_enabled)
+        is_testing_flag = bool(app.config.get("TESTING"))
+        rate_limit_enabled = bool(app.config.get("RATE_LIMIT_ENABLED", True))
+        redis_present = bool(rc)
+        is_pytest_env = bool(
+            os.getenv("PYTEST_CURRENT_TEST")
+            or os.getenv("PYTEST_RUNNING")
+            or os.getenv("PYTEST_ADDOPTS")
+        )
+        app.logger.info(
+            "Limiter selection: TESTING=%s RATE_LIMIT_ENABLED=%s redis_present=%s PYTEST=%s",
+            is_testing_flag,
+            rate_limit_enabled,
+            redis_present,
+            is_pytest_env,
+        )
+    except Exception:
+        app.logger.debug("Failed to log limiter decision variables", exc_info=True)
+
+    try:
+        limiter_instance = _init_limiter(app, bool(rc))
 
         # Debug: Log the limiter type
         limiter_type = type(limiter_instance).__name__
@@ -292,11 +338,23 @@ def init_extensions(app: Any) -> None:
         # Only initialize with Flask if it's a real Limiter instance
         if isinstance(limiter_instance, Limiter):
             limiter_instance.init_app(app)
-            app.logger.info("⏱️ Limiter registered with Flask (real Limiter instance)")
+            app.logger.info("⏱️ Limiter registered with Flask (real backend).")
         else:
-            app.logger.info("⏱️ Limiter NOT registered with Flask (using _NoopLimiter)")
+            app.logger.info("⏱️ Limiter initialized as no-op (no backend).")
 
+        # Expose limiter on the app object and the module-level symbol, but DO NOT set
+        # app.extensions["limiter"] (flask-limiter expects that key to hold a set).
+        try:
+            setattr(app, "limiter", limiter_instance)
+        except Exception:
+            app.logger.debug("Failed to set app.limiter attribute", exc_info=True)
+
+        # Keep module-level symbol for backwards compatibility/consumers
         limiter = limiter_instance
+
     except Exception as e:
-        app.logger.error(f"❌ Unexpected error initializing limiter: {e}")
+        app.logger.error(f"❌ Limiter initialization failed: {e}")
         limiter = _NoopLimiter()
+
+    app.logger.info("✅ Extensions initialization complete.")
+    return None

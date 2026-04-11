@@ -86,7 +86,17 @@ def trace_templates(app=None):
     results = []
 
     for rule in app.url_map.iter_rules():
-        if "GET" not in rule.methods or rule.endpoint.startswith("static"):
+        # Always skip static endpoints
+        if rule.endpoint.startswith("static"):
+            continue
+
+        # Determine usable methods for this rule (exclude HEAD/OPTIONS)
+        methods = set(rule.methods or []) - {"HEAD", "OPTIONS"}
+        if not methods:
+            continue
+
+        # Only trace if rule supports GET, or if it's explicitly parameterized
+        if "GET" not in methods and rule.endpoint not in PARAMETERIZED_ENDPOINTS:
             continue
 
         try:
@@ -96,19 +106,32 @@ def trace_templates(app=None):
 
             g.req_id = str(uuid.uuid4())
 
+            # Build the test URL (use any parameter suffix provided)
             if rule.endpoint in PARAMETERIZED_ENDPOINTS:
                 test_url = rule.rule + PARAMETERIZED_ENDPOINTS[rule.endpoint]
             else:
                 test_url = rule.rule
 
-            with app.test_request_context(test_url):
-                response = view_func()
-                if hasattr(response, "status_code") and response.status_code >= 400:
-                    raise ValueError(f"Returned status {response.status_code}")
+            # Choose a method to invoke: prefer GET, otherwise pick one available method
+            method = "GET" if "GET" in methods else next(iter(sorted(methods)))
 
-                # Check template existence
-                if hasattr(response, "template") and not template_exists(response.template):
-                    placeholder_path = create_placeholder(response.template)
+            with app.test_request_context(test_url, method=method):
+                response = view_func()
+
+                # Normalize status extraction (Response object or (body, status) tuple)
+                status_code = None
+                if hasattr(response, "status_code"):
+                    status_code = getattr(response, "status_code")
+                elif isinstance(response, (list, tuple)) and len(response) >= 2 and isinstance(response[1], int):
+                    status_code = response[1]
+
+                if status_code is not None and status_code >= 400:
+                    raise ValueError(f"Returned status {status_code}")
+
+                # If the view returns an object exposing 'template', check it exists
+                tmpl = getattr(response, "template", None)
+                if tmpl and not template_exists(tmpl):
+                    placeholder_path = create_placeholder(tmpl)
                     raise ValueError(f"MISSING_TEMPLATE: Created placeholder at {placeholder_path}")
 
             results.append(

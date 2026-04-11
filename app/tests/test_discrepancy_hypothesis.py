@@ -3,6 +3,8 @@ from copy import deepcopy
 
 import pytest
 from hypothesis import given, settings
+from hypothesis import HealthCheck
+from hypothesis import HealthCheck
 from hypothesis import strategies as st
 
 from app.services.discrepancy import correct_discrepancies
@@ -52,7 +54,7 @@ def statement_record_strategy():
 statements_list_st = st.lists(statement_record_strategy(), max_size=50)
 
 
-@settings(max_examples=200)
+@settings(max_examples=200, suppress_health_check=[HealthCheck.too_slow])
 @given(statements=statements_list_st)
 def test_discrepancy_correction_invariants(statements):
     """

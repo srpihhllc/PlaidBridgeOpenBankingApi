@@ -1,4 +1,4 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/identity.py
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/identity.py
 
 import logging
 import warnings
@@ -31,6 +31,12 @@ def log_identity_event(
 
     # Merge 'details' into kwargs, so they are passed to the canonical logger's **meta parameter
     merged_kwargs = {**details, **kwargs}
+
+    # Remove any keys that would duplicate explicit parameters we pass below.
+    # This prevents "got multiple values for argument 'user_id'" when callers include
+    # user_id/event_type/reason inside details or kwargs.
+    for _dup in ("user_id", "event_type", "reason"):
+        merged_kwargs.pop(_dup, None)
 
     # Call the canonical function, which handles all the Redis and DB logic
     return canonical_logger(event_type=event_type, user_id=user_id, reason=reason, **merged_kwargs)
