@@ -1441,6 +1441,40 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         flask_app.logger.debug("Post-cleanup admin_index registration skipped", exc_info=True)
 
+    # Compatibility alias: provide admin_ui.admin_home endpoint so legacy url_for() calls succeed.
+    # We register a HEAD/OPTIONS-only rule pointing to the admin.admin_index view function.
+    try:
+        try:
+            if "admin_ui.admin_home" not in flask_app.view_functions:
+                target_vf = flask_app.view_functions.get("admin.admin_index")
+                if target_vf:
+                    try:
+                        # Add a HEAD/OPTIONS-only compat rule so url_for() can build the URL without
+                        # creating a full duplicate GET route (avoids route collisions).
+                        flask_app.add_url_rule(
+                            "/admin",
+                            endpoint="admin_ui.admin_home",
+                            view_func=target_vf,
+                            methods=["HEAD", "OPTIONS"],
+                        )
+                        flask_app.logger.info("Added HEAD/OPTIONS-only compat rule for admin_ui.admin_home")
+                    except Exception:
+                        flask_app.logger.exception("Failed to add admin_ui.admin_home compat rule", exc_info=True)
+                else:
+                    flask_app.logger.debug("admin.admin_index view function not present; compat alias not added")
+        except Exception:
+            flask_app.logger.debug("admin_ui.admin_home compat registration encountered an error", exc_info=True)
+
+        # Ensure the internal _rules_by_endpoint mapping includes the new compat endpoint.
+        try:
+            _rebuild_rules_by_endpoint(flask_app)
+            flask_app.logger.debug("Rebuilt url_map._rules_by_endpoint after adding admin_ui.admin_home")
+        except Exception:
+            flask_app.logger.debug("Failed to rebuild _rules_by_endpoint after admin_ui.admin_home registration", exc_info=True)
+    except Exception:
+        # Top-level guard so create_app still returns even on weird failures here.
+        flask_app.logger.debug("admin_ui.admin_home alias installation skipped due to unexpected error", exc_info=True)
+
     # Diagnostics
     @flask_app.route("/diagnostics", methods=["GET"])
     def diagnostics():
