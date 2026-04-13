@@ -1426,6 +1426,69 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
             return Response(dep["dot"], mimetype="text/plain")
         return jsonify(dep)
 
+    # Health endpoints — return standardized schema required by smoketests.
+    @flask_app.route("/healthz", methods=["GET"])
+    def healthz():
+        """
+        Returns standardized health schema:
+         - healthy: boolean
+         - timestamp: ISO8601 UTC
+         - uptime: seconds (float)
+         - checks: dict of registered checks
+        Status code: 200 when healthy, 503 when any check fails.
+        """
+        ts = datetime.utcnow().isoformat() + "Z"
+        uptime = round(time.time() - float(getattr(flask_app, "start_time", time.time())), 3)
+        checks: Dict[str, Any] = {}
+        healthy = True
+
+        # Run any checks registered via the registry first
+        try:
+            for name in _registry.list_checks():
+                try:
+                    checks[name] = _registry.run_check(name)
+                    if not checks[name].get("ok", False):
+                        healthy = False
+                except Exception as exc:
+                    checks[name] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
+                    healthy = False
+        except Exception:
+            # Do not force unhealthy here — continue with built-in fallbacks and let
+            # those results determine the overall health.
+            flask_app.logger.debug("Health registry iteration failed; continuing with built-in fallbacks", exc_info=True)
+
+        # Ensure built-in checks exist (fallbacks) so smoketests always see them.
+        try:
+            if "database" not in checks:
+                checks["database"] = _make_db_check()()
+                if not checks["database"].get("ok", False):
+                    healthy = False
+        except Exception as exc:
+            checks["database"] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
+            healthy = False
+
+        try:
+            if "redis" not in checks:
+                checks["redis"] = _make_redis_check()()
+                if not checks["redis"].get("ok", False):
+                    healthy = False
+        except Exception as exc:
+            checks["redis"] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
+            healthy = False
+
+        payload = {"healthy": healthy, "timestamp": ts, "uptime": uptime, "checks": checks}
+        return jsonify(payload), (200 if healthy else 503)
+
+    @flask_app.route("/readyz", methods=["GET"])
+    def readyz():
+        # Reuse healthz to run the same checks and return the same schema/status.
+        return healthz()
+
+    @flask_app.route("/version", methods=["GET"])
+    def version():
+        ver = flask_app.config.get("APP_VERSION")
+        return jsonify({"version": ver, "fallback_mode": False}), 200
+
     # Return the fully-configured app instance
     return flask_app
 
