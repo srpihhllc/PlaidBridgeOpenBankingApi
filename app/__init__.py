@@ -129,13 +129,12 @@ def _register_error_handlers(flask_app: Flask) -> None:
 
             import traceback as _tb
 
-            _logger.error("BADREQUEST_PROBE type=%s desc=%r tb=\n%s",
-
+            _logger.error(
+                "BADREQUEST_PROBE type=%s desc=%r tb=\n%s",
                 type(e).__name__,
-
-                getattr(e, 'description', None),
-
-                _tb.format_exc())
+                getattr(e, "description", None),
+                _tb.format_exc(),
+            )
             status = 422
             description = "Request body must be valid JSON"
             name = "Unprocessable Entity"
@@ -1265,12 +1264,17 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # BLUEPRINT REGISTRATION — FIXED ORDER
     # ============================================================================
 
-    # 2. Admin blueprints (explicit ordering)
+    # 2. Admin blueprints (explicit ordering) — register both API and UI blueprints here
     try:
-        from .blueprints.admin_routes import admin_api_bp, admin_bp
+        # admin_routes.admin_bp is an API blueprint object (named e.g. "admin_api_core")
+        # admin_routes.admin_api_bp is the v1 API blueprint (named e.g. "admin_api")
+        from .blueprints.admin_routes import admin_api_bp, admin_bp as admin_api_core_bp
+        # admin_ui_routes.admin_bp is the UI blueprint and must be registered explicitly
+        from .blueprints.admin_ui_routes import admin_bp as admin_ui_bp
 
-        flask_app.register_blueprint(admin_bp)
-        flask_app.register_blueprint(admin_api_bp)
+        flask_app.register_blueprint(admin_api_core_bp)  # name: "admin_api_core", url_prefix=/admin/api
+        flask_app.register_blueprint(admin_api_bp)       # name: "admin_api", url_prefix=/admin/api/v1
+        flask_app.register_blueprint(admin_ui_bp)        # name: "admin", url_prefix=/admin (UI)
     except Exception as exc:
         flask_app.logger.error("Failed to register admin blueprints: %s", exc, exc_info=True)
 
@@ -1352,27 +1356,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         flask_app.logger.debug("compat_routes import skipped or failed; compat_bp not registered", exc_info=True)
 
-    # ── admin_index direct registration ──────────────────────────────────────
-    # Werkzeug silently drops blueprint routes that resolve to exactly the
-    # url_prefix path (both "" and "/" on a blueprint with url_prefix="/admin"
-    # produce no Rule in url_map). Register admin_index directly on the app
-    # under the blueprint-namespaced endpoint so url_for("admin.admin_index")
-    # always resolves, regardless of Werkzeug version or cleanup pass order.
-    try:
-        from app.blueprints.admin_ui_routes import admin_index as _admin_index_view
-        if not any(r.endpoint == "admin.admin_index" for r in flask_app.url_map.iter_rules()):
-            flask_app.add_url_rule(
-                "/admin",
-                endpoint="admin.admin_index",
-                view_func=_admin_index_view,
-                strict_slashes=False,
-            )
-            flask_app.logger.info("Registered admin.admin_index directly on app at /admin")
-    except Exception as exc:
-        flask_app.logger.error(
-            "Failed to register admin.admin_index directly: %s", exc, exc_info=True
-        )
-
     # ------------------------------------------------------------------------
     # FINAL ROUTE CLEANUP / RECONCILIATION (single consolidated pass)
     # Order is important and deterministic:
@@ -1426,6 +1409,37 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         # Extra top-level guard — should not be hit, but ensures create_app continues.
         flask_app.logger.debug("Final route cleanup encountered an unexpected error", exc_info=True)
+
+    # ── Ensure admin.admin_index exists (POST-CLEANUP) ──────────────────────────
+    # Add the rule and pin _rules_by_endpoint after cleanup to avoid later rebuilds/pruning erasing it.
+    try:
+        from app.blueprints.admin_ui_routes import admin_index as _admin_index_view
+
+        has_admin_index = any(r.endpoint == "admin.admin_index" for r in flask_app.url_map.iter_rules())
+        if not has_admin_index:
+            try:
+                flask_app.add_url_rule(
+                    "/admin",
+                    endpoint="admin.admin_index",
+                    view_func=_admin_index_view,
+                    strict_slashes=False,
+                )
+                flask_app.logger.info("Registered admin.admin_index directly on app at /admin (post-cleanup)")
+            except Exception:
+                flask_app.logger.exception("Failed to add admin.admin_index rule post-cleanup")
+
+        # Ensure url_map._rules_by_endpoint contains the entry so url_for() can build
+        try:
+            rbep2 = getattr(flask_app.url_map, "_rules_by_endpoint", None)
+            if rbep2 is not None and "admin.admin_index" not in rbep2:
+                matching = [r for r in flask_app.url_map.iter_rules() if r.endpoint == "admin.admin_index"]
+                if matching:
+                    rbep2["admin.admin_index"] = matching
+                    flask_app.logger.debug("Pinned admin.admin_index into _rules_by_endpoint post-cleanup")
+        except Exception:
+            flask_app.logger.debug("Failed to pin admin.admin_index into _rules_by_endpoint", exc_info=True)
+    except Exception:
+        flask_app.logger.debug("Post-cleanup admin_index registration skipped", exc_info=True)
 
     # Diagnostics
     @flask_app.route("/diagnostics", methods=["GET"])
