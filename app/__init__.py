@@ -480,9 +480,7 @@ class HealthCheckRegistry:
             res = fn()
             if not isinstance(res, dict):
                 return {"ok": False, "error": "invalid_result_type", "latency_ms": 0.0}
-            # Ensure 'ok' present and cast to bool, keep latency if present
             res["ok"] = bool(res.get("ok", False))
-            # Normalize latency field presence
             if "latency_ms" not in res:
                 res["latency_ms"] = 0.0
             return res
@@ -556,7 +554,6 @@ def _make_migrations_check() -> HealthCheckFn:
         try:
             inspector = inspect(db.engine)
             tables = set(inspector.get_table_names() or [])
-            # check for both alembic_version and a generic 'version' table if present
             if "alembic_version" not in tables and "version" not in tables:
                 return {"ok": False, "error": "no_migration_table", "latency_ms": 0.0}
             try:
@@ -843,7 +840,6 @@ def _prune_ignorable_route_rules(flask_app: Flask) -> None:
     try:
         removed_any_global = False
 
-        # Remove explicit compat (_clean) rules on callback paths first
         for r in list(getattr(flask_app.url_map, "_rules", list(flask_app.url_map.iter_rules()))):
             try:
                 rule_path = getattr(r, "rule", "") or ""
@@ -856,7 +852,6 @@ def _prune_ignorable_route_rules(flask_app: Flask) -> None:
 
         collisions = _find_route_collisions(flask_app)
         if not collisions:
-            # If we removed explicit compat rules, rebuild mapping for consistency
             if (
                 removed_any_global
                 and hasattr(flask_app.url_map, "_rules")
@@ -868,15 +863,11 @@ def _prune_ignorable_route_rules(flask_app: Flask) -> None:
                     _logger.debug("Failed to rebuild url_map._rules_by_endpoint after compat pruning", exc_info=True)
             return
 
-        # For remaining collisions, handle generic pruning rules but never remove canonical callback endpoints;
-        # prefer to remove compat/legacy endpoints when detected by naming heuristics.
         for c in collisions:
             existing = c.get("existing_endpoint", "") or ""
             new = c.get("new_endpoint", "") or ""
             rule = c.get("rule", "")
 
-            # Skip pruning decisions that touch canonical oauth callback endpoints directly;
-            # _reconcile_oauth_callback_aliases will create safe alias entries.
             try:
                 if (existing and existing.startswith("oauth.callback_")) or (new and new.startswith("oauth.callback_")):
                     _logger.debug("Skipping pruning decision for oauth callback collision: %s / %s at %s", existing, new, rule)
@@ -930,7 +921,6 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
         flask_app.logger.debug("Running oauth callback alias reconciliation (generic)")
 
         rules_list = list(getattr(flask_app.url_map, "_rules", list(flask_app.url_map.iter_rules())))
-        # collect callback rules grouped by path (e.g. /callback/google)
         cb_rules_by_path: Dict[str, List] = {}
         for r in rules_list:
             rule_path = getattr(r, "rule", "") or ""
@@ -942,7 +932,6 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
             return
 
         for callback_path, cb_rules in cb_rules_by_path.items():
-            # find canonical rule/endpoint for the callback_path
             canonical_rule = next((r for r in cb_rules if (r.endpoint or "") == f"oauth.callback_{callback_path.split('/')[-1]}"), None)
             if canonical_rule is None:
                 canonical_rule = next(
@@ -956,7 +945,6 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
             canonical_ep = f"oauth.callback_{provider}"
             compat_ep = f"{canonical_ep}_clean"
 
-            # resolve view function
             view_fn = flask_app.view_functions.get(canonical_ep) or flask_app.view_functions.get(canonical_rule.endpoint)
             if view_fn is None:
                 for r in cb_rules:
@@ -967,11 +955,9 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
                 flask_app.logger.debug("No view function found for %s during reconciliation", callback_path)
                 continue
 
-            # map view_functions for both canonical and compat endpoints
             flask_app.view_functions.setdefault(canonical_ep, view_fn)
             flask_app.view_functions.setdefault(compat_ep, flask_app.view_functions[canonical_ep])
 
-            # remove any explicit compat rule with unsafe methods (non HEAD/OPTIONS)
             for r in list(getattr(flask_app.url_map, "_rules", list(flask_app.url_map.iter_rules()))):
                 try:
                     if (r.rule or "") == callback_path and (r.endpoint or "") == compat_ep:
@@ -982,14 +968,12 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
                 except Exception:
                     pass
 
-            # ensure a visible HEAD/OPTIONS-only rule exists for compat endpoint
             has_compat_visible = any(
                 (r.rule or "") == callback_path and (r.endpoint or "") == compat_ep
                 for r in list(getattr(flask_app.url_map, "_rules", list(flask_app.url_map.iter_rules())))
             )
             if not has_compat_visible:
                 try:
-                    # If compat_ep already exists in view_functions but points to a different callable, warn.
                     existing_vf = flask_app.view_functions.get(compat_ep)
                     if existing_vf and existing_vf is not view_fn:
                         flask_app.logger.warning(
@@ -1006,7 +990,6 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
                 except Exception:
                     flask_app.logger.exception("Failed adding HEAD/OPTIONS-only compat rule for %s", compat_ep)
 
-        # rebuild _rules_by_endpoint mapping for consistency
         try:
             _rebuild_rules_by_endpoint(flask_app)
             flask_app.logger.info("Rebuilt url_map._rules_by_endpoint after callback alias reconciliation")
@@ -1232,8 +1215,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
         flask_app.logger.debug("models package import failed or deferred", exc_info=True)
 
     # Ensure specific model modules are imported before calling db.create_all().
-    # This is important for models like TraceEvent that may not be imported by
-    # app.models.__init__.py but are referenced later by blueprints.
     try:
         from .models import trace_events  # noqa: F401
     except Exception:
@@ -1264,17 +1245,14 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # BLUEPRINT REGISTRATION — FIXED ORDER
     # ============================================================================
 
-    # 2. Admin blueprints (explicit ordering) — register both API and UI blueprints here
+    # 2. Admin blueprints (explicit ordering)
     try:
-        # admin_routes.admin_bp is an API blueprint object (named e.g. "admin_api_core")
-        # admin_routes.admin_api_bp is the v1 API blueprint (named e.g. "admin_api")
         from .blueprints.admin_routes import admin_api_bp, admin_bp as admin_api_core_bp
-        # admin_ui_routes.admin_bp is the UI blueprint and must be registered explicitly
         from .blueprints.admin_ui_routes import admin_bp as admin_ui_bp
 
-        flask_app.register_blueprint(admin_api_core_bp)  # name: "admin_api_core", url_prefix=/admin/api
-        flask_app.register_blueprint(admin_api_bp)       # name: "admin_api", url_prefix=/admin/api/v1
-        flask_app.register_blueprint(admin_ui_bp)        # name: "admin", url_prefix=/admin (UI)
+        flask_app.register_blueprint(admin_api_core_bp)  # name="admin_api_core", url_prefix=/admin/api
+        flask_app.register_blueprint(admin_api_bp)       # name="admin_api",      url_prefix=/admin/api/v1
+        flask_app.register_blueprint(admin_ui_bp)        # name="admin",          url_prefix=/admin (has admin_index)
     except Exception as exc:
         flask_app.logger.error("Failed to register admin blueprints: %s", exc, exc_info=True)
 
@@ -1362,8 +1340,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     #   1) prune ignorable explicit compat rules
     #   2) reconcile oauth callback aliases (adds HEAD/OPTIONS-only compat rules)
     #   3) enforce uniqueness (remove duplicates not on whitelist)
-    #   4) re-inject any admin.* rules dropped by the rebuild (strict_slashes
-    #      root-route Rules live outside url_map._rules in Werkzeug)
+    #   4) re-inject any admin.* rules dropped by the rebuild
     # Each step is guarded so failures are logged but do not abort startup.
     # ------------------------------------------------------------------------
     try:
@@ -1383,40 +1360,41 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
             flask_app.logger.debug("Route uniqueness enforcement encountered an error", exc_info=True)
 
         # Step 4 — re-inject admin.* entries dropped by _rebuild_rules_by_endpoint.
-        # Werkzeug stores the Rule for @bp.route("/", strict_slashes=False) in a
-        # separate redirect-Rule slot that url_map._rules iteration misses.
-        # iter_rules() IS authoritative, so we use it to recover any gap.
         try:
             rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
             if rbep is not None:
                 for ep in list(flask_app.view_functions):
                     if ep.startswith("admin.") and ep not in rbep:
-                        matching = [
-                            r for r in flask_app.url_map.iter_rules()
-                            if r.endpoint == ep
-                        ]
+                        matching = [r for r in flask_app.url_map.iter_rules() if r.endpoint == ep]
                         if matching:
                             rbep[ep] = matching
                             flask_app.logger.debug(
-                                "Re-injected dropped admin rule into "
-                                "_rules_by_endpoint: %s", ep
+                                "Re-injected dropped admin rule into _rules_by_endpoint: %s", ep
                             )
         except Exception:
-            flask_app.logger.debug(
-                "admin _rules_by_endpoint preservation failed", exc_info=True
-            )
+            flask_app.logger.debug("admin _rules_by_endpoint preservation failed", exc_info=True)
 
     except Exception:
-        # Extra top-level guard — should not be hit, but ensures create_app continues.
         flask_app.logger.debug("Final route cleanup encountered an unexpected error", exc_info=True)
 
-    # ── Ensure admin.admin_index exists (POST-CLEANUP) ──────────────────────────
-    # Add the rule and pin _rules_by_endpoint after cleanup to avoid later rebuilds/pruning erasing it.
+    # ── admin_index direct registration (POST-CLEANUP) ────────────────────────
+    # Must run AFTER all cleanup/rebuild passes — those passes can remove Rules
+    # that live outside url_map._rules. Registering here is the last write to
+    # url_map before the app is returned so the entry will be preserved.
     try:
         from app.blueprints.admin_ui_routes import admin_index as _admin_index_view
 
-        has_admin_index = any(r.endpoint == "admin.admin_index" for r in flask_app.url_map.iter_rules())
-        if not has_admin_index:
+        # Ensure view_functions has the canonical mapping so url_for() resolves.
+        try:
+            if "admin.admin_index" not in flask_app.view_functions:
+                flask_app.view_functions["admin.admin_index"] = _admin_index_view
+        except Exception:
+            # non-fatal; continue to attempt to add a Rule below
+            flask_app.logger.debug("Could not ensure admin.admin_index in view_functions", exc_info=True)
+
+        # Add a visible Rule only if none exists for the canonical endpoint
+        has_rule = any(getattr(r, "endpoint", None) == "admin.admin_index" for r in flask_app.url_map.iter_rules())
+        if not has_rule:
             try:
                 flask_app.add_url_rule(
                     "/admin",
@@ -1426,54 +1404,9 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                 )
                 flask_app.logger.info("Registered admin.admin_index directly on app at /admin (post-cleanup)")
             except Exception:
-                flask_app.logger.exception("Failed to add admin.admin_index rule post-cleanup")
-
-        # Ensure url_map._rules_by_endpoint contains the entry so url_for() can build
-        try:
-            rbep2 = getattr(flask_app.url_map, "_rules_by_endpoint", None)
-            if rbep2 is not None and "admin.admin_index" not in rbep2:
-                matching = [r for r in flask_app.url_map.iter_rules() if r.endpoint == "admin.admin_index"]
-                if matching:
-                    rbep2["admin.admin_index"] = matching
-                    flask_app.logger.debug("Pinned admin.admin_index into _rules_by_endpoint post-cleanup")
-        except Exception:
-            flask_app.logger.debug("Failed to pin admin.admin_index into _rules_by_endpoint", exc_info=True)
-    except Exception:
-        flask_app.logger.debug("Post-cleanup admin_index registration skipped", exc_info=True)
-
-    # Compatibility alias: provide admin_ui.admin_home endpoint so legacy url_for() calls succeed.
-    # We register a HEAD/OPTIONS-only rule pointing to the admin.admin_index view function.
-    try:
-        try:
-            if "admin_ui.admin_home" not in flask_app.view_functions:
-                target_vf = flask_app.view_functions.get("admin.admin_index")
-                if target_vf:
-                    try:
-                        # Add a HEAD/OPTIONS-only compat rule so url_for() can build the URL without
-                        # creating a full duplicate GET route (avoids route collisions).
-                        flask_app.add_url_rule(
-                            "/admin",
-                            endpoint="admin_ui.admin_home",
-                            view_func=target_vf,
-                            methods=["HEAD", "OPTIONS"],
-                        )
-                        flask_app.logger.info("Added HEAD/OPTIONS-only compat rule for admin_ui.admin_home")
-                    except Exception:
-                        flask_app.logger.exception("Failed to add admin_ui.admin_home compat rule", exc_info=True)
-                else:
-                    flask_app.logger.debug("admin.admin_index view function not present; compat alias not added")
-        except Exception:
-            flask_app.logger.debug("admin_ui.admin_home compat registration encountered an error", exc_info=True)
-
-        # Ensure the internal _rules_by_endpoint mapping includes the new compat endpoint.
-        try:
-            _rebuild_rules_by_endpoint(flask_app)
-            flask_app.logger.debug("Rebuilt url_map._rules_by_endpoint after adding admin_ui.admin_home")
-        except Exception:
-            flask_app.logger.debug("Failed to rebuild _rules_by_endpoint after admin_ui.admin_home registration", exc_info=True)
-    except Exception:
-        # Top-level guard so create_app still returns even on weird failures here.
-        flask_app.logger.debug("admin_ui.admin_home alias installation skipped due to unexpected error", exc_info=True)
+                flask_app.logger.exception("Failed to add Rule for admin.admin_index (post-cleanup)")
+    except Exception as exc:
+        flask_app.logger.error("Failed to register admin.admin_index directly (post-cleanup): %s", exc, exc_info=True)
 
     # Diagnostics
     @flask_app.route("/diagnostics", methods=["GET"])
@@ -1492,52 +1425,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
         if request.args.get("format", "").lower() == "dot":
             return Response(dep["dot"], mimetype="text/plain")
         return jsonify(dep)
-
-    # Register default healthchecks and add /healthz endpoint
-    try:
-        existing_checks = set(_registry.list_checks())
-        if "database" not in existing_checks:
-            register_healthcheck("database", _make_db_check())
-        if "redis" not in existing_checks:
-            register_healthcheck("redis", _make_redis_check())
-        if "migrations" not in existing_checks:
-            register_healthcheck("migrations", _make_migrations_check())
-    except Exception:
-        flask_app.logger.debug("Failed to register default healthchecks", exc_info=True)
-
-    @flask_app.route("/healthz", methods=["GET"])
-    def healthz():
-        try:
-            now = time.time()
-            start = getattr(flask_app, "start_time", None) or flask_app.config.get("APP_START_TIME", now)
-            uptime = round(now - start, 2) if start is not None else 0.0
-
-            checks = _registry.run_all()
-            healthy = bool(checks) and all(bool(c.get("ok", False)) for c in checks.values())
-
-            payload = {
-                "healthy": healthy,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "uptime": uptime,
-                "checks": checks,
-            }
-
-            return jsonify(payload), (200 if healthy else 503)
-        except Exception as exc:
-            flask_app.logger.exception("Healthz handler failed: %s", exc)
-            return (
-                jsonify(
-                    {
-                        "healthy": False,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "uptime": 0.0,
-                        "checks": {"healthz_handler": {"ok": False, "error": str(exc)}},
-                    }
-                ),
-                503,
-            )
-
-    return flask_app
 
 
 # -----------------------------------------------------------------------------
@@ -1559,14 +1446,12 @@ if os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
 
         fallback_app = _Flask("fallback_app")
 
-        # Minimal safe config
         try:
             fallback_app.config["PROPAGATE_EXCEPTIONS"] = False
             fallback_app.config["TESTING"] = False
         except Exception:
             pass
 
-        # Try to initialize extensions defensively
         try:
             init_extensions(fallback_app)
         except Exception:
@@ -1589,7 +1474,6 @@ if os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
             except Exception:
                 pass
 
-        # Best-effort register small helpers
         try:
             _register_jwt_loaders(fallback_app)
         except Exception:
@@ -1620,7 +1504,6 @@ if os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
             "reason": "FLASK_ENV=production at import time",
         }
 
-        # Emit prominent logs but never raise
         try:
             _fallback_logger.critical("UNSAFE FALLBACK APP CREATED")
         except Exception:
@@ -1655,7 +1538,6 @@ if os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
         except Exception:
             pass
 
-        # Minimal diagnostic endpoints for the fallback app
         @fallback_app.route("/diagnostics", methods=["GET"])
         def _fallback_diagnostics():
             return _jsonify(_diagnostic_payload), 200
@@ -1729,7 +1611,6 @@ if os.getenv("FLASK_ENV") == "production" and not _create_app_invoked:
                 pass
             return response
 
-        # WSGI entrypoint and module-level fallback app export
         def fallback_wsgi_app(environ, start_response):
             return fallback_app.wsgi_app(environ, start_response)
 
