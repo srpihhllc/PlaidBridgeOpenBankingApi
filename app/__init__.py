@@ -1426,6 +1426,9 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
             return Response(dep["dot"], mimetype="text/plain")
         return jsonify(dep)
 
+    # Return the fully-configured app instance
+    return flask_app
+
 
 # -----------------------------------------------------------------------------
 # Final fallback guard — append this EXACT block at the very end of app/__init__.py
