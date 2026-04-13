@@ -299,10 +299,12 @@ def api_get_recent_traces():
 # =============================================================================
 
 
+# FIX: @bp.route must be outermost decorator so Flask registers the route.
+# auth/csrf decorators go inside (closer to the function).
+@admin_api_bp.route("/operator_code/generate", methods=["POST"])
+@csrf.exempt
 @login_required
 @admin_required
-@csrf.exempt
-@admin_api_bp.route("/operator_code/generate", methods=["POST"])
 def operator_code_generate():
     req = request.get_json(silent=True) or {}
     ttl = max(30, min(int(req.get("ttl_seconds", 600)), 3600))
@@ -327,10 +329,10 @@ def operator_code_generate():
     return jsonify({"status": "ok", "operator_code": code, "expires_in": ttl}), 201
 
 
+@admin_api_bp.route("/operator_code/invalidate", methods=["POST"])
+@csrf.exempt
 @login_required
 @admin_required
-@csrf.exempt
-@admin_api_bp.route("/operator_code/invalidate", methods=["POST"])
 def operator_code_invalidate():
     try:
         r = get_redis_client()
@@ -346,9 +348,9 @@ def operator_code_invalidate():
         return jsonify({"status": "error", "message": "server_error"}), 500
 
 
+@admin_api_bp.route("/operator_entry", methods=["POST"])
 @rate_limit_if_enabled("5/minute")
 @csrf.exempt
-@admin_api_bp.route("/operator_entry", methods=["POST"])
 def operator_entry():
     data = request.form or request.get_json(silent=True) or {}
     code = (data.get("passcode") or data.get("code") or "").upper()
@@ -389,17 +391,17 @@ def operator_entry():
 # =============================================================================
 
 
+@admin_api_bp.route("/audit", methods=["GET"])
+@csrf.exempt
 @login_required
 @admin_required
-@csrf.exempt
-@admin_api_bp.route("/audit", methods=["GET"])
 def audit_viewer_api():
     events = [{"id": i, "event_type": "MOCK_EVENT", "ip": f"192.168.1.{i}"} for i in range(1, 5)]
     return jsonify({"status": "ok", "events": events})
 
 
 # ---------------------------
-# LIST USERS (already present)
+# LIST USERS
 # ---------------------------
 
 
@@ -415,7 +417,7 @@ def admin_list_users():
 
 
 # ---------------------------
-# ⭐ NEW: DELETE USER ENDPOINT
+# DELETE USER ENDPOINT
 # ---------------------------
 
 
@@ -428,7 +430,8 @@ def admin_delete_user(user_id):
     Delete a user and cascade-delete their PlaidItem.
     Required by test_admin_delete_user_cascade_api.
     """
-    user = RealUserModel.query.get(user_id)
+    # FIX: use Session.get() instead of deprecated Query.get() (SQLAlchemy 2.x)
+    user = real_db.session.get(RealUserModel, user_id)
     if not user:
         return jsonify({"status": "error", "message": "user_not_found"}), 404
 
