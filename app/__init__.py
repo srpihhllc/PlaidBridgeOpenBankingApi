@@ -1377,6 +1377,12 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         flask_app.logger.debug("Final route cleanup encountered an unexpected error", exc_info=True)
 
+    # Stabilize rule ordering so snapshot tests are deterministic
+    try:
+        _stabilize_rules_order(flask_app)
+    except Exception:
+        flask_app.logger.debug("Stabilize rules order failed", exc_info=True)
+
     # ── admin_index direct registration (POST-CLEANUP) ────────────────────────
     # Must run AFTER all cleanup/rebuild passes — those passes can remove Rules
     # that live outside url_map._rules. Registering here is the last write to
@@ -1491,6 +1497,40 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # Return the fully-configured app instance
     return flask_app
+
+
+# =============================================================================
+# Stabilize rules helper (to make route snapshots deterministic)
+# =============================================================================
+def _stabilize_rules_order(flask_app: Flask) -> None:
+    """
+    Best-effort sort of flask_app.url_map._rules to make iter_rules() deterministic.
+    This mutates Werkzeug internals; apply after blueprint registration so snapshot tests
+    see a stable ordering.
+    """
+    try:
+        if not hasattr(flask_app, "url_map"):
+            return
+        umap = flask_app.url_map
+        rules = list(getattr(umap, "_rules", list(umap.iter_rules())))
+        def _rule_key(r):
+            methods = tuple(sorted(set(getattr(r, "methods", []) or []) - {"HEAD", "OPTIONS"}))
+            return (getattr(r, "rule", "") or "", getattr(r, "endpoint", "") or "", methods)
+        rules.sort(key=_rule_key)
+        try:
+            umap._rules = rules
+        except Exception:
+            try:
+                setattr(umap, "_rules", rules)
+            except Exception:
+                pass
+        # rebuild mapping to keep internals consistent
+        _rebuild_rules_by_endpoint(flask_app)
+    except Exception:
+        try:
+            _logger.debug("Failed to stabilize url_map._rules order", exc_info=True)
+        except Exception:
+            pass
 
 
 # -----------------------------------------------------------------------------
