@@ -1268,7 +1268,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                 return Response(dep["dot"], mimetype="text/plain")
             return jsonify(dep)
 
-        # Health endpoints — return standardized schema required by smoketests.
+        # Health endpoints — return standardized health schema required by smoketests.
         @flask_app.route("/healthz", methods=["GET"])
         def healthz():
             """
@@ -1563,31 +1563,61 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 # =============================================================================
 def _stabilize_rules_order(flask_app: Flask) -> None:
     """
-    Best-effort sort of flask_app.url_map._rules to make iter_rules() deterministic.
-    This mutates Werkzeug internals; apply after blueprint registration so snapshot tests
-    see a stable ordering.
+    Best-effort dedupe + sort of flask_app.url_map._rules to make iter_rules()
+    deterministic and to remove harmless duplicate Rule objects that can
+    otherwise trigger false-positive collision tests.
+
+    This mutates Werkzeug internals; apply after blueprint registration so
+    snapshot tests see a stable ordering.
     """
     try:
         if not hasattr(flask_app, "url_map"):
             return
         umap = flask_app.url_map
+
+        # Grab a stable snapshot of Rule objects (fall back to iter_rules())
         rules = list(getattr(umap, "_rules", list(umap.iter_rules())))
+
+        # Deduplicate identical rule+endpoint+methods entries, keeping the first
+        seen = set()
+        deduped: List = []
+        for r in rules:
+            rule_path = getattr(r, "rule", "") or ""
+            endpoint = getattr(r, "endpoint", "") or ""
+            methods = tuple(sorted(set(getattr(r, "methods", []) or []) - {"HEAD", "OPTIONS"}))
+            key = (rule_path, endpoint, methods)
+            if key in seen:
+                # Try to remove the duplicate Rule object from the url_map internals.
+                try:
+                    _safe_remove_rule_obj(flask_app, r, endpoint)
+                except Exception:
+                    # If removal fails, continue; we'll avoid putting it back into deduped.
+                    pass
+                continue
+            seen.add(key)
+            deduped.append(r)
+
+        # Sort the deduplicated rules for deterministic ordering
         def _rule_key(r):
             methods = tuple(sorted(set(getattr(r, "methods", []) or []) - {"HEAD", "OPTIONS"}))
             return (getattr(r, "rule", "") or "", getattr(r, "endpoint", "") or "", methods)
-        rules.sort(key=_rule_key)
+
+        deduped.sort(key=_rule_key)
+
+        # Write back into internals (best-effort)
         try:
-            umap._rules = rules
+            umap._rules = deduped
         except Exception:
             try:
-                setattr(umap, "_rules", rules)
+                setattr(umap, "_rules", deduped)
             except Exception:
                 pass
-        # rebuild mapping to keep internals consistent
+
+        # Rebuild mapping to keep internals consistent
         _rebuild_rules_by_endpoint(flask_app)
     except Exception:
         try:
-            _logger.debug("Failed to stabilize url_map._rules order", exc_info=True)
+            _logger.debug("Failed to stabilize and dedupe url_map._rules order", exc_info=True)
         except Exception:
             pass
 
