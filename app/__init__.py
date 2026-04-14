@@ -1061,6 +1061,109 @@ def _enforce_route_uniqueness(flask_app: Flask) -> None:
         _logger.debug("Route uniqueness enforcement failed", exc_info=True)
 
 
+# New targeted helper: ensure admin.admin_index is registered and url_for works reliably.
+def _ensure_admin_index_registered(flask_app: Flask) -> None:
+    """
+    Ensure the canonical endpoint 'admin.admin_index' is present and has a Rule
+    serving '/admin'. This is defensive: prefer importing the view from
+    app.blueprints.admin_ui_routes, but if a rule already exists that serves
+    '/admin' we reuse its view function and map it to the canonical endpoint.
+    """
+    try:
+        _admin_index_view = None
+        try:
+            from app.blueprints.admin_ui_routes import admin_index as _admin_index_view  # type: ignore
+        except Exception:
+            _admin_index_view = None
+
+        # If the endpoint is already present with a Rule, ensure _rules_by_endpoint contains it
+        try:
+            existing = [r for r in flask_app.url_map.iter_rules() if getattr(r, "endpoint", "") == "admin.admin_index"]
+            if existing:
+                try:
+                    rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
+                    if rbep is not None and "admin.admin_index" not in rbep:
+                        rbep["admin.admin_index"] = existing
+                except Exception:
+                    pass
+                # ensure view function mapping exists
+                try:
+                    if "admin.admin_index" not in flask_app.view_functions and existing:
+                        vf = flask_app.view_functions.get(existing[0].endpoint)
+                        if vf:
+                            flask_app.view_functions["admin.admin_index"] = vf
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+
+        # Look for an existing Rule that serves /admin (strip trailing slash variants)
+        admin_rule = None
+        try:
+            for r in flask_app.url_map.iter_rules():
+                path = getattr(r, "rule", "") or ""
+                if path.rstrip("/") == "/admin":
+                    admin_rule = r
+                    break
+        except Exception:
+            admin_rule = None
+
+        if admin_rule:
+            # Map its view function to canonical endpoint if possible
+            try:
+                vf = flask_app.view_functions.get(admin_rule.endpoint)
+                if vf:
+                    flask_app.view_functions.setdefault("admin.admin_index", vf)
+                    try:
+                        rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
+                        if rbep is not None:
+                            rbep.setdefault("admin.admin_index", []).append(admin_rule)
+                    except Exception:
+                        pass
+                    return
+            except Exception:
+                pass
+
+        # If no existing rule but we successfully imported the view, register it
+        if _admin_index_view:
+            try:
+                # ensure view_functions mapping exists so url_for can find it
+                flask_app.view_functions.setdefault("admin.admin_index", _admin_index_view)
+            except Exception:
+                pass
+            try:
+                has_rule = any(getattr(r, "endpoint", None) == "admin.admin_index" for r in flask_app.url_map.iter_rules())
+                if not has_rule:
+                    flask_app.add_url_rule("/admin", endpoint="admin.admin_index", view_func=_admin_index_view, strict_slashes=False)
+                    flask_app.logger.info("Registered admin.admin_index directly on app at /admin (post-cleanup)")
+                return
+            except Exception:
+                flask_app.logger.exception("Failed to add Rule for admin.admin_index (post-cleanup)")
+                return
+
+        # Last-resort: map any endpoint that looks like admin_index to the canonical name
+        try:
+            for ep, vf in list(flask_app.view_functions.items()):
+                if ep.endswith(".admin_index") or ep == "admin_index":
+                    flask_app.view_functions.setdefault("admin.admin_index", vf)
+                    try:
+                        matches = [r for r in flask_app.url_map.iter_rules() if r.endpoint == ep]
+                        if matches:
+                            rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
+                            if rbep is not None:
+                                rbep.setdefault("admin.admin_index", []).extend(matches)
+                    except Exception:
+                        pass
+                    return
+        except Exception:
+            pass
+
+        flask_app.logger.debug("Could not locate or register admin.admin_index; url_for('admin.admin_index') may fail in some contexts.")
+    except Exception:
+        flask_app.logger.exception("Error ensuring admin.admin_index registration", exc_info=True)
+
+
 # ============================================================================
 # Application factory
 # ============================================================================
@@ -1493,31 +1596,9 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # that live outside url_map._rules. Registering here is the last write to
     # url_map before the app is returned so the entry will be preserved.
     try:
-        from app.blueprints.admin_ui_routes import admin_index as _admin_index_view
-
-        # Ensure view_functions has the canonical mapping so url_for() resolves.
-        try:
-            if "admin.admin_index" not in flask_app.view_functions:
-                flask_app.view_functions["admin.admin_index"] = _admin_index_view
-        except Exception:
-            # non-fatal; continue to attempt to add a Rule below
-            flask_app.logger.debug("Could not ensure admin.admin_index in view_functions", exc_info=True)
-
-        # Add a visible Rule only if none exists for the canonical endpoint
-        has_rule = any(getattr(r, "endpoint", None) == "admin.admin_index" for r in flask_app.url_map.iter_rules())
-        if not has_rule:
-            try:
-                flask_app.add_url_rule(
-                    "/admin",
-                    endpoint="admin.admin_index",
-                    view_func=_admin_index_view,
-                    strict_slashes=False,
-                )
-                flask_app.logger.info("Registered admin.admin_index directly on app at /admin (post-cleanup)")
-            except Exception:
-                flask_app.logger.exception("Failed to add Rule for admin.admin_index (post-cleanup)")
+        _ensure_admin_index_registered(flask_app)
     except Exception as exc:
-        flask_app.logger.error("Failed to register admin.admin_index directly (post-cleanup): %s", exc, exc_info=True)
+        flask_app.logger.error("Failed to ensure admin.admin_index registration (post-cleanup): %s", exc, exc_info=True)
 
     # -------------------------------------------------------------------------
     # TESTING-ONLY: Recreate legacy dummy POST endpoints required by tests.
