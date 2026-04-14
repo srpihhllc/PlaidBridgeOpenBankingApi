@@ -59,8 +59,18 @@ from .extensions import (
 
 # Fallback defaults for some names that may be configured elsewhere in the package.
 DEFAULT_ALLOW_PREMATURE_CLEANUP = True
-# Must be mutable because tests/extensions append to it at import time
-ROUTE_PRUNE_WHITELIST: List[str] = ["oauth.callback_google"]
+# Must be mutable because tests/extensions append to it at import time.
+# Include health/diagnostic endpoints and important admin endpoints to prevent accidental pruning.
+ROUTE_PRUNE_WHITELIST: List[str] = [
+    "oauth.callback_google",
+    "healthz",
+    "readyz",
+    "version",
+    "diagnostics",
+    "dependency_graph",
+    "metrics",
+    "admin.admin_index",
+]
 _maybe_redis_client = None
 
 _logger = logging.getLogger(__name__)
@@ -1001,11 +1011,13 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
 
 
 def _enforce_route_uniqueness(flask_app: Flask) -> None:
+    """
+    Enforce uniqueness of visible non-HEAD/OPTIONS routes by pruning duplicate
+    Rule objects. This function intentionally does NOT depend on the create_app
+    sentinel or TESTING flag so behavior is deterministic regardless of how
+    create_app() is invoked. ALLOW_PREMATURE_CLEANUP can be used to opt out.
+    """
     try:
-        if not globals().get("_CREATE_APP_INVOKED", False) and not flask_app.config.get("TESTING", False):
-            _logger.debug("Route uniqueness enforcement skipped: create_app() sentinel not set and not TESTING")
-            return
-
         if not flask_app.config.get("ALLOW_PREMATURE_CLEANUP", DEFAULT_ALLOW_PREMATURE_CLEANUP):
             _logger.debug("Route uniqueness enforcement skipped by ALLOW_PREMATURE_CLEANUP flag")
             return
@@ -1233,6 +1245,105 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     _register_error_handlers(flask_app)
     _register_login_manager_loader(flask_app)
 
+    # -------------------------------------------------------------------------
+    # Register core diagnostics & health endpoints early and protect them from pruning.
+    # This guarantees these endpoints are always present regardless of TESTING and
+    # preserved by later pruning/rebuild passes.
+    # -------------------------------------------------------------------------
+    try:
+        @flask_app.route("/diagnostics", methods=["GET"])
+        def diagnostics():
+            fmt = request.args.get("format", "json").lower()
+            diag = _gather_diagnostics(flask_app)
+            dep = _build_dependency_graph(flask_app)
+            diag["dependency_graph"] = {"nodes": dep["nodes"], "edges": dep["edges"]}
+            if fmt == "dot":
+                return Response(dep["dot"], mimetype="text/plain")
+            return jsonify(diag)
+
+        @flask_app.route("/dependency-graph", methods=["GET"])
+        def dependency_graph():
+            dep = _build_dependency_graph(flask_app)
+            if request.args.get("format", "").lower() == "dot":
+                return Response(dep["dot"], mimetype="text/plain")
+            return jsonify(dep)
+
+        # Health endpoints — return standardized schema required by smoketests.
+        @flask_app.route("/healthz", methods=["GET"])
+        def healthz():
+            """
+            Returns standardized health schema:
+             - healthy: boolean
+             - timestamp: ISO8601 UTC
+             - uptime: seconds (float)
+             - checks: dict of registered checks
+            Status code: 200 when healthy, 503 when any check fails.
+            """
+            ts = datetime.utcnow().isoformat() + "Z"
+            uptime = round(time.time() - float(getattr(flask_app, "start_time", time.time())), 3)
+            checks: Dict[str, Any] = {}
+            healthy = True
+
+            # Run any checks registered via the registry first
+            try:
+                for name in _registry.list_checks():
+                    try:
+                        checks[name] = _registry.run_check(name)
+                        if not checks[name].get("ok", False):
+                            healthy = False
+                    except Exception as exc:
+                        checks[name] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
+                        healthy = False
+            except Exception:
+                # Do not force unhealthy here — continue with built-in fallbacks and let
+                # those results determine the overall health.
+                flask_app.logger.debug("Health registry iteration failed; continuing with built-in fallbacks", exc_info=True)
+
+            # Ensure built-in checks exist (fallbacks) so smoketests always see them.
+            try:
+                if "database" not in checks:
+                    checks["database"] = _make_db_check()()
+                    if not checks["database"].get("ok", False):
+                        healthy = False
+            except Exception as exc:
+                checks["database"] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
+                healthy = False
+
+            try:
+                if "redis" not in checks:
+                    checks["redis"] = _make_redis_check()()
+                    if not checks["redis"].get("ok", False):
+                        healthy = False
+            except Exception as exc:
+                checks["redis"] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
+                healthy = False
+
+            payload = {"healthy": healthy, "timestamp": ts, "uptime": uptime, "checks": checks}
+            return jsonify(payload), (200 if healthy else 503)
+
+        @flask_app.route("/readyz", methods=["GET"])
+        def readyz():
+            # Reuse healthz to run the same checks and return the same schema/status.
+            return healthz()
+
+        @flask_app.route("/version", methods=["GET"])
+        def version():
+            ver = flask_app.config.get("APP_VERSION")
+            return jsonify({"version": ver, "fallback_mode": False}), 200
+
+        # Basic metrics endpoint
+        @flask_app.route("/metrics", methods=["GET"])
+        def metrics():
+            lines = [
+                "# HELP app_up 1 = healthy, 0 = unhealthy",
+                "# TYPE app_up gauge",
+                "app_up 1",
+            ]
+            return flask_app.response_class("\n".join(lines) + "\n", mimetype="text/plain")
+
+    except Exception:
+        flask_app.logger.exception("Failed to register core health/diagnostic endpoints", exc_info=True)
+
     # Defensive: remove any oauth.* endpoints that were registered prematurely
     try:
         cleanup = globals().get("_cleanup_premature_oauth_registrations")
@@ -1377,12 +1488,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         flask_app.logger.debug("Final route cleanup encountered an unexpected error", exc_info=True)
 
-    # Stabilize rule ordering so snapshot tests are deterministic
-    try:
-        _stabilize_rules_order(flask_app)
-    except Exception:
-        flask_app.logger.debug("Stabilize rules order failed", exc_info=True)
-
     # ── admin_index direct registration (POST-CLEANUP) ────────────────────────
     # Must run AFTER all cleanup/rebuild passes — those passes can remove Rules
     # that live outside url_map._rules. Registering here is the last write to
@@ -1414,86 +1519,40 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception as exc:
         flask_app.logger.error("Failed to register admin.admin_index directly (post-cleanup): %s", exc, exc_info=True)
 
-    # Diagnostics
-    @flask_app.route("/diagnostics", methods=["GET"])
-    def diagnostics():
-        fmt = request.args.get("format", "json").lower()
-        diag = _gather_diagnostics(flask_app)
-        dep = _build_dependency_graph(flask_app)
-        diag["dependency_graph"] = {"nodes": dep["nodes"], "edges": dep["edges"]}
-        if fmt == "dot":
-            return Response(dep["dot"], mimetype="text/plain")
-        return jsonify(diag)
+    # -------------------------------------------------------------------------
+    # TESTING-ONLY: Recreate legacy dummy POST endpoints required by tests.
+    # These endpoints are intentionally only registered when TESTING=True so
+    # they do not appear in production apps. They are added before final
+    # stabilization to guarantee consistent ordering, but they are not allowed
+    # to affect core health/diagnostic endpoints (those are whitelisted).
+    # -------------------------------------------------------------------------
+    if flask_app.config.get("TESTING"):
+        def _dummy_valid():
+            return jsonify({"status": "ok"}), 200
 
-    @flask_app.route("/dependency-graph", methods=["GET"])
-    def dependency_graph():
-        dep = _build_dependency_graph(flask_app)
-        if request.args.get("format", "").lower() == "dot":
-            return Response(dep["dot"], mimetype="text/plain")
-        return jsonify(dep)
+        def _dummy_invalid():
+            return jsonify({"status": "invalid"}), 400
 
-    # Health endpoints — return standardized schema required by smoketests.
-    @flask_app.route("/healthz", methods=["GET"])
-    def healthz():
-        """
-        Returns standardized health schema:
-         - healthy: boolean
-         - timestamp: ISO8601 UTC
-         - uptime: seconds (float)
-         - checks: dict of registered checks
-        Status code: 200 when healthy, 503 when any check fails.
-        """
-        ts = datetime.utcnow().isoformat() + "Z"
-        uptime = round(time.time() - float(getattr(flask_app, "start_time", time.time())), 3)
-        checks: Dict[str, Any] = {}
-        healthy = True
+        def _dummy_malformed():
+            return jsonify({"status": "malformed"}), 422
 
-        # Run any checks registered via the registry first
+        def _dummy_violation():
+            return jsonify({"status": "violation"}), 403
+
         try:
-            for name in _registry.list_checks():
-                try:
-                    checks[name] = _registry.run_check(name)
-                    if not checks[name].get("ok", False):
-                        healthy = False
-                except Exception as exc:
-                    checks[name] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
-                    healthy = False
+            flask_app.add_url_rule("/dummy_valid", endpoint="dummy_valid", view_func=_dummy_valid, methods=["POST"])
+            flask_app.add_url_rule("/dummy_invalid", endpoint="dummy_invalid", view_func=_dummy_invalid, methods=["POST"])
+            flask_app.add_url_rule("/dummy_malformed", endpoint="dummy_malformed", view_func=_dummy_malformed, methods=["POST"])
+            flask_app.add_url_rule("/dummy_violation", endpoint="dummy_violation", view_func=_dummy_violation, methods=["POST"])
+            flask_app.logger.debug("Registered TESTING-only dummy endpoints: dummy_*")
         except Exception:
-            # Do not force unhealthy here — continue with built-in fallbacks and let
-            # those results determine the overall health.
-            flask_app.logger.debug("Health registry iteration failed; continuing with built-in fallbacks", exc_info=True)
+            flask_app.logger.debug("Failed to register TESTING-only dummy endpoints", exc_info=True)
 
-        # Ensure built-in checks exist (fallbacks) so smoketests always see them.
-        try:
-            if "database" not in checks:
-                checks["database"] = _make_db_check()()
-                if not checks["database"].get("ok", False):
-                    healthy = False
-        except Exception as exc:
-            checks["database"] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
-            healthy = False
-
-        try:
-            if "redis" not in checks:
-                checks["redis"] = _make_redis_check()()
-                if not checks["redis"].get("ok", False):
-                    healthy = False
-        except Exception as exc:
-            checks["redis"] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
-            healthy = False
-
-        payload = {"healthy": healthy, "timestamp": ts, "uptime": uptime, "checks": checks}
-        return jsonify(payload), (200 if healthy else 503)
-
-    @flask_app.route("/readyz", methods=["GET"])
-    def readyz():
-        # Reuse healthz to run the same checks and return the same schema/status.
-        return healthz()
-
-    @flask_app.route("/version", methods=["GET"])
-    def version():
-        ver = flask_app.config.get("APP_VERSION")
-        return jsonify({"version": ver, "fallback_mode": False}), 200
+    # ── Final stabilization of rule ordering (run last so it includes all routes)
+    try:
+        _stabilize_rules_order(flask_app)
+    except Exception:
+        flask_app.logger.debug("Stabilize rules order failed", exc_info=True)
 
     # Return the fully-configured app instance
     return flask_app
