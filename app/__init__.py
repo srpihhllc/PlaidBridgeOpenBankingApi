@@ -2,24 +2,20 @@
 # FILE: app/__init__.py
 # DESCRIPTION: Hardened Flask application factory for PlaidBridgeOpenBankingApi.
 # =============================================================================
-
 """
 Hardened Flask application factory for PlaidBridgeOpenBankingApi.
 
 Provides a stable, production-grade create_app() entrypoint and exposes
 get_app() for legacy shim compatibility.
 
-This module avoids module-level imports placed after executable code by
-using a lazy loader for the legacy get_app shim. That prevents E402
-("module level import not at top of file") while also avoiding circular
-import issues at import time.
+This module intentionally uses lazy imports to avoid circular-import issues
+during package initialization and to keep module-level executable code minimal.
 
-NOTE: This module intentionally mutates Werkzeug's internal url_map
-structures (url_map._rules and url_map._rules_by_endpoint) in a small
-number of places to support compatibility aliasing and deterministic
-route pruning. Mutating these internals is fragile across Werkzeug/Flask
-versions — any change to these functions should be accompanied by
-test updates and careful review when upgrading Werkzeug/Flask.
+NOTE: A few helpers in this module mutate Werkzeug internals
+(url_map._rules and url_map._rules_by_endpoint) to support compatibility
+aliasing and deterministic route pruning. Those mutations are fragile across
+Werkzeug/Flask versions — any change must be accompanied by tests and a
+careful review when upgrading Werkzeug/Flask.
 """
 
 from __future__ import annotations
@@ -34,33 +30,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from flask import (
-    Blueprint,
-    Flask,
-    Response,
-    current_app,
-    g,
-    jsonify,
-    request,
-)
+from flask import Blueprint, Flask, Response, current_app, g, jsonify, request
 from sqlalchemy import inspect, text
 from werkzeug.exceptions import BadRequest, HTTPException
 from werkzeug.utils import ImportStringError, import_string
 
-# Use package-local relative imports to avoid circular import issues during package init
+# Package-local imports (lazy where appropriate to avoid import-time cycles)
 from .config import get_config_class
-from .extensions import (
-    db,
-    init_extensions,
-    jwt,
-    login_manager,
-    socketio,
-)
+from .extensions import db, init_extensions, jwt, login_manager, socketio
 
-# Fallback defaults for some names that may be configured elsewhere in the package.
+# Mutable defaults and test-friendly hooks
 DEFAULT_ALLOW_PREMATURE_CLEANUP = True
-# Must be mutable because tests/extensions append to it at import time.
-# Include health/diagnostic endpoints and important admin endpoints to prevent accidental pruning.
 ROUTE_PRUNE_WHITELIST: List[str] = [
     "oauth.callback_google",
     "healthz",
@@ -79,8 +59,6 @@ _logger = logging.getLogger(__name__)
 # =============================================================================
 # Legacy shim compatibility (lazy import)
 # =============================================================================
-
-
 def _load_legacy_get_app() -> Callable[..., Flask]:
     # Local import avoids circular import at package init time
     from .flask_app import get_app as _get_app  # type: ignore
@@ -100,8 +78,6 @@ get_app = legacy_get_app
 # =============================================================================
 # Internal helpers
 # =============================================================================
-
-
 def _safe_status_code(code: Any) -> int:
     try:
         return int(code)
@@ -134,9 +110,7 @@ def _register_error_handlers(flask_app: Flask) -> None:
             name = type(e).__name__
 
         # Translate certain client errors to more precise responses
-
         if status == 400 and isinstance(e, BadRequest):
-
             import traceback as _tb
 
             _logger.error(
@@ -183,10 +157,10 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
             from .models.user import User  # lazy import
 
             try:
-                # try numeric id first
+                # prefer numeric id
                 return db.session.get(User, int(user_id))
             except (ValueError, TypeError):
-                # non-numeric PKs are possible
+                # non-numeric primary keys are allowed
                 return db.session.get(User, user_id)
         except Exception as exc:
             _logger.warning("User loader failed for id=%s: %s", user_id, exc, exc_info=True)
@@ -195,8 +169,8 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
 
 def _register_jwt_loaders(flask_app: Flask) -> None:
     """
-    Register JWT callbacks. Use decorators when available; set fallback attributes
-    on the jwt object for environments where the decorator API isn't present.
+    Register JWT callbacks. Use decorator APIs when available; otherwise set
+    fallback attributes on the jwt object for environments/tests that expect them.
     """
 
     def _check_if_token_is_revoked(jwt_header, jwt_payload):
@@ -217,11 +191,10 @@ def _register_jwt_loaders(flask_app: Flask) -> None:
     def _user_identity_lookup(identity):
         return str(identity)
 
-    # Preferred: register via decorator if available
+    # Preferred: decorate if available
     try:
         jwt.token_in_blocklist_loader(_check_if_token_is_revoked)
     except Exception:
-        # Fallback: attach a well-known attribute used by some consumers/tests
         try:
             setattr(jwt, "token_in_blocklist_callback", _check_if_token_is_revoked)
         except Exception:
@@ -252,11 +225,9 @@ def _ensure_db_tables(flask_app: Flask) -> None:
     """
     Best-effort creation of missing DB tables for tests and local development.
 
-    In TESTING mode: import commonly-used model modules and call db.create_all()
-    under the app context to guarantee a test schema.
-
-    Outside TESTING: only create tables when a small set of essential tables are missing
-    and ALEMBIC_RUNNING != "1".
+    - In TESTING mode: import commonly-used model modules and call db.create_all()
+    - Outside TESTING: create tables only when a small set of essential tables
+      are missing and ALEMBIC_RUNNING != "1".
     """
     # TESTING: try to ensure schema is fully present
     if flask_app.config.get("TESTING"):
@@ -282,8 +253,6 @@ def _ensure_db_tables(flask_app: Flask) -> None:
     try:
         inspector = inspect(db.engine)
         existing = set(inspector.get_table_names() or [])
-
-        # Minimal essential set used as a safe heuristic for non-test fallback.
         essential = {"users", "trace_events"}
 
         if not essential.issubset(existing):
@@ -310,24 +279,16 @@ def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
     Remove prematurely-registered oauth.* endpoints and their Rule objects.
 
     This aggressively removes endpoints whose name starts with "oauth." from
-    flask_app.view_functions and prunes any corresponding Rule objects from
-    url_map internals (_rules and _rules_by_endpoint). Rebuilds the
-    _rules_by_endpoint mapping if internal structures were mutated.
-
-    Always defensive and never raises out of this function.
+    flask_app.view_functions and prunes matching Rule objects from url_map internals.
+    Rebuilds the _rules_by_endpoint mapping if internals were mutated.
     """
     try:
         if not hasattr(flask_app, "view_functions") or not hasattr(flask_app, "url_map"):
             return
 
         removed_any = False
+        endpoints_to_remove = [ep for ep in list(flask_app.view_functions.keys()) if ep.startswith("oauth.")]
 
-        # Collect oauth.* endpoints present in view_functions
-        endpoints_to_remove = [
-            ep for ep in list(flask_app.view_functions.keys()) if ep.startswith("oauth.")
-        ]
-
-        # Remove entries from view_functions
         for ep in endpoints_to_remove:
             try:
                 flask_app.view_functions.pop(ep, None)
@@ -335,7 +296,6 @@ def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
             except Exception:
                 _logger.debug("Failed to pop oauth endpoint %s from view_functions", ep, exc_info=True)
 
-        # Remove Rule objects from internal _rules list when present
         try:
             if hasattr(flask_app.url_map, "_rules"):
                 for rule in list(getattr(flask_app.url_map, "_rules", [])):
@@ -347,12 +307,10 @@ def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
                             except ValueError:
                                 pass
                     except Exception:
-                        # tolerate odd Rule objects
                         pass
         except Exception:
             _logger.debug("Failed while pruning url_map._rules for oauth endpoints", exc_info=True)
 
-        # Remove keys from _rules_by_endpoint mapping if present
         try:
             if hasattr(flask_app.url_map, "_rules_by_endpoint"):
                 for ep in endpoints_to_remove:
@@ -364,7 +322,7 @@ def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
         except Exception:
             _logger.debug("Failed while pruning url_map._rules_by_endpoint for oauth endpoints", exc_info=True)
 
-        # Rebuild _rules_by_endpoint mapping from remaining _rules for Werkzeug consistency
+        # Rebuild mapping from remaining _rules for Werkzeug consistency
         if removed_any and hasattr(flask_app.url_map, "_rules") and hasattr(flask_app.url_map, "_rules_by_endpoint"):
             try:
                 new_map: Dict[str, list] = {}
@@ -382,9 +340,9 @@ def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
 # =============================================================================
 def _rebuild_rules_by_endpoint(flask_app: Flask) -> None:
     """
-    Rebuild the url_map._rules_by_endpoint mapping from the current rules list.
+    Rebuild url_map._rules_by_endpoint mapping from current rules list.
 
-    NOTE: This mutates Werkzeug internals (url_map._rules_by_endpoint) and must be
+    This mutates Werkzeug internals (url_map._rules_by_endpoint) and must be
     exercised with care. Tests cover behavior that depends on this mapping.
     """
     try:
@@ -397,7 +355,6 @@ def _rebuild_rules_by_endpoint(flask_app: Flask) -> None:
         try:
             flask_app.url_map._rules_by_endpoint = new_map
         except Exception:
-            # Some Werkzeug versions may treat this attr read-only; best-effort set
             try:
                 setattr(flask_app.url_map, "_rules_by_endpoint", new_map)
             except Exception:
@@ -410,13 +367,20 @@ def _safe_remove_rule_obj(flask_app: Flask, rule_obj, endpoint_name: Optional[st
     """
     Safely remove a Rule object from url_map._rules and update _rules_by_endpoint.
 
-    This centralizes the mutation and reduces duplicated try/except logic.
+    Protects admin.admin_index and tolerates a variety of Werkzeug versions.
     """
     try:
         if not hasattr(flask_app, "url_map"):
             return
+
+        # IMPORTANT PROTECTION: never remove the canonical admin index endpoint
+        # whichever pass / caller calls into this helper.
+        ep = endpoint_name or getattr(rule_obj, "endpoint", None)
+        if ep == "admin.admin_index":
+            return
+
         umap = flask_app.url_map
-        # Remove from _rules list if present
+
         if hasattr(umap, "_rules"):
             try:
                 lst = getattr(umap, "_rules", None)
@@ -424,18 +388,18 @@ def _safe_remove_rule_obj(flask_app: Flask, rule_obj, endpoint_name: Optional[st
                     lst.remove(rule_obj)
             except Exception:
                 pass
-        # Remove from mapping entry if present
-        if hasattr(umap, "_rules_by_endpoint") and endpoint_name:
+
+        if hasattr(umap, "_rules_by_endpoint") and ep:
             try:
                 mapping = getattr(umap, "_rules_by_endpoint", {}) or {}
-                lst = mapping.get(endpoint_name)
+                lst = mapping.get(ep)
                 if lst:
                     try:
                         new_lst = [x for x in lst if x is not rule_obj]
                         if new_lst:
-                            mapping[endpoint_name] = new_lst
+                            mapping[ep] = new_lst
                         else:
-                            mapping.pop(endpoint_name, None)
+                            mapping.pop(ep, None)
                     except Exception:
                         pass
             except Exception:
@@ -447,9 +411,7 @@ def _safe_remove_rule_obj(flask_app: Flask, rule_obj, endpoint_name: Optional[st
 def add_route_prune_whitelist(name: str) -> None:
     """
     Add a single endpoint prefix to the mutable route-prune whitelist.
-
-    Tests and extensions expect to be able to call this at import time, so
-    ROUTE_PRUNE_WHITELIST must be a mutable list. This function is idempotent.
+    Idempotent and used by tests/extensions at import time.
     """
     if not isinstance(name, str):
         raise TypeError("whitelist name must be a string")
@@ -586,8 +548,8 @@ def _make_migrations_check() -> HealthCheckFn:
 class CorrelationIdFilter(logging.Filter):
     """
     Logging filter that injects a `correlation_id` attribute into the LogRecord.
-    The correlation ID is taken from flask.g.correlation_id if available, else from
-    the 'X-Correlation-ID' request header, else generated.
+    The correlation ID is taken from flask.g.correlation_id if available, else
+    from the 'X-Correlation-ID' or 'X-Request-ID' request header, else generated.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -742,8 +704,6 @@ def _build_dependency_graph(flask_app: Flask) -> Dict[str, Any]:
 # ============================================================================
 # Routing validation & optional "route contract" export (collision-free policy)
 # ============================================================================
-
-
 def _find_route_collisions(flask_app: Flask):
     seen: Dict[Tuple[str, Tuple[str, ...]], str] = {}
     collisions: List[Dict[str, Any]] = []
@@ -804,6 +764,13 @@ def _is_ignorable_collision(existing_ep: str, new_ep: str, rule: str) -> bool:
 
 def _choose_compat_endpoint_to_remove(existing_ep: str, new_ep: str) -> Optional[str]:
     try:
+        # Never choose to remove the canonical admin index endpoint.
+        # If either side is the canonical admin index, always remove the other.
+        if existing_ep == "admin.admin_index" and new_ep != "admin.admin_index":
+            return new_ep
+        if new_ep == "admin.admin_index" and existing_ep != "admin.admin_index":
+            return existing_ep
+
         def split_fn(ep: str):
             return ep.split(".", 1)[1] if "." in ep else ep
 
@@ -841,11 +808,9 @@ def _prune_ignorable_route_rules(flask_app: Flask) -> None:
     """
     Remove ignorable/explicit compat rules that would create collisions.
 
-    We aggressively prune any explicit rule objects for endpoints that:
+    Aggressively prune explicit rule objects for endpoints that:
       - have a URL rule under /callback/<...>
       - have an endpoint name that ends with '_clean' (compat alias)
-    This ensures sentinel alias endpoints are visible via view_functions/_rules_by_endpoint
-    or via HEAD/OPTIONS-only rule, but do not create duplicate GET/POST routes.
     """
     try:
         removed_any_global = False
@@ -893,6 +858,11 @@ def _prune_ignorable_route_rules(flask_app: Flask) -> None:
                 _logger.debug("Could not decide which compat endpoint to remove for collision %s: %s / %s", rule, existing, new)
                 continue
 
+            # Defensive: never remove canonical admin index even if upstream logic mistakenly selected it
+            if remove_ep == "admin.admin_index":
+                _logger.debug("Skipping removal of admin.admin_index for collision %s: preserving canonical admin index", rule)
+                continue
+
             removed_any_for_collision = False
             for r in list(flask_app.url_map.iter_rules()):
                 if (r.endpoint or "") != remove_ep or (r.rule or "") != rule:
@@ -921,11 +891,9 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
     """
     Make compat endpoints visible for all /callback/<provider> routes.
 
-    For each callback path found (rule starting with /callback/), prefer the
-    canonical endpoint (oauth.callback_<provider>) and ensure an alias
-    oauth.callback_<provider>_clean exists and is visible in iter_rules().
-
-    To avoid route collisions we ensure the alias rule — if added — is HEAD/OPTIONS-only.
+    For each callback path, prefer the canonical endpoint (oauth.callback_<provider>)
+    and ensure an alias oauth.callback_<provider>_clean exists and is visible.
+    Aliases, if added, are HEAD/OPTIONS-only to avoid collisions.
     """
     try:
         flask_app.logger.debug("Running oauth callback alias reconciliation (generic)")
@@ -942,16 +910,21 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
             return
 
         for callback_path, cb_rules in cb_rules_by_path.items():
-            canonical_rule = next((r for r in cb_rules if (r.endpoint or "") == f"oauth.callback_{callback_path.split('/')[-1]}"), None)
+            provider = callback_path.split("/")[-1]
+            canonical_expected = f"oauth.callback_{provider}"
+
+            canonical_rule = next(
+                (r for r in cb_rules if (r.endpoint or "") == canonical_expected),
+                None,
+            )
             if canonical_rule is None:
                 canonical_rule = next(
-                    (r for r in cb_rules if (r.endpoint or "").endswith("callback_" + callback_path.split("/")[-1]) and not (r.endpoint or "").endswith("_clean")),
+                    (r for r in cb_rules if (r.endpoint or "").endswith("callback_" + provider) and not (r.endpoint or "").endswith("_clean")),
                     None,
                 )
             if canonical_rule is None:
                 canonical_rule = cb_rules[0]
 
-            provider = callback_path.split("/")[-1]
             canonical_ep = f"oauth.callback_{provider}"
             compat_ep = f"{canonical_ep}_clean"
 
@@ -1012,10 +985,8 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
 
 def _enforce_route_uniqueness(flask_app: Flask) -> None:
     """
-    Enforce uniqueness of visible non-HEAD/OPTIONS routes by pruning duplicate
-    Rule objects. This function intentionally does NOT depend on the create_app
-    sentinel or TESTING flag so behavior is deterministic regardless of how
-    create_app() is invoked. ALLOW_PREMATURE_CLEANUP can be used to opt out.
+    Enforce uniqueness of visible non-HEAD/OPTIONS routes by pruning duplicate Rule objects.
+    Honor ROUTE_PRUNE_WHITELIST to protect important endpoints.
     """
     try:
         if not flask_app.config.get("ALLOW_PREMATURE_CLEANUP", DEFAULT_ALLOW_PREMATURE_CLEANUP):
@@ -1037,7 +1008,8 @@ def _enforce_route_uniqueness(flask_app: Flask) -> None:
 
             primary = rules[0]
             primary_ep = getattr(primary, "endpoint", "") or ""
-            if any(primary_ep.startswith(w) for w in whitelist):
+            # Preserve whitelisted endpoints (exact match or prefix + ".")
+            if any(primary_ep == w or primary_ep.startswith(w + ".") for w in whitelist):
                 continue
 
             duplicates = [r for r in rules[1:] if (r.endpoint or "") == primary_ep]
@@ -1068,47 +1040,32 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
     serving '/admin'. This is defensive: prefer importing the view from
     app.blueprints.admin_ui_routes, but if a rule already exists that serves
     '/admin' we reuse its view function and map it to the canonical endpoint.
-
-    This helper is intentionally permissive: it will:
-      - try to import admin_index view,
-      - map any existing view function named 'admin_index' or endpoint ending
-        with '.admin_index' to 'admin.admin_index',
-      - reuse existing '/admin' Rule if present, or add a Rule at '/admin'
-        pointing to the canonical endpoint as a last resort.
     """
     try:
         def _map_canonical(vf, source_endpoint: Optional[str], rule_candidates: List = None):
             try:
-                # Ensure view_functions canonical mapping
                 if vf:
                     flask_app.view_functions.setdefault("admin.admin_index", vf)
-                # Ensure _rules_by_endpoint contains mapping
                 try:
                     rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
                     if rbep is None:
-                        # Best-effort: build one
                         _rebuild_rules_by_endpoint(flask_app)
                         rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
                     if rbep is not None:
-                        if "admin.admin_index" not in rbep:
-                            rbep["admin.admin_index"] = []
-                        # Add any candidate rules (rule objects) if provided
+                        rbep.setdefault("admin.admin_index", [])
                         if rule_candidates:
                             for rr in rule_candidates:
                                 if rr not in rbep["admin.admin_index"]:
                                     rbep["admin.admin_index"].append(rr)
                 except Exception:
                     pass
-                # If there is already a Rule for admin.admin_index, nothing more to do
                 has_rule = any(getattr(r, "endpoint", None) == "admin.admin_index" for r in flask_app.url_map.iter_rules())
                 if has_rule:
                     return True
-                # Otherwise, if we have a source endpoint that has rules, try to reuse one
                 if source_endpoint:
                     try:
                         matches = [r for r in flask_app.url_map.iter_rules() if r.endpoint == source_endpoint]
                         if matches:
-                            # Reuse first match by adding it under canonical mapping
                             rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
                             try:
                                 if rbep is not None:
@@ -1119,7 +1076,6 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
                             return True
                     except Exception:
                         pass
-                # As last resort: add a new Rule at /admin pointing to vf
                 if vf:
                     try:
                         flask_app.add_url_rule("/admin", endpoint="admin.admin_index", view_func=vf, strict_slashes=False)
@@ -1136,28 +1092,23 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
             except Exception:
                 return False
 
-        # 1) Try importing the canonical view
         _admin_index_view = None
         try:
             from app.blueprints.admin_ui_routes import admin_index as _admin_index_view  # type: ignore
         except Exception:
             _admin_index_view = None
 
-        # If admin.admin_index endpoint already exists, ensure rbep and view mapping are present
         try:
             existing_admin_ep_rules = [r for r in flask_app.url_map.iter_rules() if getattr(r, "endpoint", "") == "admin.admin_index"]
             if existing_admin_ep_rules:
-                # Ensure view_functions canonical mapping exists
                 try:
                     if "admin.admin_index" not in flask_app.view_functions:
-                        # Try to reuse the view function from the first rule's endpoint
                         src_ep = existing_admin_ep_rules[0].endpoint
                         vf = flask_app.view_functions.get(src_ep)
                         if vf:
                             flask_app.view_functions["admin.admin_index"] = vf
                 except Exception:
                     pass
-                # Ensure rbep mapping
                 try:
                     rbep = getattr(flask_app.url_map, "_rules_by_endpoint", None)
                     if rbep is None:
@@ -1171,7 +1122,6 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
         except Exception:
             pass
 
-        # 2) If there's a rule that serves '/admin' (or '/admin/'), reuse it
         try:
             admin_rule = None
             for r in flask_app.url_map.iter_rules():
@@ -1191,10 +1141,8 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
         except Exception:
             pass
 
-        # 3) If we imported the view function, try to map/reuse by identity
         if _admin_index_view:
             try:
-                # Find any existing rule whose view function is the same object
                 matches = []
                 for r in flask_app.url_map.iter_rules():
                     try:
@@ -1211,7 +1159,6 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
             except Exception:
                 pass
 
-        # 4) Fallback: find any endpoint whose name endswith '.admin_index' or equals 'admin_index'
         try:
             for ep, vf in list(flask_app.view_functions.items()):
                 try:
@@ -1223,7 +1170,6 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
         except Exception:
             pass
 
-        # 5) If nothing worked, log debug — url_for may still fail in some environments
         flask_app.logger.debug("Could not locate or register admin.admin_index; url_for('admin.admin_index') may fail in some contexts.")
     except Exception:
         flask_app.logger.exception("Error ensuring admin.admin_index registration", exc_info=True)
@@ -1233,8 +1179,7 @@ def _ensure_admin_index_registered(flask_app: Flask) -> None:
 # Application factory
 # ============================================================================
 def create_app(env_name: str = None, config_class=None) -> Flask:
-    # Sentinel for fallback logic — set as early as possible so import-time
-    # fallback detection cannot mistakenly create the unsafe fallback app.
+    # Sentinel for fallback detection - set as early as practical
     try:
         globals()["_CREATE_APP_INVOKED"] = True
     except Exception:
@@ -1293,7 +1238,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
         flask_app.config["TEMPLATES_AUTO_RELOAD"] = True
         flask_app.jinja_env.cache = {}
 
-    # Ensure the ALLOW_PREMATURE_CLEANUP setting is present (explicit preference)
+    # Ensure the ALLOW_PREMATURE_CLEANUP setting is present
     flask_app.config.setdefault("ALLOW_PREMATURE_CLEANUP", DEFAULT_ALLOW_PREMATURE_CLEANUP)
 
     # Structured logging & correlation header
@@ -1375,7 +1320,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         pass
 
-    # Initialize limiter
+    # Initialize limiter if available
     try:
         from . import extensions as _extensions
 
@@ -1388,37 +1333,36 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception as exc:
         flask_app.logger.error("Failed to init limiter: %s", exc, exc_info=True)
 
-    # Import models
+    # Import models (best-effort)
     try:
         from . import models  # noqa: F401
     except Exception:
         flask_app.logger.debug("models package import failed or deferred", exc_info=True)
 
-    # Ensure specific model modules are imported before calling db.create_all().
+    # Ensure certain model modules are imported before calling create_all()
     try:
         from .models import trace_events  # noqa: F401
     except Exception:
         flask_app.logger.debug("trace_events model import failed", exc_info=True)
 
-    # Best-effort ensure DB tables AFTER models are imported so SQLAlchemy metadata is available.
+    # Best-effort ensure DB tables after models are imported
     try:
         _ensure_db_tables(flask_app)
         flask_app.logger.debug("Called _ensure_db_tables() to create missing tables if needed.")
     except Exception:
         flask_app.logger.debug("Fallback db.create_all() skipped or failed", exc_info=True)
 
-    # JWT loaders, logging, error handlers
+    # JWT loaders, logging, error handlers, login loader
     _register_jwt_loaders(flask_app)
     _setup_logging(flask_app)
     _register_error_handlers(flask_app)
     _register_login_manager_loader(flask_app)
 
     # -------------------------------------------------------------------------
-    # Register core diagnostics & health endpoints early and protect them from pruning.
-    # This guarantees these endpoints are always present regardless of TESTING and
-    # preserved by later pruning/rebuild passes.
+    # Register core diagnostics & health endpoints early and protect them
     # -------------------------------------------------------------------------
     try:
+
         @flask_app.route("/diagnostics", methods=["GET"])
         def diagnostics():
             fmt = request.args.get("format", "json").lower()
@@ -1436,11 +1380,10 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                 return Response(dep["dot"], mimetype="text/plain")
             return jsonify(dep)
 
-        # Health endpoints — return standardized health schema required by smoketests.
         @flask_app.route("/healthz", methods=["GET"])
         def healthz():
             """
-            Returns standardized health schema:
+            Standardized health schema:
              - healthy: boolean
              - timestamp: ISO8601 UTC
              - uptime: seconds (float)
@@ -1452,7 +1395,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
             checks: Dict[str, Any] = {}
             healthy = True
 
-            # Run any checks registered via the registry first
+            # Run registered checks first
             try:
                 for name in _registry.list_checks():
                     try:
@@ -1463,11 +1406,9 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                         checks[name] = {"ok": False, "error": str(exc), "latency_ms": 0.0}
                         healthy = False
             except Exception:
-                # Do not force unhealthy here — continue with built-in fallbacks and let
-                # those results determine the overall health.
                 flask_app.logger.debug("Health registry iteration failed; continuing with built-in fallbacks", exc_info=True)
 
-            # Ensure built-in checks exist (fallbacks) so smoketests always see them.
+            # Built-in fallbacks
             try:
                 if "database" not in checks:
                     checks["database"] = _make_db_check()()
@@ -1491,7 +1432,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
         @flask_app.route("/readyz", methods=["GET"])
         def readyz():
-            # Reuse healthz to run the same checks and return the same schema/status.
             return healthz()
 
         @flask_app.route("/version", methods=["GET"])
@@ -1499,7 +1439,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
             ver = flask_app.config.get("APP_VERSION")
             return jsonify({"version": ver, "fallback_mode": False}), 200
 
-        # Basic metrics endpoint
         @flask_app.route("/metrics", methods=["GET"])
         def metrics():
             lines = [
@@ -1546,21 +1485,16 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     # 4. Auto-discovered blueprints (includes api_v1_bp with 404 handler)
     _register_blueprints(flask_app)
 
-    # 5. Cockpit blueprints (drilldown, telemetry dashboard, trace, fk_inspector).
-    #    These live under app/cockpit/ and are NOT auto-discovered by
-    #    _register_blueprints() which only scans app/blueprints/.
+    # 5. Cockpit tiles (drilldown/telemetry)
     try:
         from .cockpit import register_cockpit_tiles
 
         register_cockpit_tiles(flask_app)
         flask_app.logger.info("✅ Cockpit tiles registered.")
     except Exception as exc:
-        flask_app.logger.error(
-            "Failed to register cockpit tiles: %s", exc, exc_info=True
-        )
+        flask_app.logger.error("Failed to register cockpit tiles: %s", exc, exc_info=True)
 
-    # 6. Webhooks blueprint (ACH, Plaid, Reconcile listeners).
-    #    Lives under app/webhooks/views.py — not auto-discovered.
+    # 6. Webhooks blueprint (ACH, Plaid, reconcile listeners)
     try:
         from .webhooks.views import webhooks_bp
 
@@ -1572,7 +1506,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception as exc:
         flask_app.logger.error("Failed to register webhooks blueprint: %s", exc, exc_info=True)
 
-    # Defensive: ensure any Blueprint objects exported by oauth_routes get registered.
+    # Defensive oauth_routes blueprint registration
     try:
         if "oauth" not in flask_app.blueprints:
             for mod_name in ("app.blueprints.oauth_routes", "app.routes.oauth_routes"):
@@ -1615,12 +1549,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # ------------------------------------------------------------------------
     # FINAL ROUTE CLEANUP / RECONCILIATION (single consolidated pass)
-    # Order is important and deterministic:
-    #   1) prune ignorable explicit compat rules
-    #   2) reconcile oauth callback aliases (adds HEAD/OPTIONS-only compat rules)
-    #   3) enforce uniqueness (remove duplicates not on whitelist)
-    #   4) re-inject any admin.* rules dropped by the rebuild
-    # Each step is guarded so failures are logged but do not abort startup.
     # ------------------------------------------------------------------------
     try:
         try:
@@ -1647,9 +1575,7 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
                         matching = [r for r in flask_app.url_map.iter_rules() if r.endpoint == ep]
                         if matching:
                             rbep[ep] = matching
-                            flask_app.logger.debug(
-                                "Re-injected dropped admin rule into _rules_by_endpoint: %s", ep
-                            )
+                            flask_app.logger.debug("Re-injected dropped admin rule into _rules_by_endpoint: %s", ep)
         except Exception:
             flask_app.logger.debug("admin _rules_by_endpoint preservation failed", exc_info=True)
 
@@ -1657,9 +1583,6 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
         flask_app.logger.debug("Final route cleanup encountered an unexpected error", exc_info=True)
 
     # ── admin_index direct registration (POST-CLEANUP) ────────────────────────
-    # Must run AFTER all cleanup/rebuild passes — those passes can remove Rules
-    # that live outside url_map._rules. Registering here is the last write to
-    # url_map before the app is returned so the entry will be preserved.
     try:
         _ensure_admin_index_registered(flask_app)
     except Exception as exc:
@@ -1667,12 +1590,9 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 
     # -------------------------------------------------------------------------
     # TESTING-ONLY: Recreate legacy dummy POST endpoints required by tests.
-    # These endpoints are intentionally only registered when TESTING=True so
-    # they do not appear in production apps. They are added before final
-    # stabilization to guarantee consistent ordering, but they are not allowed
-    # to affect core health/diagnostic endpoints (those are whitelisted).
     # -------------------------------------------------------------------------
     if flask_app.config.get("TESTING"):
+
         def _dummy_valid():
             return jsonify({"status": "ok"}), 200
 
@@ -1709,19 +1629,15 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
 # =============================================================================
 def _stabilize_rules_order(flask_app: Flask) -> None:
     """
-    Best-effort dedupe + sort of flask_app.url_map._rules to make iter_rules()
-    deterministic and to remove harmless duplicate Rule objects that can
-    otherwise trigger false-positive collision tests.
-
-    This mutates Werkzeug internals; apply after blueprint registration so
-    snapshot tests see a stable ordering.
+    Dedupe + sort of flask_app.url_map._rules to make iter_rules() deterministic
+    and to remove harmless duplicate Rule objects that can otherwise trigger
+    false-positive collision tests.
     """
     try:
         if not hasattr(flask_app, "url_map"):
             return
         umap = flask_app.url_map
 
-        # Grab a stable snapshot of Rule objects (fall back to iter_rules())
         rules = list(getattr(umap, "_rules", list(umap.iter_rules())))
 
         # Deduplicate identical rule+endpoint+methods entries, keeping the first
@@ -1733,11 +1649,9 @@ def _stabilize_rules_order(flask_app: Flask) -> None:
             methods = tuple(sorted(set(getattr(r, "methods", []) or []) - {"HEAD", "OPTIONS"}))
             key = (rule_path, endpoint, methods)
             if key in seen:
-                # Try to remove the duplicate Rule object from the url_map internals.
                 try:
                     _safe_remove_rule_obj(flask_app, r, endpoint)
                 except Exception:
-                    # If removal fails, continue; we'll avoid putting it back into deduped.
                     pass
                 continue
             seen.add(key)
