@@ -367,20 +367,40 @@ def _safe_remove_rule_obj(flask_app: Flask, rule_obj, endpoint_name: Optional[st
     """
     Safely remove a Rule object from url_map._rules and update _rules_by_endpoint.
 
-    Protects admin.admin_index and tolerates a variety of Werkzeug versions.
+    Protect the canonical admin.admin_index by refusing to remove the last remaining
+    Rule for that endpoint, but allow removal of duplicates when multiple Rule objects
+    for the same endpoint are present (so dedupe/prune passes can clean duplicates).
     """
     try:
         if not hasattr(flask_app, "url_map"):
             return
 
-        # IMPORTANT PROTECTION: never remove the canonical admin index endpoint
-        # whichever pass / caller calls into this helper.
         ep = endpoint_name or getattr(rule_obj, "endpoint", None)
-        if ep == "admin.admin_index":
-            return
 
         umap = flask_app.url_map
 
+        # Defensive: protect the last remaining canonical admin index rule.
+        # If the endpoint is admin.admin_index, count how many Rule objects map to it.
+        if ep == "admin.admin_index":
+            try:
+                # Obtain mapping if available (best-effort)
+                rbep = getattr(umap, "_rules_by_endpoint", None)
+                if rbep is None:
+                    # Build a best-effort view of rules per endpoint
+                    rules_list = list(getattr(umap, "_rules", list(umap.iter_rules())))
+                    count = sum(1 for r in rules_list if getattr(r, "endpoint", None) == "admin.admin_index")
+                else:
+                    lst = rbep.get("admin.admin_index") or []
+                    count = len(lst)
+                # If there's only one or zero admin.admin_index rules, do not remove it.
+                if count <= 1:
+                    return
+                # Otherwise, allow removal (we're removing a duplicate).
+            except Exception:
+                # In case of unexpected errors while checking, play safe and skip removal.
+                return
+
+        # Remove from _rules list if present
         if hasattr(umap, "_rules"):
             try:
                 lst = getattr(umap, "_rules", None)
@@ -389,6 +409,7 @@ def _safe_remove_rule_obj(flask_app: Flask, rule_obj, endpoint_name: Optional[st
             except Exception:
                 pass
 
+        # Remove from mapping entry if present
         if hasattr(umap, "_rules_by_endpoint") and ep:
             try:
                 mapping = getattr(umap, "_rules_by_endpoint", {}) or {}
@@ -953,8 +974,7 @@ def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
 
             has_compat_visible = any(
                 (r.rule or "") == callback_path and (r.endpoint or "") == compat_ep
-                for r in list(getattr(flask_app.url_map, "_rules", list(flask_app.url_map.iter_rules())))
-            )
+                for r in list(getattr(flask_app.url_map, "_rules", list(flask_app.url_map.iter_rules()))))
             if not has_compat_visible:
                 try:
                     existing_vf = flask_app.view_functions.get(compat_ep)
@@ -1620,6 +1640,12 @@ def create_app(env_name: str = None, config_class=None) -> Flask:
     except Exception:
         flask_app.logger.debug("Stabilize rules order failed", exc_info=True)
 
+    # Final dedupe to remove duplicates that survived pruning due to safe protections
+    try:
+        _dedupe_rules(flask_app)
+    except Exception:
+        flask_app.logger.debug("Final rule dedupe failed", exc_info=True)
+
     # Return the fully-configured app instance
     return flask_app
 
@@ -1680,6 +1706,82 @@ def _stabilize_rules_order(flask_app: Flask) -> None:
             _logger.debug("Failed to stabilize and dedupe url_map._rules order", exc_info=True)
         except Exception:
             pass
+
+
+# --- FINAL DEDUPE PASS: deterministic, preserves admin.admin_index -------------
+def _dedupe_rules(flask_app: Flask) -> None:
+    """
+    Remove duplicate Rule objects that share the same (rule, methods) signature.
+    Preserve a canonical admin.admin_index rule if present.
+
+    Deterministic behavior:
+      - For each (rule, methods) key, keep the first admin.admin_index rule if any.
+      - Otherwise, keep the first rule encountered for that key.
+      - Rebuild _rules_by_endpoint from the remaining rules.
+    """
+    try:
+        if not hasattr(flask_app, "url_map"):
+            return
+
+        umap = flask_app.url_map
+        rules = list(getattr(umap, "_rules", list(umap.iter_rules())))
+
+        if not rules:
+            return
+
+        # Group rules by (rule, methods) key in original order
+        groups: Dict[Tuple[str, Tuple[str, ...]], List] = {}
+        for r in rules:
+            rule_path = getattr(r, "rule", "") or ""
+            methods = tuple(sorted(set(getattr(r, "methods", []) or []) - {"HEAD", "OPTIONS"}))
+            key = (rule_path, methods)
+            groups.setdefault(key, []).append(r)
+
+        # Select a canonical rule to keep per key (prefer admin.admin_index)
+        keep_for_key: Dict[Tuple[str, Tuple[str, ...]], Any] = {}
+        for key, group in groups.items():
+            preferred = None
+            for r in group:
+                if getattr(r, "endpoint", None) == "admin.admin_index":
+                    preferred = r
+                    break
+            keep_for_key[key] = preferred if preferred is not None else group[0]
+
+        # Build deduped list in original order, keeping only chosen rules
+        deduped: List = []
+        kept = set()
+        for r in rules:
+            rule_path = getattr(r, "rule", "") or ""
+            methods = tuple(sorted(set(getattr(r, "methods", []) or []) - {"HEAD", "OPTIONS"}))
+            key = (rule_path, methods)
+            keep_rule = keep_for_key.get(key)
+            if keep_rule is r and id(r) not in kept:
+                deduped.append(r)
+                kept.add(id(r))
+
+        # Write back into internals (best-effort)
+        try:
+            umap._rules = deduped
+        except Exception:
+            try:
+                setattr(umap, "_rules", deduped)
+            except Exception:
+                pass
+
+        # Rebuild _rules_by_endpoint for consistency
+        try:
+            _rebuild_rules_by_endpoint(flask_app)
+        except Exception:
+            try:
+                new_map: Dict[str, list] = {}
+                for r in deduped:
+                    new_map.setdefault(getattr(r, "endpoint", None), []).append(r)
+                umap._rules_by_endpoint = new_map
+            except Exception:
+                _logger.debug("Failed to rebuild _rules_by_endpoint after final dedupe", exc_info=True)
+    except Exception:
+        _logger.debug("dedupe failed", exc_info=True)
+# --- END ADDITION -----------------------------------------------------------
 
 
 # -----------------------------------------------------------------------------
