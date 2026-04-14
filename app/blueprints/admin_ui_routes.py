@@ -64,18 +64,19 @@ admin_ui_bp = admin_bp  # alias: same Blueprint object
 # =============================================================================
 # ADMIN INDEX (REQUIRED BY TEST SUITE)
 # =============================================================================
-# NOTE: No explicit endpoint= kwarg here.
-# Flask derives the endpoint name as "admin.admin_index" (blueprint name +
-# function name). Specifying endpoint="admin_index" causes Flask to register
-# the Rule under the bare name "admin_index" in _rules_by_endpoint while
-# view_functions gets "admin.admin_index" — a split that makes url_for fail.
+# IMPORTANT: Do NOT pass endpoint= here. Flask auto-derives the endpoint name
+# as "admin.admin_index" (blueprint name + "." + function name). Passing an
+# explicit endpoint= kwarg causes Flask to store the Rule under the bare name
+# in _rules_by_endpoint while view_functions receives the prefixed name —
+# a split that makes url_for("admin.admin_index") raise BuildError.
 #
-# Route is "" (empty string) not "/" — on a Blueprint with url_prefix="/admin",
-# both "" and "/" resolve to /admin but only "" reliably creates a Rule object
-# that survives Werkzeug's internal url_map update cycle. Using "/" with
-# strict_slashes=False causes the Rule to be dropped from iter_rules() after
-# the url_map is updated/locked, making url_for("admin.admin_index") fail.
-@admin_bp.route("", strict_slashes=False)
+# Use route path "/" (not "") with strict_slashes=False.
+# On a Blueprint with url_prefix="/admin" this resolves to /admin.
+# Using "" is unreliable: Werkzeug 3.1.x normalises empty-string blueprint
+# paths to "/" internally, which can cause the endpoint key to be stored
+# without the blueprint prefix in _rules_by_endpoint on some builds,
+# breaking url_for("admin.admin_index").
+@admin_bp.route("/", strict_slashes=False)
 def admin_index():
     """
     Admin UI landing page.
@@ -132,7 +133,7 @@ def _register_admin_ui_aliases(state):
 
     created_aliases = []
     for endpoint, rule_list in list(rules_by_ep.items()):
-        if not endpoint.startswith(canonical_prefix + "."):
+        if not endpoint.startswith(canonical_prefix + "."): 
             continue
 
         suffix = endpoint.split(".", 1)[1]  # 'admin_index', 'view_credit_ledger', etc.
@@ -175,7 +176,6 @@ def _get_expected_endpoints() -> Iterable[str]:
     Add to this list if you rely on other specific endpoint names in tests.
     """
     return ("admin.admin_index", "admin_ui.admin_index")
-
 
 def register_admin_blueprint(app, *, verify: bool = True, raise_on_failure: bool = True):
     """
@@ -1034,4 +1034,5 @@ def repair_result():
 # - Ensure your create_app() registers this blueprint early (call
 #   register_admin_blueprint(app)) before any code that calls url_for() at
 #   import-time or tests that call url_for.
-# - Do NOT pass endpoint= to @admin_bp.route("/") — Flask must auto-derive*](#)
+# - Do NOT pass endpoint= to @admin_bp.route("/") — Flask must auto-derive
+#   "admin.admin_index" from the blueprint name + function name.
