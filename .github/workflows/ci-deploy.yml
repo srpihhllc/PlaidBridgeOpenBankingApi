@@ -82,7 +82,24 @@ PY
           . .venv/bin/activate
           python -m alembic -c migrations/alembic.ini upgrade head || echo "alembic step failed or no DB access; check logs"
 
-      - name: Placeholder deploy step
+      - name: Deploy .env to PythonAnywhere
         if: github.ref == 'refs/heads/main'
         run: |
-          echo "DEPLOY PLACEHOLDER"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PA_USER }}@ssh.pythonanywhere.com "
+            cd PlaidBridgeOpenBankingApi &&
+            echo 'SECRET_KEY=${{ secrets.SECRET_KEY }}' > .env &&
+            echo 'JWT_SECRET_KEY=${{ secrets.JWT_SECRET_KEY }}' >> .env &&
+            echo 'DB_USER=${{ secrets.DB_USER }}' >> .env &&
+            echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> .env &&
+            echo 'DB_HOST=${{ secrets.DB_HOST }}' >> .env &&
+            echo 'DB_NAME=${{ secrets.DB_NAME }}' >> .env &&
+            echo 'PLAID_CLIENT_ID=${{ secrets.PLAID_CLIENT_ID }}' >> .env &&
+            echo 'PLAID_SECRET=${{ secrets.PLAID_SECRET }}' >> .env &&
+            echo 'REDIS_STORAGE_URI=${{ secrets.REDIS_STORAGE_URI }}' >> .env
+          "
+
+      - name: Reload PythonAnywhere web app
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PA_USER }}@ssh.pythonanywhere.com \
+            "pa_reload_web_app ${{ secrets.PA_WEBAPP_NAME }}"
