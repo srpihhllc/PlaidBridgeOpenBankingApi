@@ -164,6 +164,18 @@ class TestingConfig(BaseConfig):
     SERVER_NAME = os.getenv("TEST_SERVER_NAME", "localhost")
     PREFERRED_URL_SCHEME = os.getenv("TEST_PREFERRED_URL_SCHEME", "http")
 
+    # Minimal OAuth provider config so callback route does not error
+    OAUTH_PROVIDERS = {
+        "google": {
+            "client_id": "test",
+            "client_secret": "test",
+            "redirect_uri": "http://localhost/callback/google",
+            "auth_uri": "http://example.com/auth",
+            "token_uri": "http://example.com/token",
+        }
+    }
+
+
 
 class ProductionConfig(BaseConfig):
     ENV = "production"
