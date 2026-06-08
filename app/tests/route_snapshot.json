@@ -14,18 +14,25 @@
     "endpoint": "admin.admin_index"
   },
   {
+    "rule": "/admin/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.admin_index"
+  },
+  {
+    "rule": "/admin/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.admin_index"
+  },
+  {
     "rule": "/admin/advanced_telemetry",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.advanced_telemetry"
-  },
-  {
-    "rule": "/admin/agent_activity",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.agent_activity"
   },
   {
     "rule": "/admin/api/v1/audit",
@@ -77,13 +84,6 @@
     "endpoint": "admin_api.admin_delete_user"
   },
   {
-    "rule": "/admin/api_usage",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.api_usage"
-  },
-  {
     "rule": "/admin/approval_queue",
     "methods": [
       "GET"
@@ -91,18 +91,18 @@
     "endpoint": "admin.approval_queue"
   },
   {
+    "rule": "/admin/audit/nav",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.nav_audit"
+  },
+  {
     "rule": "/admin/audit_viewer",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.audit_viewer"
-  },
-  {
-    "rule": "/admin/brain_diagnosis",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.brain_diagnosis"
   },
   {
     "rule": "/admin/cache_health",
@@ -140,13 +140,6 @@
     "endpoint": "admin.lender_risk_overview"
   },
   {
-    "rule": "/admin/cockpit/trace/<event_id>",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "trace_event.trace_detail"
-  },
-  {
     "rule": "/admin/cockpit/trace_detail",
     "methods": [
       "GET"
@@ -166,20 +159,6 @@
       "GET"
     ],
     "endpoint": "admin.admin_cortex"
-  },
-  {
-    "rule": "/admin/dashboard_anomalies",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.dashboard_anomalies"
-  },
-  {
-    "rule": "/admin/dashboard_liquidity",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.dashboard_liquidity"
   },
   {
     "rule": "/admin/dispute_logs/<int:user_id>",
@@ -203,18 +182,25 @@
     "endpoint": "admin.fraud_scanner"
   },
   {
-    "rule": "/admin/identity_events",
+    "rule": "/admin/home",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.identity_events"
+    "endpoint": "admin.admin_home"
   },
   {
-    "rule": "/admin/ignition_trace",
+    "rule": "/admin/home",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.ignition_trace"
+    "endpoint": "admin.admin_home"
+  },
+  {
+    "rule": "/admin/home",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.admin_index"
   },
   {
     "rule": "/admin/lenders",
@@ -238,32 +224,11 @@
     "endpoint": "admin.log_viewer"
   },
   {
-    "rule": "/admin/login_trace_monitor",
+    "rule": "/admin/log_viewer",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.login_trace_monitor"
-  },
-  {
-    "rule": "/admin/me",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.me_dashboard"
-  },
-  {
-    "rule": "/admin/model_summary",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.model_summary"
-  },
-  {
-    "rule": "/admin/mutation_submit",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.mutation_submit"
+    "endpoint": "admin.log_viewer"
   },
   {
     "rule": "/admin/neural_console",
@@ -301,6 +266,13 @@
     "endpoint": "admin.rate_limits_dashboard"
   },
   {
+    "rule": "/admin/rate_limits",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.rate_limits_dashboard"
+  },
+  {
     "rule": "/admin/redis_panel",
     "methods": [
       "GET"
@@ -308,25 +280,11 @@
     "endpoint": "admin.redis_panel"
   },
   {
-    "rule": "/admin/registry",
+    "rule": "/admin/redis_panel",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.registry"
-  },
-  {
-    "rule": "/admin/repair_result",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.repair_result"
-  },
-  {
-    "rule": "/admin/route_list",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.route_list"
+    "endpoint": "admin.redis_panel"
   },
   {
     "rule": "/admin/schema_diagram",
@@ -336,18 +294,11 @@
     "endpoint": "admin.schema_diagram"
   },
   {
-    "rule": "/admin/schema_events",
+    "rule": "/admin/sql_panel",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.schema_events"
-  },
-  {
-    "rule": "/admin/schema_versions",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.schema_versions"
+    "endpoint": "admin.sql_panel"
   },
   {
     "rule": "/admin/sql_panel",
@@ -357,18 +308,25 @@
     "endpoint": "admin.sql_panel"
   },
   {
-    "rule": "/admin/statements_heatmap",
+    "rule": "/admin/sql_panel",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.statements_heatmap"
+    "endpoint": "admin.sql_panel"
   },
   {
-    "rule": "/admin/statements_timeline",
+    "rule": "/admin/sweep_expired_keys",
     "methods": [
-      "GET"
+      "POST"
     ],
-    "endpoint": "admin.statements_timeline"
+    "endpoint": "admin.sweep_expired_keys"
+  },
+  {
+    "rule": "/admin/sweep_expired_keys",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin.sweep_expired_keys"
   },
   {
     "rule": "/admin/sweep_expired_keys",
@@ -397,6 +355,20 @@
       "GET"
     ],
     "endpoint": "admin.system_map"
+  },
+  {
+    "rule": "/admin/t/<path:tpl>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.render_admin_template"
+  },
+  {
+    "rule": "/admin/t/<path:tpl>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.render_admin_template"
   },
   {
     "rule": "/admin/tile/agent_activity",
@@ -560,6 +532,13 @@
     "endpoint": "grants.compose_grant_endpoint"
   },
   {
+    "rule": "/api/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.health_check"
+  },
+  {
     "rule": "/api/login",
     "methods": [
       "POST"
@@ -623,6 +602,13 @@
     "endpoint": "api.operator_service_registry"
   },
   {
+    "rule": "/api/operator/toggle-mode",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.operator_enable"
+  },
+  {
     "rule": "/api/ping",
     "methods": [
       "GET"
@@ -642,6 +628,56 @@
       "POST"
     ],
     "endpoint": "compat.api_register"
+  },
+  {
+    "rule": "/api/reports/fraud",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "api.generate_fraud_report"
+  },
+  {
+    "rule": "/api/reports/fraud/pdf",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.generate_fraud_report_pdf"
+  },
+  {
+    "rule": "/api/reports/statement",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.generate_statement"
+  },
+  {
+    "rule": "/api/settings/theme",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.set_dark_mode"
+  },
+  {
+    "rule": "/api/status",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.health_check"
+  },
+  {
+    "rule": "/api/tradeline/review/<int:tradeline_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.tradeline_review"
+  },
+  {
+    "rule": "/api/tradelines/review/<int:tradeline_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.tradeline_review"
   },
   {
     "rule": "/api/v1/auth/login",
@@ -690,70 +726,70 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "api_v1.fintech_api_bp.health"
+    "endpoint": "fintech_bp.health"
   },
   {
     "rule": "/api/v1/fintech/lenders/link",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.lender_self_link"
+    "endpoint": "fintech_bp.lender_self_link"
   },
   {
     "rule": "/api/v1/fintech/link/manual/approve",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.approve_manual_link"
+    "endpoint": "fintech_bp.approve_manual_link"
   },
   {
     "rule": "/api/v1/fintech/link/manual/redeem",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.redeem_manual_link"
+    "endpoint": "fintech_bp.redeem_manual_link"
   },
   {
     "rule": "/api/v1/fintech/link/manual/request",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.request_manual_link"
+    "endpoint": "fintech_bp.request_manual_link"
   },
   {
     "rule": "/api/v1/fintech/sandbox/account_snapshot",
     "methods": [
       "GET"
     ],
-    "endpoint": "api_v1.fintech_api_bp.sandbox_account_snapshot"
+    "endpoint": "fintech_bp.sandbox_account_snapshot"
   },
   {
     "rule": "/api/v1/fintech/sandbox/statement/pdf",
     "methods": [
       "GET"
     ],
-    "endpoint": "api_v1.fintech_api_bp.sandbox_statement_pdf"
+    "endpoint": "fintech_bp.sandbox_statement_pdf"
   },
   {
     "rule": "/api/v1/fintech/transactions",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.create_transaction"
+    "endpoint": "fintech_bp.create_transaction"
   },
   {
     "rule": "/api/v1/fintech/verify/tink",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.verify_tink"
+    "endpoint": "fintech_bp.verify_tink"
   },
   {
     "rule": "/api/v1/fintech/verify/truelayer",
     "methods": [
       "POST"
     ],
-    "endpoint": "api_v1.fintech_api_bp.verify_truelayer"
+    "endpoint": "fintech_bp.verify_truelayer"
   },
   {
     "rule": "/api/v1/health",
@@ -970,11 +1006,6 @@
   },
   {
     "rule": "/callback/<provider>",
-    "methods": [],
-    "endpoint": "oauth.callback_<provider>_clean"
-  },
-  {
-    "rule": "/callback/<provider>",
     "methods": [
       "GET",
       "POST"
@@ -990,8 +1021,11 @@
     "endpoint": "oauth.callback_google"
   },
   {
-    "rule": "/callback/google",
-    "methods": [],
+    "rule": "/callback/google_clean",
+    "methods": [
+      "GET",
+      "POST"
+    ],
     "endpoint": "oauth.callback_google_clean"
   },
   {
@@ -1003,22 +1037,12 @@
     "endpoint": "oauth.callback_microsoft"
   },
   {
-    "rule": "/callback/microsoft",
-    "methods": [],
-    "endpoint": "oauth.callback_microsoft_clean"
-  },
-  {
     "rule": "/callback/plaid",
     "methods": [
       "GET",
       "POST"
     ],
     "endpoint": "oauth.callback_plaid"
-  },
-  {
-    "rule": "/callback/plaid",
-    "methods": [],
-    "endpoint": "oauth.callback_plaid_clean"
   },
   {
     "rule": "/cockpit/bad_method_probe",
@@ -1033,20 +1057,6 @@
       "GET"
     ],
     "endpoint": "drilldown.drilldown_view"
-  },
-  {
-    "rule": "/cockpit/fk/",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "fk_inspector_bp.index"
-  },
-  {
-    "rule": "/cockpit/telemetry",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "cockpit_bp.telemetry_dashboard"
   },
   {
     "rule": "/create_link_token",
@@ -1077,6 +1087,20 @@
     "endpoint": "debug.debug_config"
   },
   {
+    "rule": "/debug/cortex_map",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "debug.cortex_map"
+  },
+  {
+    "rule": "/debug/self_repair",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "debug.self_repair"
+  },
+  {
     "rule": "/debug/test",
     "methods": [
       "GET"
@@ -1084,7 +1108,7 @@
     "endpoint": "debug.debug_test"
   },
   {
-    "rule": "/dependency-graph",
+    "rule": "/dependency_graph",
     "methods": [
       "GET"
     ],
@@ -1098,11 +1122,32 @@
     "endpoint": "diagnostics"
   },
   {
+    "rule": "/diagnostics/cache_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.cache_health"
+  },
+  {
+    "rule": "/diagnostics/cache_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.cache_health"
+  },
+  {
     "rule": "/diagnostics/console",
     "methods": [
       "GET"
     ],
     "endpoint": "diagnostics.neural_console"
+  },
+  {
+    "rule": "/diagnostics/db_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.db_health"
   },
   {
     "rule": "/diagnostics/db_health",
@@ -1145,6 +1190,13 @@
       "POST"
     ],
     "endpoint": "dummy_malformed"
+  },
+  {
+    "rule": "/dummy_test_route",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "dummy_test_route"
   },
   {
     "rule": "/dummy_valid",
@@ -1208,7 +1260,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "fintech_api_bp.health"
+    "endpoint": "health_check_simple"
   },
   {
     "rule": "/healthz",
@@ -1247,34 +1299,6 @@
     "endpoint": "introspection.diagnose_brain"
   },
   {
-    "rule": "/lenders/link",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "fintech_api_bp.lender_self_link"
-  },
-  {
-    "rule": "/link/manual/approve",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "fintech_api_bp.approve_manual_link"
-  },
-  {
-    "rule": "/link/manual/redeem",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "fintech_api_bp.redeem_manual_link"
-  },
-  {
-    "rule": "/link/manual/request",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "fintech_api_bp.request_manual_link"
-  },
-  {
     "rule": "/login",
     "methods": [
       "GET",
@@ -1295,6 +1319,13 @@
       "GET"
     ],
     "endpoint": "main.logout"
+  },
+  {
+    "rule": "/metrics",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "metrics"
   },
   {
     "rule": "/oauth/callback/<provider>",
@@ -1326,6 +1357,13 @@
     "endpoint": "pulse.vault_pulse"
   },
   {
+    "rule": "/readyz",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "readyz"
+  },
+  {
     "rule": "/register_subscriber",
     "methods": [
       "GET",
@@ -1353,20 +1391,6 @@
       "GET"
     ],
     "endpoint": "repair.system_heartbeat"
-  },
-  {
-    "rule": "/sandbox/account_snapshot",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "fintech_api_bp.sandbox_account_snapshot"
-  },
-  {
-    "rule": "/sandbox/statement/pdf",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "fintech_api_bp.sandbox_statement_pdf"
   },
   {
     "rule": "/static/<path:filename>",
@@ -1430,6 +1454,13 @@
       "GET"
     ],
     "endpoint": "sub_ui.settings"
+  },
+  {
+    "rule": "/sub/t/<path:tpl>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.render_sub_template"
   },
   {
     "rule": "/sub/tile/diagnostics",
@@ -1502,25 +1533,11 @@
     "endpoint": "main.terence_entry"
   },
   {
-    "rule": "/tiles/blueprint_drift_overlay/pulse",
+    "rule": "/tracer/template_tracer",
     "methods": [
       "GET"
     ],
-    "endpoint": "tiles.blueprint_drift_overlay_pulse"
-  },
-  {
-    "rule": "/tiles/pulse",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "tiles.pulse_status"
-  },
-  {
-    "rule": "/transactions",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "fintech_api_bp.create_transaction"
+    "endpoint": "tracer.template_tracer"
   },
   {
     "rule": "/upload-pdf",
@@ -1530,18 +1547,11 @@
     "endpoint": "main.upload_pdf"
   },
   {
-    "rule": "/verify/tink",
+    "rule": "/version",
     "methods": [
-      "POST"
+      "GET"
     ],
-    "endpoint": "fintech_api_bp.verify_tink"
-  },
-  {
-    "rule": "/verify/truelayer",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "fintech_api_bp.verify_truelayer"
+    "endpoint": "version"
   },
   {
     "rule": "/webhooks/ach",
