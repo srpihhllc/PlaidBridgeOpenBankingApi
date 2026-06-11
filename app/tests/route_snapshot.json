@@ -196,13 +196,6 @@
     "endpoint": "admin.admin_home"
   },
   {
-    "rule": "/admin/home",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.admin_index"
-  },
-  {
     "rule": "/admin/lenders",
     "methods": [
       "GET"
