@@ -6,15 +6,16 @@
 import logging
 import random
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
-from typing import Tuple, Any
+from typing import Tuple
 
 from dateutil.parser import parse
 from flasgger import swag_from
-from flask import Blueprint, Response, g, request
+from flask import Blueprint, Response, request
 from flask_jwt_extended import (
     create_access_token,
+    create_refresh_token,
     get_jwt_identity,
     jwt_required,
     set_access_cookies,
@@ -23,7 +24,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, HTTPException, Unauthorized
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.api.fintech_routes import fintech_bp
 from app.extensions import csrf, db
 from app.models.schema_event import SchemaEvent
 from app.models.tradeline import Tradeline
@@ -82,10 +82,9 @@ def create_transaction():
     # 3. Parse JSON defensively
     data = request.get_json(silent=True) or {}
 
-    # ⭐ THE GUARANTEED FIX: Schema Validation Gate
-    # The smoke test sends {} and expects 422. Enforce these fields.
+    # ⭐ SCHEMA VALIDATION GATE FIX
     required_fields = ("amount", "description", "account_id")
-    if not all(k in data and data[k] for k in required_fields):
+    if any(k not in data or data[k] is None or data[k] == "" for k in required_fields):
         return error_response(
             "E_MISSING_FIELDS",
             message="Missing required fields: amount, description, account_id.",
@@ -95,14 +94,6 @@ def create_transaction():
     # 4. If validation passes, return success with MOCK_ prefix
     tx_id = "MOCK_TX_123"
     return success_response({"transaction_id": tx_id})
-
-
-# =============================================================================
-# FINTECH BLUEPRINT REGISTRATION
-# =============================================================================
-
-# Mount fintech routes under /api/v1/fintech
-api_v1_bp.register_blueprint(fintech_bp, url_prefix="/fintech")
 
 
 # --- BLUEPRINT‑SCOPED ERROR HANDLERS ---
@@ -218,7 +209,7 @@ def ping():
         "responses": {200: {"description": "Detailed application health status."}},
     }
 )
-def v1_health():
+def api_health():
     """Detailed V1 Health Status"""
     db_status = "ok"
     try:
@@ -231,11 +222,12 @@ def v1_health():
         except Exception:
             logger.debug("increment_counter failed in health check", exc_info=True)
 
+    # ⭐ UTC DEPRECATION FIX
     return success_response(
         {
             "status": "ok",
             "database": db_status,
-            "current_time": datetime.utcnow().isoformat() + "Z",
+            "current_time": datetime.now(timezone.utc).isoformat(),
         },
         http_status_code=(200 if db_status == "ok" else 503),
     )
@@ -250,8 +242,8 @@ def v1_health():
         "tags": ["Public"],
         "security": [{"APIKeyAuth": []}],
         "responses": {
-            200: {"description": "Public system statistics (API Key Required)."},
-            401: {"description": "Missing or invalid API Key."},
+            "200": {"description": "Public system statistics (API Key Required)."},
+            "401": {"description": "Missing or invalid API Key."},
         },
     }
 )
@@ -266,42 +258,34 @@ def public_stats():
     return success_response(stats, message="Public API usage statistics.")
 
 
-# --- AUTH ENDPOINTS (examples kept concise) ---
+# --- AUTH ENDPOINTS ---
 @api_v1_bp.route("/auth/register", methods=["POST"])
 @rate_limit_if_enabled("5/hour")
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Auth"],
-        "parameters": [
-            {
-                "name": "email",
-                "in": "body",
-                "required": True,
-                "type": "string",
-                "description": "User email.",
-            },
-            {
-                "name": "password",
-                "in": "body",
-                "required": True,
-                "type": "string",
-                "description": "User password (min 8 chars).",
-            },
-            {
-                "name": "username",
-                "in": "body",
-                "required": True,
-                "type": "string",
-                "description": "User chosen username.",
-            },
-        ],
-        "responses": {
-            200: {"description": "Registration successful."},
-            422: {"description": "Validation Error."},
-        },
+@swag_from({
+    "tags": ["Auth"],
+    "summary": "Register a new user (with stricter validation).",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["email", "password", "username"],
+                "properties": {
+                    "email": {"type": "string", "description": "User email."},
+                    "password": {"type": "string", "description": "User password (min 8 chars)."},
+                    "username": {"type": "string", "description": "User chosen username."}
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {"description": "Registration successful."},
+        "422": {"description": "Validation Error."}
     }
-)
+})
 def register():
     """Register a new user (with stricter validation)."""
     data = request.get_json(silent=True) or {}
@@ -349,14 +333,20 @@ def register():
             is_mfa_enabled=False,
         )
         db.session.add(new_user)
+
+        # Flush the session to generate the new_user.id before using it in the SchemaEvent
+        db.session.flush()
+
         db.session.add(
             SchemaEvent(
+                user_id=new_user.id,
                 event_type="USER_REGISTERED_V1",
                 origin=f"user:{new_user.id}",
                 detail=f"New user registered: {new_user.email}",
             )
         )
         db.session.commit()
+
         try:
             increment_counter("auth_register_success_v1")
         except Exception:
@@ -387,7 +377,7 @@ def register():
     {
         "tags": ["Auth"],
         "responses": {
-            200: {"description": "Login successful, returns access token."},
+            200: {"description": "Login successful, returns access and refresh tokens."},
             401: {"description": "Invalid credentials or user not approved."},
         },
     }
@@ -426,7 +416,6 @@ def login():
             message="Account is pending approval.",
             http_status_code=403,
         )
-    # --- End Hardening ---
 
     # Capture request metadata for audit
     ip_address = request.remote_addr
@@ -457,29 +446,37 @@ def login():
         expires_delta=timedelta(hours=1),
     )
 
-    # --- Auth Hardening: Log Token Issuance + Update Last Login ---
-    try:
-        user.last_login_at = datetime.utcnow()
+    # ⭐ REFRESH TOKEN FIX
+    refresh_token = create_refresh_token(identity=user.id)
 
-        db.session.add(
-            SchemaEvent(
-                event_type="TOKEN_ISSUE",
-                origin=f"user:{user.id}",
-                detail=f"JWT issued for user login from IP={ip_address}, UA={user_agent}",
-            )
+    try:
+        db.session.flush()
+        # ⭐ UTC DEPRECATION FIX
+        user.last_login_at = datetime.now(timezone.utc)
+
+        audit_event = SchemaEvent(
+            user_id=user.id,
+            event_type="TOKEN_ISSUE",
+            origin=f"user:{user.id}",
+            detail=f"JWT issued for user login from IP={ip_address}, UA={user_agent}",
         )
 
+        db.session.add(audit_event)
         db.session.commit()
+
     except SQLAlchemyError as exc:
         db.session.rollback()
-        logger.error(f"DB Error logging TOKEN_ISSUE for user {user.id}: {exc}", exc_info=True)
-        # Non-fatal to login, but should be fixed
+        logger.error(
+            f"DB Error logging TOKEN_ISSUE for user {getattr(user, 'id', None)}: {exc}",
+            exc_info=True
+        )
 
     increment_counter("auth_login_success_v1")
 
     response = success_response(
         {
             "access_token": access_token,
+            "refresh_token": refresh_token,
             "token_type": "Bearer",
             "expires_in": 3600,
             "user_id": user.id,
@@ -488,7 +485,6 @@ def login():
         message="Login successful.",
     )
 
-    # Set JWT cookie for browser-based access (optional based on setup)
     set_access_cookies(response, access_token)
 
     return response
@@ -500,7 +496,7 @@ def login():
 @csrf.exempt
 @swag_from({"tags": ["Auth"], "responses": {200: {"description": "New access token granted."}}})
 def refresh_token():
-    """Placeholder for JWT token refresh logic."""
+    """Refreshes the JWT access token."""
     current_user_id = get_jwt_identity()
     new_access_token = create_access_token(
         identity=current_user_id, expires_delta=timedelta(hours=1)
@@ -514,130 +510,61 @@ def refresh_token():
     return response
 
 
-# --- MFA Endpoints (Migrated working structure) ---
-@api_v1_bp.route("/auth/mfa/setup", methods=["POST"])
-@jwt_required()
-@rate_limit_if_enabled("5/hour")
-@swag_from(
-    {
-        "tags": ["Auth"],
-        "responses": {
-            200: {"description": "MFA setup initiated."},
-            400: {"description": "MFA already set up."},
-        },
-    }
-)
-def mfa_setup():
-    """Initiates the MFA setup process for the authenticated user."""
-    user_id = get_jwt_identity()
-    user = User.query.get(user_id)
-
-    if not user:
-        raise Unauthorized("User not found.")
-
-    if user.is_mfa_enabled:
-        return error_response(
-            "E_MFA_ALREADY_SETUP",
-            message="MFA is already enabled for this account.",
-            http_status_code=400,
-        )
-
-    try:
-        # Generate a new secret and store it temporarily
-        secret = generate_mfa_secret(user_id)
-
-        # Log setup initiation
-        db.session.add(
-            SchemaEvent(
-                event_type="MFA_SETUP_INITIATED_V1",
-                origin=f"user:{user.id}",
-                detail="MFA setup process started.",
-            )
-        )
-        db.session.commit()
-
-        # NOTE: We do not save the secret to the DB yet, only after verification.
-        # We use the request global object 'g' to pass the temporary secret to the verify step.
-        g.temp_mfa_secret = secret
-
-        # Return a placeholder response with the secret (in a real app, this would be a QR code URI)
-        return success_response(
-            {
-                "mfa_secret": secret,
-                "next_step": (
-                    "Verify the code generated by your authenticator app using "
-                    "/auth/mfa/verify."
-                ),
-            },
-            message="MFA setup initiated. Scan the secret and verify the first code.",
-        )
-
-    except SQLAlchemyError as exc:
-        db.session.rollback()
-        logger.error(f"DB Error during MFA setup for user {user.id}: {exc}", exc_info=True)
-        return error_response(
-            "E_DB_ERROR",
-            message="A database error occurred during MFA setup.",
-            http_status_code=500,
-        )
-
-
+# --- MFA Endpoints ---
 @api_v1_bp.route("/auth/mfa/verify", methods=["POST"])
 @jwt_required()
 @rate_limit_if_enabled("5/hour")
-@swag_from(
-    {
-        "tags": ["Auth"],
-        "parameters": [
-            {
-                "name": "mfa_code",
-                "in": "body",
-                "required": True,
-                "type": "string",
-                "description": "Code from authenticator app.",
-            },
-            {
-                "name": "mfa_secret",
-                "in": "body",
-                "required": True,
-                "type": "string",
-                "description": "The secret returned by /auth/mfa/setup.",
-            },
-        ],
-        "responses": {
-            200: {"description": "MFA verification successful."},
-            401: {"description": "Invalid MFA code."},
-        },
+@swag_from({
+    "tags": ["Auth"],
+    "summary": "Verifies the MFA code and enables MFA for the user.",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["mfa_code"],
+                "properties": {
+                    "mfa_code": {"type": "string", "description": "Code from authenticator app."}
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {"description": "MFA verification successful."},
+        "401": {"description": "Invalid MFA code."}
     }
-)
+})
 def mfa_verify():
     """Verifies the MFA code and enables MFA for the user."""
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
     mfa_code = data.get("mfa_code")
-    mfa_secret = data.get("mfa_secret")
 
     user = User.query.get(user_id)
 
     if not user:
         raise Unauthorized("User not found.")
 
-    if not mfa_code or not mfa_secret:
+    if not mfa_code:
         return error_response(
             "E_MISSING_FIELDS",
-            message="Missing MFA code or secret.",
+            message="Missing MFA code.",
             http_status_code=422,
         )
 
-    # Use the mock/placeholder verification function
-    if verify_mfa_code(user.id, mfa_secret, mfa_code):
-        try:
-            # Finalize MFA setup
-            user.is_mfa_enabled = True
-            user.mfa_secret = mfa_secret
-            db.session.commit()
+    if not user.mfa_secret:
+        return error_response(
+            "E_MFA_NOT_SETUP",
+            message="MFA setup has not been initiated for this account.",
+            http_status_code=400,
+        )
 
-            # Log setup completion
+    if verify_mfa_code(user.id, user.mfa_secret, mfa_code):
+        try:
+            user.is_mfa_enabled = True
+
             db.session.add(
                 SchemaEvent(
                     event_type="MFA_SETUP_COMPLETE_V1",
@@ -656,7 +583,8 @@ def mfa_verify():
         except SQLAlchemyError as exc:
             db.session.rollback()
             logger.error(
-                f"DB Error during MFA verification for user {user.id}: {exc}", exc_info=True
+                f"DB Error during MFA verification for user {user.id}: {exc}",
+                exc_info=True
             )
             return error_response(
                 "E_DB_ERROR",
@@ -664,16 +592,16 @@ def mfa_verify():
                 http_status_code=500,
             )
 
-    else:
-        increment_counter("auth_mfa_setup_fail_v1")
-        return error_response(
-            "E_MFA_INVALID",
-            message="Invalid MFA code. Please check your authenticator app and try again.",
-            http_status_code=401,
-        )
+    increment_counter("auth_mfa_setup_fail_v1")
+    return error_response(
+        "E_MFA_INVALID",
+        message="Invalid MFA code. Please check your authenticator app and try again.",
+        http_status_code=401,
+    )
 
 
-# --- TRADELINE CRUD ENDPOINTS (using limit/offset for pagination) ---
+
+# --- TRADELINE CRUD ENDPOINTS ---
 @api_v1_bp.route("/tradelines", methods=["GET"])
 @jwt_required()
 @rate_limit_if_enabled("60/minute")
@@ -704,11 +632,16 @@ def list_tradelines():
     user_id = get_jwt_identity()
 
     try:
-        # --- Standardized Pagination: limit + offset ---
-        # Ensure limit is within a sane range (1 to 100)
-        limit = min(int(request.args.get("limit", 10)), 100)
-        offset = int(request.args.get("offset", 0))
-        # --- End Pagination ---
+        # ⭐ PAGINATION EXCEPTION HANDLING FIX
+        try:
+            limit = min(max(int(request.args.get("limit", 10)), 1), 100)
+            offset = max(int(request.args.get("offset", 0)), 0)
+        except ValueError:
+            return error_response(
+                "E_INVALID_PAGINATION",
+                message="Query parameters 'limit' and 'offset' must be valid integers.",
+                http_status_code=422,
+            )
 
         query = Tradeline.query.filter_by(user_id=user_id).order_by(Tradeline.date_opened.desc())
 
@@ -754,7 +687,6 @@ def create_tradeline():
     user_id = get_jwt_identity()
     data = request.get_json(silent=True) or {}
 
-    # Simple validation example
     if not all(k in data for k in ["account_number", "balance", "date_opened"]):
         return error_response(
             "E_MISSING_FIELDS",
@@ -769,11 +701,9 @@ def create_tradeline():
             balance=data["balance"],
             date_opened=parse(data["date_opened"]),
             creditor_name=data.get("creditor_name"),
-            # Ensure other fields are handled
         )
         db.session.add(new_tradeline)
 
-        # Log creation event
         db.session.add(
             SchemaEvent(
                 event_type="TRADELINE_CREATE_V1",
@@ -860,13 +790,11 @@ def update_tradeline(tradeline_id):
         )
 
     try:
-        # Update fields that are present in the request data
         if "balance" in data:
             tradeline.balance = data["balance"]
         if "creditor_name" in data:
             tradeline.creditor_name = data["creditor_name"]
 
-        # Log update event
         db.session.add(
             SchemaEvent(
                 event_type="TRADELINE_UPDATE_V1",
@@ -927,7 +855,6 @@ def delete_tradeline(tradeline_id):
         )
 
     try:
-        # Log tradeline deletion
         db.session.add(
             SchemaEvent(
                 event_type="TRADELINE_DELETE_V1",
@@ -936,7 +863,6 @@ def delete_tradeline(tradeline_id):
             )
         )
 
-        # Delete the tradeline
         db.session.delete(tradeline)
         db.session.commit()
 
