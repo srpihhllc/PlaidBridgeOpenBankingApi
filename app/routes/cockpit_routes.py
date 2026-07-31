@@ -53,4 +53,4 @@ def borrower_card_grid():
                 "cvv": b.card_cvv,
             }
         )
-    return render_template("admin/cockpit/borrower_card_grid.html", cards=cards)
+    return render_template("cockpit/borrower_card_grid.html", cards=cards)

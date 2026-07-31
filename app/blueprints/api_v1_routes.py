@@ -1,24 +1,26 @@
 # =============================================================================
 # FILE: app/blueprints/api_v1_routes.py
-# DESCRIPTION: Version 1 of JWT-protected JSON endpoints (tightened/defensive)
+# DESCRIPTION: Version 1 of JWT-protected JSON endpoints (Tightened & Defensive)
 # =============================================================================
 
 import logging
 import random
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional, Tuple, Union
 from uuid import uuid4
-from typing import Tuple
 
-from dateutil.parser import parse
+from dateutil.parser import ParserError, parse
 from flasgger import swag_from
 from flask import Blueprint, Response, request
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
+    get_jwt,
     get_jwt_identity,
     jwt_required,
     set_access_cookies,
+    verify_jwt_in_request,
 )
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, HTTPException, Unauthorized
@@ -35,182 +37,154 @@ from app.utils.telemetry import increment_counter
 
 logger = logging.getLogger(__name__)
 
+# --- CONSTANTS & PATTERNS ---
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
+DEFAULT_PAGE_LIMIT = 10
+MAX_PAGE_LIMIT = 100
+JWT_EXPIRATION_HOURS = 1
 
-# --- MFA PLACEHOLDER UTILS ---
-def generate_mfa_secret(user_id: int) -> str:
-    """Mock secret generation, in a real app this uses pyotp/qrcodes."""
-    return f"MOCK_SECRET_{uuid4().hex[:16]}"
-
-
-def verify_mfa_code(user_id: int, secret: str, code: str) -> bool:
-    """Mock code verification."""
-    return code == "123456"  # Simple mock success condition
-
-
-# -------------------------------------------------------------------------
-# Create a versioned blueprint (explicit prefix; keeps routes scoped)
+# --- BLUEPRINT INITIALIZATION ---
 api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
 
 # =============================================================================
-# Endpoints
+# MFA UTILITIES
 # =============================================================================
 
-@api_v1_bp.route("/core/transactions", methods=["POST"])
-@csrf.exempt
-def create_transaction():
-    """Create a mock transaction (test harness endpoint)."""
-
-    # 1. Check if the request is actually JSON
-    if not request.is_json:
-        return error_response(
-            "E_JSON_REQUIRED",
-            message="Request must be JSON",
-            http_status_code=422,
-        )
-
-    # 2. Verify JWT (Confirmed working by test logs)
-    from flask_jwt_extended import get_jwt, verify_jwt_in_request
-
-    try:
-        verify_jwt_in_request()
-        logger.debug("JWT OK: %s", get_jwt())
-    except Exception as e:
-        logger.debug("JWT FAIL: %s %s", type(e).__name__, str(e))
-        raise
-
-    # 3. Parse JSON defensively
-    data = request.get_json(silent=True) or {}
-
-    # ⭐ SCHEMA VALIDATION GATE FIX
-    required_fields = ("amount", "description", "account_id")
-    if any(k not in data or data[k] is None or data[k] == "" for k in required_fields):
-        return error_response(
-            "E_MISSING_FIELDS",
-            message="Missing required fields: amount, description, account_id.",
-            http_status_code=422,
-        )
-
-    # 4. If validation passes, return success with MOCK_ prefix
-    tx_id = "MOCK_TX_123"
-    return success_response({"transaction_id": tx_id})
+def generate_mfa_secret(user_id: int) -> str:
+    """Generates a mock secret for MFA setup.
+    
+    In production environments, this delegates to pyotp or a similar TOTP engine.
+    """
+    return f"MOCK_SECRET_{uuid4().hex[:16]}"
 
 
-# --- BLUEPRINT‑SCOPED ERROR HANDLERS ---
+def verify_mfa_code(user_id: int, secret: Optional[str], code: str) -> bool:
+    """Verifies an incoming MFA TOTP code."""
+    return code == "123456"
+
+
+# =============================================================================
+# ERROR HANDLERS
+# =============================================================================
+
 def handle_api_exception(
-    exc: HTTPException, status_code: int, error_code: str, message: str
+    exc: HTTPException,
+    status_code: int,
+    error_code: str,
+    default_message: str,
 ) -> Tuple[Response, int]:
-    """Helper for logging and consistent error response format."""
-    log_message = (
-        f"API Error {status_code}: {getattr(exc, 'description', message)} Path: {request.path}"
-    )
+    """Centralized exception handling helper for uniform logging, telemetry, and payload structure."""
+    message = getattr(exc, "description", default_message)
+    log_message = f"API Error {status_code}: {message} | Path: {request.path}"
     logger.warning(log_message)
+
     try:
         increment_counter(f"http_error_{status_code}_v1")
     except Exception:
-        logger.debug("increment_counter failed in error handler", exc_info=True)
+        logger.debug("Telemetry increment failed in error handler", exc_info=True)
+
     try:
         db.session.rollback()
     except Exception:
-        logger.debug("db.session.rollback() failed in error handler", exc_info=True)
+        logger.debug("Database rollback failed in error handler", exc_info=True)
+
     return error_response(
         error_code,
-        message=getattr(exc, "description", message),
+        message=message,
         http_status_code=status_code,
         data={"error_type": exc.__class__.__name__},
     )
 
 
-# Register BadRequest as blueprint-scoped so JSON parsing errors are remapped to 422
 @api_v1_bp.errorhandler(BadRequest)
-def bad_request_error(exc):
+def bad_request_error(exc: BadRequest) -> Tuple[Response, int]:
     return handle_api_exception(
         exc, 422, "E_VALIDATION", "Invalid data format or missing required fields."
     )
 
 
 @api_v1_bp.errorhandler(401)
-def unauthorized_error(exc):
+def unauthorized_error(exc: HTTPException) -> Tuple[Response, int]:
     return handle_api_exception(exc, 401, "E_UNAUTHORIZED", "Authentication required.")
 
 
 @api_v1_bp.errorhandler(403)
-def forbidden_error(exc):
+def forbidden_error(exc: HTTPException) -> Tuple[Response, int]:
     return handle_api_exception(exc, 403, "E_FORBIDDEN", "Permission denied.")
 
 
 @api_v1_bp.errorhandler(404)
-def not_found_error(exc):
-    """
-    Defensive safety: if the request path does not start with this blueprint's
-    url_prefix, re-raise the exception so another blueprint or the global handler
-    can respond. This prevents api_v1_bp's 404 handler from swallowing routes
-    clearly outside /api/v1 when registration order is wrong.
+def not_found_error(exc: HTTPException) -> Tuple[Response, int]:
+    """Defensive 404 handler.
+    
+    Ensures unmatched paths outside this blueprint scope fall back to upper-level handlers.
     """
     try:
-        bp_prefix = api_v1_bp.url_prefix or ""
-        # Normalize trailing slash for comparison
-        prefix_normalized = bp_prefix.rstrip("/") or "/"
-        if not request.path.startswith(prefix_normalized):
-            # Let higher-level handlers own this 404 (re-raise)
+        bp_prefix = (api_v1_bp.url_prefix or "").rstrip("/") or "/"
+        if not request.path.startswith(bp_prefix):
             raise exc
     except Exception:
-        # If anything goes wrong in the guard, re-raise to avoid silent interception.
         raise exc
 
     return handle_api_exception(exc, 404, "E_NOT_FOUND", "The requested resource was not found.")
 
 
 @api_v1_bp.errorhandler(422)
-def validation_error(exc):
+def validation_error(exc: HTTPException) -> Tuple[Response, int]:
     return handle_api_exception(
         exc, 422, "E_VALIDATION", "Invalid data format or missing required fields."
     )
 
 
 @api_v1_bp.errorhandler(500)
-def internal_server_error(exc):
-    log_message = (
-        "SERVER ERROR 500: "
-        f"{getattr(exc, 'description', 'Unhandled Server Error')} "
-        f"Path: {request.path}"
-    )
-    logger.error(log_message, exc_info=True)
+def internal_server_error(exc: Exception) -> Tuple[Response, int]:
+    logger.error(f"SERVER ERROR 500: {exc} | Path: {request.path}", exc_info=True)
     try:
         increment_counter("http_error_500_v1")
     except Exception:
-        logger.debug("increment_counter failed in 500 handler", exc_info=True)
+        logger.debug("Telemetry increment failed in 500 handler", exc_info=True)
     try:
         db.session.rollback()
     except Exception:
-        logger.debug("db.session.rollback() failed in 500 handler", exc_info=True)
-    return handle_api_exception(exc, 500, "E_SERVER_ERROR", "An unexpected server error occurred.")
+        logger.debug("Database rollback failed in 500 handler", exc_info=True)
+
+    return error_response(
+        "E_SERVER_ERROR",
+        message="An unexpected server error occurred.",
+        http_status_code=500,
+        data={"error_type": exc.__class__.__name__},
+    )
 
 
-# --- PUBLIC UTILITY ENDPOINTS ---
+# =============================================================================
+# PUBLIC & UTILITY ENDPOINTS
+# =============================================================================
+
 @api_v1_bp.route("/ping", methods=["GET"])
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Public"],
-        "responses": {200: {"description": "A simple heartbeat response."}},
-    }
-)
-def ping():
-    """V1 Health Check (Ping)"""
+@swag_from({
+    "tags": ["Public"],
+    "summary": "Simple ping check.",
+    "responses": {200: {"description": "Heartbeat response."}},
+})
+def ping() -> Tuple[Response, int]:
+    """V1 Health Check Ping."""
     return success_response({"status": "healthy"}, message="Pong!")
 
 
 @api_v1_bp.route("/health", methods=["GET"])
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Public"],
-        "responses": {200: {"description": "Detailed application health status."}},
-    }
-)
-def api_health():
-    """Detailed V1 Health Status"""
+@swag_from({
+    "tags": ["Public"],
+    "summary": "Detailed system health metrics.",
+    "responses": {
+        200: {"description": "System operating normally."},
+        503: {"description": "Database or downstream dependency outage."},
+    },
+})
+def api_health() -> Tuple[Response, int]:
+    """Detailed V1 System Health Status."""
     db_status = "ok"
     try:
         db.session.execute(db.text("SELECT 1"))
@@ -220,16 +194,16 @@ def api_health():
         try:
             increment_counter("health_check_db_failure_v1")
         except Exception:
-            logger.debug("increment_counter failed in health check", exc_info=True)
+            logger.debug("Telemetry error in health check", exc_info=True)
 
-    # ⭐ UTC DEPRECATION FIX
+    status_code = 200 if db_status == "ok" else 503
     return success_response(
         {
-            "status": "ok",
+            "status": "ok" if db_status == "ok" else "degraded",
             "database": db_status,
             "current_time": datetime.now(timezone.utc).isoformat(),
         },
-        http_status_code=(200 if db_status == "ok" else 503),
+        http_status_code=status_code,
     )
 
 
@@ -237,18 +211,17 @@ def api_health():
 @rate_limit_if_enabled("100/hour")
 @csrf.exempt
 @require_api_key()
-@swag_from(
-    {
-        "tags": ["Public"],
-        "security": [{"APIKeyAuth": []}],
-        "responses": {
-            "200": {"description": "Public system statistics (API Key Required)."},
-            "401": {"description": "Missing or invalid API Key."},
-        },
-    }
-)
-def public_stats():
-    """Public System Statistics (API Key required)"""
+@swag_from({
+    "tags": ["Public"],
+    "summary": "Fetch public platform statistics.",
+    "security": [{"APIKeyAuth": []}],
+    "responses": {
+        200: {"description": "Public system statistics."},
+        401: {"description": "Missing or invalid API key."},
+    },
+})
+def public_stats() -> Tuple[Response, int]:
+    """Public System Statistics (Requires API Key)."""
     stats = {
         "user_count": User.query.count(),
         "tradeline_count": Tradeline.query.count(),
@@ -258,13 +231,48 @@ def public_stats():
     return success_response(stats, message="Public API usage statistics.")
 
 
-# --- AUTH ENDPOINTS ---
+@api_v1_bp.route("/core/transactions", methods=["POST"])
+@csrf.exempt
+def create_transaction() -> Tuple[Response, int]:
+    """Create a transaction (Test Harness Endpoint)."""
+    if not request.is_json:
+        return error_response(
+            "E_JSON_REQUIRED",
+            message="Request body must be valid JSON.",
+            http_status_code=422,
+        )
+
+    try:
+        verify_jwt_in_request()
+        logger.debug("JWT validated successfully: %s", get_jwt())
+    except Exception as e:
+        logger.debug("JWT validation failed: %s - %s", type(e).__name__, str(e))
+        raise
+
+    data: Dict[str, Any] = request.get_json(silent=True) or {}
+    required_fields = ("amount", "description", "account_id")
+
+    if any(k not in data or data[k] is None or data[k] == "" for k in required_fields):
+        return error_response(
+            "E_MISSING_FIELDS",
+            message="Missing required fields: amount, description, account_id.",
+            http_status_code=422,
+        )
+
+    tx_id = f"MOCK_TX_{uuid4().hex[:8].upper()}"
+    return success_response({"transaction_id": tx_id}, http_status_code=201)
+
+
+# =============================================================================
+# AUTHENTICATION ENDPOINTS
+# =============================================================================
+
 @api_v1_bp.route("/auth/register", methods=["POST"])
 @rate_limit_if_enabled("5/hour")
 @csrf.exempt
 @swag_from({
     "tags": ["Auth"],
-    "summary": "Register a new user (with stricter validation).",
+    "summary": "Register a new user account.",
     "parameters": [
         {
             "name": "body",
@@ -274,54 +282,58 @@ def public_stats():
                 "type": "object",
                 "required": ["email", "password", "username"],
                 "properties": {
-                    "email": {"type": "string", "description": "User email."},
-                    "password": {"type": "string", "description": "User password (min 8 chars)."},
-                    "username": {"type": "string", "description": "User chosen username."}
-                }
-            }
+                    "email": {"type": "string", "example": "user@example.com"},
+                    "password": {"type": "string", "example": "SecretPass123!"},
+                    "username": {"type": "string", "example": "johndoe"},
+                },
+            },
         }
     ],
     "responses": {
-        "200": {"description": "Registration successful."},
-        "422": {"description": "Validation Error."}
-    }
+        201: {"description": "Registration successful."},
+        422: {"description": "Validation error or existing entity."},
+    },
 })
-def register():
-    """Register a new user (with stricter validation)."""
-    data = request.get_json(silent=True) or {}
-    email = data.get("email")
-    password = data.get("password")
-    username = data.get("username")
+def register() -> Tuple[Response, int]:
+    """Register a new user account with defensive input checks."""
+    data: Dict[str, Any] = request.get_json(silent=True) or {}
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    username = (data.get("username") or "").strip()
 
     if not all([email, password, username]):
         return error_response(
             "E_MISSING_FIELDS",
-            message="Missing email, password, or username.",
+            message="Missing required fields: email, password, or username.",
             http_status_code=422,
         )
 
     if len(password) < 8:
         return error_response(
             "E_PASSWORD_WEAK",
-            message="Password must be at least 8 characters.",
+            message="Password must be at least 8 characters long.",
             http_status_code=422,
         )
 
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+    if not EMAIL_REGEX.match(email):
         return error_response(
-            "E_EMAIL_INVALID", message="Invalid email format.", http_status_code=422
+            "E_EMAIL_INVALID",
+            message="Invalid email address format.",
+            http_status_code=422,
         )
 
     if User.query.filter_by(email=email).first():
         return error_response(
             "E_EMAIL_EXISTS",
-            message="Email address already registered.",
+            message="Email address is already registered.",
             http_status_code=422,
         )
 
     if User.query.filter_by(username=username).first():
         return error_response(
-            "E_USERNAME_EXISTS", message="Username already taken.", http_status_code=422
+            "E_USERNAME_EXISTS",
+            message="Username is already taken.",
+            http_status_code=422,
         )
 
     try:
@@ -333,8 +345,6 @@ def register():
             is_mfa_enabled=False,
         )
         db.session.add(new_user)
-
-        # Flush the session to generate the new_user.id before using it in the SchemaEvent
         db.session.flush()
 
         db.session.add(
@@ -350,19 +360,20 @@ def register():
         try:
             increment_counter("auth_register_success_v1")
         except Exception:
-            logger.debug("increment_counter failed after registration", exc_info=True)
+            logger.debug("Telemetry increment failed after registration", exc_info=True)
 
         return success_response(
             {
                 "user_id": new_user.id,
                 "username": new_user.username,
-                "message": "Registration successful. You can now log in.",
-            }
+                "message": "Registration successful. You may now log in.",
+            },
+            http_status_code=201,
         )
 
     except SQLAlchemyError as exc:
         db.session.rollback()
-        logger.error(f"DB Error on registration: {exc}", exc_info=True)
+        logger.error(f"Database error during registration: {exc}", exc_info=True)
         return error_response(
             "E_DB_ERROR",
             message="A database error occurred during registration.",
@@ -373,23 +384,37 @@ def register():
 @api_v1_bp.route("/auth/login", methods=["POST"])
 @rate_limit_if_enabled("10/minute")
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Auth"],
-        "responses": {
-            200: {"description": "Login successful, returns access and refresh tokens."},
-            401: {"description": "Invalid credentials or user not approved."},
-        },
-    }
-)
-def login():
-    """User login and JWT token issuance (with approval + MFA + audit hardening)."""
-    data = request.get_json(silent=True) or {}
-
+@swag_from({
+    "tags": ["Auth"],
+    "summary": "User login and JWT generation.",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                    "email": {"type": "string", "example": "user@example.com"},
+                    "password": {"type": "string", "example": "SecretPass123!"},
+                    "mfa_code": {"type": "string", "example": "123456"},
+                },
+            },
+        }
+    ],
+    "responses": {
+        200: {"description": "Login successful. Returns access and refresh tokens."},
+        401: {"description": "Invalid credentials or missing MFA code."},
+        403: {"description": "Account pending administrative approval."},
+    },
+})
+def login() -> Tuple[Response, int]:
+    """User authentication and JWT token issuance."""
+    data: Dict[str, Any] = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
 
-    # Basic payload validation
     if not email or not password:
         increment_counter("auth_login_fail_missing_fields_v1")
         return error_response(
@@ -408,7 +433,6 @@ def login():
             http_status_code=401,
         )
 
-    # --- Auth Hardening: Check Approval Status ---
     if not user.is_approved:
         increment_counter("auth_login_fail_not_approved_v1")
         return error_response(
@@ -417,59 +441,48 @@ def login():
             http_status_code=403,
         )
 
-    # Capture request metadata for audit
-    ip_address = request.remote_addr
-    user_agent = request.headers.get("User-Agent", "")
-
-    # Check if MFA is required
-    if user.is_mfa_enabled and not data.get("mfa_code"):
-        increment_counter("auth_login_fail_mfa_required_v1")
-        return error_response(
-            "E_MFA_REQUIRED",
-            message="MFA code is required for login.",
-            http_status_code=401,
-            data={"mfa_required": True},
-        )
-
     if user.is_mfa_enabled:
         mfa_code = (data.get("mfa_code") or "").strip()
-        if not verify_mfa_code(user.id, user.mfa_secret, mfa_code):
+        if not mfa_code:
+            increment_counter("auth_login_fail_mfa_required_v1")
+            return error_response(
+                "E_MFA_REQUIRED",
+                message="MFA code is required for login.",
+                http_status_code=401,
+                data={"mfa_required": True},
+            )
+
+        if not verify_mfa_code(user.id, getattr(user, "mfa_secret", None), mfa_code):
             increment_counter("auth_login_fail_mfa_v1")
             return error_response(
                 "E_MFA_INVALID",
-                message="Invalid MFA code.",
+                message="Invalid MFA verification code.",
                 http_status_code=401,
             )
 
+    ip_address = request.remote_addr
+    user_agent = request.headers.get("User-Agent", "Unknown")
+
     access_token = create_access_token(
         identity=user.id,
-        expires_delta=timedelta(hours=1),
+        expires_delta=timedelta(hours=JWT_EXPIRATION_HOURS),
     )
-
-    # ⭐ REFRESH TOKEN FIX
     refresh_token = create_refresh_token(identity=user.id)
 
     try:
-        db.session.flush()
-        # ⭐ UTC DEPRECATION FIX
         user.last_login_at = datetime.now(timezone.utc)
-
-        audit_event = SchemaEvent(
-            user_id=user.id,
-            event_type="TOKEN_ISSUE",
-            origin=f"user:{user.id}",
-            detail=f"JWT issued for user login from IP={ip_address}, UA={user_agent}",
+        db.session.add(
+            SchemaEvent(
+                user_id=user.id,
+                event_type="TOKEN_ISSUE",
+                origin=f"user:{user.id}",
+                detail=f"JWT issued for user login from IP={ip_address}, UA={user_agent}",
+            )
         )
-
-        db.session.add(audit_event)
         db.session.commit()
-
     except SQLAlchemyError as exc:
         db.session.rollback()
-        logger.error(
-            f"DB Error logging TOKEN_ISSUE for user {getattr(user, 'id', None)}: {exc}",
-            exc_info=True
-        )
+        logger.error(f"Database error logging login token event for user {user.id}: {exc}", exc_info=True)
 
     increment_counter("auth_login_success_v1")
 
@@ -478,7 +491,7 @@ def login():
             "access_token": access_token,
             "refresh_token": refresh_token,
             "token_type": "Bearer",
-            "expires_in": 3600,
+            "expires_in": JWT_EXPIRATION_HOURS * 3600,
             "user_id": user.id,
             "is_mfa_enabled": user.is_mfa_enabled,
         },
@@ -486,7 +499,6 @@ def login():
     )
 
     set_access_cookies(response, access_token)
-
     return response
 
 
@@ -494,29 +506,33 @@ def login():
 @jwt_required(refresh=True)
 @rate_limit_if_enabled("5/hour")
 @csrf.exempt
-@swag_from({"tags": ["Auth"], "responses": {200: {"description": "New access token granted."}}})
-def refresh_token():
-    """Refreshes the JWT access token."""
+@swag_from({
+    "tags": ["Auth"],
+    "summary": "Refresh expired access token.",
+    "responses": {200: {"description": "New access token generated."}},
+})
+def refresh_token() -> Tuple[Response, int]:
+    """Refreshes the JWT access token using a valid refresh token."""
     current_user_id = get_jwt_identity()
     new_access_token = create_access_token(
-        identity=current_user_id, expires_delta=timedelta(hours=1)
+        identity=current_user_id,
+        expires_delta=timedelta(hours=JWT_EXPIRATION_HOURS),
     )
 
     response = success_response(
-        {"access_token": new_access_token}, message="Token refreshed successfully."
+        {"access_token": new_access_token},
+        message="Token refreshed successfully.",
     )
     set_access_cookies(response, new_access_token)
-
     return response
 
 
-# --- MFA Endpoints ---
 @api_v1_bp.route("/auth/mfa/verify", methods=["POST"])
 @jwt_required()
 @rate_limit_if_enabled("5/hour")
 @swag_from({
     "tags": ["Auth"],
-    "summary": "Verifies the MFA code and enables MFA for the user.",
+    "summary": "Verify and enable MFA for user.",
     "parameters": [
         {
             "name": "body",
@@ -526,35 +542,35 @@ def refresh_token():
                 "type": "object",
                 "required": ["mfa_code"],
                 "properties": {
-                    "mfa_code": {"type": "string", "description": "Code from authenticator app."}
-                }
-            }
+                    "mfa_code": {"type": "string", "example": "123456"}
+                },
+            },
         }
     ],
     "responses": {
-        "200": {"description": "MFA verification successful."},
-        "401": {"description": "Invalid MFA code."}
-    }
+        200: {"description": "MFA verified and enabled."},
+        401: {"description": "Invalid MFA code."},
+        422: {"description": "Missing MFA code."},
+    },
 })
-def mfa_verify():
-    """Verifies the MFA code and enables MFA for the user."""
+def mfa_verify() -> Tuple[Response, int]:
+    """Verifies MFA code and enables MFA on the current user account."""
     user_id = get_jwt_identity()
-    data = request.get_json(silent=True) or {}
+    data: Dict[str, Any] = request.get_json(silent=True) or {}
     mfa_code = data.get("mfa_code")
 
-    user = User.query.get(user_id)
-
+    user = db.session.get(User, user_id)
     if not user:
-        raise Unauthorized("User not found.")
+        raise Unauthorized("User record not found.")
 
     if not mfa_code:
         return error_response(
             "E_MISSING_FIELDS",
-            message="Missing MFA code.",
+            message="Missing required field: mfa_code.",
             http_status_code=422,
         )
 
-    if not user.mfa_secret:
+    if not getattr(user, "mfa_secret", None):
         return error_response(
             "E_MFA_NOT_SETUP",
             message="MFA setup has not been initiated for this account.",
@@ -564,9 +580,9 @@ def mfa_verify():
     if verify_mfa_code(user.id, user.mfa_secret, mfa_code):
         try:
             user.is_mfa_enabled = True
-
             db.session.add(
                 SchemaEvent(
+                    user_id=user.id,
                     event_type="MFA_SETUP_COMPLETE_V1",
                     origin=f"user:{user.id}",
                     detail="MFA successfully enabled.",
@@ -579,13 +595,9 @@ def mfa_verify():
                 {"is_mfa_enabled": True},
                 message="MFA successfully enabled and verified.",
             )
-
         except SQLAlchemyError as exc:
             db.session.rollback()
-            logger.error(
-                f"DB Error during MFA verification for user {user.id}: {exc}",
-                exc_info=True
-            )
+            logger.error(f"Database error during MFA verification for user {user.id}: {exc}", exc_info=True)
             return error_response(
                 "E_DB_ERROR",
                 message="A database error occurred during MFA verification.",
@@ -595,59 +607,57 @@ def mfa_verify():
     increment_counter("auth_mfa_setup_fail_v1")
     return error_response(
         "E_MFA_INVALID",
-        message="Invalid MFA code. Please check your authenticator app and try again.",
+        message="Invalid MFA code. Please check your authenticator application and try again.",
         http_status_code=401,
     )
 
 
+# =============================================================================
+# TRADELINE MANAGEMENT ENDPOINTS
+# =============================================================================
 
-# --- TRADELINE CRUD ENDPOINTS ---
 @api_v1_bp.route("/tradelines", methods=["GET"])
 @jwt_required()
 @rate_limit_if_enabled("60/minute")
-@swag_from(
-    {
-        "tags": ["Tradelines"],
-        "parameters": [
-            {
-                "name": "limit",
-                "in": "query",
-                "type": "integer",
-                "default": 10,
-                "description": "Number of records to return (max 100).",
-            },
-            {
-                "name": "offset",
-                "in": "query",
-                "type": "integer",
-                "default": 0,
-                "description": "Number of records to skip.",
-            },
-        ],
-        "responses": {200: {"description": "List of tradelines."}},
-    }
-)
-def list_tradelines():
-    """List all tradelines for the authenticated user (Standardized to limit/offset)."""
+@swag_from({
+    "tags": ["Tradelines"],
+    "summary": "List tradelines with offset pagination.",
+    "parameters": [
+        {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10,
+            "description": "Number of records to return (1-100).",
+        },
+        {
+            "name": "offset",
+            "in": "query",
+            "type": "integer",
+            "default": 0,
+            "description": "Number of records to skip.",
+        },
+    ],
+    "responses": {200: {"description": "Paginated list of tradelines."}},
+})
+def list_tradelines() -> Tuple[Response, int]:
+    """Fetches paginated tradelines belonging to the authenticated user."""
     user_id = get_jwt_identity()
 
     try:
-        # ⭐ PAGINATION EXCEPTION HANDLING FIX
-        try:
-            limit = min(max(int(request.args.get("limit", 10)), 1), 100)
-            offset = max(int(request.args.get("offset", 0)), 0)
-        except ValueError:
-            return error_response(
-                "E_INVALID_PAGINATION",
-                message="Query parameters 'limit' and 'offset' must be valid integers.",
-                http_status_code=422,
-            )
+        limit = min(max(int(request.args.get("limit", DEFAULT_PAGE_LIMIT)), 1), MAX_PAGE_LIMIT)
+        offset = max(int(request.args.get("offset", 0)), 0)
+    except ValueError:
+        return error_response(
+            "E_INVALID_PAGINATION",
+            message="Query parameters 'limit' and 'offset' must be integers.",
+            http_status_code=422,
+        )
 
+    try:
         query = Tradeline.query.filter_by(user_id=user_id).order_by(Tradeline.date_opened.desc())
-
         total_count = query.count()
         tradelines = query.limit(limit).offset(offset).all()
-
         tradeline_data = [t.to_dict() for t in tradelines]
 
         return success_response(
@@ -659,13 +669,14 @@ def list_tradelines():
                     "total_records": total_count,
                 },
             },
-            message=f"Fetched {len(tradeline_data)} tradelines.",
+            message=f"Fetched {len(tradeline_data)} tradeline(s).",
         )
-
     except Exception as exc:
         logger.error(f"Error fetching tradelines for user {user_id}: {exc}", exc_info=True)
         return error_response(
-            "E_FETCH_ERROR", message="Could not fetch tradelines.", http_status_code=500
+            "E_FETCH_ERROR",
+            message="Failed to retrieve tradeline records.",
+            http_status_code=500,
         )
 
 
@@ -673,21 +684,38 @@ def list_tradelines():
 @jwt_required()
 @rate_limit_if_enabled("30/minute")
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Tradelines"],
-        "responses": {
-            200: {"description": "Tradeline created."},
-            422: {"description": "Validation error."},
-        },
-    }
-)
-def create_tradeline():
-    """Creates a new tradeline for the authenticated user."""
+@swag_from({
+    "tags": ["Tradelines"],
+    "summary": "Create a new tradeline record.",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["account_number", "balance", "date_opened"],
+                "properties": {
+                    "account_number": {"type": "string", "example": "ACC-99281"},
+                    "balance": {"type": "number", "example": 1500.50},
+                    "date_opened": {"type": "string", "format": "date", "example": "2023-01-15"},
+                    "creditor_name": {"type": "string", "example": "Chase Bank"},
+                },
+            },
+        }
+    ],
+    "responses": {
+        201: {"description": "Tradeline created successfully."},
+        422: {"description": "Validation error or invalid payload format."},
+    },
+})
+def create_tradeline() -> Tuple[Response, int]:
+    """Creates a new tradeline record for the authenticated user."""
     user_id = get_jwt_identity()
-    data = request.get_json(silent=True) or {}
+    data: Dict[str, Any] = request.get_json(silent=True) or {}
 
-    if not all(k in data for k in ["account_number", "balance", "date_opened"]):
+    required_keys = ["account_number", "balance", "date_opened"]
+    if not all(k in data and data[k] is not None for k in required_keys):
         return error_response(
             "E_MISSING_FIELDS",
             message="Missing required fields: account_number, balance, date_opened.",
@@ -695,23 +723,25 @@ def create_tradeline():
         )
 
     try:
+        date_opened_parsed = parse(str(data["date_opened"]))
         new_tradeline = Tradeline(
             user_id=user_id,
-            account_number=data["account_number"],
-            balance=data["balance"],
-            date_opened=parse(data["date_opened"]),
+            account_number=str(data["account_number"]).strip(),
+            balance=float(data["balance"]),
+            date_opened=date_opened_parsed,
             creditor_name=data.get("creditor_name"),
         )
         db.session.add(new_tradeline)
+        db.session.flush()
 
         db.session.add(
             SchemaEvent(
+                user_id=user_id,
                 event_type="TRADELINE_CREATE_V1",
                 origin=f"user:{user_id}",
                 detail=f"Tradeline created: {new_tradeline.account_number}",
             )
         )
-
         db.session.commit()
         increment_counter("api_tradeline_create_success_v1")
 
@@ -721,32 +751,46 @@ def create_tradeline():
             http_status_code=201,
         )
 
+    except (ValueError, ParserError) as exc:
+        db.session.rollback()
+        logger.warning(f"Validation failure parsing tradeline input: {exc}")
+        return error_response(
+            "E_DATA_PARSE",
+            message="Invalid balance amount or date_opened format.",
+            http_status_code=422,
+        )
     except SQLAlchemyError as exc:
         db.session.rollback()
-        logger.error(f"DB Error on tradeline creation: {exc}", exc_info=True)
+        logger.error(f"Database error during tradeline creation: {exc}", exc_info=True)
         return error_response(
-            "E_DB_ERROR", message="A database error occurred.", http_status_code=500
+            "E_DB_ERROR",
+            message="A database error occurred while creating the tradeline.",
+            http_status_code=500,
         )
-    except Exception as exc:
-        db.session.rollback()
-        logger.error(f"Error processing tradeline data: {exc}", exc_info=True)
-        return error_response("E_DATA_PARSE", message="Invalid data format.", http_status_code=422)
 
 
 @api_v1_bp.route("/tradelines/<int:tradeline_id>", methods=["GET"])
 @jwt_required()
 @rate_limit_if_enabled("60/minute")
-@swag_from(
-    {
-        "tags": ["Tradelines"],
-        "responses": {
-            200: {"description": "Single tradeline details."},
-            404: {"description": "Not found."},
-        },
-    }
-)
-def get_tradeline(tradeline_id):
-    """Retrieves a single tradeline by ID with ownership check."""
+@swag_from({
+    "tags": ["Tradelines"],
+    "summary": "Fetch a specific tradeline by ID.",
+    "parameters": [
+        {
+            "name": "tradeline_id",
+            "in": "path",
+            "type": "integer",
+            "required": True,
+            "description": "Unique identifier of the tradeline.",
+        }
+    ],
+    "responses": {
+        200: {"description": "Tradeline details."},
+        404: {"description": "Tradeline not found or access denied."},
+    },
+})
+def get_tradeline(tradeline_id: int) -> Tuple[Response, int]:
+    """Retrieves a single tradeline record verified by user ownership."""
     user_id = get_jwt_identity()
     tradeline = Tradeline.query.filter_by(id=tradeline_id, user_id=user_id).first()
 
@@ -765,19 +809,40 @@ def get_tradeline(tradeline_id):
 @jwt_required()
 @rate_limit_if_enabled("30/minute")
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Tradelines"],
-        "responses": {
-            200: {"description": "Tradeline updated."},
-            404: {"description": "Not found."},
+@swag_from({
+    "tags": ["Tradelines"],
+    "summary": "Update an existing tradeline.",
+    "parameters": [
+        {
+            "name": "tradeline_id",
+            "in": "path",
+            "type": "integer",
+            "required": True,
+            "description": "Unique identifier of the tradeline.",
         },
-    }
-)
-def update_tradeline(tradeline_id):
-    """Updates an existing tradeline with ownership check."""
+        {
+            "name": "body",
+            "in": "body",
+            "required": False,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "balance": {"type": "number", "example": 1200.00},
+                    "creditor_name": {"type": "string", "example": "Wells Fargo"},
+                },
+            },
+        },
+    ],
+    "responses": {
+        200: {"description": "Tradeline updated successfully."},
+        404: {"description": "Tradeline not found or access denied."},
+        422: {"description": "Invalid input payload."},
+    },
+})
+def update_tradeline(tradeline_id: int) -> Tuple[Response, int]:
+    """Updates an existing tradeline record with user authorization check."""
     user_id = get_jwt_identity()
-    data = request.get_json(silent=True) or {}
+    data: Dict[str, Any] = request.get_json(silent=True) or {}
 
     tradeline = Tradeline.query.filter_by(id=tradeline_id, user_id=user_id).first()
 
@@ -791,21 +856,18 @@ def update_tradeline(tradeline_id):
 
     try:
         if "balance" in data:
-            tradeline.balance = data["balance"]
+            tradeline.balance = float(data["balance"])
         if "creditor_name" in data:
-            tradeline.creditor_name = data["creditor_name"]
+            tradeline.creditor_name = str(data["creditor_name"]).strip()
 
         db.session.add(
             SchemaEvent(
+                user_id=user_id,
                 event_type="TRADELINE_UPDATE_V1",
                 origin=f"user:{user_id}",
-                detail=(
-                    f"Tradeline {tradeline_id} updated: Balance="
-                    f"{data.get('balance', tradeline.balance)}"
-                ),
+                detail=f"Tradeline {tradeline_id} updated: Balance={tradeline.balance}",
             )
         )
-
         db.session.commit()
         increment_counter("api_tradeline_update_success_v1")
 
@@ -814,35 +876,47 @@ def update_tradeline(tradeline_id):
             message=f"Tradeline {tradeline_id} updated successfully.",
         )
 
+    except ValueError as exc:
+        db.session.rollback()
+        logger.warning(f"Invalid numeric input during tradeline update: {exc}")
+        return error_response(
+            "E_DATA_PARSE",
+            message="Invalid data format for balance field.",
+            http_status_code=422,
+        )
     except SQLAlchemyError as exc:
         db.session.rollback()
-        logger.error(f"DB Error on tradeline update: {exc}", exc_info=True)
+        logger.error(f"Database error during tradeline update: {exc}", exc_info=True)
         return error_response(
             "E_DB_ERROR",
             message="A database error occurred during the update.",
             http_status_code=500,
         )
-    except Exception as exc:
-        db.session.rollback()
-        logger.error(f"Error processing tradeline data: {exc}", exc_info=True)
-        return error_response("E_DATA_PARSE", message="Invalid data format.", http_status_code=422)
 
 
 @api_v1_bp.route("/tradelines/<int:tradeline_id>", methods=["DELETE"])
 @jwt_required()
 @rate_limit_if_enabled("10/minute")
 @csrf.exempt
-@swag_from(
-    {
-        "tags": ["Tradelines"],
-        "responses": {
-            200: {"description": "Tradeline deleted."},
-            404: {"description": "Not found."},
-        },
-    }
-)
-def delete_tradeline(tradeline_id):
-    """Deletes a specific tradeline with ownership check."""
+@swag_from({
+    "tags": ["Tradelines"],
+    "summary": "Delete a specific tradeline.",
+    "parameters": [
+        {
+            "name": "tradeline_id",
+            "in": "path",
+            "type": "integer",
+            "required": True,
+            "description": "Unique identifier of the tradeline.",
+        }
+    ],
+    "responses": {
+        200: {"description": "Tradeline deleted successfully."},
+        404: {"description": "Tradeline not found or access denied."},
+    },
+})
+def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
+    """Deletes a specific tradeline record with ownership verification."""
     user_id = get_jwt_identity()
     tradeline = Tradeline.query.filter_by(id=tradeline_id, user_id=user_id).first()
 
@@ -857,12 +931,12 @@ def delete_tradeline(tradeline_id):
     try:
         db.session.add(
             SchemaEvent(
+                user_id=user_id,
                 event_type="TRADELINE_DELETE_V1",
                 origin=f"user:{user_id}",
                 detail=f"Tradeline {tradeline_id} deleted: {tradeline.account_number}",
             )
         )
-
         db.session.delete(tradeline)
         db.session.commit()
 
@@ -874,7 +948,7 @@ def delete_tradeline(tradeline_id):
 
     except SQLAlchemyError as exc:
         db.session.rollback()
-        logger.error(f"DB Error on tradeline deletion: {exc}", exc_info=True)
+        logger.error(f"Database error during tradeline deletion: {exc}", exc_info=True)
         return error_response(
             "E_DB_ERROR",
             message="A database error occurred during deletion.",

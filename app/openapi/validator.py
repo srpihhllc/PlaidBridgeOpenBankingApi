@@ -1,9 +1,10 @@
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/openapi/validator.py
+
 from openapi_core import create_spec
 from openapi_core.validation.request.validators import RequestValidator
 from openapi_core.validation.response.validators import ResponseValidator
 from openapi_core.contrib.flask import FlaskOpenAPIRequest, FlaskOpenAPIResponse
 import yaml
-from pathlib import Path
 
 _spec = None
 _request_validator = None

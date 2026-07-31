@@ -4,21 +4,32 @@
 # =============================================================================
 
 import json
-import pytest
+import requests
 from flask import url_for
 
 from app.oauth.provider import ProviderName
 
 
 def test_apple_token_exchange_failure(monkeypatch, client, app):
-    # Make provider.exchange_code raise (simulate requests.post Timeout)
+    # Raise a requests Timeout exception to trigger the OAUTH_TOKEN_ERROR trace event path
     def mock_exchange(self, code):
-        raise TimeoutError("simulated timeout")
+        raise requests.exceptions.Timeout("simulated timeout")
 
     monkeypatch.setattr("app.oauth.provider.OAuthProvider.exchange_code", mock_exchange)
 
-    # Ensure tests use POST form for Apple
-    resp = client.post("/oauth/callback/apple", data={"code": "abc123"})
+    # Set expected state in test session for CSRF check
+    test_state = "test-state-apple"
+    with client.session_transaction() as sess:
+        sess["oauth_state:apple"] = test_state
+
+    # POST form with code and matching state
+    resp = client.post(
+        url_for("oauth.callback_provider", provider=ProviderName.APPLE.value), 
+        data={
+            "code": "abc123",
+            "state": test_state,
+        }
+    )
     assert resp.status_code == 502
 
     with app.app_context():
@@ -33,17 +44,29 @@ def test_apple_token_exchange_failure(monkeypatch, client, app):
 
 
 def test_apple_profile_fetch_failure(monkeypatch, client, app):
-    # exchange_code returns token data but fetch_profile raises
+    # exchange_code returns token data but fetch_profile raises a requests HTTPError
     def mock_exchange(self, code):
         return {"id_token": "fake", "access_token": "fake"}
 
     def mock_fetch(self, token_data):
-        raise RuntimeError("profile service down")
+        raise requests.exceptions.HTTPError("profile service down")
 
     monkeypatch.setattr("app.oauth.provider.OAuthProvider.exchange_code", mock_exchange)
     monkeypatch.setattr("app.oauth.provider.OAuthProvider.fetch_profile", mock_fetch)
 
-    resp = client.post("/oauth/callback/apple", data={"code": "abc123"})
+    # Set expected state in test session for CSRF check
+    test_state = "test-state-apple"
+    with client.session_transaction() as sess:
+        sess["oauth_state:apple"] = test_state
+
+    # POST form with code and matching state
+    resp = client.post(
+        url_for("oauth.callback_provider", provider=ProviderName.APPLE.value), 
+        data={
+            "code": "abc123",
+            "state": test_state,
+        }
+    )
     assert resp.status_code == 502
 
     with app.app_context():

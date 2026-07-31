@@ -77,7 +77,7 @@
     "endpoint": "admin_api.admin_list_users"
   },
   {
-    "rule": "/admin/api/v1/users/<int:user_id>",
+    "rule": "/admin/api/v1/users/<string:user_id>",
     "methods": [
       "DELETE"
     ],
@@ -483,13 +483,6 @@
     "endpoint": "api.ping"
   },
   {
-    "rule": "/api/api/health",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "api.health_check"
-  },
-  {
     "rule": "/api/cfpb/complaint",
     "methods": [
       "POST"
@@ -529,7 +522,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "api.health_check"
+    "endpoint": "api.api_health"
   },
   {
     "rule": "/api/login",
@@ -539,8 +532,16 @@
     "endpoint": "compat.api_login"
   },
   {
+    "rule": "/api/operator/access_token_pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.operator_access_token_pulse"
+  },
+  {
     "rule": "/api/operator/debug_flags",
     "methods": [
+      "GET",
       "POST"
     ],
     "endpoint": "api.operator_debug_flags"
@@ -548,6 +549,7 @@
   {
     "rule": "/api/operator/disable",
     "methods": [
+      "GET",
       "POST"
     ],
     "endpoint": "api.operator_disable"
@@ -562,6 +564,7 @@
   {
     "rule": "/api/operator/enable",
     "methods": [
+      "GET",
       "POST"
     ],
     "endpoint": "api.operator_enable"
@@ -576,6 +579,7 @@
   {
     "rule": "/api/operator/force_template_audit",
     "methods": [
+      "GET",
       "POST"
     ],
     "endpoint": "api.operator_force_template_audit"
@@ -597,9 +601,10 @@
   {
     "rule": "/api/operator/toggle-mode",
     "methods": [
+      "GET",
       "POST"
     ],
-    "endpoint": "api.operator_enable"
+    "endpoint": "api.operator_toggle_mode"
   },
   {
     "rule": "/api/ping",
@@ -607,13 +612,6 @@
       "GET"
     ],
     "endpoint": "api.ping"
-  },
-  {
-    "rule": "/api/public/stats",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "api.public_stats"
   },
   {
     "rule": "/api/register",
@@ -656,7 +654,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "api.health_check"
+    "endpoint": "api.api_health"
   },
   {
     "rule": "/api/tradeline/review/<int:tradeline_id>",
@@ -678,13 +676,6 @@
       "POST"
     ],
     "endpoint": "api_v1.login"
-  },
-  {
-    "rule": "/api/v1/auth/mfa/setup",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "api_v1.mfa_setup"
   },
   {
     "rule": "/api/v1/auth/mfa/verify",
@@ -789,7 +780,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "api_v1.v1_health"
+    "endpoint": "api_v1.api_health"
   },
   {
     "rule": "/api/v1/ping",
@@ -804,6 +795,13 @@
       "GET"
     ],
     "endpoint": "api_v1.public_stats"
+  },
+  {
+    "rule": "/api/v1/registry/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "registry_api.get_dynamic_registry_json"
   },
   {
     "rule": "/api/v1/tradelines",
@@ -839,6 +837,27 @@
       "PUT"
     ],
     "endpoint": "api_v1.update_tradeline"
+  },
+  {
+    "rule": "/apidocs/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "flasgger.apidocs"
+  },
+  {
+    "rule": "/apidocs/index.html",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "flasgger.<lambda>"
+  },
+  {
+    "rule": "/apispec_1.json",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "flasgger.apispec_1"
   },
   {
     "rule": "/auth/account_settings",
@@ -1003,7 +1022,7 @@
       "GET",
       "POST"
     ],
-    "endpoint": "oauth.callback_provider_legacy"
+    "endpoint": "oauth.callback_provider"
   },
   {
     "rule": "/callback/google",
@@ -1014,7 +1033,7 @@
     "endpoint": "oauth.callback_google"
   },
   {
-    "rule": "/callback/google_clean",
+    "rule": "/callback/google/clean",
     "methods": [
       "GET",
       "POST"
@@ -1028,14 +1047,6 @@
       "POST"
     ],
     "endpoint": "oauth.callback_microsoft"
-  },
-  {
-    "rule": "/callback/plaid",
-    "methods": [
-      "GET",
-      "POST"
-    ],
-    "endpoint": "oauth.callback_plaid"
   },
   {
     "rule": "/cockpit/bad_method_probe",
@@ -1220,6 +1231,13 @@
     "endpoint": "main.favicon"
   },
   {
+    "rule": "/flasgger_static/<path:filename>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "flasgger.static"
+  },
+  {
     "rule": "/generate_cfpb_complaint/<template_name>",
     "methods": [
       "POST"
@@ -1265,6 +1283,7 @@
   {
     "rule": "/ignite-cortex",
     "methods": [
+      "GET",
       "POST"
     ],
     "endpoint": "main.ignite_cortex"
@@ -1304,7 +1323,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "oauth.login_initiate"
+    "endpoint": "oauth.login"
   },
   {
     "rule": "/logout",
@@ -1321,19 +1340,11 @@
     "endpoint": "metrics"
   },
   {
-    "rule": "/oauth/callback/<provider>",
-    "methods": [
-      "GET",
-      "POST"
-    ],
-    "endpoint": "oauth.callback_provider"
-  },
-  {
-    "rule": "/oauth/login/<provider>",
+    "rule": "/oauth2-redirect.html",
     "methods": [
       "GET"
     ],
-    "endpoint": "oauth.login_initiate"
+    "endpoint": "flasgger.oauth_redirect"
   },
   {
     "rule": "/pulse/access_token/<int:token_id>",
@@ -1363,6 +1374,13 @@
       "POST"
     ],
     "endpoint": "main.register_subscriber_redirect"
+  },
+  {
+    "rule": "/registry/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "registry_ui.show_registry_html"
   },
   {
     "rule": "/repair/clear-zombies",
@@ -1512,6 +1530,14 @@
     "endpoint": "main.subscriber_dashboard"
   },
   {
+    "rule": "/subscriber/login",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "subscriber_login"
+  },
+  {
     "rule": "/subscriber/update_profile",
     "methods": [
       "POST"
@@ -1551,21 +1577,21 @@
     "methods": [
       "POST"
     ],
-    "endpoint": "webhooks.ach_listener"
+    "endpoint": "webhooks.ach_webhook"
   },
   {
     "rule": "/webhooks/plaid",
     "methods": [
       "POST"
     ],
-    "endpoint": "webhooks.plaid_listener"
+    "endpoint": "webhooks.plaid_webhook"
   },
   {
     "rule": "/webhooks/reconcile",
     "methods": [
       "POST"
     ],
-    "endpoint": "webhooks.reconcile_payments"
+    "endpoint": "webhooks.reconcile_webhook"
   },
   {
     "rule": "/welcome_back",

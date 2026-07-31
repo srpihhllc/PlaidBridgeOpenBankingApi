@@ -1,7 +1,7 @@
 # =============================================================================
 # FILE: app/tests/test_google_oauth.py
 # DESCRIPTION: Tests for Google OAuth callback flows.
-#              Inherits shared helpers from BaseOAuthTest.
+#               Inherits shared helpers from BaseOAuthTest.
 # =============================================================================
 
 import pytest
@@ -46,7 +46,12 @@ class TestGoogleOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.get", mock_get_profile)
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123"))
+        # Set up state in session to satisfy CSRF protection
+        test_state = "test-google-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:google"] = test_state
+
+        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")
 
@@ -75,7 +80,11 @@ class TestGoogleOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.post", mock_post)
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123"))
+        test_state = "test-google-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:google"] = test_state
+
+        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
         assert resp.status_code == 502
 
         with app.app_context():
@@ -112,7 +121,11 @@ class TestGoogleOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.get", mock_get)
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123"))
+        test_state = "test-google-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:google"] = test_state
+
+        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
         assert resp.status_code == 401
 
         with app.app_context():
@@ -163,10 +176,10 @@ class TestGoogleOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.get", mock_get)
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123"))
+        test_state = "test-google-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:google"] = test_state
+
+        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")
-
-
-
-

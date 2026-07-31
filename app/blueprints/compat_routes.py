@@ -5,7 +5,7 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, make_response, request
 from werkzeug.security import check_password_hash, generate_password_hash
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import create_access_token, jwt_required
 
 from app.extensions import db
 from app.models.user import User
@@ -23,7 +23,7 @@ def api_register() -> Any:
     username = (data.get("username") or "").strip()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
-    bank = data.get("bank_name") or ""
+    _bank = data.get("bank_name") or ""
 
     if not (username and email and password):
         return jsonify({"error": "missing fields"}), 400

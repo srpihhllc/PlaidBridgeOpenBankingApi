@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Vault Intake{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>🏦 Incoming Payments</h2>
+  <ul class="list-group">
+    {% for txn in txns %}
+    <li class="list-group-item">
+      ${{ "%.2f"|format(txn.amount) }} received via {{ txn.method or "—" }}<br>
+      From Borrower #{{ txn.borrower_id }} | Card #{{ txn.card_id or "—" }}<br>
+      Received: {{ txn.received_at.strftime("%Y-%m-%d %H:%M") }}<br>
+      {% if txn.reconciled %}
+        <span class="badge bg-success">Reconciled</span>
+      {% else %}
+        <span class="badge bg-secondary">Unmatched</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

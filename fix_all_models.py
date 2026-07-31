@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Add extend_existing=True to ALL models, handling both tuple and dict __table_args__."""
-import os
 import re
 from pathlib import Path
 

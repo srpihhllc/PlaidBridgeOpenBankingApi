@@ -1,0 +1,38 @@
+<div class="tile lender-risk-tile">
+    <h2>Lender Risk Overview</h2>
+
+    <h3>Telemetry Counters</h3>
+    <ul>
+        {% for key, value in counters.items() %}
+            <li><strong>{{ key }}:</strong> {{ value }}</li>
+        {% endfor %}
+    </ul>
+
+    <h3>Recent Lender Events</h3>
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Event</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for e in lender_events %}
+            <tr>
+                <td>{{ e.timestamp }}</td>
+                <td>{{ e.user_id }}</td>
+                <td>{{ e.event_type }}</td>
+                <td>{{ e.detail }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>AI Risk Evaluations</h3>
+    <pre>{{ ai_risk_logs | tojson(indent=2) }}</pre>
+
+    <h3>Recent Fraud Cases</h3>
+    <pre>{{ fraud_cases | tojson(indent=2) }}</pre>
+</div>

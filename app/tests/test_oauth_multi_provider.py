@@ -17,6 +17,8 @@ def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
     This test monkeypatches the provider.exchange_code and provider.fetch_profile
     to produce deterministic token and profile payloads for each provider.
     """
+    app.config["TESTING"] = True
+
     # Deterministic token response and profile per provider
     token_response = {"access_token": f"fake-{provider.value}-access", "id_token": f"fake-{provider.value}-id"}
     profile_response = {"email": f"test+{provider.value}@example.com", "sub": "123", "name": "Tester"}
@@ -36,8 +38,16 @@ def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
     monkeypatch.setattr(provider_module.OAuthProvider, "exchange_code", mock_exchange)
     monkeypatch.setattr(provider_module.OAuthProvider, "fetch_profile", mock_fetch_profile)
 
-    # Build the URL for the unified route
-    resp = client.get(url_for("oauth.callback_provider", provider=provider.value, code="abc123"))
+    # Seed the expected CSRF state in the session for this specific provider
+    test_state = f"test-{provider.value}-state"
+    with client.session_transaction() as sess:
+        sess[f"oauth_state:{provider.value}"] = test_state
+
+    # Build the URL for the unified route including the state parameter
+    resp = client.get(
+        url_for("oauth.callback_provider", provider=provider.value, code="abc123", state=test_state)
+    )
+
     # Expect redirect to dashboard
     assert resp.status_code in (302, 303)
     assert resp.headers["Location"].endswith("/dashboard")

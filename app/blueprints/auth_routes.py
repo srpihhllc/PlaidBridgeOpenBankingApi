@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import logging
 import secrets
-from urllib.parse import urljoin, urlparse
 from datetime import datetime, timezone
 
 
@@ -556,11 +555,7 @@ def login_view():
 
             next_url = request.args.get("next")
             if next_url and is_safe_url(next_url):
-                if user.role == "subscriber" and next_url.startswith("/sub/"):
-                    return redirect(next_url)
-                if user.role in ("admin", "super_admin") and next_url.startswith("/admin"):
-                    return redirect(next_url)
-                current_app.logger.info("Ignored unsafe next_url=%s for user_id=%s role=%s", next_url, user.id, user.role)
+                return redirect(next_url)
 
             return redirect_for_role(user)
 
@@ -570,24 +565,18 @@ def login_view():
 
     return render_template("auth/login.html")
 
-
+# Aliases for convenience
 @auth_bp.route("/subscriber_login", methods=["GET", "POST"], endpoint="subscriber_login")
-def subscriber_login_alias():
-    return login_view()
-
+def subscriber_login_alias(): return login_view()
 
 @auth_bp.route("/login_subscriber", methods=["GET", "POST"], endpoint="login_subscriber")
 def login_subscriber():
-    if request.method == "GET":
-        return render_template("auth/login_subscriber.html")
-    return login_view()
-
+    return render_template("auth/login_subscriber.html") if request.method == "GET" else login_view()
 
 @auth_bp.route("/login_operator", methods=["GET"])
-def login_operator():
-    return render_template("auth/operator_login.html")
+def login_operator(): return render_template("auth/operator_login.html")
 
-
+# API Logout
 @auth_bp.route("/api/logout", methods=["POST"])
 @jwt_required(refresh=True)
 @csrf.exempt
@@ -600,15 +589,21 @@ def api_logout():
 
     if jti and exp:
         add_token_to_blacklist(jti, exp)
-        log_identity_event(user_id, "AUTH_JWT_REFRESH_REVOKED_API", ip=ip, user_agent=user_agent, details={"jti": jti})
-
+        log_identity_event(
+            user_id,
+            "AUTH_JWT_REFRESH_REVOKED_API",
+            ip=ip,
+            user_agent=user_agent,
+            details={"jti": jti}
+        )
     return jsonify({"msg": "API logout successful"}), 200
 
-
+# Standard Web Logout (Protected path: /auth/logout)
 @auth_bp.route("/logout", methods=["GET"])
 @login_required
 def logout():
     logout_user()
+    session.clear()
     flash("You have been logged out.", "info")
     return redirect(url_for("main.home"))
 

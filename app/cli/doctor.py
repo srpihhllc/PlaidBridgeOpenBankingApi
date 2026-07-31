@@ -1,7 +1,9 @@
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli/doctor.py
+
 import click
 from flask import current_app
 from flask.cli import with_appcontext
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 from app.extensions import db
 
@@ -14,7 +16,6 @@ def doctor():
     Checks blueprints, CLI commands, DB connectivity, essential tables,
     user roles, template/static paths, and extension initialization.
     """
-
     app = current_app
     echo = click.echo
 
@@ -42,7 +43,10 @@ def doctor():
     # 3. Database connectivity
     # ---------------------------------------------------------
     try:
-        db.session.execute(text("SELECT 1"))
+        # Use the app-bound engine so the engine is resolved for the active app
+        engine = db.get_engine(app)
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
         echo("✔ Database connection OK")
     except Exception as exc:
         echo(f"✖ Database connection FAILED: {exc}")
@@ -52,8 +56,9 @@ def doctor():
     # ---------------------------------------------------------
     essential = ["users", "lenders", "bank_accounts", "bank_institutions"]
     try:
-        inspector = db.inspect(db.engine)
-        existing = set(inspector.get_table_names())
+        engine = db.get_engine(app)
+        inspector = inspect(engine)
+        existing = set(inspector.get_table_names() or [])
         missing = [t for t in essential if t not in existing]
 
         if missing:
@@ -66,9 +71,10 @@ def doctor():
     # ---------------------------------------------------------
     # 5. User role sanity
     # ---------------------------------------------------------
-    from app.models import User
-
     try:
+        # Import models inside the command to avoid import-time DB access
+        from app.models import User
+
         admin = User.query.filter_by(role="admin").first()
         subscriber = User.query.filter_by(role="subscriber").first()
         lender = User.query.filter_by(role="lender").first()
@@ -92,7 +98,11 @@ def doctor():
     # 7. Extension initialization
     # ---------------------------------------------------------
     try:
-        echo("✔ Extensions initialized: jwt, login_manager, limiter")
+        # Report presence of key extensions rather than touching them at import time
+        jwt_ok = bool(getattr(app, "jwt", None) or app.extensions.get("jwt"))
+        lm_ok = bool(getattr(app, "login_manager", None) or app.extensions.get("login_manager"))
+        limiter_ok = bool(app.extensions.get("limiter"))
+        echo(f"✔ Extensions initialized: jwt={jwt_ok}, login_manager={lm_ok}, limiter={limiter_ok}")
     except Exception as exc:
         echo(f"✖ Extension initialization check failed: {exc}")
 

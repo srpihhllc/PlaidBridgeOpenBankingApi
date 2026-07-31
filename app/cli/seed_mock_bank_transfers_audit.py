@@ -1,9 +1,8 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli/seed_mock_bank_transfers_audit.py
-
-from datetime import datetime
+from datetime import datetime, timezone
 
 import click
 from flask import current_app
+from flask.cli import with_appcontext
 
 from app.extensions import db
 from app.models import Transaction, User
@@ -11,6 +10,7 @@ from app.models.audit_log import AuditLog  # adjust import if your model lives e
 
 
 @click.command("seed-mock-bank-transfers-audit")
+@with_appcontext
 def seed_mock_bank_transfers_audit():
     """
     Generate audit‑log entries for all mock bank transfers belonging to the subscriber.
@@ -59,6 +59,7 @@ def seed_mock_bank_transfers_audit():
         # Compute simple audit signals
         direction = "credit" if tx.amount > 0 else "debit"
         risk_flag = "high" if abs(tx.amount) > 5000 else "normal"
+        now_utc = datetime.now(timezone.utc)
 
         audit_payload = {
             "transaction_id": tx.id,
@@ -66,7 +67,7 @@ def seed_mock_bank_transfers_audit():
             "direction": direction,
             "risk_flag": risk_flag,
             "category": tx.category,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": now_utc.isoformat(),
         }
 
         audit = AuditLog(
@@ -74,7 +75,7 @@ def seed_mock_bank_transfers_audit():
             transaction_id=tx.id,
             event_type=event_type,
             payload=audit_payload,
-            created_at=datetime.utcnow(),
+            created_at=now_utc,
         )
 
         db.session.add(audit)

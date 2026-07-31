@@ -1,3 +1,5 @@
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/agents/agent_registry.json
+
 {
   "CreditSherpa": {
     "description": "Pulls and consolidates credit reports across all major and alternative bureaus for financial verification.",

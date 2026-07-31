@@ -1,9 +1,8 @@
 # app/tests/test_route_cleanup.py
 
-import types
 from flask import Flask
 
-from app import _cleanup_premature_oauth_registrations, add_route_prune_whitelist
+from app import _cleanup_premature_oauth_registrations
 
 def test_cleanup_removes_premature_oauth_endpoint(monkeypatch):
     # Create a minimal Flask app and simulate a premature oauth.* view registration

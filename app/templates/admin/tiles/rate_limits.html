@@ -1,4 +1,4 @@
-{% extends "admin_base.html" %}
+{% extends "admin/admin.html" %}
 {% block title %}Rate Limit Analytics{% endblock %}
 {% block content %}
   <h2>📥 Rate Limit Dashboard</h2>
@@ -19,7 +19,7 @@
             <td>{{ stat.requests }}</td>
             <td>
               {{ stat.ttl }}
-              <form action="{{ url_for('main.delete_rate_limit') }}" method="post" style="display: inline; margin-left: 10px;">
+              <form action="{{ url_for('admin.tile_rate_limits') }}" method="post" style="display: inline; margin-left: 10px;">
                 <input type="hidden" name="ip" value="{{ stat.ip }}">
                 <button type="submit" class="btn btn-sm btn-danger" title="Remove from Redis">🗑️</button>
               </form>

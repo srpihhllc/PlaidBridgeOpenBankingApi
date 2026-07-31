@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Add extend_existing=True to all SQLAlchemy models."""
-import os
 import re
 from pathlib import Path
 

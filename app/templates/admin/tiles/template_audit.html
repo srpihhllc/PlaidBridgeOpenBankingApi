@@ -1,0 +1,33 @@
+<!-- templates/tiles/template_audit.html -->
+<h3>Template Audit Trend</h3>
+
+<p>Latest run:</p>
+<ul>
+  <li>Templates scanned: {{ summary.templates_scanned }}</li>
+  <li>Endpoints found: {{ summary.endpoints_found }}</li>
+  <li>Missing endpoints: {{ summary.missing_endpoints }}</li>
+  <li>Errors: {{ summary.errors }}</li>
+</ul>
+
+<canvas id="auditTrend"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+const records = {{ history|tojson }};
+const labels = records.map(r => new Date(r.timestamp * 1000).toLocaleString()).reverse();
+const missing = records.map(r => r.missing_endpoints).reverse();
+const errors = records.map(r => r.errors).reverse();
+const scanned = records.map(r => r.templates_scanned).reverse();
+
+new Chart(document.getElementById('auditTrend'), {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      { label: 'Missing Endpoints', data: missing, borderColor: '#f44336', fill: false },
+      { label: 'Errors', data: errors, borderColor: '#ff9800', fill: false },
+      { label: 'Templates Scanned', data: scanned, borderColor: '#2196f3', fill: false }
+    ]
+  },
+  options: { scales: { y: { beginAtZero: true } } }
+});
+</script>

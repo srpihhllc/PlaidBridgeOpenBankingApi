@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}Cortex Ignition Dashboard{% endblock %}{% block content %}<div class="container mt-4"><h2>🧠 Operator Ignition Events</h2>{% if ttl is not none and ttl <= 0 %}<script>setTimeout(() => {// NOTE: Using a custom modal or message box is recommended over alert()// as it's not supported in all environments.// alert("⚠️ Operator session expired. Please re-ignite cortex access.");window.location.href = "/terence_entry";}, 500);</script>{% endif %}{% if ttl and ttl < 60 %}<div class="alert alert-warning mt-2">⏳ Warning: Operator session TTL is below 60 seconds!</div>{% endif %}<!-- 🔁 TTL Pulse Bar -->{% include "components/ttl_pulse.html" %}<!-- 🧩 Unified Cockpit Overlay Row --><div class="row mt-4"><!-- 🔧 CLI Pulse -->
+{% extends "admin/admin.html" %}
 <div class="col-md-3">
   <div class="card border-success mb-3">
     <div class="card-header bg-success text-white">🔧 CLI Pulse</div>

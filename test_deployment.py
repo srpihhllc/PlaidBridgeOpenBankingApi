@@ -39,7 +39,7 @@ def test_backend():
         route_count = len(list(app.url_map.iter_rules()))
         blueprint_count = len(app.blueprints)
         
-        print(f"[OK] Backend app creation: SUCCESS")
+        print("[OK] Backend app creation: SUCCESS")
         print(f"   - Total routes: {route_count}")
         print(f"   - Total blueprints: {blueprint_count}")
         print(f"   - Flask version: {app.__class__.__module__}")
@@ -50,11 +50,11 @@ def test_backend():
         if missing:
             print(f"[WARN] Missing blueprints: {missing}")
         else:
-            print(f"[OK] All critical blueprints registered")
+            print("[OK] All critical blueprints registered")
         
         return True
     except Exception as e:
-        print(f"[FAIL] Backend app creation: FAILED")
+        print("[FAIL] Backend app creation: FAILED")
         print(f"   Error: {e}")
         import traceback
         traceback.print_exc()
@@ -112,7 +112,7 @@ def test_mobile():
         
         return True
     except Exception as e:
-        print(f"[FAIL] Mobile app test: FAILED")
+        print("[FAIL] Mobile app test: FAILED")
         print(f"   Error: {e}")
         return False
 
@@ -226,7 +226,7 @@ def test_git_status():
         if tracking.returncode == 0:
             ahead, behind = tracking.stdout.strip().split()
             if ahead == "0" and behind == "0":
-                print(f"[OK] In sync with origin/main")
+                print("[OK] In sync with origin/main")
             else:
                 print(f"[WARN] Ahead: {ahead}, Behind: {behind}")
 

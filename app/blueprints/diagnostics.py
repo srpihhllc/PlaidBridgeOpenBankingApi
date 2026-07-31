@@ -1,4 +1,6 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/blueprints/diagnostics.py
+# =============================================================================
+# FILE: app/blueprints/diagnostics.py
+# =============================================================================
 
 import os
 import time
@@ -16,12 +18,14 @@ from app.decorators import admin_required
 from app.models import Transaction, User, db
 from app.utils.redis_utils import get_redis_client
 
+# New import for template wiring audit
+from app.utils.template_audit import run_template_audit
+
 diagnostics_bp = Blueprint("diagnostics", __name__, url_prefix="/diagnostics")
 
 # =============================================================================
 # COCKPIT-GRADE UTILITIES
 # =============================================================================
-
 
 def cli_safe_auth(f):
     """
@@ -29,7 +33,6 @@ def cli_safe_auth(f):
     If DIAGNOSTICS_CLI_MODE is True (set by CLI), we skip Flask-Login/Admin checks.
     Otherwise, we enforce full production security for web requests.
     """
-
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if current_app.config.get("DIAGNOSTICS_CLI_MODE"):
@@ -41,14 +44,11 @@ def cli_safe_auth(f):
             return f(*args, **kwargs)
 
         return wrapper()
-
     return decorated_function
-
 
 # =============================================================================
 # DIAGNOSTIC ROUTES
 # =============================================================================
-
 
 @diagnostics_bp.route("/console")
 @login_required
@@ -57,18 +57,16 @@ def neural_console():
     """Renders the central admin cockpit UI."""
     return render_template("admin/neural_console.html")
 
-
 @diagnostics_bp.route("/full")
 @cli_safe_auth
 def get_full_diagnostics():
     """
     The Unified /full Endpoint.
-    Consolidates Performance, Integrity, Configuration, and Statistics.
+    Consolidates Performance, Integrity, Configuration, Statistics, and Wiring.
     """
     config_obj = get_config()
     start_total = time.time()
 
-    # Threshold for 'Degraded' state detection
     LATENCY_THRESHOLD_MS = 200
 
     # 1. Database Performance & Connectivity
@@ -96,11 +94,10 @@ def get_full_diagnostics():
     except Exception as e:
         redis_msg = str(e)
 
-    # 3. Migration Integrity (The Fixed Snippet)
+    # 3. Migration Integrity
     current_head = "Unknown"
     current_db_rev = "Unknown"
     try:
-        # ⭐ Force look for alembic.ini in the current working directory (Project Root)
         project_root = os.getcwd()
         alembic_ini_path = os.path.join(project_root, "alembic.ini")
 
@@ -119,7 +116,6 @@ def get_full_diagnostics():
         current_head = f"Error: {str(e)}"
         current_db_rev = "Error"
 
-    # Normalize revisions
     invalid_states = [None, "Unknown", "Error", "N/A"]
     normalized_head = str(current_head).strip()
     normalized_db = str(current_db_rev).strip()
@@ -142,13 +138,20 @@ def get_full_diagnostics():
         cache_stats = {
             "total_keys": len(keys),
             "volatile_alerts": sum(
-                1
-                for k in keys
+                1 for k in keys
                 if redis.ttl(k) == -1 and k.decode().startswith(("mfa", "rate", "session"))
             ),
         }
     except Exception:
         cache_stats = {"error": "Cache stats unavailable"}
+
+    # 6. Template Wiring Audit
+    try:
+        template_report = run_template_audit()
+        wiring_status = "healthy" if template_report.get("missing_endpoints", 0) == 0 else "degraded"
+    except Exception as e:
+        wiring_status = "error"
+        template_report = {"error": str(e), "missing_endpoints": -1}
 
     return (
         jsonify(
@@ -164,17 +167,13 @@ def get_full_diagnostics():
                     "database": {
                         "online": db_connected,
                         "latency_ms": db_latency_ms,
-                        "degraded": (
-                            db_latency_ms > LATENCY_THRESHOLD_MS if db_connected else False
-                        ),
+                        "degraded": db_latency_ms > LATENCY_THRESHOLD_MS if db_connected else False,
                         "message": db_message,
                     },
                     "redis": {
                         "online": redis_ok,
                         "latency_ms": redis_latency_ms,
-                        "degraded": (
-                            redis_latency_ms > LATENCY_THRESHOLD_MS if redis_ok else False
-                        ),
+                        "degraded": redis_latency_ms > LATENCY_THRESHOLD_MS if redis_ok else False,
                         "message": redis_msg,
                     },
                 },
@@ -183,6 +182,10 @@ def get_full_diagnostics():
                     "db_revision": normalized_db,
                     "synced": migration_synced,
                 },
+                "wiring": {
+                    "status": wiring_status,
+                    "audit": template_report
+                },
                 "stats": {"db": db_stats, "cache": cache_stats},
                 "config_summary": config_obj.summarize(),
             }
@@ -190,9 +193,7 @@ def get_full_diagnostics():
         200,
     )
 
-
 # --- Standard UI Routes ---
-
 
 @diagnostics_bp.route("/routes")
 @login_required
@@ -210,12 +211,16 @@ def route_list():
     routes.sort(key=lambda r: r["url"])
     return render_template("admin/route_list.html", routes=routes)
 
+@diagnostics_bp.route("/cache_health")
+@login_required
+@admin_required
+def cache_health():
+    return render_template("cache_health.html")
 
 @diagnostics_bp.route("/db_health")
 @login_required
 @admin_required
 def db_health():
-    """Renders a detailed health check for the database."""
     return render_template(
         "admin/db_health.html",
         total_users=User.query.count(),

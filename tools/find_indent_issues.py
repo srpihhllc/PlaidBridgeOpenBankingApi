@@ -39,11 +39,8 @@ def main():
         if not path.exists():
             print("Not found:", path)
             continue
-        rc = show(path)
-        if rc:
-            # print small surrounding context for first issue
-            lines = path.read_text(encoding="utf-8").splitlines()
-            idx = [i for i,_,_ in [(i,*None) for i in range(1,1)]]
+        show(path)
     # exit code indicates detection count is >0
+
 if __name__ == "__main__":
     sys.exit(main())

@@ -1,22 +1,28 @@
-#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/operator_flow.sh
-
 #!/bin/bash
 # Operator lifecycle test: login → generate → consume → invalidate
 
 BASE_URL="https://srpihhllc.pythonanywhere.com"
 
-# 🔑 Replace with a real admin username/password
-USERNAME="admin@example.com"
-PASSWORD="SuperSecretPassword"
+# Automatically source live credentials from environment or pipeline sync variables
+if [ -f .env ]; then
+    export $(cat .env | grep -v '#' | xargs)
+elif [ -f ../.env ]; then
+    export $(cat ../.env | grep -v '#' | xargs)
+fi
+
+# 🛡️ Use Admin values provided by your pipeline, falling back to seed defaults if unset
+USERNAME="${ADMIN_EMAIL:-admin@example.com}"
+PASSWORD="${ADMIN_PASSWORD:-AdminPass123!}"
 
 echo "🔐 Step 0: Login to fetch JWT"
+# FIX: Targeted the precise API blueprint routing prefix path
 LOGIN_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
   -d "{\"email\":\"$USERNAME\",\"password\":\"$PASSWORD\"}" \
-  $BASE_URL/auth/login)
+  $BASE_URL/api/v1/auth/login)
 
 echo "Login response: $LOGIN_RESPONSE"
 
-JWT_TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.access_token')
+JWT_TOKEN=$(echo $LOGIN_RESPONSE | jq -r '.access_token // .data.access_token')
 if [ "$JWT_TOKEN" == "null" ] || [ -z "$JWT_TOKEN" ]; then
   echo "❌ Failed to fetch JWT token. Check credentials or login endpoint."
   exit 1
@@ -50,4 +56,3 @@ INVALIDATE_RESPONSE=$(curl -s -X POST -H "Content-Type: application/json" \
 echo "Invalidate response: $INVALIDATE_RESPONSE"
 
 echo "✅ Flow complete. Now open: $BASE_URL/admin/cockpit"
-

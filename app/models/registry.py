@@ -1,6 +1,7 @@
 # =============================================================================
 # FILE: app/models/registry.py
 # DESCRIPTION: Centralized registry model for user configurations.
+#              Updated to use dynamic backref to prevent KeyError on User mapper.
 # =============================================================================
 
 from datetime import datetime
@@ -15,6 +16,7 @@ class Registry(db.Model):
     """
 
     __tablename__ = "registries"
+    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -30,8 +32,15 @@ class Registry(db.Model):
     config_blob = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # ✔ Reverse relationship to User
-    user = db.relationship("User", back_populates="registry_events")
+    # -------------------------------------------------------------------------
+    # Relationships
+    # -------------------------------------------------------------------------
+
+    # ⭐ User Fix: Swapped back_populates to dynamic backref since User lacks 'registry_events'
+    user = db.relationship(
+        "User",
+        backref=db.backref("registry_events", lazy="dynamic", passive_deletes=True),
+    )
 
     def __repr__(self):
         return f"<Registry {self.name}>"

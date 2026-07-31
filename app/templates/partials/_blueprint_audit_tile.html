@@ -10,7 +10,6 @@
     - `audit_status`: The status of the last audit (e.g., "Pass", "Fail").
     - `audit_issues`: The number of issues found in the last audit.
 -->
-
 <div class="col-md-4">
   <div class="card bg-warning text-white shadow-sm rounded">
     <div class="card-body">
@@ -21,26 +20,33 @@
       <p class="card-text">
         <small class="text-white-50">
           Last Audit Date:
-          <strong>{{ audit_info.last_audit_date[:10] }}</strong>
+          <strong>
+            {% if audit_info and audit_info.get('last_audit_date') %}
+              {{ audit_info.get('last_audit_date')[:10] }}
+            {% else %}
+              SYSTEM_LIVE
+            {% endif %}
+          </strong>
         </small><br>
 
         <small class="text-white-50">
           Status:
-          <strong>{{ audit_info.audit_status }}</strong>
+          <strong>{{ audit_info.get('audit_status', 'OPERATOR_OVERRIDE') }}</strong>
         </small><br>
 
         <small class="text-white-50">
           Issues Found:
-          <strong>{{ audit_info.audit_issues }}</strong>
+          <strong>{{ audit_info.get('audit_issues', 0) }}</strong>
         </small>
       </p>
 
       <div class="d-flex justify-content-between align-items-center mt-3">
         <a href="#" class="btn btn-outline-light btn-sm">View Report</a>
         <span class="badge badge-pill badge-light">
-          {{ audit_info.audit_status }}
+          {{ audit_info.get('audit_status', 'ACTIVE') }}
         </span>
       </div>
     </div>
   </div>
 </div>
+

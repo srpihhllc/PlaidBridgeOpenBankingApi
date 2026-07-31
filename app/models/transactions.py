@@ -14,7 +14,6 @@ from ..extensions import db
 class Transaction(db.Model):
     __tablename__ = "transactions"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     # -------------------------------------------------------------------------
     # Primary Key
@@ -28,7 +27,7 @@ class Transaction(db.Model):
     # -------------------------------------------------------------------------
     # Foreign Keys
     # -------------------------------------------------------------------------
-    # MUST match User.id (String(36)) — corrected from Integer
+    # MUST match User.id (String(36))
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -79,8 +78,10 @@ class Transaction(db.Model):
         passive_deletes=True,
     )
 
-    # Audit events (reverse relationship for AuditLog.transaction)
-    audit_events = db.relationship(
+    # -------------------------------------------------------------------------
+    # FIXED: Rename audit_events → audit_logs to avoid collision with User.audit_events
+    # -------------------------------------------------------------------------
+    audit_logs = db.relationship(
         "AuditLog",
         back_populates="transaction",
         lazy="dynamic",

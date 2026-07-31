@@ -20,7 +20,7 @@
           <td>{{ item.size }}</td>
           <td>
             <form method="POST"
-                  action="{{ url_for('admin_ui.sweep_expired_keys') }}"
+                  action="{{ url_for('admin.sweep_expired_keys') }}"
                   class="d-inline">
               <input type="hidden" name="key" value="{{ item.key }}">
               <button type="submit"

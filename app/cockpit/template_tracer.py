@@ -12,7 +12,7 @@ import traceback
 import uuid
 from pathlib import Path
 
-from flask import Blueprint, current_app, g, render_template
+from flask import Blueprint, current_app, g, render_template, has_app_context
 
 bp = Blueprint("tracer", __name__, url_prefix="/cockpit")
 
@@ -99,12 +99,13 @@ def trace_templates(app=None):
         if "GET" not in methods and rule.endpoint not in PARAMETERIZED_ENDPOINTS:
             continue
 
+        # Use a local trace tracking variable to preserve test context compatibility
+        current_req_id = str(uuid.uuid4())
+
         try:
             view_func = app.view_functions.get(rule.endpoint)
             if not view_func:
                 raise ValueError("No view function found")
-
-            g.req_id = str(uuid.uuid4())
 
             # Build the test URL (use any parameter suffix provided)
             if rule.endpoint in PARAMETERIZED_ENDPOINTS:
@@ -116,6 +117,10 @@ def trace_templates(app=None):
             method = "GET" if "GET" in methods else next(iter(sorted(methods)))
 
             with app.test_request_context(test_url, method=method):
+                # Safely populate request globals if needed within the active context block
+                if has_app_context():
+                    g.req_id = current_req_id
+
                 response = view_func()
 
                 # Normalize status extraction (Response object or (body, status) tuple)
@@ -140,7 +145,7 @@ def trace_templates(app=None):
                     "rule": rule.rule,
                     "status": "ok",
                     "error": None,
-                    "req_id": g.req_id,
+                    "req_id": current_req_id,
                 }
             )
 
@@ -155,7 +160,7 @@ def trace_templates(app=None):
                     "rule": rule.rule,
                     "status": status,
                     "error": traceback.format_exc(limit=2),
-                    "req_id": g.get("req_id", "n/a"),
+                    "req_id": current_req_id,
                 }
             )
 

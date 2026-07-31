@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Vault Export Dashboard{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>📤 Vault Trace Export</h2>
+  <p>Export trace logs for borrower cards. You can filter by event type or download full telemetry.</p>
+
+  <form method="GET" action="/card-vault-export">
+    <div class="mb-3">
+      <label for="filter" class="form-label">Event Type Filter:</label>
+      <select id="filter" name="event_type" class="form-select">
+        <option value="">All</option>
+        <option value="CARD_REVOKED">CARD_REVOKED</option>
+        <option value="CARD_LINKED_WALLET">CARD_LINKED_WALLET</option>
+      </select>
+    </div>
+    <button class="btn btn-outline-primary btn-sm" type="submit">Apply Filter</button>
+  </form>
+
+  <hr>
+
+  <h5>Export Options:</h5>
+  <a href="/card-vault-export?format=json" class="btn btn-outline-dark btn-sm">Download JSON</a>
+  <a href="/card-vault-export?format=csv" class="btn btn-outline-secondary btn-sm">Download CSV</a>
+
+  <hr>
+  <h5>🧠 Trace Logs:</h5>
+  <ul class="list-group">
+    {% for log in logs %}
+    <li class="list-group-item">
+      <strong>{{ log.event_type }}</strong> — <code>{{ log.by }}</code> at {{ log.timestamp }}
+      {% if log.card_id %}<br><em>Card:</em> {{ log.card_id }}{% endif %}
+      {% if log.reason %}<br><em>Reason:</em> {{ log.reason }}{% endif %}
+      {% if log.method %}<br><em>Method:</em> {{ log.method }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

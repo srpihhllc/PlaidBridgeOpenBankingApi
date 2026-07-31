@@ -15,6 +15,8 @@
     </p>
 
     <form action="{{ url_for('main.ignite_cortex') }}" method="POST">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+
       <div class="form-group mb-3">
         <label for="passcode">🔐 Entry Key</label>
         <input type="password"
@@ -35,11 +37,10 @@
     <small class="text-muted text-center d-block">
       FinBrain • Version Seed → July 2025
     </small>
-    <small class="text-muted text-center">
+    <small class="text-muted text-center d-block">
       Registry → Terence Operator Protocol
     </small>
 
   </div>
 </div>
 {% endblock %}
-

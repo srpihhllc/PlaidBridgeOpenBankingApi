@@ -1,13 +1,11 @@
 #  /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/lender.py
 
 from datetime import datetime
-
 from ..extensions import db
 
 
 class Lender(db.Model):
     __tablename__ = "lenders"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -30,11 +28,31 @@ class Lender(db.Model):
     verification_score = db.Column(db.Integer, default=0)
     bank_linked = db.Column(db.Boolean, default=False)
     linked_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    # ----------------------------------------------------------------------
+    # Relationships
+    # ----------------------------------------------------------------------
     user = db.relationship("User", back_populates="lender_profiles")
 
+    # ⭐ NEW — 1:1 lender risk profile
+    risk_profile = db.relationship(
+        "LenderRisk",
+        back_populates="lender",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+    # ----------------------------------------------------------------------
+    # Serialization
+    # ----------------------------------------------------------------------
     def to_dict(self):
         return {
             "id": self.id,

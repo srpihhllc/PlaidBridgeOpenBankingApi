@@ -3,6 +3,7 @@
 # DESCRIPTION: System-level models including rate limiting, schema versioning,
 #              and boot logs. SystemVersion is tied to a specific User and must
 #              align with UUID primary keys and cascade semantics.
+#              Updated to use dynamic backref to prevent KeyError on User mapper.
 # =============================================================================
 
 from datetime import datetime
@@ -13,7 +14,6 @@ from ..extensions import db
 class RateLimit(db.Model):
     __tablename__ = "rate_limits"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
     ip_address = db.Column(db.String(50), unique=True, nullable=False)
@@ -23,7 +23,6 @@ class RateLimit(db.Model):
 
 class SystemVersion(db.Model):
     __tablename__ = "system_versions"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -39,8 +38,15 @@ class SystemVersion(db.Model):
     version_hash = db.Column(db.String(40), nullable=False)
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # ✔ Reverse relationship to User
-    user = db.relationship("User", back_populates="system_events")
+    # -------------------------------------------------------------------------
+    # Relationships
+    # -------------------------------------------------------------------------
+
+    # ⭐ User Fix: Swapped back_populates to dynamic backref since User lacks 'system_events'
+    user = db.relationship(
+        "User",
+        backref=db.backref("system_events", lazy="dynamic", passive_deletes=True),
+    )
 
     def __repr__(self):
         return f"<SystemVersion id={self.id} user_id={self.user_id} hash={self.version_hash}>"
@@ -48,7 +54,6 @@ class SystemVersion(db.Model):
 
 class SystemBootLog(db.Model):
     __tablename__ = "system_boot_logs"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)

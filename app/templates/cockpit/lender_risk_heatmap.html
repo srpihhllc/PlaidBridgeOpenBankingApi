@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lender Risk Heatmap</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        .heatmap-cell {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            margin: 2px;
+            cursor: pointer;
+            transition: transform 0.1s ease-in-out;
+        }
+        .heatmap-cell:hover {
+            transform: scale(1.25);
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease-in-out;
+            z-index: 50;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 p-8 min-h-screen">
+
+<div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg p-6">
+
+    <!-- Header -->
+    <header class="flex items-center justify-between pb-4 mb-6 border-b border-gray-200">
+        <h1 class="text-2xl font-bold text-gray-800">Lender Risk Heatmap</h1>
+        <a href="/cockpit/tiles/lender_risk/"
+           class="text-sm text-indigo-600 hover:text-indigo-800 font-semibold">
+            ← Back to Lender Risk Tile
+        </a>
+    </header>
+
+    <p class="text-gray-600 mb-4">
+        Each square represents a day. Darker red = more risk alerts. Blue = verified links.
+    </p>
+
+    <!-- Heatmap Grid -->
+    <div class="flex space-x-1 overflow-x-auto py-4">
+
+        {% for day, counts in risk_data.items() %}
+            {% set alerts = counts.alerts %}
+            {% set links = counts.links %}
+
+            {% if alerts > 5 %}
+                {% set color = 'bg-red-700' %}
+            {% elif alerts > 2 %}
+                {% set color = 'bg-red-500' %}
+            {% elif alerts > 0 %}
+                {% set color = 'bg-red-300' %}
+            {% elif links > 5 %}
+                {% set color = 'bg-blue-700' %}
+            {% elif links > 2 %}
+                {% set color = 'bg-blue-500' %}
+            {% elif links > 0 %}
+                {% set color = 'bg-blue-300' %}
+            {% else %}
+                {% set color = 'bg-gray-200' %}
+            {% endif %}
+
+            <div class="heatmap-cell {{ color }}"
+                 data-day="{{ day }}"
+                 data-alerts="{{ alerts }}"
+                 data-links="{{ links }}">
+            </div>
+        {% endfor %}
+
+    </div>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="tooltip"></div>
+
+</div>
+
+<script>
+    const tooltip = document.getElementById("tooltip");
+
+    document.querySelectorAll(".heatmap-cell").forEach(cell => {
+        cell.addEventListener("mouseenter", e => {
+            const day = cell.dataset.day;
+            const alerts = cell.dataset.alerts;
+            const links = cell.dataset.links;
+
+            tooltip.innerHTML = `
+                <strong>${day}</strong><br>
+                Alerts: ${alerts}<br>
+                Verified Links: ${links}
+            `;
+            tooltip.style.opacity = 1;
+        });
+
+        cell.addEventListener("mousemove", e => {
+            tooltip.style.left = (e.pageX + 12) + "px";
+            tooltip.style.top = (e.pageY + 12) + "px";
+        });
+
+        cell.addEventListener("mouseleave", () => {
+            tooltip.style.opacity = 0;
+        });
+
+        // Optional: click to drill down
+        cell.addEventListener("click", () => {
+            const day = cell.dataset.day;
+            window.location.href = `/cockpit/tiles/lender_risk/day/${day}`;
+        });
+    });
+</script>
+
+</body>
+</html>

@@ -1,6 +1,5 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_route_collisions.py
 
-
 def test_no_route_collisions(app):
     """
     Detects duplicate route rules + HTTP methods.
@@ -14,14 +13,17 @@ def test_no_route_collisions(app):
         key = (rule.rule, tuple(sorted(rule.methods - {"HEAD", "OPTIONS"})))
 
         if key in rules:
-            collisions.append(
-                {
-                    "rule": rule.rule,
-                    "methods": list(rule.methods),
-                    "existing_endpoint": rules[key],
-                    "new_endpoint": rule.endpoint,
-                }
-            )
+            # 🚨 DEFENSIVE CHECK: It is only a genuine collision if a 
+            # DIFFERENT endpoint string tries to hijack the same path/method combination.
+            if rules[key] != rule.endpoint:
+                collisions.append(
+                    {
+                        "rule": rule.rule,
+                        "methods": list(rule.methods),
+                        "existing_endpoint": rules[key],
+                        "new_endpoint": rule.endpoint,
+                    }
+                )
         else:
             rules[key] = rule.endpoint
 

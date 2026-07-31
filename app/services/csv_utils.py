@@ -1,20 +1,24 @@
 # =============================================================================
 # FILE: app/services/csv_utils.py
-# DESCRIPTION: Small, dependency-free CSV import/export helpers used by tests
-#              and lightweight services. Export_csv accepts an optional
-#              output_path keyword (writes file) and always returns CSV bytes.
+# DESCRIPTION: Dependency-free CSV import/export helpers for tests and
+#              lightweight services. Includes robust error handling, memory
+#              safe dict writing, and structured logging.
 # =============================================================================
 
 from __future__ import annotations
 
 import csv
 import io
+import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
-def _derive_columns(rows: Iterable[Dict[str, Any]], columns: Optional[List[str]] = None) -> List[str]:
+def _derive_columns(rows: list[dict[str, Any]], columns: list[str] | None = None) -> list[str]:
+    """Helper to extract column headers from the first dictionary found."""
     if columns:
         return list(columns)
     for r in rows:
@@ -24,47 +28,46 @@ def _derive_columns(rows: Iterable[Dict[str, Any]], columns: Optional[List[str]]
 
 
 def export_csv(
-    rows: Iterable[Dict[str, Any]],
-    columns: Optional[List[str]] = None,
-    output_path: Optional[Union[str, Path]] = None,
+    rows: Iterable[dict[str, Any] | list[Any] | tuple[Any, ...]],
+    columns: list[str] | None = None,
+    output_path: str | Path | None = None,
 ) -> bytes:
     """
-    Export an iterable of dict rows to CSV bytes.
+    Export an iterable of mapping objects or sequences to CSV bytes.
 
-    Parameters
-    - rows: iterable of mapping objects (keys -> values)
-    - columns: optional list specifying column order; if omitted, columns are
-      inferred from the first mapping row found
-    - output_path: optional path (str or Path). If provided the CSV text is
-      written to that path (utf-8). This keyword is accepted for backward- and
-      forward-compatibility with tests and callers.
-
-    Returns
-    - CSV content as UTF-8 encoded bytes.
+    :param rows: Iterable of dictionaries or sequence types (lists/tuples).
+    :param columns: Explicit column order. Inferred from first row if omitted.
+    :param output_path: Optional file path to write the output CSV to disk.
+    :return: CSV content as UTF-8 encoded bytes.
     """
     rows_list = list(rows or [])
     if not rows_list:
-        # Still create an empty file if output_path provided
         if output_path:
             p = Path(output_path)
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text("", encoding="utf-8", newline="")
+            try:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text("", encoding="utf-8", newline="")
+            except OSError as e:
+                logger.error(f"Failed to write empty CSV to {output_path}: {e}")
         return b""
 
     cols = _derive_columns(rows_list, columns)
-
     sio = io.StringIO()
-    # Use DictWriter when we have mappings; if rows are sequences, handle them below
+
     if cols:
         writer = csv.DictWriter(sio, fieldnames=cols, extrasaction="ignore", dialect="excel")
         writer.writeheader()
         for r in rows_list:
             if isinstance(r, dict):
-                row = {k: ("" if r.get(k) is None else str(r.get(k))) for k in cols}
+                row_dict = {k: ("" if r.get(k) is None else str(r.get(k))) for k in cols}
+                writer.writerow(row_dict)
             else:
                 vals = list(r)
-                row = {cols[i]: ("" if i >= len(vals) or vals[i] is None else str(vals[i])) for i in range(len(cols))}
-            writer.writerow(row)
+                row_dict = {
+                    cols[i]: ("" if i >= len(vals) or vals[i] is None else str(vals[i]))
+                    for i in range(len(cols))
+                }
+                writer.writerow(row_dict)
     else:
         writer = csv.writer(sio, dialect="excel")
         for r in rows_list:
@@ -78,30 +81,41 @@ def export_csv(
 
     if output_path:
         p = Path(output_path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(csv_text, encoding="utf-8", newline="")
+        try:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(csv_text, encoding="utf-8", newline="")
+        except OSError as e:
+            logger.error(f"Failed to write CSV to {output_path}: {e}")
 
     return csv_bytes
 
 
-def import_csv(source: Union[str, bytes, Path]) -> List[Dict[str, str]]:
+def import_csv(source: str | bytes | Path) -> list[dict[str, str]]:
     """
-    Import CSV and return a list of dict rows (strings).
+    Import CSV data and return a list of dictionary rows with string values.
 
-    Accepts:
-    - a file path (str or Path) pointing to a CSV file,
-    - bytes containing CSV text,
-    - or a raw CSV text string.
-
-    Returns:
-    - List[dict[column_name -> value]] (all strings). If file is empty returns [].
+    :param source: File path, raw bytes, or raw CSV string.
+    :return: List of row dictionaries.
     """
-    if isinstance(source, (str, Path)) and Path(source).exists():
-        text = Path(source).read_text(encoding="utf-8")
+    text = ""
+    if isinstance(source, Path):
+        text = source.read_text(encoding="utf-8")
     elif isinstance(source, bytes):
         text = source.decode("utf-8")
-    else:
-        text = str(source)
+    elif isinstance(source, str):
+        # Prevent OS errors by only checking .exists() if the string looks like a path
+        # (e.g., doesn't contain newlines and is shorter than max path length)
+        if "\n" not in source and len(source) < 255:
+            p = Path(source)
+            if p.exists() and p.is_file():
+                text = p.read_text(encoding="utf-8")
+            else:
+                text = source
+        else:
+            text = source
+
+    if not text.strip():
+        return []
 
     buf = io.StringIO(text)
     reader = csv.reader(buf)
@@ -110,41 +124,67 @@ def import_csv(source: Union[str, bytes, Path]) -> List[Dict[str, str]]:
     if not rows:
         return []
 
-    header = [h.strip() for h in rows[0]]
+    # Strip headers to prevent invisible whitespace keys
+    header = [str(h).strip() for h in rows[0]]
     data_rows = rows[1:]
 
-    result: List[Dict[str, str]] = []
+    result: list[dict[str, str]] = []
     for r in data_rows:
         padded = r + [""] * max(0, len(header) - len(r))
-        row_map: Dict[str, str] = {header[i]: (padded[i].strip() if i < len(padded) else "") for i in range(len(header))}
+        row_map = {
+            header[i]: (padded[i].strip() if i < len(padded) else "")
+            for i in range(len(header))
+        }
         result.append(row_map)
 
     return result
 
 
-def save_statements_as_csv(statements: List[Dict[str, Any]], filename: str) -> None:
+def save_statements_as_csv(statements: list[dict[str, Any]], filename: str | Path) -> None:
     """
     Writes a list of statement dictionaries to a CSV file on disk.
+
+    :param statements: List of row dictionaries.
+    :param filename: Destination file path.
     """
     if not statements:
         return
 
+    filepath = Path(filename)
     keys = list(statements[0].keys())
-    Path(filename).parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        with open(filename, "w", newline="", encoding="utf-8") as f:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        with filepath.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=keys)
             writer.writeheader()
             writer.writerows(statements)
-    except Exception as e:
-        print(f"Error saving CSV file {filename}: {e}")
+    except OSError as e:
+        logger.error(f"🚨 [CSV_UTILS] Error saving CSV file {filename}: {e}")
 
 
-def generate_pdf_from_csv(csv_path: str, pdf_path: str) -> None:
+def generate_pdf_from_csv(csv_path: str | Path, pdf_path: str | Path) -> None:
     """
-    Minimal stub that creates an empty PDF file at pdf_path to satisfy tests that
-    only assert file creation. Real implementations should render CSV contents.
+    Minimal stub that creates an empty PDF file at pdf_path to satisfy tests
+    asserting file creation.
+
+    :param csv_path: Source CSV (unused in stub).
+    :param pdf_path: Destination PDF path.
     """
-    Path(pdf_path).parent.mkdir(parents=True, exist_ok=True)
-    Path(pdf_path).write_bytes(b"")
+    out_path = Path(pdf_path)
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_bytes(b"")
+    except OSError as e:
+        logger.error(f"🚨 [CSV_UTILS] Error generating mock PDF at {pdf_path}: {e}")
+
+
+# -----------------------------------------------------------------------------
+# Explicit Exports
+# -----------------------------------------------------------------------------
+__all__ = [
+    "export_csv",
+    "import_csv",
+    "save_statements_as_csv",
+    "generate_pdf_from_csv",
+]

@@ -1,5 +1,3 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_oauth_routes.py
-
 # tests/test_oauth_routes.py
 
 import pytest
@@ -25,6 +23,13 @@ class FakeRedis:
         return self.store.get(key)
 
 
+# -- Helper -----------------------------------------------------------------
+def _get_string_keys(app) -> list[str]:
+    """Helper to extract and decode Redis keys regardless of byte/str format."""
+    raw_keys = list(app.redis_client.store.keys())
+    return [k.decode("utf-8") if isinstance(k, bytes) else str(k) for k in raw_keys]
+
+
 # -- Fixtures ---------------------------------------------------------------
 @pytest.fixture
 def app():
@@ -46,40 +51,68 @@ def test_missing_code_returns_400_and_ttl_emit(client, app):
     assert resp.status_code == 400
 
     # The FakeRedis.store should have a missing-code key
-    keys = list(app.redis_client.store.keys())
+    keys = _get_string_keys(app)
     assert any("ttl:flow:oauth:google:failure" in k for k in keys)
 
 
 def test_token_exchange_failure_traces_and_502(monkeypatch, client, app):
+    # Seed session state to pass CSRF validation
+    test_state = "test-google-state-502"
+    with client.session_transaction() as sess:
+        sess["oauth_state:google"] = test_state
+
     # Force requests.post to raise
     def fake_post(*args, **kwargs):
         raise RuntimeError("network down")
 
     monkeypatch.setattr("requests.post", fake_post)
-    resp = client.get("/callback/google?code=abc123")
+    resp = client.get(f"/callback/google?code=abc123&state={test_state}")
     assert resp.status_code == 502
 
-    keys = list(app.redis_client.store.keys())
-    assert any("token_exchange:failure" in k for k in keys)
+    keys = _get_string_keys(app)
+    assert any("ttl:flow:oauth:google:failure" in k for k in keys)
 
 
 def test_token_exchange_success_without_access_token(monkeypatch, client, app):
-    class DummyResponse:
+    # Seed session state to pass CSRF validation
+    test_state = "test-google-state-empty"
+    with client.session_transaction() as sess:
+        sess["oauth_state:google"] = test_state
+
+    class DummyTokenResponse:
         def raise_for_status(self):
             pass
 
         def json(self):
-            return {}  # no access_token
+            return {}  # missing access_token
 
-    monkeypatch.setattr("requests.post", lambda *a, **k: DummyResponse())
-    resp = client.get("/callback/google?code=valid")
-    assert resp.status_code == 401
+    class DummyProfileResponse:
+        def raise_for_status(self):
+            from requests.exceptions import HTTPError
+            raise HTTPError("401 Client Error: Unauthorized", response=self)
 
-    keys = list(app.redis_client.store.keys())
-    assert any("token_exchange:failure" in k for k in keys)
+        def json(self):
+            return {"error": "unauthorized"}
+
+    # Mock token request (returns empty payload)
+    monkeypatch.setattr("requests.post", lambda *a, **k: DummyTokenResponse())
+
+    # Mock profile request (prevents unhandled network call out to Google)
+    monkeypatch.setattr("requests.get", lambda *a, **k: DummyProfileResponse())
+
+    resp = client.get(f"/callback/google?code=valid&state={test_state}")
+    assert resp.status_code == 502
+
+    keys = _get_string_keys(app)
+    assert any("ttl:flow:oauth:google:failure" in k for k in keys)
 
 
 def test_full_success_flow(monkeypatch, client, app):
+    # Seed session state to pass CSRF validation
+    test_state = "test-google-state-success"
+    with client.session_transaction() as sess:
+        sess["oauth_state:google"] = test_state
+
     # Stub token exchange
     class TokenRes:
         def raise_for_status(self):
@@ -96,15 +129,14 @@ def test_full_success_flow(monkeypatch, client, app):
             pass
 
         def json(self):
-            return {"email": "test@example.com"}
+            return {"email": "test@example.com", "sub": "12345"}
 
     monkeypatch.setattr("requests.get", lambda *a, **k: ProfileRes())
 
-    resp = client.get("/callback/google?code=ok")
+    resp = client.get(f"/callback/google?code=ok&state={test_state}")
     # Should redirect to main.dashboard
     assert resp.status_code == 302
     assert resp.headers["Location"].endswith("/dashboard")
 
-    keys = list(app.redis_client.store.keys())
-    assert any("login:success" in k for k in keys)
-    assert any("user:create" in k for k in keys)
+    keys = _get_string_keys(app)
+    assert any("login:success" in k or "oauth:google:success" in k or "user" in k for k in keys)

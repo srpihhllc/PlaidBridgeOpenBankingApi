@@ -1,6 +1,6 @@
 # app/cockpit/tiles/fk_constraint_inspector.py
 
-from flask import Blueprint, render_template
+from flask import Blueprint, render_template, current_app
 from sqlalchemy import inspect
 
 from app.extensions import db
@@ -11,21 +11,29 @@ fk_inspector_bp = Blueprint("fk_inspector_bp", __name__, url_prefix="/cockpit/fk
 
 @fk_inspector_bp.route("/")
 def index():
-    inspector = inspect(db.engine)
+    """
+    Inspect foreign key constraints at runtime inside an application context.
+    This ensures db.engine is resolved for the active Flask app and avoids
+    "Working outside of application context" errors.
+    """
     fk_issues = []
 
-    for table_name in inspector.get_table_names():
-        fks = inspector.get_foreign_keys(table_name)
-        for fk in fks:
-            if not fk.get("referred_table"):
-                fk_issues.append(
-                    {
-                        "table": table_name,
-                        "fk": fk.get("name"),
-                        "columns": fk.get("constrained_columns"),
-                        "error": "Missing referred table",
-                    }
-                )
+    # Ensure inspection runs inside an application context (Pattern A)
+    with current_app.app_context():
+        inspector = inspect(db.engine)
+
+        for table_name in inspector.get_table_names():
+            fks = inspector.get_foreign_keys(table_name)
+            for fk in fks:
+                if not fk.get("referred_table"):
+                    fk_issues.append(
+                        {
+                            "table": table_name,
+                            "fk": fk.get("name"),
+                            "columns": fk.get("constrained_columns"),
+                            "error": "Missing referred table",
+                        }
+                    )
 
     # Telemetry: record outcome
     if fk_issues:

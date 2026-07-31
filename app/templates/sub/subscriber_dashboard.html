@@ -18,7 +18,6 @@
     </div>
 
     <ul class="nav flex-column mt-3">
-
       <li class="nav-item">
         <a class="nav-link active" href="{{ url_for('sub_ui.dashboard') }}">
           <i class="fas fa-tachometer-alt me-2"></i> Dashboard
@@ -50,7 +49,7 @@
       </li>
 
       <li class="nav-item mt-3">
-        <a class="nav-link" href="{{ url_for('main.logout') }}">
+        <a class="nav-link" href="{{ url_for('auth.logout') }}">
           <i class="fas fa-sign-out-alt me-2"></i> Logout
         </a>
       </li>
@@ -551,36 +550,69 @@
               </div>
             </div>
 
-            <!-- SERVICE REGISTRY TILES -->
-            <div class="card mb-3">
+            <!-- ========================================================= -->
+            <!-- UPGRADED SERVICE REGISTRY LAUNCHER TILES -->
+            <!-- ========================================================= -->
+            <div class="card mb-3 shadow-sm border-0">
               <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                  <i class="fas fa-cubes me-2"></i> Service Registry
+                <h5 class="mb-0 fw-bold">
+                  <i class="fas fa-cubes me-2 text-info"></i> Provisioned Core Slots
                 </h5>
                 {% if is_operator %}
-                <span class="badge bg-warning">Auto‑discovered from /services</span>
+                <span class="badge bg-warning text-dark font-monospace small">Matrix Operator Bypass Active</span>
                 {% endif %}
               </div>
-              <div class="card-body">
-                <div class="row g-2">
+              <div class="card-body bg-light-workspace p-3">
+                <div class="row g-3">
                   {% for svc in service_registry %}
                     <div class="col-md-6">
-                      <div class="border rounded px-2 py-2 small h-100">
-                        <div class="d-flex justify-content-between align-items-center">
-                          <span>
-                            <i class="fas {{ svc.icon }} me-1"></i>
-                            {{ svc.name }}
-                          </span>
-                          {% if is_operator %}
-                          <span class="badge bg-light text-dark">{{ svc.category }}</span>
-                          {% endif %}
+                      <div class="card h-100 border-0 shadow-xs workspace-tile transition-all">
+                        <div class="card-body p-3 d-flex flex-column justify-content-between">
+                          <div>
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                              <span class="fw-bold text-dark text-truncate mb-0 block">
+                                <i class="fas {{ svc.icon or 'fa-bolt' }} text-primary me-2"></i>{{ svc.name }}
+                              </span>
+                              <span class="badge bg-light text-secondary border px-2 py-1 tracking-badge">{{ svc.category or 'System' }}</span>
+                            </div>
+
+                            {% if svc.description %}
+                              <p class="text-muted mb-3 extra-small-desc line-height-sm">
+                                {{ svc.description }}
+                              </p>
+                            {% else %}
+                              <p class="text-muted mb-3 extra-small-desc line-height-sm">
+                                Dynamic integration module linked via subscriber workspace cluster routing table.
+                              </p>
+                            {% endif %}
+                          </div>
+
+                          <div class="mt-auto">
+                            <!-- Dynamic route compiler execution -->
+                            <a href="{{ url_for(svc.endpoint) if svc.endpoint else '#' }}"
+                               class="btn btn-sm btn-primary w-100 d-flex align-items-center justify-content-center py-1 font-weight-bold shadow-xs transition-all">
+                              <span>Open Workspace</span>
+                              <i class="fas fa-external-link-alt ms-2 extra-small-icon"></i>
+                            </a>
+
+                            {% if is_operator %}
+                              <div class="border-top mt-2 pt-1 text-center font-monospace text-muted block text-truncate" style="font-size: 0.65rem;">
+                                <code>{{ svc.module }}</code>
+                              </div>
+                            {% endif %}
+                          </div>
                         </div>
-                        {% if is_operator %}
-                        <div class="text-muted mt-1">
-                          <code class="small">{{ svc.module }}</code>
-                        </div>
-                        {% endif %}
                       </div>
+                    </div>
+                  {% else %}
+                    <div class="col-12 py-4 text-center">
+                      <div class="text-muted mb-2">
+                        <i class="fas fa-layer-group fa-2x opacity-50"></i>
+                      </div>
+                      <h6 class="text-dark fw-bold mb-1">No Active Integration Components Found</h6>
+                      <p class="text-muted extra-small-desc mb-0">
+                        This subscriber account profile has no active telemetry automation rows initialized.
+                      </p>
                     </div>
                   {% endfor %}
                 </div>
@@ -1137,10 +1169,35 @@
         }, 30000);
     }
 </script>
+
+<style>
+    /* Integrated Workspace Card Theme System Extensions */
+    .transition-all {
+        transition: all 0.22s ease-in-out;
+    }
+    .bg-light-workspace {
+        background-color: #f8f9fc !important;
+    }
+    .workspace-tile {
+        background-color: #ffffff;
+        border: 1px solid #e3e6f0 !important;
+        border-radius: 0.35rem;
+    }
+    .workspace-tile:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1) !important;
+        border-color: #b7cefc !important;
+    }
+    .tracking-badge {
+        font-size: 0.68rem !important;
+        font-weight: 600;
+    }
+    .extra-small-desc {
+        font-size: 0.76rem !important;
+        color: #858796;
+    }
+    .extra-small-icon {
+        font-size: 0.65rem;
+    }
+</style>
 {% endblock %}
-
-
-
-
-
-

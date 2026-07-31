@@ -5,6 +5,8 @@
 #       or a thread-safe cache like Redis.
 # =============================================================================
 
+from __future__ import annotations
+
 import logging
 from typing import Any
 
@@ -35,17 +37,13 @@ def compute_new_balance(statements: list[dict[str, Any]], start_balance: float) 
 
 def update_account_balance(statements: list[dict[str, Any]]) -> None:
     """
-    Mutates the global 'account_balance' by delegating to compute_new_balance.
+    Mutates the global 'account_balance' by computing the statements against
+    the current global total.
     """
     global account_balance
-    account_balance = compute_new_balance(statements, account_balance)
-
-
-def get_balance(user_id: int = 0) -> dict[str, Any]:
-    # ... (remains the same) ...
-    return {
-        "user_id": user_id,
-        "available_balance": round(account_balance, 2),
-        "ledger_balance": round(account_balance, 2),
-        "currency": "USD",
-    }
+    
+    try:
+        account_balance = compute_new_balance(statements, account_balance)
+        logger.info(f"Account balance globally updated to: {account_balance:.2f}")
+    except Exception as e:
+        logger.error(f"Failed to update account balance: {e}", exc_info=True)

@@ -27,7 +27,6 @@ def test_user(db_session):
 
 def test_login_with_none_role(client, test_user):
     """Ensure login works when user.role is None → redirect to sub_ui."""
-    # ✅ Build URL inside a request context
     with client.application.test_request_context():
         login_url = url_for("auth.login")
         sub_index_url = url_for("sub_ui.sub_index")
@@ -45,10 +44,10 @@ def test_login_with_none_role(client, test_user):
 def test_login_with_admin_role(client, db_session):
     """Ensure role='admin' redirects to admin UI."""
     admin = User(
-        email="admin_test@example.com",  # ✅ avoid collision with seeded admin@example.com
+        email="admin_test@example.com",
         password_hash=generate_password_hash("password123"),
         role="admin",
-        is_admin=True,  # ✅ match your app logic
+        is_admin=True,
         mfa_enabled=False,
     )
     db_session.add(admin)
@@ -56,7 +55,12 @@ def test_login_with_admin_role(client, db_session):
 
     with client.application.test_request_context():
         login_url = url_for("auth.login")
-        admin_index_url = url_for("admin.admin_index")  # ✅ correct endpoint
+        # Verify the endpoint exists before building
+        assert "admin.admin_index" in client.application.view_functions, (
+            "admin.admin_index endpoint missing — ensure admin_ui_bp is registered "
+            "via register_admin_blueprint(app) in create_app()"
+        )
+        admin_index_url = url_for("admin.admin_index")
 
     resp = client.post(
         login_url,
@@ -82,7 +86,11 @@ def test_login_with_is_admin_flag(client, db_session):
 
     with client.application.test_request_context():
         login_url = url_for("auth.login")
-        admin_index_url = url_for("admin.admin_index")  # ✅ corrected endpoint
+        assert "admin.admin_index" in client.application.view_functions, (
+            "admin.admin_index endpoint missing — ensure admin_ui_bp is registered "
+            "via register_admin_blueprint(app) in create_app()"
+        )
+        admin_index_url = url_for("admin.admin_index")
 
     resp = client.post(
         login_url,
@@ -133,3 +141,29 @@ def test_login_invalid_credentials(client):
 
     assert resp.status_code in (302, 303)
     assert login_url in resp.headers["Location"]
+
+
+def test_admin_endpoint_registered(client):
+    """Smoke test: verify admin.admin_index endpoint and alias exist after app creation."""
+    with client.application.test_request_context():
+        vf = client.application.view_functions
+
+        # Canonical endpoint must exist
+        assert "admin.admin_index" in vf, (
+            f"admin.admin_index not in view_functions. "
+            f"Admin endpoints found: {[k for k in vf if k.startswith('admin.')]}"
+        )
+
+        # admin_ui.* alias should also exist (created by record_once hook)
+        assert "admin_ui.admin_index" in vf, (
+            "admin_ui.admin_index alias not created — "
+            "check _register_admin_ui_aliases in admin_ui_routes.py"
+        )
+
+        # Both must resolve to the same URL
+        canonical_url = url_for("admin.admin_index")
+        alias_url = url_for("admin_ui.admin_index")
+        assert canonical_url == alias_url, (
+            f"URL mismatch: admin.admin_index={canonical_url} vs "
+            f"admin_ui.admin_index={alias_url}"
+        )

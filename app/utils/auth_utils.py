@@ -1,4 +1,4 @@
-# app/utils/auth_utils.py
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/auth_utils.py
 
 # =====================
 # ⚙️ Standard Libraries
@@ -49,3 +49,30 @@ def require_api_key(f):
         return f(*args, **kwargs)
 
     return decorated_function
+
+
+# =============================================================================
+# ⚓ SUBSCRIBER & CREATOR BYPASS GUARD
+# =============================================================================
+def require_subscriber():
+    """
+    Hard guard: only authenticated subscribers may access these routes.
+    Operators/Creators bypass the role check.
+    """
+    if not getattr(current_user, "is_authenticated", False):
+        abort(401)
+
+    # 💡 OPERATOR BYPASS (Local imports prevent circular dependency loops)
+    from flask import session
+    from app.constants import OPERATOR_MODE_KEY
+    from app.blueprints.main_routes import is_creator
+
+    # If session flag is set OR user matches creator profile, open the gates
+    if session.get(OPERATOR_MODE_KEY) is True or is_creator(current_user):
+        return current_user
+
+    # 🔒 STANDARD SUBSCRIBER CHECK
+    if getattr(current_user, "role", None) != "subscriber":
+        abort(403)
+
+    return current_user

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Card Audit Trail{% endblock %}
+{% block content %}
+<div class="container mt-4">
+  <h2>🧠 Card Telemetry Log – ID #{{ card_id }}</h2>
+  <ul class="list-group mt-3">
+    {% for log in logs %}
+    <li class="list-group-item">
+      <strong>{{ log.event_type.replace("_", " ") }}</strong> by <code>{{ log.by }}</code><br>
+      🕐 {{ log.timestamp | datetimeformat }}<br>
+      {% if log.reason %}<em>Reason:</em> {{ log.reason }}{% endif %}
+      {% if log.method %}<em>Method:</em> {{ log.method }}{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

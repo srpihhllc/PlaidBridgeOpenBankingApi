@@ -66,9 +66,15 @@ def _results_by_endpoint(app) -> dict[str, dict]:
 
 def test_trace_templates_returns_list(tracer_app):
     """trace_templates must always return a list of dicts with an 'endpoint' key."""
-    results = trace_templates(tracer_app)
+    # Wrap the execution block to establish the active application context
+    # for Werkzeug local context proxies like g, request, or session.
+    with tracer_app.app_context():
+        results = trace_templates(tracer_app)
+
+    # Assertions are performed cleanly outside the application context block
     assert isinstance(results, list), "trace_templates() must return a list"
     assert len(results) > 0, "Expected at least one route to be traced"
+
     for r in results:
         assert "endpoint" in r, f"Result missing 'endpoint' key: {r}"
         assert "status" in r, f"Result missing 'status' key: {r}"

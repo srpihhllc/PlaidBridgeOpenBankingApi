@@ -3,7 +3,7 @@ import pytest
 # =============================================================================
 # FILE: app/tests/api/test_transactions_endpoint.py
 # DESCRIPTION: Unit tests for /api/v1/core/transactions endpoint.
-#              Clean, deterministic, aligned with global auth fixtures.
+#               Clean, deterministic, aligned with global auth fixtures.
 # =============================================================================
 
 
@@ -46,11 +46,15 @@ def test_api_transactions_json_required(client, fresh_auth_headers):
     resp = client.post(
         "/api/v1/core/transactions",
         data="not-json",
-        headers=fresh_auth_headers,  # Now uses the defined fixture with a valid user
+        headers=fresh_auth_headers,  # Uses the defined fixture with a valid user
     )
 
     assert resp.status_code == 422
-    assert b"Request must be JSON" in resp.data
+
+    # Assert against the standardized API error envelope payload
+    json_data = resp.get_json()
+    assert json_data["error_code"] == "E_JSON_REQUIRED"
+    assert json_data["message"] == "Request body must be valid JSON."
 
 
 # =============================================================================
@@ -70,7 +74,7 @@ def test_api_transactions_queueing_success(client, fresh_auth_headers):
         headers=fresh_auth_headers,
     )
 
-    assert resp.status_code == 200
+    assert resp.status_code == 201
     body = resp.get_json()
 
     # Envelope

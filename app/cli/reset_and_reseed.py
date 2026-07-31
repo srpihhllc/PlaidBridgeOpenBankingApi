@@ -1,18 +1,18 @@
+# =============================================================================
 # FILE: app/cli/reset_and_reseed.py
-
-from subprocess import call
+# DESCRIPTION: Programmatic orchestration layer executing in-process migrations.
+# =============================================================================
 
 import click
 from flask.cli import with_appcontext
-
 from app.extensions import db
 
-
 @click.command("reset-and-reseed")
+@click.pass_context
 @with_appcontext
-def reset_and_reseed():
-    """Reset the database and reseed all users."""
-
+def reset_and_reseed(ctx: click.Context):
+    """Purges all structural entities and hydrates identity targets atomically."""
+    
     click.echo("⚠️  WARNING: This will DROP ALL TABLES and recreate them.")
     if not click.confirm("Continue?"):
         click.echo("Cancelled.")
@@ -20,19 +20,25 @@ def reset_and_reseed():
 
     click.echo("🧨 Dropping all tables...")
     db.drop_all()
-
+    
     click.echo("🛠️  Creating tables...")
     db.create_all()
+    
+    # Access the command registry from the root CLI (manage.py)
+    # The 'ctx.parent' refers to the FlaskGroup 'cli'
+    commands = ctx.parent.command.commands
+    
+    # Helper to invoke safely
+    def run_seeder(name: str):
+        if name in commands:
+            click.echo(f"🌱 Invoking: {name}")
+            ctx.invoke(commands[name])
+        else:
+            click.echo(f"❌ FATAL: Could not find command '{name}' in registry.")
 
-    click.echo("🌱 Seeding admin, subscriber, and lender...")
-    call(["flask", "seed-admin"])
-    call(["flask", "seed-subscriber"])
-    call(["flask", "seed-lender"])
+    # Execute seeders in-process
+    run_seeder("seed-admin")
+    run_seeder("seed-subscriber")
+    run_seeder("seed-lender")
 
-    click.echo("\n📊 Cockpit‑Grade Seeding Report")
-    click.echo("--------------------------------")
-    click.echo("Admin:      admin@example.com / AdminPass123!")
-    click.echo("Subscriber: subscriber@example.com / Test1234!")
-    click.echo("Lender:     lender@example.com / LenderPass123!")
-    click.echo("--------------------------------")
-    click.echo("🎉 Environment reset and reseeded successfully.")
+    click.echo("\n📊 Cockpit-Grade Seeding Report Complete.")

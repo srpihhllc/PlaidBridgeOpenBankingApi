@@ -9,13 +9,18 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.exc import SQLAlchemyError
 
 from ..extensions import db
 
 logger = logging.getLogger(__name__)
+
+
+def _get_naive_utc_now() -> datetime:
+    """Return a naive datetime object representing current UTC time."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class MFACode(db.Model):
@@ -37,8 +42,6 @@ class MFACode(db.Model):
     # -------------------------------------------------------------------------
     id = db.Column(db.Integer, primary_key=True)
 
-    # ✔ Updated to match User.id (String(36))
-    # ✔ Added ondelete="CASCADE"
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -47,14 +50,18 @@ class MFACode(db.Model):
     )
 
     code = db.Column(db.String(32), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=_get_naive_utc_now, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
     fail_count = db.Column(db.Integer, default=0, nullable=False)
 
     # -------------------------------------------------------------------------
-    # Relationships
+    # Relationships (Switched to backref to avoid modifying the User model)
     # -------------------------------------------------------------------------
-    user = db.relationship("User", back_populates="mfa_codes", lazy="joined")
+    user = db.relationship(
+        "User", 
+        backref=db.backref("mfa_codes", lazy="dynamic"), 
+        lazy="joined"
+    )
 
     # -------------------------------------------------------------------------
     # Construction / lifecycle helpers
@@ -79,7 +86,7 @@ class MFACode(db.Model):
                 db.session.delete(existing)
                 db.session.flush()
 
-            now = datetime.utcnow()
+            now = _get_naive_utc_now()
             obj = cls(
                 user_id=user_id,
                 code=code,
@@ -107,7 +114,7 @@ class MFACode(db.Model):
         Return the (first) active MFACode for a user or None if none exists.
         Active means expires_at in the future.
         """
-        now = datetime.utcnow()
+        now = _get_naive_utc_now()
         return (
             cls.query.filter_by(user_id=user_id)
             .filter(cls.expires_at > now)
@@ -120,25 +127,24 @@ class MFACode(db.Model):
     # -------------------------------------------------------------------------
     def is_valid(self) -> bool:
         """Return True if the code has not expired."""
-        # Defensive: if expires_at not set, treat as expired
         if self.expires_at is None:
             return False
-        return datetime.utcnow() < self.expires_at
+
+        expires = self.expires_at
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+
+        return datetime.now(timezone.utc) < expires
 
     def time_remaining(self) -> int:
         """Seconds remaining until expiry. Returns 0 when expired."""
-        from datetime import datetime, timezone
-
-        # Defensive: if expires_at not set, treat as expired
         if self.expires_at is None:
             return 0
 
-        # Normalize to aware UTC datetimes for safe subtraction
         expires = self.expires_at
         now = datetime.now(timezone.utc)
 
         if expires.tzinfo is None:
-            # assume naive datetimes are in UTC
             expires = expires.replace(tzinfo=timezone.utc)
 
         remaining = int((expires - now).total_seconds())
@@ -203,18 +209,19 @@ class MFACode(db.Model):
             self.consume(commit=True)
             return True
 
-        self.increment_fail(commit=True)
+        try:
+            self.increment_fail(commit=False)
 
-        if (self.fail_count or 0) >= max_failures:
-            try:
+            if (self.fail_count or 0) >= max_failures:
                 db.session.delete(self)
-                db.session.commit()
-            except SQLAlchemyError:
-                db.session.rollback()
-                logger.exception(
-                    "Failed to purge MFACode after excessive failures id=%s",
-                    getattr(self, "id", None),
-                )
+
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            logger.exception(
+                "Failed to handle verification failure or lockout purge for MFACode id=%s",
+                getattr(self, "id", None),
+            )
 
         return False
 
@@ -228,7 +235,7 @@ class MFACode(db.Model):
         `older_than_seconds` to avoid deleting very recently expired codes.
         Returns number of rows deleted.
         """
-        now = datetime.utcnow()
+        now = _get_naive_utc_now()
         threshold = (
             now if older_than_seconds is None else now - timedelta(seconds=older_than_seconds)
         )

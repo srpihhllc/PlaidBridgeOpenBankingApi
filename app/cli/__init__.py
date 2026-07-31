@@ -1,7 +1,5 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli/__init__.py
 
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli/__init__.py
-
 """
 Cockpit CLI Command Registry
 
@@ -36,8 +34,9 @@ from .cockpit_pdf_test import test_cockpit_pdf
 # ---------------------------------------------------------------------------
 # Core command imports
 # ---------------------------------------------------------------------------
-from .commands import route_map_command as route_map_dump
-from .commands import validate_relationships_command
+# ✅ CORRECTED: Routing to the new cli_commands module instead of legacy .commands
+from app.cli_commands.route_map_dump import route_map_command as route_map_dump
+from app.cli_commands.validate_relationships import validate_relationships_command
 from .doctor import doctor
 
 # ---------------------------------------------------------------------------

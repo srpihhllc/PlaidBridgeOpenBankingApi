@@ -1,15 +1,13 @@
 # =============================================================================
 # FILE: app/cli_commands/ttl_audit.py
-# DESCRIPTION: CLI command to audit Redis TTL telemetry keys by domain.
-#              Uses @with_appcontext to ensure a safe Flask context.
+# DESCRIPTION: Cockpit-grade TTL audit engine with dynamic Redis type decoding.
 # =============================================================================
-
-from collections import defaultdict
 
 import click
 from flask import current_app
 from flask.cli import with_appcontext
 
+from app.utils.redis_utils import get_redis_client
 from app.telemetry.ttl_emit import emit_schema_trace
 
 
@@ -22,71 +20,120 @@ from app.telemetry.ttl_emit import emit_schema_trace
 @with_appcontext
 def ttl_audit(domain: str):
     """
-    Scans Redis for all ttl:{domain}:* keys and summarizes their health.
+    Scans Redis for all ttl:{domain}:* keys, dynamically determines their 
+    underlying Redis data type, extracts payload data, and audits TTL states.
     Emits a schema-compliant summary trace back into Redis for observability.
     """
-    redis_client = getattr(current_app, "redis_client", None)
+    redis_client = get_redis_client()
     if not redis_client:
         click.echo("❌ Redis client not configured.")
         return
 
+    pattern = f"ttl:{domain}:*"
+
+    # Production-safe SCAN instead of KEYS
+    keys = []
+    cursor = 0
     try:
-        pattern = f"ttl:{domain}:*"
-        keys = redis_client.keys(pattern)
-        if not keys:
-            click.echo(f"⚠️ No telemetry keys found under {pattern}")
-            return
+        while True:
+            cursor, partial = redis_client.scan(cursor=cursor, match=pattern, count=100)
+            keys.extend(partial)
+            if cursor == 0:
+                break
+    except Exception as e:
+        click.echo(f"❌ SCAN failed for pattern {pattern}: {e}")
+        return
 
-        click.echo(f"📡 Found {len(keys)} telemetry keys under domain '{domain}':\n")
+    if not keys:
+        click.echo(f"⚠️ No telemetry keys found under {pattern}")
+        return
 
-        status_counts = defaultdict(int)
+    click.echo(f"📡 Found {len(keys)} telemetry keys under domain '{domain}':\n")
 
-        for key in sorted(keys):
+    readable = 0
+    unreadable = 0
+    status_counts = {}
+
+    for key_bytes in keys:
+        key = key_bytes.decode("utf-8") if isinstance(key_bytes, bytes) else key_bytes
+
+        try:
             ttl = redis_client.ttl(key)
-            value = redis_client.get(key)
+            key_type = redis_client.type(key)
+            if isinstance(key_type, bytes):
+                key_type = key_type.decode("utf-8")
+
+            value_summary = None
             status = "unknown"
 
-            if value:
-                try:
-                    decoded = value.decode("utf-8")
-                    status = decoded.split(":")[-1]
-                except Exception:
-                    status = "unreadable"
+            # ------------------------------
+            # Dynamic Type Decoding
+            # ------------------------------
+            if key_type == "string":
+                val = redis_client.get(key)
+                if val:
+                    decoded = val.decode("utf-8") if isinstance(val, bytes) else str(val)
+                    value_summary = decoded
+                    status = "string"
 
-            status_counts[status] += 1
+            elif key_type == "hash":
+                fields = redis_client.hgetall(key)
+                decoded = {
+                    (k.decode("utf-8") if isinstance(k, bytes) else k):
+                    (v.decode("utf-8") if isinstance(v, bytes) else v)
+                    for k, v in fields.items()
+                }
+                value_summary = f"HashData({decoded})"
+                status = "hash"
+
+            elif key_type == "list":
+                elements = redis_client.lrange(key, 0, -1)
+                value_summary = f"ListData(length={len(elements)})"
+                status = "list"
+
+            elif key_type == "set":
+                members = redis_client.smembers(key)
+                value_summary = f"SetData(size={len(members)})"
+                status = "set"
+
+            # ------------------------------
+            # Output Formatting
+            # ------------------------------
+            if value_summary is not None:
+                readable += 1
+                status_counts[status] = status_counts.get(status, 0) + 1
+                status_str = f"Readable → {value_summary[:70]}"
+            else:
+                unreadable += 1
+                status_counts["unreadable"] = status_counts.get("unreadable", 0) + 1
+                status_str = "Unreadable (unknown type)"
 
             click.echo(f"🔹 {key}")
-            click.echo(f"    TTL: {ttl}s | Status: {status}")
-            click.echo("")
+            click.echo(f"    TTL: {ttl}s | Type: {key_type} | Status: {status_str}\n")
 
-        # Summary
-        click.echo("📊 Telemetry Summary:")
-        for status, count in status_counts.items():
-            click.echo(f" - {status}: {count} keys")
+        except Exception as e:
+            unreadable += 1
+            status_counts["error"] = status_counts.get("error", 0) + 1
+            click.echo(f"🔹 {key}")
+            click.echo(f"    TTL: Error | Status: unreadable (Exception: {str(e)[:40]})\n")
 
-        # Emit schema-compliant audit summary trace
-        emit_schema_trace(
-            domain="cli",
-            event="ttl_audit",
-            detail="summary",
-            value=f"keys:{len(keys)}",
-            status="ok",
-            ttl=300,
-            client=redis_client,
-            meta={"domain": domain, "status_counts": dict(status_counts)},
-        )
-        click.echo(f"\n✨ Emitted audit summary trace for domain '{domain}'")
+    # ------------------------------
+    # Summary
+    # ------------------------------
+    click.echo("📊 Telemetry Summary:")
+    for status, count in status_counts.items():
+        click.echo(f" - {status}: {count} keys")
 
-    except Exception as e:
-        click.echo(f"❌ Failed to audit Redis TTL keys: {e}")
-        # Emit schema-compliant error trace
-        emit_schema_trace(
-            domain="cli",
-            event="ttl_audit",
-            detail="error",
-            value="failure",
-            status="error",
-            ttl=300,
-            client=redis_client,
-            meta={"domain": domain, "error": str(e)},
-        )
+    # Emit schema-compliant audit summary trace
+    emit_schema_trace(
+        domain="cli",
+        event="ttl_audit",
+        detail="summary",
+        value=f"keys:{len(keys)}",
+        status="ok",
+        ttl=300,
+        client=redis_client,
+        meta={"domain": domain, "status_counts": status_counts},
+    )
+
+    click.echo(f"\n✨ Emitted audit summary trace for domain '{domain}'")

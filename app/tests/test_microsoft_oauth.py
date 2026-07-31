@@ -1,9 +1,10 @@
 # =============================================================================
 # FILE: app/tests/test_microsoft_oauth.py
 # DESCRIPTION: Tests for Microsoft OAuth callback flows.
-#              Inherits shared helpers from BaseOAuthTest.
+#               Inherits shared helpers from BaseOAuthTest.
 # =============================================================================
 
+import jwt
 import pytest
 from flask import url_for
 from requests.exceptions import HTTPError, Timeout
@@ -49,7 +50,13 @@ class TestMicrosoftOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.get", mock_get_profile)
 
-        resp = client.get(url_for("oauth.callback_microsoft", code="def456"))
+        test_state = "test-ms-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:microsoft"] = test_state
+
+        resp = client.get(
+            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+        )
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")
 
@@ -78,7 +85,13 @@ class TestMicrosoftOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.post", mock_post)
 
-        resp = client.get(url_for("oauth.callback_microsoft", code="def456"))
+        test_state = "test-ms-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:microsoft"] = test_state
+
+        resp = client.get(
+            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+        )
         assert resp.status_code == 502
 
         with app.app_context():
@@ -97,7 +110,10 @@ class TestMicrosoftOAuth(BaseOAuthTest):
                     return None
 
                 def json(self):
-                    return {"access_token": "fake-microsoft-token"}
+                    return {
+                        "access_token": "fake-microsoft-token",
+                        "id_token": "fake-id",
+                    }
 
             return Resp()
 
@@ -115,7 +131,13 @@ class TestMicrosoftOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.get", mock_get)
 
-        resp = client.get(url_for("oauth.callback_microsoft", code="def456"))
+        test_state = "test-ms-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:microsoft"] = test_state
+
+        resp = client.get(
+            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+        )
         assert resp.status_code == 401
 
         with app.app_context():
@@ -144,7 +166,7 @@ class TestMicrosoftOAuth(BaseOAuthTest):
         monkeypatch.setattr("requests.post", mock_post)
 
         def mock_verify_token(token, *args, **kwargs):
-            raise Exception("Invalid ID token")
+            raise jwt.PyJWTError("Invalid ID token")
 
         monkeypatch.setattr("app.services.oauth.verify_ms_token", mock_verify_token)
 
@@ -153,7 +175,13 @@ class TestMicrosoftOAuth(BaseOAuthTest):
 
         monkeypatch.setattr("requests.get", mock_get)
 
-        resp = client.get(url_for("oauth.callback_microsoft", code="def456"))
+        test_state = "test-ms-state"
+        with client.session_transaction() as sess:
+            sess["oauth_state:microsoft"] = test_state
+
+        resp = client.get(
+            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+        )
         assert resp.status_code == 401
 
         with app.app_context():

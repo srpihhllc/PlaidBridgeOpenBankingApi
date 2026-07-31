@@ -3,6 +3,7 @@
 # DESCRIPTION: Normalized Models for Subscription and SubscriberProfile.
 #              Identity and financial data live in the User model to ensure
 #              a single source of truth and prevent database discrepancies.
+#              Updated to use dynamic 1:1 backref to fix User mapper KeyError.
 # =============================================================================
 
 import secrets
@@ -70,8 +71,16 @@ class SubscriberProfile(db.Model):
     api_key = db.Column(db.String(64), unique=True, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # -------------------------------------------------------------------------
     # Relationships
-    user = db.relationship("User", back_populates="subscriber_profile")
+    # -------------------------------------------------------------------------
+
+    # ⭐ User Fix: Swapped back_populates to dynamic backref. 
+    # Added uselist=False to preserve the strict 1:1 relationship structural framing.
+    user = db.relationship(
+        "User",
+        backref=db.backref("subscriber_profile", uselist=False, passive_deletes=True),
+    )
 
     subscriptions = db.relationship(
         "Subscription",

@@ -74,10 +74,15 @@ def cockpit_instrument(ttl_key, ttl=300):
 @cockpit_bp.before_request
 @login_required
 def refresh_operator_ttl():
+    # Allow creator entry routes to bypass cockpit guard
+    if request.path in ("/terence_entry", "/ignite-cortex"):
+        return None
+
     """Refresh Redis TTL for operator sessions on cockpit route access."""
-    if session.get(OPERATOR_MODE_KEY):  # <--- REPLACED "operator_mode" (CHECK 1/2)
+    if session.get(OPERATOR_MODE_KEY):
         redis = get_redis_client()
         redis.expire(f"operator_session:{current_user.email}", 900)
+
 
 
 # -------------------------------------------------------------------
@@ -237,7 +242,7 @@ def ignite_dashboard():
     }
 
     return render_template(
-        "admin/cockpit/ignite_dashboard.html",
+        "cockpit/ignite_dashboard.html",
         events=events,
         ttl=ttl,
         login_link_tile=login_link_tile,
@@ -270,7 +275,7 @@ def borrower_card_grid():
             }
         )
     return render_template(
-        "admin/cockpit/borrower_card_grid.html",
+        "cockpit/borrower_card_grid.html",
         cards=cards,
         current_time=datetime.utcnow(),
     )
@@ -305,7 +310,7 @@ def vault_metrics(client=None):
     total = len(cards)
 
     return render_template(
-        "admin/cockpit/vault_metrics.html",
+        "cockpit/vault_metrics.html",
         active=active,
         expiring=expiring,
         dormant=dormant,
@@ -368,7 +373,7 @@ def card_audit(card_id):
         if raw:
             audit_logs.append(json.loads(raw))
     audit_logs.sort(key=lambda log: log["timestamp"], reverse=True)
-    return render_template("admin/cockpit/card_audit.html", logs=audit_logs, card_id=card_id)
+    return render_template("cockpit/card_audit.html", logs=audit_logs, card_id=card_id)
 
 
 @cockpit_bp.route("/card-vault-export")
@@ -396,7 +401,7 @@ def card_vault_export():
             mimetype="text/csv",
             headers={"Content-Disposition": "attachment;filename=vault_export.csv"},
         )
-    return render_template("admin/cockpit/card_vault_export.html", logs=logs)
+    return render_template("cockpit/card_vault_export.html", logs=logs)
 
 
 @cockpit_bp.route("/underwriter-intake")
@@ -404,7 +409,7 @@ def card_vault_export():
 def underwriter_intake():
     """Renders a view of all underwriter agents."""
     underwriters = UnderwriterAgent.query.order_by(UnderwriterAgent.verified_at.desc()).all()
-    return render_template("admin/cockpit/underwriter_intake.html", underwriters=underwriters)
+    return render_template("cockpit/underwriter_intake.html", underwriters=underwriters)
 
 
 @cockpit_bp.route("/vault-intake")
@@ -412,7 +417,7 @@ def underwriter_intake():
 def vault_intake():
     """Renders a view of all vault transactions."""
     txns = VaultTransaction.query.order_by(VaultTransaction.received_at.desc()).all()
-    return render_template("admin/cockpit/vault_intake.html", txns=txns)
+    return render_template("cockpit/vault_intake.html", txns=txns)
 
 
 @cockpit_bp.route("/debug/blueprints")

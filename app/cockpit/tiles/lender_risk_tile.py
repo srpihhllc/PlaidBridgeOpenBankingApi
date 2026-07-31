@@ -1,5 +1,5 @@
 # =============================================================================
-# FILE: cockpit/tiles/lender_risk_tile.py
+# FILE: app/cockpit/tiles/lender_risk_tile.py
 # DESCRIPTION: Cockpit tile surfacing lender risk signals, AI evaluations,
 #              compliance violations, and fraud trend indicators.
 # =============================================================================
@@ -72,10 +72,7 @@ def load_lender_events(limit=20):
                 ]
             )
         )
-        .order_by(desc(SchemaEvent.timestamp))
-        .limit(limit)
-        .all()
-    )
+    ) .order_by(desc(SchemaEvent.timestamp)).limit(limit).all()
 
     return [
         {
@@ -128,7 +125,7 @@ def lender_risk_tile():
         "timestamp": datetime.utcnow().isoformat(),
     }
 
-    return render_template("admin/cockpit/lender_risk_tile.html", **context)
+    return render_template("cockpit/lender_risk_tile.html", context)
 
 
 # -----------------------------------------------------------------------------
@@ -165,7 +162,7 @@ def lender_risk_heatmap():
             risk_data[day]["links"] += 1
 
     return render_template(
-        "admin/cockpit/lender_risk_heatmap.html",
+        "cockpit/lender_risk_heatmap.html",
         risk_data=risk_data,
     )
 
@@ -187,7 +184,7 @@ def lender_risk_day_detail(date_str):
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        return render_template("admin/cockpit/lender_risk_day_invalid.html", date_str=date_str)
+        return render_template("cockpit/lender_risk_day_invalid.html", date_str=date_str)
 
     # Start/end of day
     start_dt = datetime.combine(target_date, datetime.min.time())
@@ -220,7 +217,7 @@ def lender_risk_day_detail(date_str):
             continue
 
     return render_template(
-        "admin/cockpit/lender_risk_day_detail.html",
+        "cockpit/lender_risk_day_detail.html",
         date_str=date_str,
         events=events,
         fraud_cases=fraud_cases,
@@ -267,7 +264,7 @@ def lender_risk_overview():
             heatmap[day]["links"] += 1
 
     return render_template(
-        "admin/cockpit/lender_risk_overview.html",
+        "cockpit/lender_risk_tile.html",
         recent_events=recent_events,
         recent_fraud=recent_fraud,
         recent_ai=recent_ai,

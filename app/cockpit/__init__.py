@@ -1,19 +1,41 @@
 # =============================================================================
 # FILE: app/cockpit/__init__.py
 # DESCRIPTION: Registers cockpit blueprints with fault-tolerant logging
-#              and cockpit‑grade TTL pulses.
+#              and cockpit-grade TTL pulses.
 # =============================================================================
 
 import logging
-
 from app.constants.telemetry_keys import REDIS_FAIL_TTL, REDIS_QUEUE_FLUSH_TTL
-from app.telemetry.ttl_emit import safe_emit, ttl_emit
+# Import the underlying function directly to avoid the broken wrapper
+from app.telemetry.ttl_emit import safe_emit, ttl_emit as raw_ttl_emit
 from app.utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
 
-# Wrap ttl_emit so it never raises through safe_import
-ttl_emit = safe_emit(ttl_emit)
+# ROBUST WRAPPER: This ensures positional arguments and keyword arguments 
+# are passed through. If the underlying function signature is strict, 
+# this wrapper will strip unsupported arguments and retry.
+def robust_ttl_emit(*args, **kwargs):
+    try:
+        return raw_ttl_emit(*args, **kwargs)
+    except TypeError:
+        # If the underlying function signature is strict (e.g., no 'meta' or 'client'),
+        # strip the offending keywords and try one more time.
+        filtered_kwargs = {
+            k: v for k, v in kwargs.items() 
+            if k not in ['meta', 'client']
+        }
+        try:
+            return raw_ttl_emit(*args, **filtered_kwargs)
+        except Exception as e:
+            logger.debug(f"Telemetry pulse finally failed after filtering: {e}")
+            return None
+    except Exception as e:
+        logger.debug(f"Telemetry pulse suppressed: {e}")
+        return None
+
+# Replace the broken wrapper with the robust one
+ttl_emit = robust_ttl_emit
 
 
 def _emit_cockpit_pulse(ttl_key: str, status: str, ttl: int):
@@ -48,9 +70,7 @@ def safe_import(module_path: str, attr_name: str, ttl_key: str):
 
 
 # Safe imports — missing tiles won’t crash the package
-# Point directly at telemetry_dashboard.py where cockpit_bp is defined
 cockpit_bp = safe_import("app.cockpit.routes.telemetry_dashboard", "cockpit_bp", "cockpit_bp")
-
 trace_bp = safe_import("app.admin.cockpit.trace.event_id", "trace_bp", "trace_bp")
 fk_inspector_bp = safe_import(
     "app.cockpit.tiles.fk_constraint_inspector", "fk_inspector_bp", "fk_inspector_bp"

@@ -1,10 +1,11 @@
 # =============================================================================
 # FILE: app/utils/redis_utils.py
 # DESCRIPTION: Cockpit‑grade Redis client with health pulses, startup‑emit
-#              buffering, and connection‑failure metrics. Defensive about SSL
-#              kwargs and provides DISABLE_REDIS guard for migrations/CLI.
-#              Normalizes URIs to avoid passing unsupported 'ssl' kwargs and
-#              guarantees a clean Redis PING on init when available.
+#              buffering, cluster debug flag store, and connection‑failure
+#              metrics. Defensive about SSL kwargs and provides DISABLE_REDIS
+#              guard for migrations/CLI. Normalizes URIs to avoid passing
+#              unsupported 'ssl' kwargs and guarantees a clean Redis PING on
+#              init when available.
 # =============================================================================
 
 from __future__ import annotations
@@ -32,6 +33,8 @@ from app.constants.telemetry_keys import (
 from app.telemetry.ttl_emit import flush_emit_queue, ttl_emit
 
 logger = logging.getLogger(__name__)
+
+REDIS_DEBUG_FLAGS_HASH: str = "app:config:debug_flags"
 
 # -------------------------------------------------------------------------
 # Metrics Counter (mocked if missing)
@@ -98,19 +101,14 @@ def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
     port = parsed.port
 
     netloc = parsed.netloc
-    # parsed.netloc contains the original <user[:pass]@host[:port]> string
-    # We will rebuild netloc when necessary.
     if username is None and password:
-        # Build a netloc with "default:<password>@host[:port]"
         if port:
             netloc = f"default:{password}@{hostname}:{port}"
         else:
             netloc = f"default:{password}@{hostname}"
     else:
-        # Use original netloc (but ensure no trailing/leading empties)
         netloc = parsed.netloc
 
-    # Rebuild URL without 'ssl' query param
     new_query = urlencode(q, doseq=True)
     normalized = urlunparse(
         (
@@ -133,9 +131,6 @@ def _masked_endpoint(uri: str) -> str:
     Examples:
       - rediss://user:****@host:port/db
       - redis://default:****@host/db
-
-    Works when username is missing but password present (in which case we show
-    the inserted default username).
     """
     try:
         p = urlparse(uri)
@@ -146,11 +141,9 @@ def _masked_endpoint(uri: str) -> str:
         path = p.path or ""
 
         if username or password:
-            # When username is missing but password present, show 'default:****'
             display_user = username if username else "default"
             return f"{p.scheme}://{display_user}:****@{host}{port}{path}"
         else:
-            # No credentials
             netloc = p.netloc or ""
             return f"{p.scheme}://{netloc}{path}"
     except Exception:
@@ -163,14 +156,6 @@ def _masked_endpoint(uri: str) -> str:
 def get_redis_client() -> Redis[Any] | None:
     """
     Returns a cached Redis client if available, otherwise creates one.
-
-    Behavior changes compared with the previous implementation:
-    - In test environments (FLASK_ENV=testing) or when DISABLE_REDIS is set,
-      this will return None if REDIS_STORAGE_URI is not provided. Tests must
-      install a stub by monkeypatching app.utils.redis_utils.get_redis_client
-      or by setting REDIS_STORAGE_URI for integration tests that need a real Redis.
-    - Network calls (Redis.from_url and ping) are guarded and best-effort;
-      failures return None and emit non-fatal telemetry.
     """
     # Explicit CLI/migration guard
     if os.environ.get("DISABLE_REDIS"):
@@ -181,12 +166,9 @@ def get_redis_client() -> Redis[Any] | None:
     if has_app_context():
         cached = getattr(current_app, "redis_client", None)
         if cached is not None:
-            # Tell mypy that the cached attribute is a Redis (or None)
-            # Changed from cast(Redis[Any] | None, cached) to avoid generic class error
             return cast(Any, cached)
 
     raw_url = os.getenv("REDIS_STORAGE_URI", "").strip()
-    # In test mode, avoid attempting remote connections if no URI provided
     if os.environ.get("FLASK_ENV") == "testing" and not raw_url:
         logger.debug(
             "Testing environment with no REDIS_STORAGE_URI; skipping Redis client creation."
@@ -194,7 +176,6 @@ def get_redis_client() -> Redis[Any] | None:
         return None
 
     if not raw_url:
-        # Do not log an error here; keep quiet and let callers handle absence.
         logger.debug("REDIS_STORAGE_URI not set; get_redis_client returning None.")
         return None
 
@@ -216,13 +197,11 @@ def get_redis_client() -> Redis[Any] | None:
     }
 
     try:
-        # Create client lazily and validate connectivity.
         client = Redis.from_url(url, **kwargs)
 
         try:
             client.ping()
         except Exception as ping_exc:
-            # Ping failed — increment metric and emit a TTL trace, but do not raise.
             REDIS_CONNECT_FAILURES_COUNTER.inc()
             logger.warning("Redis ping failed for %s: %s", _masked_endpoint(url), ping_exc)
             try:
@@ -235,7 +214,6 @@ def get_redis_client() -> Redis[Any] | None:
                 pass
             return None
 
-        # Successful ping: emit pulses and flush queue (best-effort)
         logger.info(
             "🟢 Redis ping successful—client checked out. endpoint=%s tls=%s",
             _masked_endpoint(url),
@@ -266,9 +244,7 @@ def get_redis_client() -> Redis[Any] | None:
         except Exception:
             logger.debug("Best-effort telemetry/flush failed (continuing).", exc_info=True)
 
-        # Cache for reuse on the app object when possible
         if has_app_context():
-            # Use setattr to avoid mypy complaining about unknown Flask attributes
             current_app.redis_client = client
 
         return client
@@ -299,6 +275,71 @@ def get_redis_client() -> Redis[Any] | None:
         except Exception:
             pass
         return None
+
+
+# -------------------------------------------------------------------------
+# Dynamic Cluster Debug Flag Store (Prevents WSGI Worker Drift)
+# -------------------------------------------------------------------------
+def get_cluster_debug_flags() -> dict[str, Any]:
+    """
+    Retrieves dynamic debug flags from shared Redis state.
+    Falls back to current_app.config if Redis is unreachable or unconfigured.
+    """
+    flags: dict[str, Any] = {}
+
+    # 1. Start with process-local Flask config defaults
+    if has_app_context():
+        flags = {
+            k: v
+            for k, v in current_app.config.items()
+            if k.isupper() and ("DEBUG" in k or "FLAG" in k)
+        }
+
+    # 2. Layer shared Redis overrides on top
+    client = get_redis_client()
+    if client:
+        try:
+            raw_hash = client.hgetall(REDIS_DEBUG_FLAGS_HASH)
+            for k, v in raw_hash.items():
+                key_str = k.decode("utf-8") if isinstance(k, bytes) else str(k)
+                val_str = v.decode("utf-8") if isinstance(v, bytes) else str(v)
+                try:
+                    flags[key_str] = json.loads(val_str)
+                except (json.JSONDecodeError, TypeError):
+                    flags[key_str] = val_str
+        except Exception as exc:
+            logger.warning(
+                "Redis flag lookup failed, relying on local config fallback: %s", exc
+            )
+
+    return flags
+
+
+def set_cluster_debug_flags(updates: dict[str, Any]) -> dict[str, Any]:
+    """
+    Persists debug flag mutations into shared Redis storage and updates process config.
+    Returns the dictionary of successfully applied flag key-value pairs.
+    """
+    client = get_redis_client()
+    applied: dict[str, Any] = {}
+
+    for key, value in updates.items():
+        # Update current process memory if inside Flask app context
+        if has_app_context():
+            current_app.config[key] = value
+        applied[key] = value
+
+        # Sync across WSGI workers via Redis Hash
+        if client:
+            try:
+                serialized = json.dumps(value)
+                client.hset(REDIS_DEBUG_FLAGS_HASH, key, serialized)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to synchronize debug flag '%s' across Redis: %s", key, exc
+                )
+
+    return applied
 
 
 # -------------------------------------------------------------------------

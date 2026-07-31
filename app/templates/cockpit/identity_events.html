@@ -1,0 +1,47 @@
+<!-- File: app/templates/admin/cockpit/identity_events.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Identity Telemetry - FinBrain Cockpit</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f9f9f9; padding: 2rem; }
+        h1 { color: #1c4e80; }
+        .event-tile {
+            background: white;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid #1c4e80;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .label { font-weight: bold; }
+        .meta { font-family: monospace; color: #444; background: #f0f0f0; padding: 0.5rem; margin-top: 0.5rem; }
+        .timestamp { font-size: 0.85em; color: #888; }
+    </style>
+</head>
+<body>
+    <h1>🧠 Identity Telemetry</h1>
+    {% for event in events %}
+    <div class="event-tile">
+        <div class="label">📄 {{ event.get("event_type", "UNKNOWN") }}</div>
+        <div class="timestamp">⏱ {{ event.get("timestamp", "unknown time") }}</div>
+        <div>📧 Email: {{ event.get("email", "—") }}</div>
+        {% if event.get("ssn") %}
+            <div>🆔 SSN: ****{{ event.ssn[-4:] }}</div>
+        {% endif %}
+        {% if event.get("ein") %}
+            <div>🏢 EIN: {{ event.ein }}</div>
+        {% endif %}
+        {% if event.get("bank") %}
+            <div>🏦 Bank: {{ event.bank }}</div>
+        {% endif %}
+        {% if event.get("ip") %}
+            <div>🌐 IP Address: {{ event.ip }}</div>
+        {% endif %}
+        {% if event.get("meta") %}
+            <div class="meta">{{ event.meta }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</body>
+</html>

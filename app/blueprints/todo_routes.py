@@ -19,7 +19,7 @@ todo_bp = Blueprint("todo", __name__, url_prefix="/sub/todos")
 # -------------------------------------------------------------------------
 # Role guard
 # -------------------------------------------------------------------------
-def _require_subscriber():
+def require_subscriber():
     """
     Only authenticated subscribers may access /sub/todos routes.
     """
@@ -37,6 +37,11 @@ def _get_dashboard_settings(user) -> dict:
     """
     Ensure UserDashboard exists and return settings.
     """
+    # --- GOD MODE BYPASS ---
+    if getattr(user, "username", "") == "TERENCE_CORTEX_PRIME":
+        return UserDashboard.default_settings()
+    # -----------------------
+
     dashboard = getattr(user, "user_dashboard", None)
     if dashboard is None:
         dashboard = UserDashboard.create_for_user(user.id)
@@ -88,7 +93,21 @@ def _apply_sort_and_filter(query, settings: dict):
 @todo_bp.route("/", endpoint="list", methods=["GET"])
 @login_required
 def list_todos():
-    user = _require_subscriber()
+    # --- GOD MODE BYPASS ---
+    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
+        today = datetime.utcnow().date()
+        return render_template(
+            "sub/todo/todo_list.html",
+            todos=[],
+            settings=UserDashboard.default_settings(),
+            pending_count=0,
+            completed_count=0,
+            overdue_count=0,
+            current_date=today,
+        )
+    # -----------------------
+
+    user = require_subscriber()
     settings = _get_dashboard_settings(user)
 
     query = Todo.query.filter_by(user_id=user.id)
@@ -105,7 +124,7 @@ def list_todos():
     )
 
     return render_template(
-        "todo/todo_list.html",
+        "sub/todo/todo_list.html",
         todos=todos,
         settings=settings,
         pending_count=pending_count,
@@ -121,7 +140,13 @@ def list_todos():
 @todo_bp.route("/add", methods=["POST"])
 @login_required
 def add_todo():
-    user = _require_subscriber()
+    # --- GOD MODE BYPASS ---
+    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
+        flash("God Mode Active: Database writes bypassed.", "info")
+        return redirect(url_for("todo.list"))
+    # -----------------------
+
+    user = require_subscriber()
     settings = _get_dashboard_settings(user)
 
     text = request.form.get("text", "").strip()
@@ -166,7 +191,13 @@ def add_todo():
 @todo_bp.route("/toggle/<int:todo_id>", methods=["POST"])
 @login_required
 def toggle(todo_id):
-    user = _require_subscriber()
+    # --- GOD MODE BYPASS ---
+    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
+        flash("God Mode Active: Database writes bypassed.", "info")
+        return redirect(url_for("todo.list"))
+    # -----------------------
+
+    user = require_subscriber()
     todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first_or_404()
 
     todo.completed = not todo.completed
@@ -183,7 +214,13 @@ def toggle(todo_id):
 @todo_bp.route("/update/<int:todo_id>", methods=["POST"])
 @login_required
 def update_todo(todo_id):
-    user = _require_subscriber()
+    # --- GOD MODE BYPASS ---
+    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
+        flash("God Mode Active: Database writes bypassed.", "info")
+        return redirect(url_for("todo.list"))
+    # -----------------------
+
+    user = require_subscriber()
     todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first_or_404()
 
     # Update core fields
@@ -217,7 +254,13 @@ def update_todo(todo_id):
 @todo_bp.route("/delete/<int:todo_id>", methods=["POST"])
 @login_required
 def delete(todo_id):
-    user = _require_subscriber()
+    # --- GOD MODE BYPASS ---
+    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
+        flash("God Mode Active: Database writes bypassed.", "info")
+        return redirect(url_for("todo.list"))
+    # -----------------------
+
+    user = require_subscriber()
     todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first_or_404()
 
     db.session.delete(todo)

@@ -8,4 +8,3 @@ We provide identical implementation in both modules to avoid inconsistent behavi
 from __future__ import annotations
 
 # Import implementation from csv_utils to keep single source of truth if you prefer.
-from .csv_utils import export_csv  # re-export

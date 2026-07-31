@@ -1,91 +1,18 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
+<head>
+    <meta charset="UTF-8">
     <title>{% block title %}PlaidBridgeOpenBankingApi{% endblock %}</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    {% block head %}{% endblock %}
 
-    <!-- Shared CSS (replace with your real assets) -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
-    <style>
-      /* Minimal fallback styles so pages render in tests without Tailwind */
-      body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f7fafc; margin:0; color:#1a202c; }
-      header { background: #ffffff; border-bottom: 1px solid #e5e7eb; }
-      .container { max-width: 1024px; margin: 0 auto; padding: 1rem; }
-      .nav { display:flex; gap:1rem; align-items:center; justify-content:space-between; }
-      .brand { font-weight:700; font-size:1.1rem; color:#0f172a; text-decoration:none; }
-      .btn { display:inline-block; padding:.5rem .75rem; border-radius:.375rem; text-decoration:none; }
-      .btn-primary { background:#2563eb;color:#fff; }
-      .btn-ghost { background:transparent;color:#2563eb;border:1px solid #bfdbfe;padding:.45rem .7rem;border-radius:.375rem; }
-      main { padding: 2rem 1rem; }
-      footer { padding:1rem; text-align:center; color:#6b7280; font-size:.9rem; }
-      .flash { margin: .5rem 0; padding: .75rem 1rem; border-radius: .375rem; }
-      .flash-success { background:#ecfdf5; color:#065f46; border:1px solid #bbf7d0; }
-      .flash-error { background:#fff1f2; color:#7f1d1d; border:1px solid #fecaca; }
-    </style>
-  </head>
-  <body>
-    <header>
-      <div class="container nav" role="navigation" aria-label="Main navigation">
-        <!-- brand link: point to existing endpoint main.home (was main.index -> caused BuildError) -->
-        <a class="brand" href="{{ url_for('main.home') }}">PlaidBridgeOpenBankingApi</a>
-        <nav>
-          {% if current_user and current_user.is_authenticated %}
-            <span>Signed in as {{ current_user.email if current_user.email else current_user.id }}</span>
-            {% if current_user.is_admin %}
-              <a class="btn btn-primary" href="{{ url_for('admin_ui.admin_home') }}">Admin</a>
-            {% else %}
-              <a class="btn btn-primary" href="{{ url_for('main.dashboard') }}">Dashboard</a>
-            {% endif %}
-            <a class="btn btn-ghost" href="{{ url_for('auth.logout') }}">Sign out</a>
-          {% else %}
-            <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Sign in</a>
-            <a class="btn btn-ghost" href="{{ url_for('main.subscriber_entry') }}">Get Started</a>
-          {% endif %}
-        </nav>
-      </div>
-    </header>
+    {% block head %}
+        {% include "base_cdn_fallback.html" %}
+    {% endblock %}
+</head>
 
-    <main id="content" class="container" role="main">
-      <!-- flash messages -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-          {% for category, msg in messages %}
-            <div class="flash flash-{{ 'success' if category == 'success' else 'error' }}">
-              {{ msg }}
-            </div>
-          {% endfor %}
-        {% endif %}
-      {% endwith %}
-
-      {% block content %}{% endblock %}
-    </main>
-
-    <footer>
-      <div class="container">
-        <small>
-          {# app created in 2022; render range when current year > 2022 with safe fallbacks #}
-          {% set start_year = 2022 %}
-          {% if current_year is defined %}
-            {% set end_year = current_year %}
-          {% elif config.get('APP_YEAR') %}
-            {% set end_year = config.get('APP_YEAR') %}
-          {% else %}
-            {% set end_year = start_year %}
-          {% endif %}
-
-          {% if end_year|int > start_year %}
-            © {{ start_year }}–{{ end_year }} PlaidBridgeOpenBankingApi — Built with care.
-          {% else %}
-            © {{ start_year }} PlaidBridgeOpenBankingApi — Built with care.
-          {% endif %}
-        </small>
-      </div>
-    </footer>
-
-    <!-- Shared JS (replace with your real assets) -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
-    {% block scripts %}{% endblock %}
-  </body>
+<body>
+    {% block body %}
+        {% block content %}{% endblock %}
+    {% endblock %}
+</body>
 </html>
+

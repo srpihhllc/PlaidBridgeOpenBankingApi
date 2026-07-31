@@ -7,13 +7,16 @@
 
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import time
 from enum import Enum
 from typing import Any, Dict, Optional
+from urllib.parse import urlencode
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderName(str, Enum):
@@ -22,16 +25,11 @@ class ProviderName(str, Enum):
     MICROSOFT = "microsoft"
 
 
-# Simple in-memory cache for Apple JWKS to avoid fetching keys on every request.
 _apple_jwks_cache: Dict[str, Any] = {"jwks": None, "fetched_at": 0}
 _APPLE_JWKS_TTL = 60 * 60  # 1 hour
 
 
 def _get_apple_jwks() -> Dict[str, Any]:
-    """
-    Fetch Apple's JWKS and cache it for _APPLE_JWKS_TTL seconds.
-    Returns a dict with keys as returned by the JWKS endpoint.
-    """
     now = int(time.time())
     cached = _apple_jwks_cache
     if cached["jwks"] and (now - cached["fetched_at"] < _APPLE_JWKS_TTL):
@@ -46,19 +44,64 @@ def _get_apple_jwks() -> Dict[str, Any]:
 
 
 class OAuthProvider:
-    """
-    Unified abstraction for exchanging authorization codes and fetching
-    normalized profile information from different OAuth providers.
-
-    Methods:
-      - exchange_code(code) -> token_data (dict)
-      - fetch_profile(token_data) -> normalized profile dict:
-          { "email": str|None, "sub": str|None, "name": str|None }
-    """
-
     def __init__(self, provider: ProviderName, config: Optional[Dict[str, Any]] = None) -> None:
         self.provider = provider
         self.config = config or {}
+
+    def get_authorization_url(
+        self,
+        state: Optional[str] = None,
+        scope: Optional[str] = None,
+        code_challenge: Optional[str] = None,
+        **kwargs: Any,
+    ) -> str:
+        """
+        Generates the provider-specific OAuth authorization URL for user redirection.
+        """
+        endpoints = {
+            ProviderName.GOOGLE: "https://accounts.google.com/o/oauth2/v2/auth",
+            ProviderName.MICROSOFT: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+            ProviderName.APPLE: "https://appleid.apple.com/auth/authorize",
+        }
+
+        base_url = endpoints.get(self.provider)
+        if not base_url:
+            raise NotImplementedError(f"Provider {self.provider} not supported")
+
+        params: Dict[str, Any] = {
+            "client_id": self.config.get("client_id", ""),
+            "redirect_uri": self.config.get("redirect_uri", ""),
+            "response_type": "code",
+        }
+
+        if state:
+            params["state"] = state
+
+        if scope:
+            params["scope"] = scope
+        else:
+            if self.provider == ProviderName.GOOGLE:
+                params["scope"] = "openid email profile"
+            elif self.provider == ProviderName.MICROSOFT:
+                params["scope"] = "openid profile email User.Read"
+            elif self.provider == ProviderName.APPLE:
+                params["scope"] = "name email"
+                params["response_mode"] = "form_post"
+
+        # Google specific parameter
+        if self.provider == ProviderName.GOOGLE:
+            params["access_type"] = kwargs.get("access_type", "offline")
+
+        if code_challenge:
+            params["code_challenge"] = code_challenge
+            params["code_challenge_method"] = "S256"
+
+        # Pass through any remaining keyword arguments
+        for k, v in kwargs.items():
+            if k not in params and v is not None:
+                params[k] = v
+
+        return f"{base_url}?{urlencode(params)}"
 
     def exchange_code(self, code: str) -> Dict[str, Any]:
         if self.provider == ProviderName.GOOGLE:
@@ -94,21 +137,19 @@ class OAuthProvider:
             return resp.json()
 
         if self.provider == ProviderName.APPLE:
-            # Apple requires a client_assertion JWT signed by your private key.
             client_id = self.config.get("client_id")
             redirect_uri = self.config.get("redirect_uri")
             team_id = self.config.get("apple_team_id")
             key_id = self.config.get("apple_key_id")
-            private_key = self.config.get("apple_private_key")  # PEM string
+            private_key = self.config.get("apple_private_key")
             aud = self.config.get("apple_aud", "https://appleid.apple.com")
 
             if not all((client_id, redirect_uri, team_id, key_id, private_key)):
                 raise RuntimeError("Apple OAuth requires apple_team_id, apple_key_id and apple_private_key in config")
 
-            # Build client_assertion JWT (ES256 expected).
             try:
-                import jwt  # PyJWT
-            except Exception as exc:
+                import jwt
+            except ImportError as exc:
                 raise RuntimeError("PyJWT is required for Apple client assertion") from exc
 
             now = int(time.time())
@@ -140,10 +181,6 @@ class OAuthProvider:
         raise NotImplementedError(f"Provider {self.provider} not supported")
 
     def fetch_profile(self, token_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Fetch a normalized profile dict with keys: email, sub, name.
-        For Apple this verifies the id_token against Apple's JWKS when possible.
-        """
         if self.provider == ProviderName.GOOGLE:
             access_token = token_data.get("access_token")
             profile_url = "https://openidconnect.googleapis.com/v1/userinfo"
@@ -158,7 +195,6 @@ class OAuthProvider:
             resp = requests.get(profile_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
             resp.raise_for_status()
             d = resp.json()
-            # Normalize Graph fields: prefer 'mail', fall back to 'userPrincipalName'
             email = d.get("mail") or d.get("userPrincipalName")
             return {"email": email, "sub": d.get("id"), "name": d.get("displayName")}
 
@@ -167,12 +203,10 @@ class OAuthProvider:
             if not id_token:
                 raise RuntimeError("Apple token response did not include id_token")
 
-            # Prefer full verification using Apple's JWKS if PyJWT available.
             try:
-                import jwt  # PyJWT
+                import jwt
                 from jwt.algorithms import RSAAlgorithm
-            except Exception:
-                # PyJWT not installed — fall back to unverified decode (tests can monkeypatch)
+            except ImportError:
                 try:
                     import jwt
                     payload = jwt.decode(id_token, options={"verify_signature": False})
@@ -180,7 +214,6 @@ class OAuthProvider:
                 except Exception:
                     return {"email": None, "sub": None, "name": None}
 
-            # Attempt to verify signature using Apple's JWKS
             client_id = self.config.get("client_id")
             try:
                 jwks = _get_apple_jwks()
@@ -197,19 +230,16 @@ class OAuthProvider:
                 if not key_dict:
                     raise RuntimeError("No matching Apple JWKS key found for kid")
 
-                # Convert JWK to PEM public key
                 public_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
-                # Verify token (audience should match client_id)
                 payload = jwt.decode(id_token, public_key, algorithms=["RS256"], audience=client_id)
                 return {"email": payload.get("email"), "sub": payload.get("sub"), "name": payload.get("name")}
+
+            except jwt.PyJWTError as exc:
+                logger.error("Apple id_token signature verification failed: %s", exc)
+                raise RuntimeError("Invalid Apple ID Token signature") from exc
             except Exception as exc:
-                # If verification fails, fall back to unverified decode so tests can still run
-                logger = logging.getLogger(__name__)
-                logger.debug("Apple id_token verification failed, falling back to unverified decode: %s", exc, exc_info=True)
-                try:
-                    payload = jwt.decode(id_token, options={"verify_signature": False})
-                    return {"email": payload.get("email"), "sub": payload.get("sub"), "name": payload.get("name")}
-                except Exception:
-                    return {"email": None, "sub": None, "name": None}
+                logger.debug("System error during parsing: %s", exc)
+                payload = jwt.decode(id_token, options={"verify_signature": False})
+                return {"email": payload.get("email"), "sub": payload.get("sub"), "name": payload.get("name")}
 
         raise NotImplementedError(f"Provider {self.provider} not supported")

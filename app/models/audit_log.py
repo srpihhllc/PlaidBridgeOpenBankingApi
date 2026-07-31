@@ -4,9 +4,12 @@
 #              linked cockpit analytics). Fully aligned with UUID User.id.
 # =============================================================================
 
-from datetime import datetime
-
+from datetime import datetime, timezone
 from ..extensions import db
+
+
+def _get_naive_utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # -------------------------------------------------------------------------
@@ -15,11 +18,9 @@ from ..extensions import db
 class FinancialAuditLog(db.Model):
     __tablename__ = "financial_audit_logs"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # UUID FK — must match User.id (String(36))
     actor_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -32,10 +33,13 @@ class FinancialAuditLog(db.Model):
 
     created_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
+        default=_get_naive_utc_now,
         nullable=False,
         index=True,
     )
+
+    # Core Relationships
+    actor = db.relationship("User", backref=db.backref("financial_audit_logs", lazy="dynamic"))
 
     def __repr__(self):
         return f"<FinancialAuditLog id={self.id} action_type={self.action_type}>"
@@ -47,11 +51,9 @@ class FinancialAuditLog(db.Model):
 class AuditLog(db.Model):
     __tablename__ = "audit_logs"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # UUID FK — must match User.id (String(36))
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -59,8 +61,6 @@ class AuditLog(db.Model):
         index=True,
     )
 
-    # Optional link to a transaction (mock or real)
-    # FIXED: Changed from db.Integer to db.String(36) to match transactions.id UUID
     transaction_id = db.Column(
         db.String(36),
         db.ForeignKey("transactions.id", ondelete="SET NULL"),
@@ -68,24 +68,23 @@ class AuditLog(db.Model):
         index=True,
     )
 
-    # Event classification (e.g., "mock_bank_transfer_audit")
-    event_type = db.Column(db.String(64), nullable=False, index=True)
-
-    # Structured JSON payload (risk flags, direction, metadata, etc.)
-    payload = db.Column(db.JSON, nullable=False, default=dict)
-
     created_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
+        default=_get_naive_utc_now,
         nullable=False,
         index=True,
     )
 
-    # Relationships for cockpit drilldowns
-    # NOTE: No imports — string-based relationships prevent circular imports
-    user = db.relationship("User", back_populates="audit_events", lazy=True)
-    transaction = db.relationship("Transaction", back_populates="audit_events", lazy=True)
+    # Core Relationships
+    user = db.relationship("User", backref=db.backref("audit_logs", lazy="dynamic"))
+
+    # -----------------------------------------------------------------------
+    # Transaction Bridge (Fixes the InvalidRequestError: KeyError: 'transaction')
+    # -----------------------------------------------------------------------
+    transaction = db.relationship(
+        "Transaction",
+        back_populates="audit_logs",
+    )
 
     def __repr__(self):
-        return f"<AuditLog id={self.id} event_type={self.event_type}>"
-
+        return f"<AuditLog id={self.id} user_id={self.user_id} transaction_id={self.transaction_id}>"

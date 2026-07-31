@@ -1,6 +1,5 @@
 # name=app/tests/test_ttl_emit_smoke.py
 import pytest
-from app.config import TestingConfig
 from importlib import import_module
 
 def test_ttl_emit_import_and_call(app):

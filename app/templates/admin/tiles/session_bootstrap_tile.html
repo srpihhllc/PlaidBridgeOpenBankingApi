@@ -1,0 +1,14 @@
+<!-- app/templates/tiles/session_bootstrap_tile.html -->
+<h2>Session Bootstrap Method: {{ method }}</h2>
+<p>TTL Freshness: {{ freshness }} seconds</p>
+
+<div style="background-color: #eee; width: 100%; height: 20px; border-radius: 5px; overflow: hidden;">
+  <div style="
+    width: {{ freshness }}px;
+    max-width: 100%;
+    height: 100%;
+    background-color: {% if freshness > 300 %}#4CAF50{% elif freshness > 60 %}#FFC107{% else %}#F44336{% endif %};
+    transition: width 0.5s ease;
+  "></div>
+</div>
+

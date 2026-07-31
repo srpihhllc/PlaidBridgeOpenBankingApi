@@ -11,7 +11,6 @@ from ..extensions import db
 class LoanAgreement(db.Model):
     __tablename__ = "loan_agreement"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -43,22 +42,22 @@ class LoanAgreement(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # -------------------------------------------------------------------------
-    # Relationships (The Symmetry Fix)
+    # Relationships (The Runtime Symmetry Fix)
     # -------------------------------------------------------------------------
 
-    # ⭐ FIX: Borrower symmetry
+    # ⭐ SENIOR FIX: Swapped back_populates for explicit dynamic backrefs.
+    # This prevents the application from throwing a KeyError on the User model initialization frame.
     borrower = db.relationship(
         "User",
         foreign_keys=[borrower_id],
-        back_populates="borrowed_loan_agreements",
+        backref=db.backref("borrowed_loan_agreements", lazy="dynamic", passive_deletes=True),
         lazy="joined",  # Optimized for fetching borrower details with the loan
     )
 
-    # ⭐ FIX: Lender symmetry (Ensure User model has 'lent_loan_agreements')
     lender = db.relationship(
         "User",
         foreign_keys=[lender_id],
-        back_populates="lent_loan_agreements",
+        backref=db.backref("lent_loan_agreements", lazy="dynamic", passive_deletes=True),
         lazy="joined",
     )
 

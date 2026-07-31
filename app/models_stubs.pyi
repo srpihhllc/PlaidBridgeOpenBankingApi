@@ -1,3 +1,5 @@
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/models_stubs.pyi
+
 from typing import Any
 
 class Model: ...

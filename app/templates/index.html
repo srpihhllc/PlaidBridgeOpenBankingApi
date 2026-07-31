@@ -36,7 +36,7 @@
         <!-- Dynamic Action Buttons -->
         {% if current_user and current_user.is_authenticated %}
             {% if current_user.is_admin %}
-                <a href="{{ url_for('admin_ui.admin_home') }}" class="block w-full py-3 px-8 text-lg font-semibold rounded-lg shadow-lg text-white bg-blue-600 hover:bg-blue-700">
+                <a href="{{ url_for('admin.admin_home') }}" class="block w-full py-3 px-8 text-lg font-semibold rounded-lg shadow-lg text-white bg-blue-600 hover:bg-blue-700">
                     Manage the Platform
                 </a>
             {% else %}

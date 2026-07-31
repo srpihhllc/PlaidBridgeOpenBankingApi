@@ -1,6 +1,5 @@
 <h2>📝 Pending Tradeline Approvals</h2>
 
-<!-- Flash message support -->
 {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
     {% for category, msg in messages %}
@@ -12,7 +11,6 @@
   {% endif %}
 {% endwith %}
 
-<!-- Status filter -->
 <div class="mb-3">
   <form method="get" class="d-flex align-items-center">
     <label for="status" class="form-label me-2 mb-0">Filter by status:</label>
@@ -59,11 +57,11 @@
         {% endif %}
       </td>
       <td>
-        <form class="d-inline" method="post" action="{{ url_for('api_bp.tradeline_review', tradeline_id=line.id) }}">
+        <form class="d-inline" method="post" action="{{ url_for('api.tradeline_review', tradeline_id=line.id) }}">
           <input type="hidden" name="action" value="approve">
           <button class="btn btn-sm btn-success">Approve</button>
         </form>
-        <form class="d-inline" method="post" action="{{ url_for('api_bp.tradeline_review', tradeline_id=line.id) }}">
+        <form class="d-inline" method="post" action="{{ url_for('api.tradeline_review', tradeline_id=line.id) }}">
           <input type="hidden" name="action" value="deny">
           <button class="btn btn-sm btn-danger">Deny</button>
         </form>
@@ -79,5 +77,3 @@
     {% endfor %}
   </tbody>
 </table>
-
-

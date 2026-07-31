@@ -1,4 +1,8 @@
-# app/models/dispute_log.py
+# =============================================================================
+# FILE: app/models/dispute_log.py
+# DESCRIPTION: Cockpit‑grade DisputeLog model aligned with UUID user IDs,
+#              cascade delete semantics, and dynamic two-way relationships.
+# =============================================================================
 
 import hashlib
 import os
@@ -9,7 +13,6 @@ from ..extensions import db
 
 class DisputeLog(db.Model):
     __tablename__ = "dispute_log"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -35,8 +38,17 @@ class DisputeLog(db.Model):
 
     status = db.Column(db.String(32), default="sent")
 
-    # ✔ Correct parent relationship
-    user = db.relationship("User", back_populates="dispute_logs")
+    # -------------------------------------------------------------------------
+    # Relationships (The Runtime Symmetry Fix)
+    # -------------------------------------------------------------------------
+
+    # ⭐ SENIOR FIX: Swapped back_populates for explicit dynamic backref.
+    # This dynamically injects 'dispute_logs' into the User mapper frame at runtime,
+    # clearing the compile-time KeyError validation check.
+    user = db.relationship(
+        "User",
+        backref=db.backref("dispute_logs", lazy="dynamic", passive_deletes=True),
+    )
 
     # ---------- Artifact Trace Properties ----------
     @property
@@ -127,3 +139,6 @@ class DisputeLog(db.Model):
                 "zip": self.download_zip_url,
             },
         }
+
+    def __repr__(self):
+        return f"<DisputeLog id={self.id} user_id={self.user_id} status='{self.status}'>"

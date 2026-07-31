@@ -5,22 +5,22 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-3 small">🧠 System</div>
 
-  <a href="{{ url_for('admin_ui.admin_home') }}"
+  <a href="{{ url_for('admin.admin_home') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.admin_home' %}active{% endif %}">
     🔍 Overview
   </a>
 
-  <a href="{{ url_for('admin_ui.system_heartbeat') }}"
+  <a href="{{ url_for('admin.system_heartbeat') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.system_heartbeat' %}active{% endif %}">
     ❤️ Heartbeat
   </a>
 
-  <a href="{{ url_for('admin_ui.redis_panel') }}"
+  <a href="{{ url_for('admin.redis_panel') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.redis_panel' %}active{% endif %}">
     🧊 Redis Panel
   </a>
 
-  <a href="{{ url_for('admin_ui.cache_health') }}"
+  <a href="{{ url_for('admin.cache_health') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.cache_health' %}active{% endif %}">
     🩺 Cache Health
   </a>
@@ -31,22 +31,22 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">🧬 Schema & Telemetry</div>
 
-  <a href="{{ url_for('admin_ui.schema_events') }}"
+  <a href="{{ url_for('admin.tile_schema_events') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.schema_events' %}active{% endif %}">
     📜 Events
   </a>
 
-  <a href="{{ url_for('admin_ui.schema_versions') }}"
+  <a href="{{ url_for('admin.tile_schema_versions') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.schema_versions' %}active{% endif %}">
     🧪 Versions
   </a>
 
-  <a href="{{ url_for('admin_ui.schema_viewer') }}"
+  <a href="{{ url_for('admin.schema_diagram') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.schema_viewer' %}active{% endif %}">
     🔬 Viewer
   </a>
 
-  <a href="{{ url_for('admin_ui.route_list') }}"
+  <a href="{{ url_for('diagnostics.route_list') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.route_list' %}active{% endif %}">
     🗺️ Routes
   </a>
@@ -57,22 +57,22 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">📊 Activity & Stats</div>
 
-  <a href="{{ url_for('admin_ui.fraud_scanner') }}"
+  <a href="{{ url_for('admin.fraud_scanner') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.fraud_scanner' %}active{% endif %}">
     🚨 Fraud Charts
   </a>
 
-  <a href="{{ url_for('admin_ui.agent_activity') }}"
+  <a href="{{ url_for('admin.tile_agent_activity') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.agent_activity' %}active{% endif %}">
     🧍 Agent Activity
   </a>
 
-  <a href="{{ url_for('admin_ui.rate_limits_dashboard') }}"
+  <a href="{{ url_for('admin.rate_limits_dashboard') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.rate_limits_dashboard' %}active{% endif %}">
     ⏱️ Rate Limits
   </a>
 
-  <a href="{{ url_for('admin_ui.log_viewer') }}"
+  <a href="{{ url_for('admin.log_viewer') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.log_viewer' %}active{% endif %}">
     📁 Logs
   </a>
@@ -83,12 +83,12 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">📄 Statements</div>
 
-  <a href="{{ url_for('admin_ui.statements_timeline') }}"
+  <a href="{{ url_for('admin.tile_statements_timeline') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.statements_timeline' %}active{% endif %}">
     📈 Timeline
   </a>
 
-  <a href="{{ url_for('admin_ui.statements_heatmap') }}"
+  <a href="{{ url_for('admin.tile_statements_heatmap') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.statements_heatmap' %}active{% endif %}">
     🔥 Heatmap
   </a>
@@ -99,22 +99,22 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">🧠 Neural Insights</div>
 
-  <a href="{{ url_for('admin_ui.admin_cortex') }}"
+  <a href="{{ url_for('admin.admin_cortex') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.admin_cortex' %}active{% endif %}">
     🧩 Cortex Map
   </a>
 
-  <a href="{{ url_for('admin_ui.system_map') }}"
+  <a href="{{ url_for('admin.system_map') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.system_map' %}active{% endif %}">
     🗺️ System Map
   </a>
 
-  <a href="{{ url_for('admin_ui.brain_diagnosis') }}"
+  <a href="{{ url_for('introspection.diagnose_brain') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.brain_diagnosis' %}active{% endif %}">
     🧠 Brain Diagnosis
   </a>
 
-  <a href="{{ url_for('admin_ui.model_summary') }}"
+  <a href="{{ url_for('admin.tile_schema_versions') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.model_summary' %}active{% endif %}">
     🧾 Model Summary
   </a>
@@ -125,17 +125,17 @@
   ============================= -->
   <div class="fw-bold text-muted ps-2 pt-4 small">🛠️ Tools</div>
 
-  <a href="{{ url_for('admin_ui.repair_result') }}"
+  <a href="{{ url_for('repair.self_repair') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.repair_result' %}active{% endif %}">
     🛠️ Repair Log
   </a>
 
-  <a href="{{ url_for('admin_ui.sql_panel') }}"
+  <a href="{{ url_for('admin.sql_panel') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.sql_panel' %}active{% endif %}">
     💾 SQL Panel
   </a>
 
-  <a href="{{ url_for('admin_ui.trace_viewer') }}"
+  <a href="{{ url_for('admin.trace_viewer') }}"
      class="list-group-item list-group-item-action {% if request.endpoint == 'admin_ui.trace_viewer' %}active{% endif %}">
     📍 Trace Viewer
   </a>

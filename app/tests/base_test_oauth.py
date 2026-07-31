@@ -5,8 +5,8 @@
 # =============================================================================
 
 import pytest
+import uuid
 from flask import Flask
-
 from sqlalchemy import text
 
 from app import create_app, db
@@ -32,6 +32,7 @@ class BaseOAuthTest:
                 "SERVER_NAME": "localhost",
             }
         )
+
         with app.app_context():
             try:
                 db.create_all()
@@ -40,16 +41,12 @@ class BaseOAuthTest:
                 db.session.rollback()
                 db.session.remove()
 
-                # If using MySQL/MariaDB in other environments, disable FK checks
-                # while dropping tables to avoid "cannot drop table referenced by FK"
-                # errors during teardown. For sqlite/in-memory this will just run
-                # db.drop_all().
+                # MySQL/MariaDB teardown requires disabling FK checks
                 engine_name = getattr(db.engine, "name", None) or db.engine.dialect.name
                 if engine_name in ("mysql", "mariadb"):
                     conn = db.engine.connect()
                     trans = conn.begin()
                     try:
-                        # SET FOREIGN_KEY_CHECKS is connection-scoped; run drop on same conn
                         conn.execute(text("SET FOREIGN_KEY_CHECKS=0"))
                         db.metadata.drop_all(bind=conn)
                         conn.execute(text("SET FOREIGN_KEY_CHECKS=1"))
@@ -133,9 +130,22 @@ class BaseOAuthTest:
     def setup_mock_user(self, email="test@example.com"):
         """
         Creates and commits a mock user in the database so that
-        Plaid callbacks (or other provider flows) can associate items/sessions.
+        OAuth provider callbacks can associate items/sessions.
+
+        If the default email is used, append a short uuid fragment to ensure
+        uniqueness across test runs to avoid unique-key collisions.
         """
-        user = User(email=email, username="Mock User")
+        if email == "test@example.com":
+            email = f"test+{uuid.uuid4().hex[:8]}@example.com"
+
+        user = User(
+            username="Mock User",
+            email=email,
+            is_approved=True,
+            is_admin=False,
+            is_super_admin=False,
+        )
+
         db.session.add(user)
         db.session.commit()
         return user

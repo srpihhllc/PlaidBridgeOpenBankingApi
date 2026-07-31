@@ -10,6 +10,7 @@ import os
 from typing import Any
 from urllib.parse import urlparse
 
+from flasgger import Swagger
 from flask_jwt_extended import JWTManager
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -20,6 +21,7 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
+from sqlalchemy.pool import StaticPool
 
 from .utils.redis_utils import get_redis_client
 
@@ -45,6 +47,7 @@ socketio = SocketIO(async_mode="threading")
 mail = Mail()
 login_manager = LoginManager()
 csrf = CSRFProtect()
+swagger = Swagger()
 
 # Backward-compatible module-level symbol for consumers that import it
 redis_client: object | None = None
@@ -121,7 +124,6 @@ def _init_limiter(app: Any, redis_enabled: bool) -> Limiter | _NoopLimiter:
     # Also detect pytest environment variables so tests running under pytest do not
     # accidentally get a real Redis-backed limiter.
     is_testing_flag = bool(app.config.get("TESTING"))
-    # Common pytest env indicators
     is_pytest_env = bool(
         os.getenv("PYTEST_CURRENT_TEST")
         or os.getenv("PYTEST_RUNNING")
@@ -190,7 +192,7 @@ def init_extensions(app: Any) -> None:
 
     This function:
     - Validates app.extensions is a proper dict
-    - Configures SQLAlchemy engine options from environment
+    - Configures SQLAlchemy engine options with defensive dialect normalization
     - Initializes db, migrate, jwt, mail, socketio, login_manager, csrf
     - Connects to Redis (if available) and configures dependent features
     - Initializes rate limiter (with graceful fallback on errors)
@@ -208,11 +210,46 @@ def init_extensions(app: Any) -> None:
     if not isinstance(getattr(app, "extensions", {}), dict):
         raise RuntimeError("app.extensions corrupted; cannot init safely.")
 
-    # SQLAlchemy engine options
-    engine_opts = _build_engine_options_from_env()
-    if not app.config.get("SQLALCHEMY_ENGINE_OPTIONS"):
-        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = engine_opts
-        app.logger.debug("Set SQLALCHEMY_ENGINE_OPTIONS: %s", engine_opts)
+    # 1. Safely isolate database URI and engine configurations
+    uri = app.config.get("SQLALCHEMY_DATABASE_URI") or ""
+
+    # Extract or build standard engine options mapping
+    engine_opts = app.config.get("SQLALCHEMY_ENGINE_OPTIONS")
+    if not engine_opts or not isinstance(engine_opts, dict):
+        engine_opts = _build_engine_options_from_env()
+    else:
+        engine_opts = dict(engine_opts)
+
+    # 2. Apply explicit normalization for SQLite providers to prevent pooling conflicts
+    # Deterministic sanitization: strip any flat pooling args and enforce SQLite-safe defaults.
+    if uri.startswith("sqlite"):
+        app.logger.info(
+            "SQLite dialect detected. Normalizing engine options to prevent pool configuration conflicts."
+        )
+
+        # Remove any flat pooling args that are invalid for StaticPool
+        for incompatible_key in ("pool_size", "max_overflow", "pool_timeout", "pool_recycle"):
+            engine_opts.pop(incompatible_key, None)
+
+        # Ensure we use StaticPool for in-memory or sqlite URIs that require it,
+        # and set safe connect_args for multi-threaded test contexts.
+        engine_opts["poolclass"] = engine_opts.get("poolclass", StaticPool)
+
+        # Ensure connect_args is a dict and set check_same_thread=False if not present.
+        connect_args = engine_opts.get("connect_args")
+        if connect_args is None or not isinstance(connect_args, dict):
+            engine_opts["connect_args"] = {"check_same_thread": False}
+        else:
+            connect_args.setdefault("check_same_thread", False)
+
+        # Defensive: ensure no environment-derived defaults can be merged back later.
+        # Commit the sanitized mapping back immediately to the Flask config so any
+        # subsequent reads see the sanitized version.
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = dict(engine_opts)
+
+    # Commit normalized options back to Flask configuration context (idempotent)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = dict(engine_opts)
+    app.logger.debug("Committed SQLALCHEMY_ENGINE_OPTIONS (sanitized): %s", engine_opts)
 
     # DB & Migrations
     if not _already_registered(app, "migrate"):
@@ -221,8 +258,6 @@ def init_extensions(app: Any) -> None:
         app.logger.info("🗄️ SQLAlchemy and Migrate initialized.")
 
     # JWT
-    # Use the actual library registration key for the guard to avoid false negatives,
-    # but always provide a 'jwt' alias for tests and consumers that expect it.
     if not _already_registered(app, "flask-jwt-extended"):
         jwt.init_app(app)
         app.logger.info("🔐 JWT initialized.")
@@ -252,11 +287,9 @@ def init_extensions(app: Any) -> None:
                     return None
 
         except Exception as e:
-            app.logger.warning(f"⚠️ JWT handlers failed: {e}")
+            app.warning(f"⚠️ JWT handlers failed: {e}")
 
-    # ⭐ ALWAYS enforce the test-required alias for backwards compatibility.
-    # Some environments or versions may register under 'flask-jwt-extended' only;
-    # tests and some code expect 'jwt' as the key, so ensure it exists.
+    # ALWAYS enforce the test-required alias for backwards compatibility.
     try:
         app.extensions["jwt"] = jwt
     except Exception:
@@ -281,6 +314,11 @@ def init_extensions(app: Any) -> None:
     if not _already_registered(app, "csrf"):
         csrf.init_app(app)
         app.logger.info("🛡️ CSRFProtect initialized.")
+
+    # Flasgger / Swagger
+    if not _already_registered(app, "flasgger"):
+        swagger.init_app(app)
+        app.logger.info("📄 Flasgger/Swagger initialized.")
 
     # Redis client (MUST come before limiter, as limiter depends on redis_client)
     rc = None
@@ -307,8 +345,6 @@ def init_extensions(app: Any) -> None:
         app.logger.error(f"❌ Redis init failed: {e} — rate limiter will use in-memory backend")
 
     # Limiter (AFTER Redis initialization, since it depends on redis_client)
-    # CRITICAL: Only call init_app() if we have a real Limiter, not a _NoopLimiter
-    # Log the decision variables used to choose the limiter type so tests/CI can debug.
     try:
         is_testing_flag = bool(app.config.get("TESTING"))
         rate_limit_enabled = bool(app.config.get("RATE_LIMIT_ENABLED", True))
@@ -342,8 +378,6 @@ def init_extensions(app: Any) -> None:
         else:
             app.logger.info("⏱️ Limiter initialized as no-op (no backend).")
 
-        # Expose limiter on the app object and the module-level symbol, but DO NOT set
-        # app.extensions["limiter"] (flask-limiter expects that key to hold a set).
         try:
             setattr(app, "limiter", limiter_instance)
         except Exception:
@@ -355,6 +389,31 @@ def init_extensions(app: Any) -> None:
     except Exception as e:
         app.logger.error(f"❌ Limiter initialization failed: {e}")
         limiter = _NoopLimiter()
+
+    # -------------------------------------------------------------------------
+    # 3. Dynamic Service Registry Telemetry Emitter
+    # -------------------------------------------------------------------------
+    if getattr(app, "redis_client", None):
+        try:
+            from app.services.registry import get_service_registry
+            from app.telemetry.ttl_emit import emit_schema_trace
+
+            discovered_services = get_service_registry()
+            emit_schema_trace(
+                domain="registry",
+                event="service_registry",
+                detail="discovery",
+                value=f"services:{len(discovered_services)}",
+                status="ok",
+                ttl=1800,
+                client=app.redis_client,
+                meta={"services": [s.name for s in discovered_services]},
+            )
+            app.logger.info(f"📦 Service registry telemetry trace emitted successfully ({len(discovered_services)} services mapped).")
+        except Exception as registry_err:
+            app.logger.error(f"❌ Failed to emit service registry telemetry: {registry_err}")
+    else:
+        app.logger.warning("📦 Service registry telemetry trace skipped: Active Redis backend is missing.")
 
     app.logger.info("✅ Extensions initialization complete.")
     return None

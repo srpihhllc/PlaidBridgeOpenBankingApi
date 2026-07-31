@@ -1,119 +1,158 @@
 # =============================================================================
-# FILE: app/tests/test_plaid_oauth.py
-# DESCRIPTION: Tests for Plaid OAuth callback flows.
-#              Inherits shared helpers from BaseOAuthTest.
+# FILE: app/tests/test_plaid_routes.py
+# DESCRIPTION: Test suite covering Plaid Link token generation & exchange flows.
 # =============================================================================
 
+import os
+from unittest.mock import MagicMock, patch
 import pytest
-from flask import url_for
-from requests.exceptions import HTTPError, Timeout
+from cryptography.fernet import Fernet
 
-from .base_test_oauth import BaseOAuthTest
+from app.models.plaid_item import PlaidItem
+from app.models.user import User
 
 
-@pytest.mark.plaid
-class TestPlaidOAuth(BaseOAuthTest):
-    """Test suite for Plaid OAuth callbacks."""
-
-    def test_plaid_success(self, monkeypatch, client, app):
-        """Simulate a successful Plaid OAuth public_token exchange."""
-        access_token_mock = "access-token-xyz"
-        item_id_mock = "item-id-123"
-
-        def mock_exchange(url, json=None, timeout=10):
-            assert url.endswith("/item/public_token/exchange")
-            assert json.get("public_token") == "public-token-abc"
-
-            class Resp:
-                def raise_for_status(self):
-                    return None
-
-                def json(self):
-                    return {"access_token": access_token_mock, "item_id": item_id_mock}
-
-            return Resp()
-
-        monkeypatch.setattr("requests.post", mock_exchange)
-
-        mock_user = self.setup_mock_user()
-
-        resp = client.get(
-            url_for(
-                "oauth.callback_plaid",
-                public_token="public-token-abc",
-                user_id=mock_user.id,
+@pytest.fixture
+def test_user(app):
+    """Fixture providing a persisted test user for login session injection."""
+    with app.app_context():
+        user = User.query.filter_by(email="plaid_tester@example.com").first()
+        if not user:
+            user = User(
+                username="plaid_tester",
+                email="plaid_tester@example.com"
             )
-        )
-        assert resp.status_code in (302, 303)
-        self.assert_url_redirect(resp, "/dashboard")
+            user.set_password("SecurePass123!") if hasattr(user, "set_password") else None
+            from app.extensions import db
+            db.session.add(user)
+            db.session.commit()
+            db.session.refresh(user)
+        return user
 
-        with app.app_context():
-            self.assert_plaid_item_created(
-                user_id=mock_user.id,
-                item_id=item_id_mock,
-                access_token=access_token_mock,
-            )
-            self.assert_events(
-                ["PLAID_ACCESS_TOKEN_EXCHANGE_SUCCESS", "SESSION_ESTABLISHED"],
-                ordered=True,
-            )
 
-    @pytest.mark.parametrize(
-        "mock_exception",
-        [
-            pytest.param(Timeout("Read timed out."), id="timeout"),
-            pytest.param(HTTPError("400 Bad Request: INVALID_PUBLIC_TOKEN"), id="invalid-token"),
-        ],
+@pytest.fixture
+def authenticated_client(client, test_user):
+    """Simulates an authenticated Flask-Login session for current_user."""
+    with client.session_transaction() as sess:
+        sess["_user_id"] = str(test_user.id)
+        sess["_fresh"] = True
+    return client
+
+
+# =============================================================================
+# 1. LINK TOKEN CREATION TESTS
+# =============================================================================
+
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+def test_create_link_token_success(mock_get_client, authenticated_client):
+    """Verify successful creation and returning of a Plaid Link token."""
+    mock_client = MagicMock()
+    mock_client.LinkToken.create.return_value = {"link_token": "link-sandbox-test-123"}
+    mock_get_client.return_value = mock_client
+
+    response = authenticated_client.post("/create_link_token")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"link_token": "link-sandbox-test-123"}
+    mock_client.LinkToken.create.assert_called_once()
+
+
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+def test_create_link_token_sdk_unavailable(mock_get_client, authenticated_client):
+    """Verify 503 error returned when Plaid SDK fails to initialize."""
+    mock_get_client.return_value = None
+
+    response = authenticated_client.post("/create_link_token")
+
+    assert response.status_code == 503
+    assert response.get_json() == {"error": "Service unavailable"}
+
+
+# =============================================================================
+# 2. PUBLIC TOKEN EXCHANGE TESTS
+# =============================================================================
+
+@patch("app.blueprints.plaid_routes.ttl_emit")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+def test_exchange_public_token_success(
+    mock_get_client, mock_ttl_emit, authenticated_client, test_user, app, monkeypatch
+):
+    """Verify token exchange, Fernet encryption, DB persistence, and telemetry."""
+    # Ensure encryption key is present in environment
+    dummy_key = Fernet.generate_key().decode("utf-8")
+    monkeypatch.setenv("PLAID_ENCRYPTION_KEY", dummy_key)
+
+    mock_client = MagicMock()
+    mock_client.Item.public_token_exchange.return_value = {
+        "access_token": "access-sandbox-999-xyz",
+        "item_id": "item_id_plaid_123"
+    }
+    mock_get_client.return_value = mock_client
+
+    response = authenticated_client.post(
+        "/exchange_public_token",
+        json={"public_token": "public-sandbox-mock-000"}
     )
-    def test_plaid_exchange_failure_variants(self, monkeypatch, client, app, mock_exception):
-        """Simulate different public_token exchange failure modes."""
 
-        def mock_exchange(url, json=None, timeout=10):
-            raise mock_exception
+    assert response.status_code == 200
+    assert response.get_json() == {"success": True, "item_id": "item_id_plaid_123"}
 
-        monkeypatch.setattr("requests.post", mock_exchange)
+    # Assert database insertion and token encryption
+    with app.app_context():
+        item = PlaidItem.query.filter_by(user_id=test_user.id, plaid_item_id="item_id_plaid_123").first()
+        assert item is not None
+        
+        # Verify stored access token can be decrypted
+        f = Fernet(dummy_key.encode())
+        decrypted = f.decrypt(item.plaid_access_token.encode()).decode("utf-8")
+        assert decrypted == "access-sandbox-999-xyz"
 
-        resp = client.get(url_for("oauth.callback_plaid", public_token="bad-public-token"))
-        assert resp.status_code == 502
+    # Assert telemetry invocation
+    mock_ttl_emit.assert_called_with(
+        f"ttl:plaid:success:{test_user.id}", status="success", ttl=300
+    )
 
-        with app.app_context():
-            events = self.assert_events(["PLAID_ACCESS_TOKEN_EXCHANGE_FAILURE"])
-            self.assert_no_user()
-            assert mock_exception.args[0] in events[0].details.get("error")
 
-    def test_plaid_missing_public_token(self, client, app):
-        """Simulate callback with no public_token provided."""
-        resp = client.get(url_for("oauth.callback_plaid"))
-        assert resp.status_code == 400
+def test_exchange_public_token_missing_payload(authenticated_client):
+    """Verify 400 response when public_token key is omitted in request body."""
+    response = authenticated_client.post("/exchange_public_token", json={})
+    
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "Missing public token"}
 
-        with app.app_context():
-            self.assert_events(
-                ["PLAID_PUBLIC_TOKEN_MISSING"],
-                details={"PLAID_PUBLIC_TOKEN_MISSING": {"reason": "Missing public_token"}},
-            )
-            self.assert_no_user()
 
-    def test_plaid_exchange_returns_no_access_token(self, monkeypatch, client, app):
-        """Simulate Plaid exchange response missing access_token."""
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+def test_exchange_public_token_sdk_unavailable(mock_get_client, authenticated_client):
+    """Verify 503 error returned when SDK client factory yields None."""
+    mock_get_client.return_value = None
 
-        def mock_exchange(url, json=None, timeout=10):
-            class Resp:
-                def raise_for_status(self):
-                    return None
+    response = authenticated_client.post(
+        "/exchange_public_token",
+        json={"public_token": "public-sandbox-mock-000"}
+    )
 
-                def json(self):
-                    return {"item_id": "item-id-123"}  # no access_token
+    assert response.status_code == 503
+    assert response.get_json() == {"error": "Service unavailable"}
 
-            return Resp()
 
-        monkeypatch.setattr("requests.post", mock_exchange)
+@patch("app.blueprints.plaid_routes.ttl_emit")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+def test_exchange_public_token_sdk_failure(
+    mock_get_client, mock_ttl_emit, authenticated_client, test_user
+):
+    """Verify failure state handling, error logging, and error telemetry emit."""
+    mock_client = MagicMock()
+    mock_client.Item.public_token_exchange.side_effect = Exception("Plaid API Timeout")
+    mock_get_client.return_value = mock_client
 
-        resp = client.get(url_for("oauth.callback_plaid", public_token="public-token-abc"))
-        assert resp.status_code == 401
+    response = authenticated_client.post(
+        "/exchange_public_token",
+        json={"public_token": "public-sandbox-mock-000"}
+    )
 
-        with app.app_context():
-            self.assert_events(
-                ["PLAID_ACCESS_TOKEN_EXCHANGE_FAILURE"],
-                details={"PLAID_ACCESS_TOKEN_EXCHANGE_FAILURE": {"reason": "No access_token"}},
-            )
-            self.assert_no_user()
+    assert response.status_code == 500
+    assert response.get_json() == {"error": "Exchange failed"}
+    
+    mock_ttl_emit.assert_called_with(
+        f"ttl:plaid:error:{test_user.id}", status="error", ttl=300
+    )

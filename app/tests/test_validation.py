@@ -4,10 +4,7 @@
 # Dummy routes are registered in conftest.py inside the session-scoped `app`
 # fixture, before any request is handled, so Flask allows route registration.
 # =============================================================================
-import pytest
-from flask import jsonify
 
-from app.api.validation import validate_json_schema
 
 
 def test_validate_json_schema_invalid_json(client):

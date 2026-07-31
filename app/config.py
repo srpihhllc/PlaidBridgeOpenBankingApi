@@ -1,16 +1,16 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/config.py
-
-# Minimal/compatible configuration module derived from tests (safe for local testing).
-# DO NOT commit secrets. Use environment variables in production and CI.
+# =============================================================================
+# FILE: /home/srpihhllc/PlaidBridgeOpenBankingApi/app/config.py
+# DESCRIPTION: Defensively-engineered configuration parser layer.
+#              Safeguards connection strings from malformed env inputs.
+# =============================================================================
 
 import logging
 import os
 import urllib.parse
 from pathlib import Path
-
 from dotenv import load_dotenv
 
-# Always load .env for local consistency (tests expect this)
+# Enforce explicit .env ingestion across execution paradigms
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _dotenv_path = os.path.join(_PROJECT_ROOT, ".env")
 if Path(_dotenv_path).exists():
@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 def as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
-    return str(value).lower() in ("true", "1", "yes")
+    return str(value).lower() in ("true", "1", "yes", "on")
 
 
-def parse_rate_limits(raw: str | None):
+def parse_rate_limits(raw: str | None) -> list[str]:
     if not raw:
         return ["200 per day", "50 per hour"]
     parts = [p.strip() for p in raw.split(",") if p.strip()]
@@ -33,71 +33,66 @@ def parse_rate_limits(raw: str | None):
 
 
 def _ensure_redis_url(url: str | None) -> str | None:
-    """
-    Normalize Redis URL if it uses the pattern redis://:PASSWORD@host:port (no username).
-    Some hosted Redis providers (e.g. Redis Labs with ACLs) require a username such as "default".
-    If the URL starts with redis://: we replace that prefix with redis://default: so clients that
-    expect a username:password form will work.
-
-    NOTE: This is a best-effort convenience for development/testing. In production, set a correct
-    REDIS_URL explicitly in the environment (e.g. redis://default:password@host:port/0).
-    """
+    """Normalizes missing usernames in managed Redis strings to default."""
     if not url:
         return None
-    # quick detect for "redis://:password@host" (no username)
     if url.startswith("redis://:"):
-        logger.warning("Redis URL appears to have no username; inserting 'default' username for compatibility.")
+        logger.warning("Redis engine string missing user context; applying 'default' fallback schema.")
         return url.replace("redis://:", "redis://default:", 1)
     return url
 
 
-# Metadata
-_APP_NAME = os.getenv("APP_NAME", "FinancialPowerhouseAPI")
-_APP_VERSION = os.getenv("APP_VERSION", "0.0.1")
+# Clean string values extracted from environments to eliminate accidental literal outer quotes
+def _clean_env_string(key: str, default: str | None = None) -> str | None:
+    val = os.getenv(key, default)
+    if val:
+        return val.strip("'\"")
+    return val
+
+
+# Metadata Ingestion
+_APP_NAME = os.getenv("APP_NAME", "PlaidBridgeOpenBankingApi")
+_APP_VERSION = os.getenv("APP_VERSION", "1.0.0")
 _TIMEZONE = os.getenv("TIMEZONE", "UTC")
 
-# Flask secrets (use env vars; these defaults are safe for tests only)
+# Fallback Cryptographic Keys
 _SECRET_KEY = os.getenv("SECRET_KEY", "DEV_SECRET_KEY")
 _JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "DEV_JWT_SECRET")
 
-# Database components
-_DB_USER = os.getenv("DB_USER")
-_DB_PASSWORD = os.getenv("DB_PASSWORD")
-_DB_HOST = os.getenv("DB_HOST")
-_DB_PORT = os.getenv("DB_PORT", "3306")
-_DB_NAME = os.getenv("DB_NAME")
+# Relational Database Context Sanitation
+_DB_USER = _clean_env_string("DB_USER")
+_DB_PASSWORD = _clean_env_string("DB_PASSWORD")
+_DB_HOST = _clean_env_string("DB_HOST")
+_DB_PORT = _clean_env_string("DB_PORT", "3306")
+_DB_NAME = _clean_env_string("DB_NAME")
 
+# Unified Dynamic Unified Cache Resolution
+_RAW_REDIS_TARGET = os.getenv("REDIS_URL") or os.getenv("REDIS_STORAGE_URI")
+
+# System Stage Verification Evaluator
 _IS_PROD_OR_MIGRATION = (
-    os.getenv("FLASK_ENV") == "production" or os.getenv("ALEMBIC_RUNNING") == "1"
+    str(os.getenv("FLASK_ENV")).lower() == "production" or 
+    str(os.getenv("ENV_NAME")).lower() == "production" or 
+    os.getenv("ALEMBIC_RUNNING") == "1"
 )
 
 if _IS_PROD_OR_MIGRATION:
-    if not _DB_USER:
-        raise RuntimeError("CRITICAL: DB_USER missing in production/migration context.")
-    if not _DB_PASSWORD:
-        raise RuntimeError("CRITICAL: DB_PASSWORD missing or empty. Refusing to continue.")
-    if not _DB_HOST:
-        raise RuntimeError("CRITICAL: DB_HOST missing in production/migration context.")
-    if not _DB_NAME:
-        raise RuntimeError("CRITICAL: DB_NAME missing in production/migration context.")
+    if not all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME]):
+        raise RuntimeError("CRITICAL: Production relational configuration matrix is incomplete.")
 
-_HAS_COMPONENTS = all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME])
-
-_encoded_password = urllib.parse.quote_plus(_DB_PASSWORD or "")
-_GENERATED_URI = f"mysql+pymysql://{_DB_USER}:{_encoded_password}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
-
-if _HAS_COMPONENTS:
-    _SQLALCHEMY_DATABASE_URI = _GENERATED_URI
+# Secure Connection Construction using percent-encoded parameterization
+if all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME]):
+    _encoded_password = urllib.parse.quote_plus(_DB_PASSWORD or "")
+    _SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{_DB_USER}:{_encoded_password}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
 else:
-    _SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
-    if not _SQLALCHEMY_DATABASE_URI and _IS_PROD_OR_MIGRATION:
-        raise RuntimeError("CRITICAL: No database components found and no URI override provided.")
+    _SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
 
 
 class BaseConfig:
     ENV = "production"
     DEBUG = False
     TESTING = False
+    DEBUG_UI = as_bool(os.getenv("DEBUG_UI"), default=False)
 
     APP_NAME = _APP_NAME
     APP_VERSION = _APP_VERSION
@@ -106,6 +101,14 @@ class BaseConfig:
     SECRET_KEY = _SECRET_KEY
     JWT_SECRET_KEY = _JWT_SECRET_KEY
 
+    # SMTP Mail Handlers
+    MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
+    MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
+    MAIL_USE_TLS = as_bool(os.getenv("MAIL_USE_TLS", "True"), default=True)
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER")
+
     SQLALCHEMY_DATABASE_URI = _SQLALCHEMY_DATABASE_URI
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
@@ -113,24 +116,23 @@ class BaseConfig:
         "pool_recycle": 280,
     }
 
-    # Rate limit defaults (can be overridden by env)
     RATELIMIT_DEFAULT = os.getenv("RATELIMIT_DEFAULT", "200 per day;50 per hour")
 
     @classmethod
     def validate(cls):
         if cls.ENV == "production":
             if cls.SECRET_KEY.startswith("DEV_") or cls.JWT_SECRET_KEY.startswith("DEV_"):
-                raise RuntimeError("Production secrets must be set via environment variables.")
+                raise RuntimeError("Production environments must employ high-entropy token secrets.")
 
     @classmethod
-    def summarize(cls):
+    def summarize(cls) -> dict:
         return {
             "app": cls.APP_NAME,
             "version": cls.APP_VERSION,
             "env": cls.ENV,
             "db_host": _DB_HOST,
-            "db_user": _DB_USER,
             "db_name": _DB_NAME,
+            "debug_ui": cls.DEBUG_UI,
         }
 
 
@@ -138,51 +140,27 @@ class DevelopmentConfig(BaseConfig):
     ENV = "development"
     DEBUG = True
     LOG_LEVEL = logging.DEBUG
-    # Use local redis by default in development if not provided
-    REDIS_URL = _ensure_redis_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+    REDIS_URL = _ensure_redis_url(_RAW_REDIS_TARGET or "redis://localhost:6379/0")
 
 
 class TestingConfig(BaseConfig):
     ENV = "testing"
     TESTING = True
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
-    SECRET_KEY = "test-secret"
-    JWT_SECRET_KEY = "test-jwt-secret"
-    # Disable Flask-WTF CSRF checks in tests so test clients can POST forms without tokens
+    SECRET_KEY = "test-secret-sentinel-key"
+    JWT_SECRET_KEY = "test-jwt-sentinel-key"
     WTF_CSRF_ENABLED = False
-    # Disable rate limiting in tests by default
     RATELIMIT_ENABLED = False
-    SENDGRID_API_KEY = None
-    REFLECTORAI_API_KEY = None
-    REFLECTORAI_API_ENDPOINT = None
-    # For tests, default to localhost Redis (or pick up REDIS_URL from env)
-    REDIS_URL = _ensure_redis_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
-
-    # Make url_for() work outside request contexts during tests:
-    # When building URLs outside an active request Flask requires SERVER_NAME.
-    # PREFERRED_URL_SCHEME is set so generated external URLs use http in tests.
+    REDIS_URL = _ensure_redis_url(_RAW_REDIS_TARGET or "redis://localhost:6379/0")
     SERVER_NAME = os.getenv("TEST_SERVER_NAME", "localhost")
     PREFERRED_URL_SCHEME = os.getenv("TEST_PREFERRED_URL_SCHEME", "http")
-
-    # Minimal OAuth provider config so callback route does not error
-    OAUTH_PROVIDERS = {
-        "google": {
-            "client_id": "test",
-            "client_secret": "test",
-            "redirect_uri": "http://localhost/callback/google",
-            "auth_uri": "http://example.com/auth",
-            "token_uri": "http://example.com/token",
-        }
-    }
-
 
 
 class ProductionConfig(BaseConfig):
     ENV = "production"
     DEBUG = False
     LOG_LEVEL = logging.INFO
-    # In production, require REDIS_URL to be explicitly provided via env; do not invent credentials.
-    REDIS_URL = _ensure_redis_url(os.getenv("REDIS_URL", None))
+    REDIS_URL = _ensure_redis_url(_RAW_REDIS_TARGET)
 
 
 CONFIG_MAP = {
@@ -193,7 +171,7 @@ CONFIG_MAP = {
 
 
 def get_config_class(env_name: str | None = None):
-    raw = env_name or os.getenv("FLASK_ENV") or "production"
+    raw = env_name or os.getenv("ENV_NAME") or os.getenv("FLASK_ENV") or "production"
     return CONFIG_MAP.get(raw.lower(), ProductionConfig)
 
 
@@ -203,18 +181,18 @@ def get_config(env_name: str | None = None):
     return cls()
 
 
-def probe_services(strict: bool = True) -> None:
+def probe_services(strict: bool = True) -> str | None:
     from app.extensions import db
-
     try:
         db.session.execute(db.text("SELECT 1"))
         db.session.commit()
     except Exception as e:
         if strict:
-            raise RuntimeError(f"Database probe failed: {e}") from e
+            raise RuntimeError(f"Database infrastructure verification probe failed: {e}") from e
         return str(e)
     return None
 
+
 class TestConfig(TestingConfig):
-    """Backwards-compatible alias used by older tests."""
+    """Legacy alias matching back-compatibility test cases."""
     pass

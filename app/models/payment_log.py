@@ -12,7 +12,6 @@ from ..extensions import db
 class PaymentLog(db.Model):
     __tablename__ = "payment_log"
     __table_args__ = {"extend_existing": True}
-    __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
@@ -45,8 +44,17 @@ class PaymentLog(db.Model):
         onupdate=datetime.utcnow,
     )
 
-    # ✔ Relationship back to User
-    user = db.relationship("User", back_populates="payment_logs")
+    # -------------------------------------------------------------------------
+    # Relationships (The Runtime Symmetry Fix)
+    # -------------------------------------------------------------------------
+
+    # ⭐ SENIOR FIX: Swapped back_populates for explicit dynamic backref.
+    # This dynamically injects 'payment_logs' into the User mapper frame at runtime,
+    # avoiding compile-time KeyError/InvalidRequestError checks.
+    user = db.relationship(
+        "User",
+        backref=db.backref("payment_logs", lazy="dynamic", passive_deletes=True),
+    )
 
     def __repr__(self):
         return f"<PaymentLog id={self.id} user_id={self.user_id} status='{self.status}'>"

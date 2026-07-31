@@ -1,5 +1,10 @@
+# =============================================================================
 # FILE: app/cli/seed_lender.py
+# DESCRIPTION: Environment-driven seeder for hydrated lender profiles.
+# =============================================================================
 
+import os
+import sys
 import click
 from flask.cli import with_appcontext
 from werkzeug.security import generate_password_hash
@@ -15,11 +20,7 @@ from app.models import BankAccount, BankInstitution, Lender, User
 @click.option("--interactive", is_flag=True, help="Prompt for fields")
 @with_appcontext
 def seed_lender(email, password, username, interactive):
-    """Create or update a lender user with sandbox-safe mock data."""
-
-    default_email = "lender@example.com"
-    default_password = "LenderPass123!"
-    default_username = "lender_user"
+    """Create or update a lender user with sandbox-safe mock data using environment config."""
 
     if interactive:
         email = email or click.prompt("Lender email")
@@ -28,22 +29,27 @@ def seed_lender(email, password, username, interactive):
         )
         username = username or click.prompt("Lender username")
     else:
-        email = email or default_email
-        password = password or default_password
-        username = username or default_username
+        # Fall back strictly to environment variables instead of hardcoded defaults
+        email = email or os.environ.get("LENDER_EMAIL")
+        password = password or os.environ.get("LENDER_PASSWORD")
+        username = username or os.environ.get("LENDER_USERNAME", "lender_user")
+
+    # Enforce mandatory credentials
+    if not email or not password:
+        click.echo("❌ ERROR: LENDER_EMAIL and LENDER_PASSWORD must be set in the environment or provided via arguments.")
+        sys.exit(1)
 
     user = User.query.filter_by(email=email).first()
 
     if user:
-        click.echo(f"Updating existing lender: {email}")
+        click.echo(f"ℹ️ Updating existing lender: {email}")
         user.password_hash = generate_password_hash(password)
         user.role = "lender"
         user.is_admin = False
         user.is_approved = True
         user.is_mfa_enabled = False
-
     else:
-        click.echo(f"Creating new lender: {email}")
+        click.echo(f"🌱 Creating new lender: {email}")
         user = User(
             username=username,
             email=email,
@@ -54,7 +60,7 @@ def seed_lender(email, password, username, interactive):
             is_mfa_enabled=False,
         )
         db.session.add(user)
-        db.session.flush()
+        db.session.flush()  # Get user.id
 
         # Create lender profile using actual model fields
         lender = Lender(
@@ -86,4 +92,4 @@ def seed_lender(email, password, username, interactive):
         db.session.add_all([institution, account])
 
     db.session.commit()
-    click.echo("✅ Lender user seeded successfully.")
+    click.echo("✅ Lender user context seeded successfully.")

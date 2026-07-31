@@ -1,13 +1,12 @@
 # app/models/borrower_card.py
 
 from datetime import datetime
-
+from sqlalchemy.orm import synonym
 from ..extensions import db
 
 
 class BorrowerCard(db.Model):
     __tablename__ = "borrower_cards"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -33,3 +32,8 @@ class BorrowerCard(db.Model):
     trace_status = db.Column(db.String(32), default="active")
 
     user = db.relationship("User", back_populates="borrower_cards")
+
+    # =============================================================================
+    # ORM SYNONYM PROXY (Bridges user_id to borrower_id for queries & instances)
+    # =============================================================================
+    borrower_id = synonym("user_id")

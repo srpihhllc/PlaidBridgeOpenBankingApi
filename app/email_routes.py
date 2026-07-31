@@ -19,7 +19,7 @@ def send_test_email():
         # Create the email message
         msg = Message(
             subject="Hello from Flask!",
-            recipients=["your_email@example.com"],  # Replace with the recipient's email address
+            recipients=["srpollardsihhllc@gmail.com"],  # Targeted to your direct email
             body="This is a test email sent from your Flask application.",
         )
 

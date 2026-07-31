@@ -47,7 +47,7 @@ def anomaly_dashboard():
         current_app.logger.error("[anomaly_dashboard] Redis unavailable — no anomaly data loaded")
 
     return render_template(
-        "dashboard_anomalies.html",
+        "admin/dashboard_anomalies.html",  # 👈 Fixed: Prefix added to match disk path
         high_count=high_count,
         medium_count=medium_count,
         low_count=low_count,

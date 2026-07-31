@@ -2,6 +2,7 @@
 # FILE: app/models/user_dashboard.py
 # DESCRIPTION: Subscriber dashboard settings model with UUID FK linkage,
 #              cockpit‑grade defaults, and safe update helpers.
+#              Updated to use dynamic 1:1 backref to fix User mapper KeyError.
 # =============================================================================
 
 from datetime import datetime
@@ -11,7 +12,6 @@ from ..extensions import db
 
 class UserDashboard(db.Model):
     __tablename__ = "user_dashboards"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -37,8 +37,16 @@ class UserDashboard(db.Model):
         nullable=False,
     )
 
-    # Relationship back to User
-    user = db.relationship("User", back_populates="user_dashboard")
+    # -------------------------------------------------------------------------
+    # Relationships
+    # -------------------------------------------------------------------------
+    
+    # ⭐ User Fix: Swapped back_populates to a dynamic backref.
+    # Included uselist=False to ensure a strict 1:1 scalar mapping on the User model.
+    user = db.relationship(
+        "User",
+        backref=db.backref("user_dashboard", uselist=False, passive_deletes=True),
+    )
 
     # -------------------------------------------------------------------------
     # Default dashboard settings (cockpit‑grade)

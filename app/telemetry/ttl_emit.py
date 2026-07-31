@@ -105,7 +105,6 @@ def _attempt_flush_queue(client: Any) -> int:
         except Exception as e:
             logger.exception("Failed flushing emit queue: %s", e)
 
-    # 🔥 REQUIRED FIX: explicit fallback return
     return 0
 
 
@@ -138,20 +137,42 @@ def _resolve_client(
 
 
 def ttl_emit(
-    *,
-    key: str,
-    value: str | None = None,
+    key: str | None = None,
+    value: Any | None = None,
     status: str | None = None,
     client: Any | None = None,
     r: Any | None = None,
     ttl: int = 60,
     meta: dict[str, Any] | None = None,
+    *args: Any,
+    **kwargs: Any,
 ) -> None:
     """Emit a TTL-backed trace to Redis + in-memory store."""
     global _in_progress, _warned_no_redis
 
     if _in_progress:
         return
+
+    # Handle positional argument fallback
+    if key is None and args:
+        key = str(args[0])
+        if len(args) > 1 and value is None:
+            value = args[1]
+
+    if not key:
+        logger.debug("ttl_emit called without key; ignoring.")
+        return
+
+    # If payload dictionary is passed as positional value, normalize meta/str_val
+    if meta is None and isinstance(value, dict):
+        meta = value
+        str_val = json.dumps(value)
+    elif isinstance(value, dict):
+        str_val = json.dumps(value)
+    elif value is not None:
+        str_val = str(value)
+    else:
+        str_val = None
 
     try:
         _in_progress = True
@@ -161,7 +182,7 @@ def ttl_emit(
             _ttl_data[key] = {
                 "expires_at": datetime.datetime.now() + datetime.timedelta(seconds=ttl),
                 "ttl_seconds": ttl,
-                "value": value,
+                "value": str_val,
                 "status": status,
                 "meta": meta,
             }
@@ -172,7 +193,7 @@ def ttl_emit(
                 logger.warning("TTL emit queued: no Redis available")
                 _warned_no_redis = True
             with _queue_lock:
-                _emit_queue.append((key, ts, value, status, ttl, meta))
+                _emit_queue.append((key, ts, str_val, status, ttl, meta))
             return
 
         if _emit_queue:
@@ -183,7 +204,7 @@ def ttl_emit(
         payload: dict[str, Any] = {
             "status": status or "N/A",
             "timestamp": ts,
-            "value": value or "",
+            "value": str_val or "",
         }
         if meta:
             payload.update(meta)

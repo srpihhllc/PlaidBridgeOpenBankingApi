@@ -22,7 +22,6 @@ try:
     
     # Now try importing via the `app` alias (like blueprints/routes do)
     from app.models.user import User
-    from app.models import Transaction
     
     print("✅ Step 2: Imported via app.models alias")
     

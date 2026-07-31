@@ -4,7 +4,6 @@ from copy import deepcopy
 import pytest
 from hypothesis import given, settings
 from hypothesis import HealthCheck
-from hypothesis import HealthCheck
 from hypothesis import strategies as st
 
 from app.services.discrepancy import correct_discrepancies

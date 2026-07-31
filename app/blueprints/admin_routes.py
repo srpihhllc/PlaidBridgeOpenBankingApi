@@ -2,6 +2,9 @@
 # FILE: app/blueprints/admin_routes.py
 # DESCRIPTION: Admin API layer only.
 #              FIXED: Strict decorator stacking order and added missing routes.
+#              FIXED: operator_entry form parsing and UI redirects.
+#              FIXED: _audit_emit current_user bug and positional args.
+#              FIXED: Cascade user deletion ensuring PlaidItem dependency purge.
 # =============================================================================
 
 import json
@@ -13,10 +16,9 @@ import string
 from datetime import datetime
 from typing import Any
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, session, redirect, url_for, flash
 from flask_jwt_extended import get_jwt, jwt_required
-from flask_login import current_user as login_user
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from app.decorators import admin_required, roles_required
 from app.extensions import csrf
@@ -34,7 +36,7 @@ logger = logging.getLogger(__name__)
 # 1. BLUEPRINTS (API ONLY)
 # =============================================================================
 
-admin_bp = Blueprint("admin_api_core", __name__, url_prefix="/admin/api")
+admin_api_core_bp = Blueprint("admin_api_core", __name__, url_prefix="/admin/api")
 admin_api_bp = Blueprint("admin_api", __name__, url_prefix="/admin/api/v1")
 
 # =============================================================================
@@ -59,7 +61,6 @@ return v
 # =============================================================================
 # 3. HYBRID MODEL LAYER (Mocks for Dev / Real for Prod)
 # =============================================================================
-
 
 class MockQuery:
     def __init__(self, model_class):
@@ -236,18 +237,17 @@ DisputeLog = MockDisputeLog
 # 4. INTERNAL HELPERS
 # =============================================================================
 
-
 def _make_operator_key(code: str) -> str:
     return f"operator:code:v1:{code}"
-
 
 def _generate_code(length: int = 8) -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
-
 def _audit_emit(event_type: str, metadata: dict):
-    user_identifier = getattr(login_user, "id", None) or request.remote_addr
+    # FIXED: 'current_user' is the proxy object, not a function.
+    user_identifier = getattr(current_user, "id", 0) if current_user.is_authenticated else 0
+
     safe_details = {
         "target_user": metadata.get("target_user"),
         "admin_id": metadata.get("admin_user_id") or user_identifier,
@@ -256,16 +256,18 @@ def _audit_emit(event_type: str, metadata: dict):
         "ttl": metadata.get("ttl"),
         "keys_deleted": metadata.get("keys_deleted"),
     }
+
     try:
+        # FIXED: event_type passed safely as an explicit keyword argument
         log_identity_event(
-            user_id=user_identifier,
             event_type=event_type,
+            user_id=user_identifier,
             details={k: v for k, v in safe_details.items() if v is not None},
             ip=request.remote_addr,
         )
-    except Exception:
-        pass
-
+    except Exception as e:
+        # Failsafe so a broken log doesn't crash the operator login
+        logger.warning(f"Audit emit failed: {e}")
 
 def get_remote_address():
     return request.remote_addr
@@ -274,7 +276,6 @@ def get_remote_address():
 # =============================================================================
 # 5. BASIC ADMIN API ROUTES
 # =============================================================================
-
 
 @admin_api_bp.route("/traces/recent", methods=["GET"])
 @csrf.exempt
@@ -298,11 +299,12 @@ def api_get_recent_traces():
 # 6. OPERATOR CODE API
 # =============================================================================
 
-
+# FIX: @bp.route must be outermost decorator so Flask registers the route.
+# auth/csrf decorators go inside (closer to the function).
+@admin_api_bp.route("/operator_code/generate", methods=["POST"])
+@csrf.exempt
 @login_required
 @admin_required
-@csrf.exempt
-@admin_api_bp.route("/operator_code/generate", methods=["POST"])
 def operator_code_generate():
     req = request.get_json(silent=True) or {}
     ttl = max(30, min(int(req.get("ttl_seconds", 600)), 3600))
@@ -319,7 +321,7 @@ def operator_code_generate():
         "created_by_ip": request.remote_addr,
         "created_at": datetime.utcnow().isoformat(),
         "ttl": ttl,
-        "admin_user_id": getattr(login_user, "id", "unknown"),
+        "admin_user_id": getattr(current_user, "id", "unknown"),
     }
     r.setex(key, ttl, json.dumps(payload))
 
@@ -327,10 +329,10 @@ def operator_code_generate():
     return jsonify({"status": "ok", "operator_code": code, "expires_in": ttl}), 201
 
 
+@admin_api_bp.route("/operator_code/invalidate", methods=["POST"])
+@csrf.exempt
 @login_required
 @admin_required
-@csrf.exempt
-@admin_api_bp.route("/operator_code/invalidate", methods=["POST"])
 def operator_code_invalidate():
     try:
         r = get_redis_client()
@@ -346,62 +348,74 @@ def operator_code_invalidate():
         return jsonify({"status": "error", "message": "server_error"}), 500
 
 
+@admin_api_bp.route("/operator_entry", methods=["POST"])
 @rate_limit_if_enabled("5/minute")
 @csrf.exempt
-@admin_api_bp.route("/operator_entry", methods=["POST"])
 def operator_entry():
-    data = request.form or request.get_json(silent=True) or {}
-    code = (data.get("passcode") or data.get("code") or "").upper()
+    # 1. Properly extract from the HTML Form POST
+    code = request.form.get("passcode", "").strip().upper()
 
+    # (Fallback just in case you ever hit this from an API client)
+    if not code and request.is_json:
+        data = request.get_json(silent=True) or {}
+        code = data.get("passcode", "").strip().upper()
+
+    # 2. Validate against your Regex
     if not code or not OPERATOR_CODE_REGEX.match(code):
-        return jsonify({"status": "error", "message": "invalid_format"}), 400
+        flash("Invalid operator ignition format. Please check your code.", "danger")
+        return redirect(url_for("admin.operator_login"))
 
+    # 3. Check Redis for the Operator Key
     key = _make_operator_key(code)
 
     try:
         r = get_redis_client()
         if not r:
-            return jsonify({"status": "error", "message": "service_unavailable"}), 503
+            flash("Service unavailable: Redis offline.", "danger")
+            return redirect(url_for("admin.operator_login"))
 
+        # Atomic fetch-and-delete
         raw = r.eval(LUA_GETDEL, 1, key)
         if raw is None:
-            return (
-                jsonify({"status": "error", "message": "invalid_or_expired_code"}),
-                403,
-            )
+            flash("Ignition code expired or invalid.", "danger")
+            return redirect(url_for("admin.operator_login"))
 
         meta = json.loads(raw.decode("utf-8")) if isinstance(raw, bytes) else json.loads(raw)
         ttl = meta.get("ttl", 600)
 
+        # 4. Success - Ignite Cortex Mode
         session[OPERATOR_MODE_KEY] = True
         session[OPERATOR_MODE_TTL_SECONDS_KEY] = ttl
         session[OPERATOR_MODE_START_TIME_KEY] = datetime.utcnow().timestamp()
 
         _audit_emit("OPERATOR_CODE_CONSUMED", {"code_prefix": code[:4], "ttl": ttl})
-        return jsonify({"status": "ok", "message": "operator_mode_enabled"}), 200
 
-    except Exception:
-        return jsonify({"status": "error", "message": "server_error"}), 500
+        # 5. Redirect straight to the Cockpit
+        flash("Cortex Operator Mode Active. Welcome.", "success")
+        return redirect(url_for("admin.admin_cockpit"))
+
+    except Exception as e:
+        logger.error(f"Operator entry crash: {e}")
+        flash("Internal error processing ignition code.", "danger")
+        return redirect(url_for("admin.operator_login"))
 
 
 # =============================================================================
 # 7. AUDIT & USER MANAGEMENT API
 # =============================================================================
 
-
+@admin_api_bp.route("/audit", methods=["GET"])
+@csrf.exempt
 @login_required
 @admin_required
-@csrf.exempt
-@admin_api_bp.route("/audit", methods=["GET"])
 def audit_viewer_api():
     events = [{"id": i, "event_type": "MOCK_EVENT", "ip": f"192.168.1.{i}"} for i in range(1, 5)]
     return jsonify({"status": "ok", "events": events})
 
 
 # ---------------------------
-# LIST USERS (already present)
+# LIST USERS
 # ---------------------------
-
 
 @admin_api_bp.route("/users", methods=["GET"])
 @csrf.exempt
@@ -415,11 +429,10 @@ def admin_list_users():
 
 
 # ---------------------------
-# ⭐ NEW: DELETE USER ENDPOINT
+# DELETE USER ENDPOINT
 # ---------------------------
 
-
-@admin_api_bp.route("/users/<int:user_id>", methods=["DELETE"])
+@admin_api_bp.route("/users/<string:user_id>", methods=["DELETE"])
 @csrf.exempt
 @jwt_required()
 @roles_required("admin")
@@ -428,13 +441,26 @@ def admin_delete_user(user_id):
     Delete a user and cascade-delete their PlaidItem.
     Required by test_admin_delete_user_cascade_api.
     """
-    user = RealUserModel.query.get(user_id)
+    # Force clean type format conversion for the UUID string
+    user_id = str(user_id).strip()
+
+    # FIX: use Session.get() instead of deprecated Query.get() (SQLAlchemy 2.x)
+    user = real_db.session.get(RealUserModel, user_id)
     if not user:
         return jsonify({"status": "error", "message": "user_not_found"}), 404
 
-    PlaidItem.query.filter_by(user_id=user_id).delete()
+    try:
+        # Explicit transaction control to clear dependencies first
+        PlaidItem.query.filter_by(user_id=user_id).delete(synchronize_session=False)
 
-    real_db.session.delete(user)
-    real_db.session.commit()
+        real_db.session.delete(user)
+        real_db.session.commit()
 
-    return jsonify({"status": "ok", "message": "user_deleted"}), 200
+        return jsonify({"status": "ok", "message": "user_deleted"}), 200
+
+    except Exception as e:
+        real_db.session.rollback()
+        return jsonify({
+            "status": "error",
+            "message": f"Database transaction failed during cascade execution: {str(e)}"
+        }), 500

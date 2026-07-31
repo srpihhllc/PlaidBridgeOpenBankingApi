@@ -1,144 +1,114 @@
 # =============================================================================
 # FILE: app/services/symphony_ai.py
-# DESCRIPTION: Orchestration brain for grant workflows with Redis-backed telemetry.
+# DESCRIPTION: Cockpit-grade Orchestration Cortex (Refactored for google-genai)
 # =============================================================================
 
 import json
-import queue
-import re
-import threading
 from datetime import datetime
-from pathlib import Path
-
 from flask import current_app
 
-from app.models import User
+# Modern Gemini SDK
+from google import genai
+from google.genai import types
+
+from app.services.bank_simulator import BankSimulator
+from app.agents.banking_tools import FINANCIAL_CORTEX_TOOLS
 from app.utils.redis_utils import get_redis_client
 
-ROLE_WEIGHTS = {
-    "grant_manager": 0.9,
-    "compliance_officer": 0.75,
-    "gov_liaison": 0.85,
-    "admin": 1.0,
-}
-
-# Initialize global Redis client
-redis_client = get_redis_client()
-
-# 🧠 Grant Decision Subroutines
-
-
-def extract_org_id(instruction):
-    match = re.search(r"OrgID[:\s]*([A-Za-z0-9_-]+)", instruction)
-    return match.group(1) if match else "unknown_org"
-
-
-def simulate_grant_approval_risk(redis_keys):
-    score = 100
-    for key in redis_keys:
-        value = redis_client.get(key)
-        if value:
-            decoded = value.decode("utf-8")
-            if "fraud" in key and "flag" in decoded:
-                score -= 40
-            elif "velocity" in key:
-                try:
-                    velocity = float(decoded)
-                    if velocity < 1000.0:
-                        score -= 30
-                except ValueError:
-                    score -= 10
-    return max(score, 0)
-
-
-def save_to_dashboard(org_id, score):
-    log = {"org_id": org_id, "score": score, "timestamp": datetime.utcnow().isoformat()}
-    client = getattr(current_app, "redis_client", None) or get_redis_client()
-    if client:
-        client.set(f"org_scores:{org_id}", json.dumps(log))
-    else:
-        current_app.logger.error(
-            "[symphony_ai.save_to_dashboard] Redis unavailable — skipping set for " "org_scores:%s",
-            org_id,
-        )
-
-
-# 🧠 SymphonyAI Brain Class
-
+SYSTEM_INSTRUCTION = """
+You are the master executive brain of a cockpit-grade open-banking orchestration network.
+You possess expert-level knowledge of credit architecture, grant procurement, and 
+regulatory compliance (FCRA, FDCPA, CFPB).
+Your objective: evaluate financial interactions, inspect contracts for predatory 
+patterns, and enforce state-driven account security protocols.
+"""
 
 class SymphonyAI:
-    def __init__(self, memory_limit=100, max_threads=5):
-        self.memory = []
-        self.memory_limit = memory_limit
-        self.max_threads = max_threads
-        self.task_queue = queue.Queue()
-        self.results = {}
-        self.agent_registry = self.load_registry()
+    def __init__(self):
+        # Initialize modern Gemini client
+        self.client = genai.Client()
+        self.model_id = "gemini-2.0-flash"
 
-    def load_registry(self):
-        path = Path("app/agents/agent_registry.json")
-        return json.loads(path.read_text()) if path.exists() else {}
+        # Enforcement engine
+        self.simulator = BankSimulator()
 
-    def dispatch_to_agent(self, task):
-        for agent, meta in self.agent_registry.items():
-            if task in meta.get("tasks", []):
-                return f"✅ Task '{task}' routed to {agent}: {meta.get('description')}"
-        return f"⚠️ No matching agent found for '{task}'"
+        # Telemetry engine
+        self.redis = get_redis_client()
 
-    def run(self, instruction, user_id=None):
+    def execute_instruction(self, instruction: str, subscriber_id: str = None) -> dict:
         """
-        Executes a series of tasks based on a given instruction,
-        prioritizing them based on the user's role.
+        Routes instructions through the Gemini Cortex using the modern SDK.
+        Captures function calls, executes them via BankSimulator, and returns the state.
         """
-        tasks = self.process_instruction(instruction)
-        self.results = {}
+        current_app.logger.info(f"⚡ [SYMPHONY_AI] Processing: {instruction[:50]}...")
 
-        # Role-weighted orchestration priority
-        role = None
-        if user_id:
-            user = User.query.get(user_id)
-            role = user.role if user else None
-
-        for task in tasks:
-            if role:
-                weight = ROLE_WEIGHTS.get(role, 0.5)
-                if weight >= 0.85:
-                    task = f"[PRIORITY] {task}"
-            self.task_queue.put(task)
-
-        threads = [
-            threading.Thread(target=self.worker) for _ in range(min(self.max_threads, len(tasks)))
-        ]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
-
-        # 🧾 Log orchestration to Redis
-        log_key = f"grants_composed:{datetime.utcnow().timestamp()}"
-        client = getattr(current_app, "redis_client", None) or get_redis_client()
-
-        if client:
-            try:
-                client.setex(
-                    log_key,
-                    86400 * 30,
-                    json.dumps(
-                        {
-                            "instruction": instruction,
-                            "results": self.results,
-                            "timestamp": datetime.utcnow().isoformat(),
-                            "user_role": role or "anonymous",
-                        }
-                    ),
-                )
-            except Exception as log_error:
-                current_app.logger.error(
-                    f"[symphony_ai.run] Redis setex failed for {log_key} — {log_error}"
-                )
-        else:
-            current_app.logger.error(
-                f"[symphony_ai.run] Redis unavailable — skipping setex for {log_key}"
+        try:
+            # Configure system instruction + tools
+            config = types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                tools=FINANCIAL_CORTEX_TOOLS,
+                temperature=0.1  # deterministic enforcement
             )
 
-        return self.results
+            # AI reasoning
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=instruction,
+                config=config
+            )
+
+            # --- FUNCTION CALL DETECTED ---
+            if response.function_calls:
+                fc = response.function_calls[0]
+                tool_name = fc.name
+                tool_args = fc.args
+
+                current_app.logger.warning(
+                    f"🚨 [CORTEX_INTENT] Gemini invoked enforcement tool: {tool_name}"
+                )
+
+                # Route into BankSimulator
+                simulator_result = self.simulator.apply(
+                    agent_name="Gemini_Cortex",
+                    payload={"action": tool_name, "data": tool_args},
+                    subscriber_id=subscriber_id or tool_args.get("subscriber_id")
+                )
+
+                final_result = {
+                    "status": "ENFORCEMENT_TRIGGERED",
+                    "tool_executed": tool_name,
+                    "simulator_state": simulator_result,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                self._log_orchestration_event(subscriber_id, instruction, final_result)
+                return final_result
+
+            # --- NO TOOL CALL: ANALYSIS ONLY ---
+            final_result = {
+                "status": "CORTEX_ANALYSIS_COMPLETE",
+                "ai_response": response.text,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+            self._log_orchestration_event(subscriber_id, instruction, final_result)
+            return final_result
+
+        except Exception as e:
+            current_app.logger.error(f"🚨 [CORTEX_CRITICAL_FAILURE]: {str(e)}")
+            return {"status": "ERROR", "message": str(e)}
+
+    def _log_orchestration_event(self, subscriber_id: str, instruction: str, result: dict):
+        """Writes cockpit-grade telemetry into Redis."""
+        if not self.redis:
+            return
+
+        trace_key = f"symphony_tracer:{datetime.utcnow().timestamp()}"
+        payload = {
+            "subscriber_id": subscriber_id or "ANONYMOUS",
+            "instruction": instruction,
+            "outcome": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        self.redis.setex(trace_key, 86400 * 30, json.dumps(payload))

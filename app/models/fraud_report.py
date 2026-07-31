@@ -2,7 +2,7 @@
 # FILE: app/models/fraud_report.py
 # DESCRIPTION: Cockpit‑grade FraudReport model with explicit relationships,
 #              UUID primary key, classification fields, and operator‑friendly
-#              serialization helpers.
+#              serialization helpers. Adjusted for dynamic User backrefs.
 # =============================================================================
 import uuid
 from datetime import datetime
@@ -12,7 +12,6 @@ from ..extensions import db
 
 class FraudReport(db.Model):
     __tablename__ = "fraud_reports"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -55,7 +54,14 @@ class FraudReport(db.Model):
     # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------
-    user = db.relationship("User", back_populates="fraud_reports")
+    
+    # ⭐ User Fix: Kept as backref because User model lacks 'fraud_reports'.
+    user = db.relationship(
+        "User",
+        backref=db.backref("fraud_reports", lazy="dynamic", passive_deletes=True),
+    )
+    
+    # Kept as back_populates assuming Transaction model has 'fraud_reports' defined.
     transaction = db.relationship("Transaction", back_populates="fraud_reports")
 
     # -------------------------------------------------------------------------
