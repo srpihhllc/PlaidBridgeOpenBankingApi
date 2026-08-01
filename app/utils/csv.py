@@ -1,10 +1,12 @@
 """
-Compatibility wrapper module exposing export_csv in the short "csv" module path.
+Compatibility wrapper module exposing export_csv and import_csv in the short
+`csv` module path.
 
-Some code/tests import from app.utils.csv; others import app.utils.csv_utils.
-We provide identical implementation in both modules to avoid inconsistent behavior.
+Some code/tests import from `app.utils.csv`; others import `app.utils.csv_utils`.
+This wrapper re‑exports both functions so both import paths behave identically.
 """
 
 from __future__ import annotations
 
-# Import implementation from csv_utils to keep single source of truth if you prefer.
+# Re‑export the real implementations from csv_utils
+from .csv_utils import export_csv, import_csv
