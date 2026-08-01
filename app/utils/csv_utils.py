@@ -1,5 +1,3 @@
-# /PlaidBridgeOpenBankingApi/app/utils/csv_utils.py
-
 """
 CSV helper utilities.
 
