@@ -1052,12 +1052,14 @@ def create_app(
 
     try:
         _register_blueprints(flask_app)
-        registered = list(flask_app.blueprints.keys())
         flask_app.logger.info(
             "✅ Blueprint Registration Complete. %d blueprints active.",
-            len(registered),
+            len(flask_app.blueprints),
         )
-        flask_app.logger.info("📘 Registered Blueprints: %s", registered)
+        flask_app.logger.info(
+            "📘 Registered Blueprints: %s",
+            list(flask_app.blueprints.keys()),
+        )
     except Exception:
         flask_app.logger.critical(
             "💥 CRITICAL: Blueprint Auto-Discovery FAILED — application startup aborted.",
@@ -1222,7 +1224,6 @@ except Exception as e:
     if os.environ.get("FLASK_ENV") == "production":
         import logging
 
-
         logger = logging.getLogger(__name__)
         logger.critical(
             "FATAL BOOT ERROR: create_app() failed. Sentinel override active, instantiating Emergency Safe-Mode Fallback App.",
@@ -1230,6 +1231,12 @@ except Exception as e:
         )
         # 🚨 Telemetry assertion sentinel for test_fallback_app_guard & log monitoring
         logger.critical("UNSAFE FALLBACK APP CREATED")
+
+        app = Flask(__name__)
+
+        @app.route("/fallback-health")
+        def fallback_health():
+            return jsonify({"status": "fallback", "error": "create_app_failed"}), 503
 
         # ------------------------------------------------------------------
         # Pristine Sentinel Safe-Mode Flask Instance Construction
