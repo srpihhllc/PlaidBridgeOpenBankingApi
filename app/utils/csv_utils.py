@@ -147,7 +147,7 @@ def export_csv(
 
 def import_csv(
     source: Union[str, Path, TextIO],
-    encoding: str = "utf-8-sig",
+    encoding: str = "utf-8",
     dialect: str = "excel",
     **kwargs: Any,
 ) -> List[Dict[str, str]]:
@@ -159,7 +159,7 @@ def import_csv(
     source : Union[str, Path, TextIO]
         File path or text stream object.
     encoding : str
-        File encoding (default "utf-8-sig" to automatically handle UTF-8 BOMs).
+        File encoding (default "utf-8").
     dialect : str
         CSV dialect (default "excel").
 
@@ -172,9 +172,19 @@ def import_csv(
         p = Path(source)
         if not p.exists():
             raise FileNotFoundError(f"CSV file not found: {p}")
-        with p.open("r", encoding=encoding, newline="") as fh:
-            reader = csv.DictReader(fh, dialect=dialect, **kwargs)
-            return [dict(row) for row in reader]
 
-    reader = csv.DictReader(source, dialect=dialect, **kwargs)
+        # Read raw text and strip BOM + leading blank lines
+        raw = p.read_text(encoding=encoding)
+        cleaned = raw.lstrip("\ufeff").lstrip("\r\n")
+
+        # Re-parse using StringIO
+        fh = io.StringIO(cleaned)
+        reader = csv.DictReader(fh, dialect=dialect, **kwargs)
+        return [dict(row) for row in reader]
+
+    # File-like object path
+    text = source.read()
+    cleaned = text.lstrip("\ufeff").lstrip("\r\n")
+    fh = io.StringIO(cleaned)
+    reader = csv.DictReader(fh, dialect=dialect, **kwargs)
     return [dict(row) for row in reader]
