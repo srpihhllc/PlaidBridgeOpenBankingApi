@@ -173,18 +173,27 @@ def import_csv(
         if not p.exists():
             raise FileNotFoundError(f"CSV file not found: {p}")
 
-        # Read raw text and strip BOM + leading blank lines
-        raw = p.read_text(encoding=encoding)
-        cleaned = raw.lstrip("\ufeff").lstrip("\r\n")
+        # Read bytes and decode explicitly to bypass OS-level newline corruption
+        # This prevents \r\n from turning into \r\r\n on poorly written Windows text files
+        raw = p.read_bytes().decode(encoding)
+    else:
+        raw = source.read()
 
-        # Re-parse using StringIO
-        fh = io.StringIO(cleaned)
-        reader = csv.DictReader(fh, dialect=dialect, **kwargs)
-        return [dict(row) for row in reader]
+    # Normalize line endings strictly to \n
+    cleaned = raw.replace("\r\r\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
+    
+    # Strip BOM and any leading blank lines
+    cleaned = cleaned.lstrip("\ufeff").lstrip("\n")
 
-    # File-like object path
-    text = source.read()
-    cleaned = text.lstrip("\ufeff").lstrip("\r\n")
-    fh = io.StringIO(cleaned)
+    # Re-parse using StringIO (newline="" is strictly required by the csv module)
+    fh = io.StringIO(cleaned, newline="")
     reader = csv.DictReader(fh, dialect=dialect, **kwargs)
-    return [dict(row) for row in reader]
+    
+    results = []
+    for row in reader:
+        # csv.DictReader will sometimes yield fully blank rows as empty strings
+        # Keep the row only if it contains at least one non-empty value
+        if any(str(v).strip() for v in row.values() if v is not None):
+            results.append(dict(row))
+            
+    return results
