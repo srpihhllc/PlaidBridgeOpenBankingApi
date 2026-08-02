@@ -99,34 +99,43 @@ def import_csv(source: str | bytes | Path) -> list[dict[str, str]]:
     """
     text = ""
     if isinstance(source, Path):
+        if not source.exists() or not source.is_file():
+            return []
         text = source.read_text(encoding="utf-8")
     elif isinstance(source, bytes):
         text = source.decode("utf-8")
     elif isinstance(source, str):
-        # Prevent OS errors by only checking .exists() if the string looks like a path
-        # (e.g., doesn't contain newlines and is shorter than max path length)
+        # Prevent OS errors by checking .exists() if string resembles a file path
         if "\n" not in source and len(source) < 255:
             p = Path(source)
             if p.exists() and p.is_file():
                 text = p.read_text(encoding="utf-8")
+            elif "." in source or "/" in source or "\\" in source:
+                # Path string provided but file does not exist
+                return []
             else:
                 text = source
         else:
             text = source
 
-    if not text.strip():
+    # Normalize line endings strictly to \n to prevent Windows \r\r\n issues
+    cleaned_text = "\n".join(text.splitlines())
+
+    if not cleaned_text.strip():
         return []
 
-    buf = io.StringIO(text)
+    buf = io.StringIO(cleaned_text)
     reader = csv.reader(buf)
-    rows = list(reader)
 
-    if not rows:
+    # Filter out empty or whitespace-only rows
+    raw_rows = [r for r in reader if any(cell.strip() for cell in r)]
+
+    if not raw_rows:
         return []
 
-    # Strip headers to prevent invisible whitespace keys
-    header = [str(h).strip() for h in rows[0]]
-    data_rows = rows[1:]
+    # Strip headers to eliminate hidden whitespace / BOM characters
+    header = [str(h).strip().lstrip("\ufeff") for h in raw_rows[0]]
+    data_rows = raw_rows[1:]
 
     result: list[dict[str, str]] = []
     for r in data_rows:
