@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import importlib
 import logging
-import sys
 import os
 import time
 import uuid
@@ -1054,10 +1053,16 @@ def create_app(
     try:
         _register_blueprints(flask_app)
         registered = list(flask_app.blueprints.keys())
-        flask_app.logger.info("✅ Blueprint Registration Complete. %d blueprints active.", len(registered))
+        flask_app.logger.info(
+            "✅ Blueprint Registration Complete. %d blueprints active.",
+            len(registered),
+        )
         flask_app.logger.info("📘 Registered Blueprints: %s", registered)
-    except Exception as exc:
-        flask_app.logger.critical("💥 CRITICAL: Blueprint Auto-Discovery FAILED — application startup aborted.", exc_info=True)
+    except Exception:
+        flask_app.logger.critical(
+            "💥 CRITICAL: Blueprint Auto-Discovery FAILED — application startup aborted.",
+            exc_info=True,
+        )
         raise
 
     # ------------------------------------------------------------------
@@ -1216,7 +1221,7 @@ except Exception as e:
     # 🚨 Only deploy the emergency safe-mode fallback if explicitly in production
     if os.environ.get("FLASK_ENV") == "production":
         import logging
-        from flask import Flask, jsonify
+
 
         logger = logging.getLogger(__name__)
         logger.critical(
