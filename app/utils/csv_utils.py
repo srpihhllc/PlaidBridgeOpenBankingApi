@@ -171,13 +171,18 @@ def import_csv(
     if isinstance(source, (str, Path)):
         p = Path(source)
         if not p.exists():
-            raise FileNotFoundError(f"CSV file not found: {p}")
+            return []
 
         # Read bytes and decode explicitly to bypass OS-level newline corruption
-        # This prevents \r\n from turning into \r\r\n on poorly written Windows text files
+        # This prevents \r\n from turning into \r\r\n on Windows text files
         raw = p.read_bytes().decode(encoding)
-    else:
+    elif hasattr(source, "read"):
         raw = source.read()
+    else:
+        raw = str(source)
+
+    if not raw or not raw.strip():
+        return []
 
     # Normalize line endings strictly to \n
     cleaned = raw.replace("\r\r\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
