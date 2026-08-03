@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from app.services.csv_utils import export_csv, import_csv
+from app.utils.csv_utils import export_csv, import_csv
 
 SAMPLE_DATA = [
     {"date": "2024-01-01", "description": "Coffee Shop", "amount": "-5.50"},
