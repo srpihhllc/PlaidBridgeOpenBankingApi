@@ -3,16 +3,14 @@ CSV helper utilities.
 
 Provides flexible export_csv and import_csv functions.
 
-export_csv accepts either:
-- output_path (str / pathlib.Path) as a destination path (keyword)
-- file (a file-like object opened for text write)
+export_csv accepts:
+- output_path (str / pathlib.Path) destination path
+- file (file-like object opened for text write)
 - or no destination (returns CSV string)
 
 import_csv accepts:
-- source (str / pathlib.Path or file-like object)
-- returns list of dict rows with automatic cross-platform newline handling
-
-The functions are cross-platform safe (Windows/Linux/macOS) and handle line endings reliably.
+- source (str / pathlib.Path, bytes, or file-like stream)
+- returns list of dict rows with native cross-platform newline handling
 """
 
 from __future__ import annotations
@@ -29,11 +27,7 @@ def _normalize_headers(
     data: Sequence[Mapping[str, Any]], 
     headers: Optional[Sequence[str]] = None
 ) -> List[str]:
-    """
-    Determine CSV headers:
-    - If explicit headers provided, use them as a list.
-    - Otherwise, aggregate keys from ALL rows in data (preserving insertion order).
-    """
+    """Determine CSV headers from explicit list or by aggregating row keys."""
     if headers is not None:
         return list(headers)
 
@@ -85,42 +79,10 @@ def export_csv(
     encoding: str = "utf-8",
     lineterminator: Optional[str] = None,
 ) -> Optional[str]:
-    """
-    Export a sequence of mapping rows (list of dict-like objects) to CSV.
-
-    Parameters
-    ----------
-    data : Sequence[Mapping[str, Any]]
-        Sequence of dict-like rows.
-    output_path : Optional[Union[str, Path]]
-        Destination path. If provided, CSV is written to this path.
-    file : Optional[TextIO]
-        File-like object opened for text write.
-        Note: output_path takes precedence if both are provided.
-    headers : Optional[Sequence[str]]
-        Explicit column headers. If None, derived automatically from row keys.
-    dialect : str
-        CSV dialect name (default "excel").
-    extrasaction : str
-        How to handle extra keys when using csv.DictWriter (default "ignore").
-    newline : str
-        Newline handling when opening output_path (default "").
-    encoding : str
-        File encoding (default "utf-8").
-    lineterminator : Optional[str]
-        Explicit line terminator override (e.g. "\\n" or "\\r\\n").
-
-    Returns
-    -------
-    Optional[str]
-        - str(output_path) if output_path is provided.
-        - None if file object is provided (and no output_path).
-        - CSV content string if neither output_path nor file is provided.
-    """
+    """Export sequence of mapping rows to file, stream, or CSV string."""
     rows = list(data or [])
     cols = _normalize_headers(rows, headers)
 
-    # Destination 1: Write to file path
     if output_path is not None:
         p = Path(output_path)
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -130,14 +92,12 @@ def export_csv(
             )
         return str(p)
 
-    # Destination 2: Write to provided file handle
     if file is not None:
         _write_csv_to_stream(
             file, rows, cols, dialect=dialect, extrasaction=extrasaction, lineterminator=lineterminator
         )
         return None
 
-    # Destination 3: Return string representation
     sio = io.StringIO()
     _write_csv_to_stream(
         sio, rows, cols, dialect=dialect, extrasaction=extrasaction, lineterminator=lineterminator
@@ -145,60 +105,76 @@ def export_csv(
     return sio.getvalue()
 
 
+def _parse_dict_reader(reader: csv.DictReader) -> List[Dict[str, str]]:
+    """
+    Helper to consume a DictReader, strip BOMs from header keys, and skip blank rows.
+    Note: This deliberately preserves intentional leading/trailing whitespace in header names.
+    """
+    results = []
+    for row in reader:
+        normalized = {}
+        for k, v in row.items():
+            if k is None:
+                continue
+            # Strip BOM only; preserve intentional leading/trailing whitespace
+            nk = str(k).lstrip("\ufeff")
+            normalized[nk] = "" if v is None else str(v)
+        if any(val.strip() for val in normalized.values()):
+            results.append(normalized)
+    return results
+
+
 def import_csv(
-    source: Union[str, Path, TextIO],
+    source: Union[str, Path, bytes, TextIO],
     encoding: str = "utf-8",
     dialect: str = "excel",
     **kwargs: Any,
 ) -> List[Dict[str, str]]:
     """
-    Import CSV data from a file path or file-like object into a list of dicts.
-
-    Parameters
-    ----------
-    source : Union[str, Path, TextIO]
-        File path or text stream object.
-    encoding : str
-        File encoding (default "utf-8").
-    dialect : str
-        CSV dialect (default "excel").
-
-    Returns
-    -------
-    List[Dict[str, str]]
-        List of dictionaries corresponding to CSV rows.
+    Import CSV data from a file path, raw string/bytes, or text stream into a list of dicts.
     """
+    # 1. Explicit Path object or path string
     if isinstance(source, (str, Path)):
-        p = Path(source)
-        if not p.exists():
+        try:
+            p = Path(source)
+            if p.exists() and p.is_file():
+                with p.open("r", encoding=encoding, newline="") as fh:
+                    return _parse_dict_reader(csv.DictReader(fh, dialect=dialect, **kwargs))
+        except OSError:
+            # Catch OS errors if `source` is a massive raw CSV string exceeding path length limits
+            pass
+
+    # 2. Raw bytes input
+    if isinstance(source, (bytes, bytearray)):
+        text = source.decode(encoding)
+        if not text.strip():
             return []
+        fh = io.StringIO(text, newline="")
+        return _parse_dict_reader(csv.DictReader(fh, dialect=dialect, **kwargs))
 
-        # Read bytes and decode explicitly to bypass OS-level newline corruption
-        # This prevents \r\n from turning into \r\r\n on Windows text files
-        raw = p.read_bytes().decode(encoding)
-    elif hasattr(source, "read"):
-        raw = source.read()
-    else:
-        raw = str(source)
+    # 3. File-like stream (TextIO, StringIO, BytesIO)
+    if hasattr(source, "read"):
+        # Try to use it directly as a text stream, but rewind if needed
+        try:
+            peek = source.read(0)
+            if hasattr(source, "seek"):
+                source.seek(0)
+            if isinstance(peek, (bytes, bytearray)):
+                # Force fallback to decoding if it's a binary stream
+                raise ValueError("binary stream")
+            return _parse_dict_reader(csv.DictReader(source, dialect=dialect, **kwargs))
+        except Exception:
+            raw = source.read()
+            if isinstance(raw, (bytes, bytearray)):
+                raw = raw.decode(encoding)
+            if not raw or not str(raw).strip():
+                return []
+            fh = io.StringIO(str(raw), newline="")
+            return _parse_dict_reader(csv.DictReader(fh, dialect=dialect, **kwargs))
 
-    if not raw or not raw.strip():
+    # 4. Fallback: Raw CSV text string
+    raw_str = str(source)
+    if not raw_str.strip():
         return []
-
-    # Normalize line endings strictly to \n
-    cleaned = raw.replace("\r\r\n", "\n").replace("\r\n", "\n").replace("\r", "\n")
-    
-    # Strip BOM and any leading blank lines
-    cleaned = cleaned.lstrip("\ufeff").lstrip("\n")
-
-    # Re-parse using StringIO (newline="" is strictly required by the csv module)
-    fh = io.StringIO(cleaned, newline="")
-    reader = csv.DictReader(fh, dialect=dialect, **kwargs)
-    
-    results = []
-    for row in reader:
-        # csv.DictReader will sometimes yield fully blank rows as empty strings
-        # Keep the row only if it contains at least one non-empty value
-        if any(str(v).strip() for v in row.values() if v is not None):
-            results.append(dict(row))
-            
-    return results
+    fh = io.StringIO(raw_str, newline="")
+    return _parse_dict_reader(csv.DictReader(fh, dialect=dialect, **kwargs))
