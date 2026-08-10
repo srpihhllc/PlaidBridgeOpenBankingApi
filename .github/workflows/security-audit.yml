@@ -1,0 +1,63 @@
+name: CI / Tests & Security Audit
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-audit:
+    name: Tests and Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run tests (pytest)
+        run: |
+          if [ -f pytest.ini ] || [ -d tests ]; then
+            python -m pip install pytest
+            pytest -q
+          else
+            echo "No tests found; skipping pytest"
+          fi
+
+      - name: Install and run pip-audit (dependency vulnerability scan)
+        run: |
+          python -m pip install pip-audit
+          pip-audit --progress=off --format=columns || true
+
+      - name: Install and run Bandit (static security scan)
+        run: |
+          python -m pip install bandit
+          bandit -r . -x .venv -f json -o bandit-results.json || true
+          echo "Bandit results written to bandit-results.json"
+
+      - name: Upload Bandit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-results
+          path: bandit-results.json
