@@ -71,7 +71,7 @@ pandas==2.3.3
 pathspec==0.12.1
 pdfminer.six==20220524
 pdfplumber==0.7.4
-pillow==12.1.1
+pillow==12.2.0
 pip-tools==7.5.1
 plaid-python==14.0.0
 platformdirs==4.5.0
