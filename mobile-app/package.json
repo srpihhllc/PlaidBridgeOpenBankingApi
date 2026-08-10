@@ -86,7 +86,7 @@
     "react-test-renderer": "19.1.0",
     "tsx": "^4.19.1",
     "typescript": "~5.9.2",
-    "vitest": "^2.1.4"
+    "vitest": "^4.1.0"
   },
   "packageManager": "pnpm@9.12.0"
 }
