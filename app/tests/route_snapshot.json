@@ -455,6 +455,13 @@
     "endpoint": "admin.tile_trace_viewer"
   },
   {
+    "rule": "/admin/tiles/blueprint_drift_overlay/pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin.tile_blueprint_drift_pulse"
+  },
+  {
     "rule": "/admin/trace_viewer",
     "methods": [
       "GET"
@@ -802,6 +809,20 @@
       "GET"
     ],
     "endpoint": "registry_api.get_dynamic_registry_json"
+  },
+  {
+    "rule": "/api/v1/sync",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.enqueue_sync"
+  },
+  {
+    "rule": "/api/v1/sync/jobs/<path:job_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api_v1.get_sync_job_status"
   },
   {
     "rule": "/api/v1/tradelines",
