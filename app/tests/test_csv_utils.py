@@ -1,4 +1,6 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_csv_utils.py
+# app/tests/test_csv_utils.py
+
+from __future__ import annotations
 
 import csv
 import io
@@ -20,7 +22,6 @@ def test_csv_export_writes_expected_data(tmp_path: Path):
     output_file = tmp_path / "export.csv"
     data_copy = json.loads(json.dumps(SAMPLE_DATA))
 
-    # FIX: pass file path as keyword argument
     export_csv(data_copy, output_path=str(output_file))
     assert output_file.exists()
 
@@ -44,7 +45,12 @@ def test_csv_import_reads_expected_data(tmp_path: Path):
     input_file = tmp_path / "input.csv"
     buffer = io.StringIO()
 
-    writer = csv.DictWriter(buffer, fieldnames=list(SAMPLE_DATA[0].keys()))
+    # Enforce Unix lineterminator to prevent Windows \r\r\n newline inflation
+    writer = csv.DictWriter(
+        buffer, 
+        fieldnames=list(SAMPLE_DATA[0].keys()), 
+        lineterminator="\n"
+    )
     writer.writeheader()
     writer.writerows(SAMPLE_DATA)
 
@@ -77,7 +83,7 @@ def test_csv_import_returns_empty_for_empty_file(tmp_path: Path):
         "extra,columns,here\n1,2,3,4",
     ],
 )
-def test_csv_import_handles_malformed_csv(tmp_path: Path, bad_content):
+def test_csv_import_handles_malformed_csv(tmp_path: Path, bad_content: str):
     fpath = tmp_path / "malformed.csv"
     fpath.write_text(bad_content, encoding="utf-8")
 
