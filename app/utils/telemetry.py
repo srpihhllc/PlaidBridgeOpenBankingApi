@@ -17,7 +17,11 @@ from typing import Any, TypeVar
 logger = logging.getLogger(__name__)
 
 # --- Configuration & Global State ---
-MOCK_MODE = os.getenv("TELEMETRY_MOCK_MODE", "True").lower() in ("true", "1", "t")
+MOCK_MODE = os.getenv("TELEMETRY_MOCK_MODE", "True").lower() in (
+    "true",
+    "1",
+    "t",
+)
 TTL_SUCCESS = int(os.getenv("TTL_SUCCESS_SECONDS", 300))
 TTL_FAILURE = int(os.getenv("TTL_FAILURE_SECONDS", 600))
 APP_ID = os.getenv("APP_ID", "default_app")
@@ -83,7 +87,9 @@ class MockMetric:
         self.samples: list[float] = []
         _METRIC_LOOKUP.setdefault(name, self)
 
-    def inc(self, amount: float = 1, labels: dict[str, str] | None = None) -> None:
+    def inc(
+        self, amount: float = 1, labels: dict[str, str] | None = None
+    ) -> None:
         if labels and set(labels.keys()) != set(self.labelnames):
             logger.warning(
                 "MockMetric '%s': label mismatch. expected=%s provided=%s",
@@ -105,7 +111,9 @@ class MockMetric:
         self.value = value
         logger.debug(f"MOCK_METRIC SET {self.name}={value} labels={labels}")
 
-    def observe(self, value: float, labels: dict[str, str] | None = None) -> None:
+    def observe(
+        self, value: float, labels: dict[str, str] | None = None
+    ) -> None:
         if labels and set(labels.keys()) != set(self.labelnames):
             logger.warning(
                 "MockMetric '%s': label mismatch. expected=%s provided=%s",
@@ -114,7 +122,9 @@ class MockMetric:
                 tuple(labels.keys()),
             )
         self.samples.append(value)
-        logger.debug(f"MOCK_METRIC OBSERVE {self.name}={value} labels={labels}")
+        logger.debug(
+            f"MOCK_METRIC OBSERVE {self.name}={value} labels={labels}"
+        )
 
     def labels(self, **labels: str) -> "MockMetric":
         return self
@@ -145,20 +155,30 @@ class MockMetric:
 _LATENCY_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0)
 
 if PROMETHEUS_CLIENT_ENABLED:
-    _REQUEST_COUNTER = Counter("http_requests_total", "Total HTTP Requests", ["method", "endpoint"])
+    _REQUEST_COUNTER = Counter(
+        "http_requests_total", "Total HTTP Requests", ["method", "endpoint"]
+    )
     _DB_FAILURE_COUNTER = Counter(
         "db_failure_count", "Database failures", ["error_type", "op_type"]
     )
-    _IDENTITY_EVENT_COUNTER = Counter("identity_events_total", "Identity events", ["event_type"])
-    _REDIS_HEALTH_GAUGE = Gauge("redis_health_status", "Redis health (1=up,0=down)", ["app_id"])
+    _IDENTITY_EVENT_COUNTER = Counter(
+        "identity_events_total", "Identity events", ["event_type"]
+    )
+    _REDIS_HEALTH_GAUGE = Gauge(
+        "redis_health_status", "Redis health (1=up,0=down)", ["app_id"]
+    )
     _API_LATENCY_HISTOGRAM = Histogram(
         "http_request_duration_seconds",
         "HTTP Request latency",
         ["method", "endpoint"],
         buckets=_LATENCY_BUCKETS,
     )
-    _HTTP_ERROR_404_COUNTER = Counter("http_error_404_v1", "HTTP 404 errors (v1)")
-    _HTTP_ERROR_401_COUNTER = Counter("http_error_401_v1", "HTTP 401 errors (v1)")
+    _HTTP_ERROR_404_COUNTER = Counter(
+        "http_error_404_v1", "HTTP 404 errors (v1)"
+    )
+    _HTTP_ERROR_401_COUNTER = Counter(
+        "http_error_401_v1", "HTTP 401 errors (v1)"
+    )
     _METRIC_LOOKUP.update(
         {
             "http_requests_total": _REQUEST_COUNTER,
@@ -172,29 +192,43 @@ if PROMETHEUS_CLIENT_ENABLED:
     )
 else:
     _REQUEST_COUNTER = MockMetric(
-        "http_requests_total", "Total HTTP Requests", "counter", ("method", "endpoint")
+        "http_requests_total",
+        "Total HTTP Requests",
+        "counter",
+        ("method", "endpoint"),
     )
     _DB_FAILURE_COUNTER = MockMetric(
-        "db_failure_count", "Database failures", "counter", ("error_type", "op_type")
+        "db_failure_count",
+        "Database failures",
+        "counter",
+        ("error_type", "op_type"),
     )
     _IDENTITY_EVENT_COUNTER = MockMetric(
         "identity_events_total", "Identity events", "counter", ("event_type",)
     )
-    _REDIS_HEALTH_GAUGE = MockMetric("redis_health_status", "Redis health", "gauge", ("app_id",))
+    _REDIS_HEALTH_GAUGE = MockMetric(
+        "redis_health_status", "Redis health", "gauge", ("app_id",)
+    )
     _API_LATENCY_HISTOGRAM = MockMetric(
         "http_request_duration_seconds",
         "HTTP latency",
         "histogram",
         ("method", "endpoint"),
     )
-    _HTTP_ERROR_404_COUNTER = MockMetric("http_error_404_v1", "HTTP 404 errors (v1)", "counter")
-    _HTTP_ERROR_401_COUNTER = MockMetric("http_error_401_v1", "HTTP 401 errors (v1)", "counter")
+    _HTTP_ERROR_404_COUNTER = MockMetric(
+        "http_error_404_v1", "HTTP 404 errors (v1)", "counter"
+    )
+    _HTTP_ERROR_401_COUNTER = MockMetric(
+        "http_error_401_v1", "HTTP 401 errors (v1)", "counter"
+    )
 
 _METRIC_LOOKUP.setdefault("http_requests_total", _REQUEST_COUNTER)
 _METRIC_LOOKUP.setdefault("db_failure_count", _DB_FAILURE_COUNTER)
 _METRIC_LOOKUP.setdefault("identity_events_total", _IDENTITY_EVENT_COUNTER)
 _METRIC_LOOKUP.setdefault("redis_health_status", _REDIS_HEALTH_GAUGE)
-_METRIC_LOOKUP.setdefault("http_request_duration_seconds", _API_LATENCY_HISTOGRAM)
+_METRIC_LOOKUP.setdefault(
+    "http_request_duration_seconds", _API_LATENCY_HISTOGRAM
+)
 _METRIC_LOOKUP.setdefault("http_error_404_v1", _HTTP_ERROR_404_COUNTER)
 _METRIC_LOOKUP.setdefault("http_error_401_v1", _HTTP_ERROR_401_COUNTER)
 
@@ -216,7 +250,9 @@ def _get_metric(name: str) -> Any | None:
         return _METRIC_LOOKUP.get(name)
 
 
-def inc_metric(name: str, labels: dict[str, str] | None = None, amount: float = 1) -> None:
+def inc_metric(
+    name: str, labels: dict[str, str] | None = None, amount: float = 1
+) -> None:
     metric = _get_metric(name)
     if not metric:
         logger.warning(f"inc_metric: unknown metric '{name}'")
@@ -230,7 +266,9 @@ def inc_metric(name: str, labels: dict[str, str] | None = None, amount: float = 
         logger.debug(f"inc_metric fallback for '{name}': {e}")
 
 
-def set_metric(name: str, value: float, labels: dict[str, str] | None = None) -> None:
+def set_metric(
+    name: str, value: float, labels: dict[str, str] | None = None
+) -> None:
     metric = _get_metric(name)
     if not metric or not hasattr(metric, "set"):
         logger.warning(f"set_metric: unknown or non-gauge metric '{name}'")
@@ -249,7 +287,9 @@ def record_timing_sample(
 ) -> None:
     metric = _get_metric(name)
     if not metric or not hasattr(metric, "observe"):
-        logger.warning(f"record_timing_sample: unknown or non-histogram metric '{name}'")
+        logger.warning(
+            f"record_timing_sample: unknown or non-histogram metric '{name}'"
+        )
         return
     try:
         if labels:
@@ -263,7 +303,9 @@ def record_timing_sample(
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-def time_metric(name: str, labels: dict[str, str] | None = None) -> Callable[[F], F]:
+def time_metric(
+    name: str, labels: dict[str, str] | None = None
+) -> Callable[[F], F]:
     """
     Decorator factory that records timing samples for the wrapped function.
     If the underlying metric exposes a .time() decorator (e.g. Prometheus),
@@ -279,7 +321,9 @@ def time_metric(name: str, labels: dict[str, str] | None = None) -> Callable[[F]
             finally:
                 duration = time.perf_counter() - start
                 record_timing_sample(name, duration, labels)
-                logger.debug(f"time_metric: {name}={duration:.4f}s labels={labels}")
+                logger.debug(
+                    f"time_metric: {name}={duration:.4f}s labels={labels}"
+                )
 
         return wrapper  # type: ignore[return-value]
 
@@ -358,7 +402,10 @@ def ttl_pulse_emit(
     if not redis:
         # No Redis available
         if TELEMETRY_MODE == "redis":
-            logger.error("TTL_EMIT: TELEMETRY_MODE=redis but Redis unavailable for key=%s", key)
+            logger.error(
+                "TTL_EMIT: TELEMETRY_MODE=redis but Redis unavailable for key=%s",
+                key,
+            )
         else:
             logger.info(
                 "TTL_EMIT (No Redis): %s status=%s ttl=%ss payload=%s",
@@ -377,7 +424,9 @@ def ttl_pulse_emit(
             redis.set(key, json.dumps(payload), ex=ttl_seconds)
         logger.debug(f"TTL_EMIT (Redis): {key} ttl={ttl_seconds}s")
     except Exception as e:
-        logger.error(f"CRITICAL: TTL emit failed for key '{key}': {e}", exc_info=True)
+        logger.error(
+            f"CRITICAL: TTL emit failed for key '{key}': {e}", exc_info=True
+        )
         try:
             set_metric("redis_health_status", 0, labels={"app_id": APP_ID})
         except Exception:
@@ -393,7 +442,10 @@ def log_db_failure(
     msg = str(error)
     logger.error(f"DB Failure in {context} ({op_type}): {error_type} {msg}")
     try:
-        inc_metric("db_failure_count", labels={"error_type": error_type, "op_type": op_type})
+        inc_metric(
+            "db_failure_count",
+            labels={"error_type": error_type, "op_type": op_type},
+        )
     except Exception:
         pass
     structured = {
@@ -484,7 +536,10 @@ def log_identity_event(
     except Exception as e:
         # Non-fatal — record health metric and attempt fallback queueing for diagnostics
         logger.error(
-            "CRITICAL: Identity event stream failure for %s: %s", event_type, e, exc_info=True
+            "CRITICAL: Identity event stream failure for %s: %s",
+            event_type,
+            e,
+            exc_info=True,
         )
         try:
             set_metric("redis_health_status", 0, labels={"app_id": APP_ID})
@@ -514,12 +569,19 @@ def log_identity_event(
                 r = None
             if r:
                 r.rpush("telemetry_fallback_queue", payload)
-                logger.info("Queued identity event to telemetry_fallback_queue")
+                logger.info(
+                    "Queued identity event to telemetry_fallback_queue"
+                )
         except Exception:
-            logger.debug("Fallback queueing for identity event failed", exc_info=True)
+            logger.debug(
+                "Fallback queueing for identity event failed", exc_info=True
+            )
 
         ttl_pulse_emit(
-            f"ttl_pulse:telemetry_failure:{APP_ID}", "FAILURE", TTL_FAILURE, client=None
+            f"ttl_pulse:telemetry_failure:{APP_ID}",
+            "FAILURE",
+            TTL_FAILURE,
+            client=None,
         )
 
 
@@ -552,7 +614,9 @@ def record_lifecycle_event(
         current_app = None
 
     if require_app_context and not current_app:
-        raise RuntimeError("record_lifecycle_event requires an active Flask app context")
+        raise RuntimeError(
+            "record_lifecycle_event requires an active Flask app context"
+        )
 
     did_push = False
     try:
@@ -622,7 +686,9 @@ def record_restart_event(event_type: str = "restart") -> None:
 # =============================================================================
 # Operational decorator: pulse_on_completion
 # =============================================================================
-def pulse_on_completion(key_prefix: str, op_type: str = "job") -> Callable[[F], F]:
+def pulse_on_completion(
+    key_prefix: str, op_type: str = "job"
+) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -653,7 +719,9 @@ def pulse_on_completion(key_prefix: str, op_type: str = "job") -> Callable[[F], 
 # =============================================================================
 # Deprecated shims (kept for migration)
 # =============================================================================
-def increment_counter(name: str, value: float = 1, labels: dict[str, str] | None = None) -> None:
+def increment_counter(
+    name: str, value: float = 1, labels: dict[str, str] | None = None
+) -> None:
     logger.warning(
         "[Telemetry Shim] increment_counter is deprecated. Use inc_metric('%s') instead.",
         name,
@@ -662,7 +730,9 @@ def increment_counter(name: str, value: float = 1, labels: dict[str, str] | None
 
 
 def increment_timing(
-    name: str, description: str = "Timing shim", labels: dict[str, str] | None = None
+    name: str,
+    description: str = "Timing shim",
+    labels: dict[str, str] | None = None,
 ) -> Callable[[F], F]:
     def decorator(func: F) -> F:
         @functools.wraps(func)
@@ -693,7 +763,10 @@ def log_route_usage(method: str, endpoint: str) -> None:
         _REQUEST_COUNTER.labels(method=method, endpoint=endpoint).inc()
     except Exception:
         try:
-            inc_metric("http_requests_total", labels={"method": method, "endpoint": endpoint})
+            inc_metric(
+                "http_requests_total",
+                labels={"method": method, "endpoint": endpoint},
+            )
         except Exception:
             pass
 
@@ -708,9 +781,9 @@ def time_route_latency(method: str, endpoint: str) -> Callable[[F], F]:
             finally:
                 duration = time.perf_counter() - start
                 try:
-                    _API_LATENCY_HISTOGRAM.labels(method=method, endpoint=endpoint).observe(
-                        duration
-                    )
+                    _API_LATENCY_HISTOGRAM.labels(
+                        method=method, endpoint=endpoint
+                    ).observe(duration)
                 except Exception:
                     try:
                         record_timing_sample(
@@ -758,7 +831,9 @@ def log_route(route_path: str) -> Callable[[F], F]:
                     )
                 except Exception:
                     logger.debug("log_route: metric recording failed.")
-                logger.debug(f"ROUTE_USAGE: {method} {route_path} completed in {duration:.4f}s")
+                logger.debug(
+                    f"ROUTE_USAGE: {method} {route_path} completed in {duration:.4f}s"
+                )
 
         return wrapper
 

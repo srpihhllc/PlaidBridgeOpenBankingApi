@@ -1,6 +1,7 @@
 #  /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/lender.py
 
-from datetime import datetime
+from datetime import datetime, timezone
+
 from ..extensions import db
 
 
@@ -29,11 +30,13 @@ class Lender(db.Model):
     bank_linked = db.Column(db.Boolean, default=False)
     linked_at = db.Column(db.DateTime)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # ----------------------------------------------------------------------
@@ -66,6 +69,8 @@ class Lender(db.Model):
             "verification_status": self.verification_status,
             "verification_score": self.verification_score,
             "bank_linked": self.bank_linked,
-            "linked_at": self.linked_at.isoformat() if self.linked_at else None,
+            "linked_at": self.linked_at.isoformat()
+            if self.linked_at
+            else None,
             "created_at": self.created_at.isoformat(),
         }

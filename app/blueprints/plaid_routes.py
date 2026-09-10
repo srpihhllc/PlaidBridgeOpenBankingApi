@@ -1,121 +1,156 @@
 # =============================================================================
-# FILE: app/blueprints/plaid_routes.py
-# DESCRIPTION: Finalized Plaid token lifecycle handler with Fernet encryption
+# FILE: app/services/plaid_api.py
+# DESCRIPTION: Cockpit‑grade Plaid API integration service.
+#               Provides link token generation, credential verification,
+#               and transaction retrieval with robust error handling.
 # =============================================================================
 
+import json
 import os
-from typing import Any
-from cryptography.fernet import Fernet
-from flask import Blueprint, current_app, jsonify, request
-from flask_login import current_user, login_required
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Union
 
-from app.extensions import db
-from app.models.plaid_item import PlaidItem
-from app.models.trace_events import TraceEvent
-from app.telemetry.ttl_emit import ttl_emit
+import plaid
+from plaid.api import plaid_api
+from plaid.exceptions import ApiException
+from plaid.model.country_code import CountryCode
+from plaid.model.link_token_create_request import LinkTokenCreateRequest
+from plaid.model.link_token_create_request_user import (
+    LinkTokenCreateRequestUser,
+)
+from plaid.model.products import Products
+from plaid.model.transactions_get_request import TransactionsGetRequest
 
-plaid_bp = Blueprint("plaid", __name__)
+# -----------------------------------------------------------------------------
+# Environment & Client Initialization
+# -----------------------------------------------------------------------------
+PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
+PLAID_SECRET = os.getenv("PLAID_SECRET")
+PLAID_ENV = os.getenv("PLAID_ENV", "sandbox").lower()
 
-class PlaidClientWithTimeout:
-    """Recursive wrapper to ensure Plaid SDK calls never hang indefinitely."""
-    def __init__(self, client, default_timeout=10):
-        self._client = client
-        self._default_timeout = default_timeout
+if not PLAID_CLIENT_ID or not PLAID_SECRET:
+    raise RuntimeError(
+        "❌ Missing Plaid API credentials. Check environment variables."
+    )
 
-    def __getattr__(self, name):
-        original_attribute = getattr(self._client, name)
-        if callable(original_attribute):
-            def wrapper(*args, **kwargs):
-                if "timeout" not in kwargs:
-                    kwargs["timeout"] = self._default_timeout
-                return original_attribute(*args, **kwargs)
-            return wrapper
-        return PlaidClientWithTimeout(original_attribute, self._default_timeout)
+# Map environment string to Plaid SDK host
+HOST_MAP = {
+    "sandbox": plaid.Environment.Sandbox,
+    "production": plaid.Environment.Production,
+}
+plaid_host = HOST_MAP.get(PLAID_ENV, plaid.Environment.Sandbox)
 
-def _get_plaid_client_and_log_error() -> Any:
-    """Lazily imports Plaid SDK and returns wrapped client."""
+configuration = plaid.Configuration(
+    host=plaid_host,
+    api_key={
+        "clientId": PLAID_CLIENT_ID,
+        "secret": PLAID_SECRET,
+    },
+)
+
+api_client = plaid.ApiClient(configuration)
+plaid_client = plaid_api.PlaidApi(api_client)
+
+
+# -----------------------------------------------------------------------------
+# Internal Helpers
+# -----------------------------------------------------------------------------
+def _parse_api_error(e: ApiException) -> str:
+    """Extracts human-readable error messages from Plaid ApiException bodies."""
     try:
-        from plaid import Client, environments
-        plaid_env_str = current_app.config.get("PLAID_ENV", "Development")
-        environment = getattr(environments, plaid_env_str.capitalize(), environments.Development)
-        raw_client = Client(
-            client_id=current_app.config["PLAID_CLIENT_ID"],
-            secret=current_app.config["PLAID_SECRET"],
-            environment=environment,
+        body = json.loads(e.body) if hasattr(e, "body") and e.body else {}
+        return body.get("error_message", str(e))
+    except Exception:
+        return str(e)
+
+
+# -----------------------------------------------------------------------------
+# Link Token Generation
+# -----------------------------------------------------------------------------
+def generate_link_token(user_id: str) -> Dict[str, Any]:
+    """
+    Creates a Plaid Link Token for user authentication.
+    Returns a dictionary payload for route serialization.
+    """
+    try:
+        request = LinkTokenCreateRequest(
+            client_name="PlaidBridge Open Banking API",
+            language="en",
+            country_codes=[CountryCode("US")],
+            products=[Products("auth"), Products("transactions")],
+            user=LinkTokenCreateRequestUser(client_user_id=str(user_id)),
         )
-        return PlaidClientWithTimeout(raw_client)
+        response = plaid_client.link_token_create(request)
+        return {"link_token": response["link_token"]}
+    except ApiException as e:
+        return {"error": _parse_api_error(e)}, 500
     except Exception as e:
-        current_app.logger.error(f"Plaid SDK initialization failed: {e}")
-        return None
+        return {"error": str(e)}, 500
 
-@plaid_bp.route("/create_link_token", methods=["POST"])
-@login_required
-def create_link_token():
-    """Creates a Link token for client-side integration."""
-    plaid_client = _get_plaid_client_and_log_error()
-    if not plaid_client:
-        return jsonify({"error": "Service unavailable"}), 503
 
+# Alias for backward compatibility
+create_link_token = generate_link_token
+
+
+# -----------------------------------------------------------------------------
+# Verify Lender Credentials
+# -----------------------------------------------------------------------------
+def verify_via_plaid(plaid_token: str) -> Dict[str, Any]:
+    """
+    Verifies credentials via Plaid API by fetching a small transaction window.
+    Returns transaction dict on success or standardized error dict on failure.
+    """
     try:
-        response = plaid_client.LinkToken.create({
-            "user": {"client_user_id": str(current_user.id)},
-            "client_name": "Plaid Bridge",
-            "products": ["auth", "transactions"],
-            "country_codes": ["US"],
-            "language": "en",
-            "redirect_uri": current_app.config.get("PLAID_REDIRECT_URI", ""),
-        })
-        return jsonify({"link_token": response["link_token"]})
-    except Exception as e:
-        current_app.logger.error(f"Link Token creation error: {e}")
-        return jsonify({"error": "Failed to generate link token"}), 500
+        # Default target window
+        start_date = (datetime.now(timezone.utc) - timedelta(days=30)).date()
+        end_date = datetime.now(timezone.utc).date()
 
-@plaid_bp.route("/exchange_public_token", methods=["POST"])
-@login_required
-def exchange_public_token():
-    """Exchanges public token, encrypts access token, and persists to DB."""
-    public_token = request.json.get("public_token")
-    if not public_token:
-        return jsonify({"error": "Missing public token"}), 400
-
-    plaid_client = _get_plaid_client_and_log_error()
-    if not plaid_client:
-        return jsonify({"error": "Service unavailable"}), 503
-
-    try:
-        # 1. Exchange Token
-        exchange_response = plaid_client.Item.public_token_exchange(public_token)
-        access_token = exchange_response["access_token"]
-        item_id = exchange_response["item_id"]
-
-        # 2. Check for existence
-        if PlaidItem.query.filter_by(user_id=current_user.id, plaid_item_id=item_id).first():
-            return jsonify({"success": True, "message": "Already linked"}), 200
-
-        # 3. Secure Encryption
-        encryption_key = os.getenv("PLAID_ENCRYPTION_KEY")
-        if not encryption_key:
-            raise ValueError("PLAID_ENCRYPTION_KEY not set")
-        
-        f = Fernet(encryption_key.encode())
-        encrypted_token = f.encrypt(access_token.encode()).decode('utf-8')
-
-        # 4. Persistence
-        new_item = PlaidItem(
-            user_id=current_user.id,
-            plaid_item_id=item_id,
-            plaid_access_token=encrypted_token
+        request = TransactionsGetRequest(
+            access_token=plaid_token,
+            start_date=start_date,
+            end_date=end_date,
         )
-        db.session.add(new_item)
-        db.session.commit()
-
-        # 5. Telemetry Pulse
-        ttl_emit(f"ttl:plaid:success:{current_user.id}", status="success", ttl=300)
-        
-        return jsonify({"success": True, "item_id": item_id})
-
+        response = plaid_client.transactions_get(request)
+        return response.to_dict()
+    except ApiException as e:
+        return {"error": _parse_api_error(e)}, 500
     except Exception as e:
-        db.session.rollback()
-        current_app.logger.error(f"Exchange error for user {current_user.id}: {e}")
-        ttl_emit(f"ttl:plaid:error:{current_user.id}", status="error", ttl=300)
-        return jsonify({"error": "Exchange failed"}), 500
+        return {"error": str(e)}, 500
+
+
+# -----------------------------------------------------------------------------
+# Fetch Transactions
+# -----------------------------------------------------------------------------
+def get_transactions(
+    access_token: str,
+    start_date: Union[str, None] = None,
+    end_date: Union[str, None] = None,
+) -> Dict[str, Any]:
+    """
+    Retrieves transactions for a given access token.
+    Defaults to the last 30 days if dates are unsupplied.
+    """
+    if not access_token:
+        return {"error": "Missing access token"}, 400
+
+    now = datetime.now(timezone.utc)
+    if not start_date:
+        start_date = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+    if not end_date:
+        end_date = now.strftime("%Y-%m-%d")
+
+    try:
+        request = TransactionsGetRequest(
+            access_token=access_token,
+            start_date=datetime.strptime(start_date, "%Y-%m-%d").date(),
+            end_date=datetime.strptime(end_date, "%Y-%m-%d").date(),
+        )
+        response = plaid_client.transactions_get(request)
+
+        # Extract transactions and parse models to standard dictionaries
+        transactions = [txn.to_dict() for txn in response.transactions]
+        return {"transactions": transactions}
+    except ApiException as e:
+        return {"error": _parse_api_error(e)}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500

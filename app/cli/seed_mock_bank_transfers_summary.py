@@ -8,7 +8,9 @@ from flask.cli import with_appcontext
 from tabulate import tabulate
 
 from app.models import BankTransaction, User
-from app.services.bank_transaction_generator import seed_mock_bank_transfers_for_user
+from app.services.bank_transaction_generator import (
+    seed_mock_bank_transfers_for_user,
+)
 
 
 @click.command("seed-mock-bank-transfers-summary")
@@ -28,7 +30,11 @@ def seed_mock_bank_transfers_summary(email, count):
     seed_mock_bank_transfers_for_user(user, count=count)
 
     # Fetch last N transfers
-    txns = BankTransaction.query.order_by(BankTransaction.timestamp.desc()).limit(count).all()
+    txns = (
+        BankTransaction.query.order_by(BankTransaction.timestamp.desc())
+        .limit(count)
+        .all()
+    )
 
     table = [
         [

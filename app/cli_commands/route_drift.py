@@ -25,11 +25,28 @@ def _load_expected(path: Path) -> Set[str]:
 
 
 @click.command("route-drift")
-@click.option("--expected-file", "-e", required=True, type=click.Path(exists=True, readable=True), help="Path to JSON array or newline list of expected endpoints (e.g. expected_endpoints.json)")
-@click.option("--fail-on-missing/--no-fail-on-missing", default=True, help="Exit non-zero if any expected endpoints are missing")
-@click.option("--json", "as_json", is_flag=True, help="Emit machine-readable JSON summary")
+@click.option(
+    "--expected-file",
+    "-e",
+    required=True,
+    type=click.Path(exists=True, readable=True),
+    help="Path to JSON array or newline list of expected endpoints (e.g. expected_endpoints.json)",
+)
+@click.option(
+    "--fail-on-missing/--no-fail-on-missing",
+    default=True,
+    help="Exit non-zero if any expected endpoints are missing",
+)
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    help="Emit machine-readable JSON summary",
+)
 @with_appcontext
-def route_drift(expected_file: str, fail_on_missing: bool, as_json: bool) -> None:
+def route_drift(
+    expected_file: str, fail_on_missing: bool, as_json: bool
+) -> None:
     """
     Compare an expected endpoint list to the endpoints actually registered in Flask.
     Exits with non-zero status when missing endpoints are found (if --fail-on-missing).

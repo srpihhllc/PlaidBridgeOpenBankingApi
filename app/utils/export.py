@@ -13,7 +13,14 @@ def serialize_logs_as_csv(logs):
     output = io.StringIO()
     writer = csv.DictWriter(
         output,
-        fieldnames=["event_type", "by", "card_id", "timestamp", "reason", "method"],
+        fieldnames=[
+            "event_type",
+            "by",
+            "card_id",
+            "timestamp",
+            "reason",
+            "method",
+        ],
     )
     writer.writeheader()
     for log in logs:

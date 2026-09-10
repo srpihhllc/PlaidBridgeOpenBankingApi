@@ -6,7 +6,7 @@ Supports local storage and optional email dispatch via SendGrid.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import sendgrid
 from sendgrid.helpers.mail import Mail
@@ -26,7 +26,7 @@ def dispatch_letter(
 
     delivery_method = bureau.get("delivery_method", "print")
     slug = bureau["name"].lower().replace(" ", "_")
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
     # 📁 Save a local copy
     save_dir = os.path.join("generated_letters", slug)
@@ -50,7 +50,9 @@ def dispatch_letter(
             sg.send(message)
             return "email"
         except Exception as e:
-            print(f"[SENDGRID ERROR] Failed to deliver to {bureau['name']}: {e}")
+            print(
+                f"[SENDGRID ERROR] Failed to deliver to {bureau['name']}: {e}"
+            )
             return "email_failed"
 
     return "print"

@@ -18,7 +18,9 @@ def emit_access_token_trace(token_obj):
     payload = {
         "token": token_obj.token,
         "issued_at": token_obj.created_at.isoformat(),
-        "expires_at": (token_obj.expires_at.isoformat() if token_obj.expires_at else None),
+        "expires_at": (
+            token_obj.expires_at.isoformat() if token_obj.expires_at else None
+        ),
     }
 
     try:

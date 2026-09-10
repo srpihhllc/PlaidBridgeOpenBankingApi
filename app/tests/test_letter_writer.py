@@ -27,6 +27,8 @@ def test_letter_render_to_text_with_dict():
 
 def test_letter_bundle_all_letters_invalid_type():
     """bundle_all_letters should return error message and None doc_id for unsupported types."""
-    content, doc_id = letter_writer.bundle_all_letters(123, document_type="UNKNOWN")
+    content, doc_id = letter_writer.bundle_all_letters(
+        123, document_type="UNKNOWN"
+    )
     assert content == "Document type not supported"
     assert doc_id is None

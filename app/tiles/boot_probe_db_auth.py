@@ -19,4 +19,6 @@ def probe_db_auth():
         conn.close()
     except Exception as e:
         ttl_emitter("boot:db_auth", status="red", ts=True)
-        trace_log("boot:db_auth", f"❌ DB auth failed: {str(e)}", level="error")
+        trace_log(
+            "boot:db_auth", f"❌ DB auth failed: {str(e)}", level="error"
+        )

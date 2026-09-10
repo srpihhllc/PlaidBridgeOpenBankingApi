@@ -6,10 +6,11 @@
 #              work without schema churn.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import synonym
 
 from ..extensions import db
-from sqlalchemy.orm import synonym
 
 
 class VaultTransaction(db.Model):
@@ -43,7 +44,9 @@ class VaultTransaction(db.Model):
     method = db.Column(db.String(64), nullable=True)
 
     # Keep a created_at column for existing code; use as the canonical timestamp
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # Expose received_at as a synonym for created_at for readability in webhook code
     received_at = synonym("created_at")
@@ -61,7 +64,9 @@ class VaultTransaction(db.Model):
     user = db.relationship("User", back_populates="vault_transactions")
 
     # Convenience relationship to BorrowerCard
-    card = db.relationship("BorrowerCard", backref="vault_transactions", lazy="joined")
+    card = db.relationship(
+        "BorrowerCard", backref="vault_transactions", lazy="joined"
+    )
 
     def __repr__(self):
         return (

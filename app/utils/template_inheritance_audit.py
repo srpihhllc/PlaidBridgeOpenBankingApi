@@ -5,7 +5,6 @@
 
 import json
 import logging
-import os
 import re
 
 from flask import current_app
@@ -40,9 +39,9 @@ def audit_template_inheritance(redis_client) -> dict:
         # 1. Ask Jinja for the exact, namespaced template map
         # ---------------------------------------------------------------------
         template_map: dict[str, str] = {}  # child_name → exact text source
-        file_map: dict[str, str] = {}      # child_name → absolute physical path
+        file_map: dict[str, str] = {}  # child_name → absolute physical path
         env = current_app.jinja_env
-        
+
         for t_name in env.list_templates():
             if t_name.endswith((".html", ".jinja2")):
                 try:
@@ -52,7 +51,9 @@ def audit_template_inheritance(redis_client) -> dict:
                     if filename:
                         file_map[t_name] = filename
                 except Exception as e:
-                    _logger.warning("⚠️ Could not read template %s: %s", t_name, e)
+                    _logger.warning(
+                        "⚠️ Could not read template %s: %s", t_name, e
+                    )
                     summary["errors"] += 1
                     continue
 
@@ -74,7 +75,9 @@ def audit_template_inheritance(redis_client) -> dict:
         # Detect missing parents
         # ---------------------------------------------------------------------
         missing_parents = {
-            child: parent for child, parent in parent_map.items() if parent not in template_map
+            child: parent
+            for child, parent in parent_map.items()
+            if parent not in template_map
         }
 
         summary["missing_parents"] = len(missing_parents)
@@ -100,17 +103,23 @@ def audit_template_inheritance(redis_client) -> dict:
         # ---------------------------------------------------------------------
         def domain_of(t_name: str) -> str:
             # 1. Check logical Jinja namespace first (e.g., "admin/admin.html")
-            if t_name.startswith("admin/"): return "admin"
-            if t_name.startswith("sub/"): return "subscriber"
-            if t_name.startswith("cockpit/"): return "cockpit"
-            
-            # 2. Fallback: Check absolute physical path on disk 
+            if t_name.startswith("admin/"):
+                return "admin"
+            if t_name.startswith("sub/"):
+                return "subscriber"
+            if t_name.startswith("cockpit/"):
+                return "cockpit"
+
+            # 2. Fallback: Check absolute physical path on disk
             # (Handles flat structures in blueprint template folders)
             filepath = file_map.get(t_name, "").replace("\\", "/")
-            if "/admin" in filepath: return "admin"
-            if "/sub" in filepath or "/subscriber" in filepath: return "subscriber"
-            if "/cockpit" in filepath: return "cockpit"
-            
+            if "/admin" in filepath:
+                return "admin"
+            if "/sub" in filepath or "/subscriber" in filepath:
+                return "subscriber"
+            if "/cockpit" in filepath:
+                return "cockpit"
+
             return "global"
 
         cross_domain = {}
@@ -139,11 +148,20 @@ def audit_template_inheritance(redis_client) -> dict:
         )
 
         if missing_parents:
-            _logger.error("🚨 Missing parent templates:\n%s", json.dumps(missing_parents, indent=2))
+            _logger.error(
+                "🚨 Missing parent templates:\n%s",
+                json.dumps(missing_parents, indent=2),
+            )
         if cycles:
-            _logger.error("🚨 Circular inheritance detected:\n%s", json.dumps(cycles, indent=2))
+            _logger.error(
+                "🚨 Circular inheritance detected:\n%s",
+                json.dumps(cycles, indent=2),
+            )
         if cross_domain:
-            _logger.error("🚨 Cross-domain inheritance drift:\n%s", json.dumps(cross_domain, indent=2))
+            _logger.error(
+                "🚨 Cross-domain inheritance drift:\n%s",
+                json.dumps(cross_domain, indent=2),
+            )
 
     except Exception as e:
         _logger.exception("Template inheritance audit failed: %s", e)

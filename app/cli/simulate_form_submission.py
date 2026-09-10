@@ -5,6 +5,7 @@
 
 import click
 from flask.cli import with_appcontext
+
 from app.extensions import db
 
 # Dynamic import fallback to accommodate active branch structures
@@ -22,7 +23,10 @@ except ImportError:
 def simulate_form_submission_command():
     """Run a synthetic form submission save simulation."""
     if FormSubmission is None:
-        click.secho("⚠️ FormSubmission model not found on this branch. Skipping simulation.", fg="yellow")
+        click.secho(
+            "⚠️ FormSubmission model not found on this branch. Skipping simulation.",
+            fg="yellow",
+        )
         return
 
     try:

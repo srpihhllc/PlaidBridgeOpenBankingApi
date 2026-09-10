@@ -6,8 +6,12 @@ from wtforms.validators import DataRequired, Length
 
 
 class AccountUpdateForm(FlaskForm):
-    first_name = StringField("First Name", validators=[DataRequired(), Length(max=50)])
-    last_name = StringField("Last Name", validators=[DataRequired(), Length(max=50)])
+    first_name = StringField(
+        "First Name", validators=[DataRequired(), Length(max=50)]
+    )
+    last_name = StringField(
+        "Last Name", validators=[DataRequired(), Length(max=50)]
+    )
     address = StringField("Address", validators=[Length(max=255)])
     city = StringField("City", validators=[Length(max=100)])
     state = StringField("State", validators=[Length(max=50)])

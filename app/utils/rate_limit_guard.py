@@ -42,7 +42,9 @@ def rate_limit_if_enabled(limit_str: str):
                 return func(*args, **kwargs)
 
             is_testing = current_app.config.get("TESTING", False)
-            is_rate_limit_enabled = current_app.config.get("RATE_LIMIT_ENABLED", True)
+            is_rate_limit_enabled = current_app.config.get(
+                "RATE_LIMIT_ENABLED", True
+            )
 
             if is_testing or not is_rate_limit_enabled:
                 # Testing mode or rate limiting disabled - skip rate limiting

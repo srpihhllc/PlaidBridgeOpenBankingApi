@@ -3,10 +3,12 @@
 # DESCRIPTION: Emits TTL-backed Redis pulses for cockpit PDF export telemetry.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.telemetry.ttl_emit import ttl_emit
-from app.utils.redis_utils import get_redis_client  # ✅ import the function, not a global
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ import the function, not a global
 
 
 def log_pdf_export_pulse(filename, operator="system", ttl_seconds=300):
@@ -20,9 +22,16 @@ def log_pdf_export_pulse(filename, operator="system", ttl_seconds=300):
         ttl_seconds (int): How long the pulse should live in Redis.
     """
     job_id = f"ttl:pdf:{filename}"
-    status = f"exported by {operator} @ {datetime.utcnow().isoformat()}"
+    status = (
+        f"exported by {operator} @ {datetime.now(timezone.utc).isoformat()}"
+    )
     try:
-        ttl_emit(key=job_id, status=status, client=get_redis_client(), ttl=ttl_seconds)
+        ttl_emit(
+            key=job_id,
+            status=status,
+            client=get_redis_client(),
+            ttl=ttl_seconds,
+        )
     except Exception:
         # If Redis is down or unreachable, skip without crashing
         ttl_emit(key=job_id, status=status, client=None, ttl=ttl_seconds)

@@ -5,59 +5,71 @@
 
 import datetime
 import logging
+
 from flask import current_app
 from flask_mail import Message
-from app.extensions import db, mail
+
+from app.extensions import mail
 
 logger = logging.getLogger(__name__)
 
+
 def compile_system_metrics():
     """
-    Aggregates operational state from the DB, Redis instances, 
+    Aggregates operational state from the DB, Redis instances,
     and systemic wiring matrices for the digest.
     """
     from app.models.user import User
-    
+
     metrics = {
         "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "total_users": 0,
         "redis_status": "OFFLINE",
         "db_status": "HEALTHY",
-        "active_operator_sessions": 0
+        "active_operator_sessions": 0,
     }
-    
+
     try:
         # 1. Extract database metrics
         metrics["total_users"] = User.query.count()
     except Exception as e:
         metrics["db_status"] = f"DEGRADED ({str(e)})"
-        logger.error(f"[REPORT ENGINE] Database metrics extraction failed: {e}")
+        logger.error(
+            f"[REPORT ENGINE] Database metrics extraction failed: {e}"
+        )
 
     try:
         # 2. Extract telemetry patterns directly from your live Redis cluster extension
         # Accessing the redis client instance attached to your extensions map
-        redis_client = current_app.extensions.get("redis") or current_app.extensions.get("redis_client")
+        redis_client = current_app.extensions.get(
+            "redis"
+        ) or current_app.extensions.get("redis_client")
         if redis_client:
             redis_client.ping()
             metrics["redis_status"] = "ONLINE"
-            
+
             # Scan for active operator lifecycles from your token keyspace pattern
             operator_keys = redis_client.keys("operator:code:v1:*")
             metrics["active_operator_sessions"] = len(operator_keys)
     except Exception as e:
         metrics["redis_status"] = f"DISCONNECTED ({str(e)})"
         logger.error(f"[REPORT ENGINE] Redis telemetry collection failed: {e}")
-        
+
     return metrics
 
 
 def generate_html_digest_template(metrics):
     """
-    Generates a professional, responsive HTML status interface 
+    Generates a professional, responsive HTML status interface
     designed for high visibility in an inbox.
     """
-    status_color = "#10b981" if "ONLINE" in metrics["redis_status"] and "HEALTHY" in metrics["db_status"] else "#f59e0b"
-    
+    status_color = (
+        "#10b981"
+        if "ONLINE" in metrics["redis_status"]
+        and "HEALTHY" in metrics["db_status"]
+        else "#f59e0b"
+    )
+
     return f"""
     <!DOCTYPE html>
     <html>
@@ -131,29 +143,39 @@ def execute_scheduled_report_dispatch():
     """
     # Defensive application context checking
     from app.models.user import User
-    
-    logger.info("[REPORT ENGINE] Starting background telemetry compilation sequence...")
-    
+
+    logger.info(
+        "[REPORT ENGINE] Starting background telemetry compilation sequence..."
+    )
+
     with current_app.app_context():
         # 1. Resolve the primary authoritative administrator record dynamically
         admin_operator = User.query.filter_by(role="admin").first()
-        
+
         if not admin_operator:
-            logger.warning("[REPORT ENGINE] Aborting dispatch: No seeded administrator profile discovered.")
+            logger.warning(
+                "[REPORT ENGINE] Aborting dispatch: No seeded administrator profile discovered."
+            )
             return
 
         # 2. Extract the telemetry layer stats
         metrics = compile_system_metrics()
-        
+
         # 3. Construct the mail message
         msg = Message(
             subject="⚙️ PlaidBridge API: Daily Cockpit Telemetry Digest",
-            recipients=[admin_operator.email], # Sends directly to your configured srpollardsihhllc@gmail.com record
-            html=generate_html_digest_template(metrics)
+            recipients=[
+                admin_operator.email
+            ],  # Sends directly to your configured srpollardsihhllc@gmail.com record
+            html=generate_html_digest_template(metrics),
         )
-        
+
         try:
             mail.send(msg)
-            logger.info(f"✅ [REPORT ENGINE] Telemetry digest dispatched successfully to {admin_operator.email}")
+            logger.info(
+                f"✅ [REPORT ENGINE] Telemetry digest dispatched successfully to {admin_operator.email}"
+            )
         except Exception as e:
-            logger.error(f"❌ [REPORT ENGINE] Critical dispatch failure over mail extension layer: {e}")
+            logger.error(
+                f"❌ [REPORT ENGINE] Critical dispatch failure over mail extension layer: {e}"
+            )

@@ -3,14 +3,17 @@
 Check template url_for endpoints against app.view_functions.
 Outputs missing endpoints and the templates that reference them.
 """
+
 import re
 import sys
 from pathlib import Path
+
 from app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app" / "templates"
 PAT = re.compile(r"url_for\(\s*['\"]([^'\"]+)['\"]")
+
 
 def find_template_endpoints():
     refs = {}
@@ -19,6 +22,7 @@ def find_template_endpoints():
         for m in PAT.findall(text):
             refs.setdefault(m, set()).add(str(tpl.relative_to(TEMPLATES)))
     return refs
+
 
 def main():
     app = create_app(env_name="development")
@@ -34,6 +38,7 @@ def main():
         for f in sorted(files):
             print(f"    {f}")
     return 1
+
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -22,6 +22,8 @@ def assert_lender_context() -> User:
 
     # You can refine this to check a dedicated lender flag/role
     if getattr(user, "role", None) == "subscriber":
-        raise IsolationError("Subscriber context may not access lender sandbox APIs.")
+        raise IsolationError(
+            "Subscriber context may not access lender sandbox APIs."
+        )
 
     return user

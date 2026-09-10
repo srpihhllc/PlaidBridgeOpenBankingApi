@@ -17,6 +17,8 @@ def analyze_loan_agreement(text):
     findings = {kw: kw in text.lower() for kw in keywords}
     return {
         "total_words": len(text.split()),
-        "matched_keywords": [kw for kw, present in findings.items() if present],
+        "matched_keywords": [
+            kw for kw, present in findings.items() if present
+        ],
         "keyword_presence": findings,
     }

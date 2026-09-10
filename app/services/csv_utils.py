@@ -17,7 +17,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-def _derive_columns(rows: list[dict[str, Any]], columns: list[str] | None = None) -> list[str]:
+def _derive_columns(
+    rows: list[dict[str, Any]], columns: list[str] | None = None
+) -> list[str]:
     """Helper to extract column headers from the first dictionary found."""
     if columns:
         return list(columns)
@@ -48,23 +50,34 @@ def export_csv(
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text("", encoding="utf-8", newline="")
             except OSError as e:
-                logger.error(f"Failed to write empty CSV to {output_path}: {e}")
+                logger.error(
+                    f"Failed to write empty CSV to {output_path}: {e}"
+                )
         return b""
 
     cols = _derive_columns(rows_list, columns)
     sio = io.StringIO()
 
     if cols:
-        writer = csv.DictWriter(sio, fieldnames=cols, extrasaction="ignore", dialect="excel")
+        writer = csv.DictWriter(
+            sio, fieldnames=cols, extrasaction="ignore", dialect="excel"
+        )
         writer.writeheader()
         for r in rows_list:
             if isinstance(r, dict):
-                row_dict = {k: ("" if r.get(k) is None else str(r.get(k))) for k in cols}
+                row_dict = {
+                    k: ("" if r.get(k) is None else str(r.get(k)))
+                    for k in cols
+                }
                 writer.writerow(row_dict)
             else:
                 vals = list(r)
                 row_dict = {
-                    cols[i]: ("" if i >= len(vals) or vals[i] is None else str(vals[i]))
+                    cols[i]: (
+                        ""
+                        if i >= len(vals) or vals[i] is None
+                        else str(vals[i])
+                    )
                     for i in range(len(cols))
                 }
                 writer.writerow(row_dict)
@@ -72,7 +85,9 @@ def export_csv(
         writer = csv.writer(sio, dialect="excel")
         for r in rows_list:
             if isinstance(r, dict):
-                writer.writerow([str(v) if v is not None else "" for v in r.values()])
+                writer.writerow(
+                    [str(v) if v is not None else "" for v in r.values()]
+                )
             else:
                 writer.writerow([str(v) if v is not None else "" for v in r])
 
@@ -149,7 +164,9 @@ def import_csv(source: str | bytes | Path) -> list[dict[str, str]]:
     return result
 
 
-def save_statements_as_csv(statements: list[dict[str, Any]], filename: str | Path) -> None:
+def save_statements_as_csv(
+    statements: list[dict[str, Any]], filename: str | Path
+) -> None:
     """
     Writes a list of statement dictionaries to a CSV file on disk.
 
@@ -185,7 +202,9 @@ def generate_pdf_from_csv(csv_path: str | Path, pdf_path: str | Path) -> None:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_bytes(b"")
     except OSError as e:
-        logger.error(f"🚨 [CSV_UTILS] Error generating mock PDF at {pdf_path}: {e}")
+        logger.error(
+            f"🚨 [CSV_UTILS] Error generating mock PDF at {pdf_path}: {e}"
+        )
 
 
 # -----------------------------------------------------------------------------

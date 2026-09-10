@@ -4,6 +4,7 @@
 # =============================================================================
 
 import sys
+
 import click
 from flask.cli import with_appcontext
 
@@ -31,8 +32,16 @@ def get_total_routes():
 def get_route_map_data():
     return [
         {"endpoint": "index", "rule": "/", "methods": "GET"},
-        {"endpoint": "admin.console_view", "rule": "/admin/console", "methods": "GET"},
-        {"endpoint": "api.users", "rule": "/api/v1/users", "methods": "POST, GET"},
+        {
+            "endpoint": "admin.console_view",
+            "rule": "/admin/console",
+            "methods": "GET",
+        },
+        {
+            "endpoint": "api.users",
+            "rule": "/api/v1/users",
+            "methods": "POST, GET",
+        },
     ]
 
 
@@ -58,7 +67,9 @@ def route_map_command():
 
     try:
         for route in route_data:
-            click.echo(f"  [{route['methods']:<10}] {route['rule']:<30} -> {route['endpoint']}")
+            click.echo(
+                f"  [{route['methods']:<10}] {route['rule']:<30} -> {route['endpoint']}"
+            )
         click.echo("")
     except BrokenPipeError:
         sys.exit(0)

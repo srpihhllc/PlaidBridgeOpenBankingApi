@@ -75,7 +75,9 @@ def audit_templates(app) -> dict[str, Any]:
 
             except Exception as e:
                 # Non‑fatal: log and continue
-                current_app.logger.debug(f"Template scan skipped {full_path}: {e}")
+                current_app.logger.debug(
+                    f"Template scan skipped {full_path}: {e}"
+                )
 
     missing = sorted(ep for ep in all_eps if ep not in app.view_functions)
 

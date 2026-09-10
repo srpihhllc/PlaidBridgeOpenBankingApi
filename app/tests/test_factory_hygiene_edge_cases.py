@@ -3,27 +3,27 @@
 # DESCRIPTION: Hardened edge case coverage targeting app/__init__.py hygiene loops
 # =============================================================================
 
-import logging
 import importlib
+import logging
+from unittest.mock import patch
+
 import pytest
-from flask import Flask, g, jsonify, request, Response
-from unittest.mock import patch, MagicMock
-from werkzeug.exceptions import BadRequest, Forbidden
+from flask import Flask, Response, g, jsonify
+from werkzeug.exceptions import BadRequest
 
 from app import (
-    create_app,
-    _registry,
-    register_healthcheck,
-    unregister_healthcheck,
     _cleanup_premature_oauth_registrations,
+    _rebuild_rules_by_endpoint,
+    _registry,
     _stabilize_rules_order,
-    _rebuild_rules_by_endpoint
+    create_app,
 )
 from app.config import TestingConfig
 
 # =============================================================================
 # 1. CORE FACTORY CONFIGURATION RESOLUTION & BOOT GATES
 # =============================================================================
+
 
 def test_create_app_via_string_configuration_path():
     """
@@ -59,10 +59,10 @@ def test_routing_hygiene_and_pruner_engine():
         return jsonify({"id": 2})
 
     from app import (
-        _prune_ignorable_route_rules,
         _dedupe_rules,
+        _prune_ignorable_route_rules,
+        _rebuild_rules_by_endpoint,
         _stabilize_rules_order,
-        _rebuild_rules_by_endpoint
     )
 
     with app.app_context():
@@ -88,7 +88,9 @@ def test_blueprint_registration_guards_and_failures(monkeypatch):
     try:
         _register_blueprints(app)
     except Exception:
-        pytest.fail("Blueprint registration guard structure threw an unhandled exception.")
+        pytest.fail(
+            "Blueprint registration guard structure threw an unhandled exception."
+        )
 
     # Cache the original import function reference to avoid recursive infinite loops
     original_import_module = importlib.import_module
@@ -96,7 +98,9 @@ def test_blueprint_registration_guards_and_failures(monkeypatch):
     def mock_import_module(name, *args, **kwargs):
         # Explicitly trip the import error line targets for administrative route loading gates
         if "admin_routes" in name:
-            raise ImportError("Simulated structural import failure for testing coverage path.")
+            raise ImportError(
+                "Simulated structural import failure for testing coverage path."
+            )
         # Safely hand off core dependencies back to the real python system reference
         return original_import_module(name, *args, **kwargs)
 
@@ -110,6 +114,7 @@ def test_blueprint_registration_guards_and_failures(monkeypatch):
 # =============================================================================
 # 2. HYGIENE INTERCEPTORS, HEALTH REGISTRIES & TELEMETRY LIFECYCLE
 # =============================================================================
+
 
 def test_health_check_registry_error_boundaries_and_invalid_types():
     """
@@ -162,10 +167,13 @@ def test_route_hygiene_exception_swallowing_and_removal_edge_cases():
     # Inject a premature fake oauth view function matching prefix check criteria
     def mock_oauth_view():
         return "oauth"
+
     mock_oauth_view.__module__ = "app.blueprints.oauth_routes.dummy"
 
     app.view_functions["oauth.premature_endpoint_test"] = mock_oauth_view
-    app.add_url_rule("/oauth/premature_test", endpoint="oauth.premature_endpoint_test")
+    app.add_url_rule(
+        "/oauth/premature_test", endpoint="oauth.premature_endpoint_test"
+    )
 
     # Force cleanup execution path over the app to sweep target sections
     _cleanup_premature_oauth_registrations(app)
@@ -183,12 +191,19 @@ def test_structured_logging_correlation_fallback_vectors():
 
     filter_instance = CorrelationIdFilter()
     log_record = logging.LogRecord(
-        name="test_logger", level=logging.INFO, pathname="test.py",
-        lineno=10, msg="Telemetry test message", args=(), exc_info=None
+        name="test_logger",
+        level=logging.INFO,
+        pathname="test.py",
+        lineno=10,
+        msg="Telemetry test message",
+        args=(),
+        exc_info=None,
     )
 
     # Test path where context has an explicit header mapping
-    with app.test_request_context("/v1/api/probe", headers={"X-Correlation-ID": "header-sig-9999"}):
+    with app.test_request_context(
+        "/v1/api/probe", headers={"X-Correlation-ID": "header-sig-9999"}
+    ):
         assert hasattr(g, "correlation_id") is False
         filter_instance.filter(log_record)
         assert log_record.correlation_id == "header-sig-9999"
@@ -245,7 +260,9 @@ def test_request_telemetry_lifecycle_and_teardown_context():
     with app.app_context():
         with app.test_request_context("/"):
             app.preprocess_request()
-            app.do_teardown_request(exc=ValueError("Simulated request context destruction crash."))
+            app.do_teardown_request(
+                exc=ValueError("Simulated request context destruction crash.")
+            )
 
 
 def test_blueprint_graph_validation_and_prefix_collision_guards():
@@ -262,6 +279,7 @@ def test_blueprint_graph_validation_and_prefix_collision_guards():
 
     with patch("app.validate_blueprints_graph", return_value=False):
         from app import _register_blueprints
+
         try:
             _register_blueprints(app)
         except Exception:
@@ -276,6 +294,7 @@ def test_url_map_rebuild_and_stabilization_loops():
     app = create_app(config_class="app.config.TestingConfig")
 
     with app.app_context():
+
         @app.route("/order_probe", methods=["POST", "GET", "PUT"])
         def order_probe():
             return "ok"
@@ -283,5 +302,7 @@ def test_url_map_rebuild_and_stabilization_loops():
         _stabilize_rules_order(app)
         _rebuild_rules_by_endpoint(app)
 
-        rules = [r for r in app.url_map.iter_rules() if r.endpoint == "order_probe"]
+        rules = [
+            r for r in app.url_map.iter_rules() if r.endpoint == "order_probe"
+        ]
         assert len(rules) > 0

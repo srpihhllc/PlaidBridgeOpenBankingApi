@@ -4,8 +4,9 @@
 #              and helper assertions.
 # =============================================================================
 
-import pytest
 import uuid
+
+import pytest
 from flask import Flask
 from sqlalchemy import text
 
@@ -42,7 +43,9 @@ class BaseOAuthTest:
                 db.session.remove()
 
                 # MySQL/MariaDB teardown requires disabling FK checks
-                engine_name = getattr(db.engine, "name", None) or db.engine.dialect.name
+                engine_name = (
+                    getattr(db.engine, "name", None) or db.engine.dialect.name
+                )
                 if engine_name in ("mysql", "mariadb"):
                     conn = db.engine.connect()
                     trans = conn.begin()
@@ -63,8 +66,14 @@ class BaseOAuthTest:
     # -------------------------------------------------------------------------
     # Shared helper assertions
     # -------------------------------------------------------------------------
-    def assert_events(self, expected_types, ordered=False, details=None, exact=True):
-        q = TraceEvent.query.order_by(TraceEvent.id) if ordered else TraceEvent.query
+    def assert_events(
+        self, expected_types, ordered=False, details=None, exact=True
+    ):
+        q = (
+            TraceEvent.query.order_by(TraceEvent.id)
+            if ordered
+            else TraceEvent.query
+        )
         events = q.all()
         types = [e.event_type for e in events]
 
@@ -77,7 +86,9 @@ class BaseOAuthTest:
         if details:
             for etype, kv in details.items():
                 matching_events = [e for e in events if e.event_type == etype]
-                assert matching_events, f"No events of type '{etype}' were found."
+                assert (
+                    matching_events
+                ), f"No events of type '{etype}' were found."
                 for event in matching_events:
                     for key, expected_value in kv.items():
                         if exact:
@@ -86,7 +97,9 @@ class BaseOAuthTest:
                                 f"event '{etype}'"
                             )
                         else:
-                            assert expected_value in (event.details.get(key) or ""), (
+                            assert expected_value in (
+                                event.details.get(key) or ""
+                            ), (
                                 f"Expected substring '{expected_value}' in detail "
                                 f"'{key}' of event '{etype}'"
                             )
@@ -105,7 +118,9 @@ class BaseOAuthTest:
         assert response.status_code == 302
         assert response.headers["Location"].endswith(endpoint_or_path)
 
-    def _assert_provider_item_created(self, item_class, user_id=None, **kwargs):
+    def _assert_provider_item_created(
+        self, item_class, user_id=None, **kwargs
+    ):
         """Generic helper to assert a provider item exists and is linked to a user."""
         query = item_class.query
         if user_id:
@@ -118,7 +133,9 @@ class BaseOAuthTest:
         assert item.user_id is not None
         return item
 
-    def assert_plaid_item_created(self, user_id=None, item_id=None, access_token=None):
+    def assert_plaid_item_created(
+        self, user_id=None, item_id=None, access_token=None
+    ):
         """Asserts that a PlaidItem exists and is linked to a user."""
         return self._assert_provider_item_created(
             PlaidItem,

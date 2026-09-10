@@ -8,6 +8,7 @@ import logging
 import os
 import urllib.parse
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Enforce explicit .env ingestion across execution paradigms
@@ -37,7 +38,9 @@ def _ensure_redis_url(url: str | None) -> str | None:
     if not url:
         return None
     if url.startswith("redis://:"):
-        logger.warning("Redis engine string missing user context; applying 'default' fallback schema.")
+        logger.warning(
+            "Redis engine string missing user context; applying 'default' fallback schema."
+        )
         return url.replace("redis://:", "redis://default:", 1)
     return url
 
@@ -71,21 +74,25 @@ _RAW_REDIS_TARGET = os.getenv("REDIS_URL") or os.getenv("REDIS_STORAGE_URI")
 
 # System Stage Verification Evaluator
 _IS_PROD_OR_MIGRATION = (
-    str(os.getenv("FLASK_ENV")).lower() == "production" or 
-    str(os.getenv("ENV_NAME")).lower() == "production" or 
-    os.getenv("ALEMBIC_RUNNING") == "1"
+    str(os.getenv("FLASK_ENV")).lower() == "production"
+    or str(os.getenv("ENV_NAME")).lower() == "production"
+    or os.getenv("ALEMBIC_RUNNING") == "1"
 )
 
 if _IS_PROD_OR_MIGRATION:
     if not all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME]):
-        raise RuntimeError("CRITICAL: Production relational configuration matrix is incomplete.")
+        raise RuntimeError(
+            "CRITICAL: Production relational configuration matrix is incomplete."
+        )
 
 # Secure Connection Construction using percent-encoded parameterization
 if all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME]):
     _encoded_password = urllib.parse.quote_plus(_DB_PASSWORD or "")
     _SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{_DB_USER}:{_encoded_password}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
 else:
-    _SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:")
+    _SQLALCHEMY_DATABASE_URI = os.getenv(
+        "SQLALCHEMY_DATABASE_URI", "sqlite:///:memory:"
+    )
 
 
 class BaseConfig:
@@ -116,13 +123,19 @@ class BaseConfig:
         "pool_recycle": 280,
     }
 
-    RATELIMIT_DEFAULT = os.getenv("RATELIMIT_DEFAULT", "200 per day;50 per hour")
+    RATELIMIT_DEFAULT = os.getenv(
+        "RATELIMIT_DEFAULT", "200 per day;50 per hour"
+    )
 
     @classmethod
     def validate(cls):
         if cls.ENV == "production":
-            if cls.SECRET_KEY.startswith("DEV_") or cls.JWT_SECRET_KEY.startswith("DEV_"):
-                raise RuntimeError("Production environments must employ high-entropy token secrets.")
+            if cls.SECRET_KEY.startswith(
+                "DEV_"
+            ) or cls.JWT_SECRET_KEY.startswith("DEV_"):
+                raise RuntimeError(
+                    "Production environments must employ high-entropy token secrets."
+                )
 
     @classmethod
     def summarize(cls) -> dict:
@@ -140,7 +153,9 @@ class DevelopmentConfig(BaseConfig):
     ENV = "development"
     DEBUG = True
     LOG_LEVEL = logging.DEBUG
-    REDIS_URL = _ensure_redis_url(_RAW_REDIS_TARGET or "redis://localhost:6379/0")
+    REDIS_URL = _ensure_redis_url(
+        _RAW_REDIS_TARGET or "redis://localhost:6379/0"
+    )
 
 
 class TestingConfig(BaseConfig):
@@ -151,7 +166,9 @@ class TestingConfig(BaseConfig):
     JWT_SECRET_KEY = "test-jwt-sentinel-key"
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
-    REDIS_URL = _ensure_redis_url(_RAW_REDIS_TARGET or "redis://localhost:6379/0")
+    REDIS_URL = _ensure_redis_url(
+        _RAW_REDIS_TARGET or "redis://localhost:6379/0"
+    )
     SERVER_NAME = os.getenv("TEST_SERVER_NAME", "localhost")
     PREFERRED_URL_SCHEME = os.getenv("TEST_PREFERRED_URL_SCHEME", "http")
 
@@ -171,7 +188,12 @@ CONFIG_MAP = {
 
 
 def get_config_class(env_name: str | None = None):
-    raw = env_name or os.getenv("ENV_NAME") or os.getenv("FLASK_ENV") or "production"
+    raw = (
+        env_name
+        or os.getenv("ENV_NAME")
+        or os.getenv("FLASK_ENV")
+        or "production"
+    )
     return CONFIG_MAP.get(raw.lower(), ProductionConfig)
 
 
@@ -183,16 +205,20 @@ def get_config(env_name: str | None = None):
 
 def probe_services(strict: bool = True) -> str | None:
     from app.extensions import db
+
     try:
         db.session.execute(db.text("SELECT 1"))
         db.session.commit()
     except Exception as e:
         if strict:
-            raise RuntimeError(f"Database infrastructure verification probe failed: {e}") from e
+            raise RuntimeError(
+                f"Database infrastructure verification probe failed: {e}"
+            ) from e
         return str(e)
     return None
 
 
 class TestConfig(TestingConfig):
     """Legacy alias matching back-compatibility test cases."""
+
     pass

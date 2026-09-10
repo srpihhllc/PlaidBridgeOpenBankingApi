@@ -31,7 +31,7 @@ def run_template_audit(redis_client: redis.Redis = None) -> Dict[str, Any]:
         "endpoints_found": 0,
         "missing_endpoints": 0,
         "errors": 0,
-        "drift_details": []
+        "drift_details": [],
     }
 
     # -------------------------------------------------------------------------
@@ -43,9 +43,14 @@ def run_template_audit(redis_client: redis.Redis = None) -> Dict[str, Any]:
         summary["errors"] += 1
         if redis_client:
             emit_schema_trace(
-                domain="cli", event="template_audit", detail="missing_app_context",
-                value="error", status="error", ttl=300, client=redis_client,
-                meta={"reason": "missing_app_context"}
+                domain="cli",
+                event="template_audit",
+                detail="missing_app_context",
+                value="error",
+                status="error",
+                ttl=300,
+                client=redis_client,
+                meta={"reason": "missing_app_context"},
             )
         return summary
 
@@ -53,16 +58,18 @@ def run_template_audit(redis_client: redis.Redis = None) -> Dict[str, Any]:
     # 2. Endpoint Link Audit (Jinja Native)
     # -------------------------------------------------------------------------
     # Extract all valid endpoints registered in the Flask app
-    valid_endpoints = {rule.endpoint for rule in current_app.url_map.iter_rules()}
+    valid_endpoints = {
+        rule.endpoint for rule in current_app.url_map.iter_rules()
+    }
     missing_dict: dict[str, set[str]] = {}
 
     # Scan exactly what Jinja sees (handles Blueprints and Global folders)
     for t_name in env.list_templates():
         if not t_name.endswith((".html", ".htm", ".jinja2")):
             continue
-        
+
         summary["templates_scanned"] += 1
-        
+
         try:
             # Resolve source via the registered loader
             source, _, _ = env.loader.get_source(env, t_name)
@@ -80,10 +87,9 @@ def run_template_audit(redis_client: redis.Redis = None) -> Dict[str, Any]:
             summary["endpoints_found"] += 1
             if ep not in valid_endpoints:
                 missing_dict.setdefault(t_name, set()).add(ep)
-                summary["drift_details"].append({
-                    "template": t_name,
-                    "broken_endpoint": ep
-                })
+                summary["drift_details"].append(
+                    {"template": t_name, "broken_endpoint": ep}
+                )
 
     # -------------------------------------------------------------------------
     # 3. Telemetry & Reporting
@@ -91,17 +97,34 @@ def run_template_audit(redis_client: redis.Redis = None) -> Dict[str, Any]:
     if missing_dict:
         if redis_client:
             emit_schema_trace(
-                domain="cli", event="template_audit", detail="missing_endpoints",
-                value="error", status="error", ttl=300, client=redis_client
+                domain="cli",
+                event="template_audit",
+                detail="missing_endpoints",
+                value="error",
+                status="error",
+                ttl=300,
+                client=redis_client,
             )
-        serializable_missing = {k: sorted(list(v)) for k, v in missing_dict.items()}
-        _logger.error("🚨 Missing endpoints:\n%s", json.dumps(serializable_missing, indent=2))
-        summary["missing_endpoints"] = sum(len(v) for v in missing_dict.values())
+        serializable_missing = {
+            k: sorted(list(v)) for k, v in missing_dict.items()
+        }
+        _logger.error(
+            "🚨 Missing endpoints:\n%s",
+            json.dumps(serializable_missing, indent=2),
+        )
+        summary["missing_endpoints"] = sum(
+            len(v) for v in missing_dict.values()
+        )
     else:
         if redis_client:
             emit_schema_trace(
-                domain="cli", event="template_audit", detail="missing_endpoints",
-                value="success", status="ok", ttl=300, client=redis_client
+                domain="cli",
+                event="template_audit",
+                detail="missing_endpoints",
+                value="success",
+                status="ok",
+                ttl=300,
+                client=redis_client,
             )
         _logger.info("✅ All template endpoints are valid.")
 
@@ -111,17 +134,32 @@ def run_template_audit(redis_client: redis.Redis = None) -> Dict[str, Any]:
     if redis_client:
         try:
             agg = "template_audit:aggregate"
-            for key in ["templates_scanned", "endpoints_found", "missing_endpoints", "errors"]:
+            for key in [
+                "templates_scanned",
+                "endpoints_found",
+                "missing_endpoints",
+                "errors",
+            ]:
                 redis_client.hincrby(agg, key, summary[key])
 
             # Strip drift_details from the meta payload to prevent Redis bloat
-            meta_summary = {k: v for k, v in summary.items() if k != "drift_details"}
+            meta_summary = {
+                k: v for k, v in summary.items() if k != "drift_details"
+            }
             emit_schema_trace(
-                domain="cli", event="template_audit", detail="summary",
-                value="success", status="ok", ttl=600, client=redis_client, meta=meta_summary
+                domain="cli",
+                event="template_audit",
+                detail="summary",
+                value="success",
+                status="ok",
+                ttl=600,
+                client=redis_client,
+                meta=meta_summary,
             )
         except Exception as agg_err:
-            _logger.warning("⚠️ Could not update Redis aggregation: %s", agg_err)
+            _logger.warning(
+                "⚠️ Could not update Redis aggregation: %s", agg_err
+            )
 
     return summary
 

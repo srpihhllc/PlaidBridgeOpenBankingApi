@@ -14,8 +14,14 @@ from app.telemetry.ttl_emit import trace_log, ttl_emit
 
 
 @click.command("test-cockpit-pdf")
-@click.option("--host", default="http://127.0.0.1:5000", help="Base URL of the Flask app")
-@click.option("--path", default="/cockpit/pdf-test", help="Relative path to the test route")
+@click.option(
+    "--host", default="http://127.0.0.1:5000", help="Base URL of the Flask app"
+)
+@click.option(
+    "--path",
+    default="/cockpit/pdf-test",
+    help="Relative path to the test route",
+)
 @click.option(
     "--job-id",
     default="cli-test-001",
@@ -27,7 +33,9 @@ from app.telemetry.ttl_emit import trace_log, ttl_emit
     type=int,
     help="Optional user ID to include in telemetry meta (0 for system).",
 )
-@click.option("--timeout", default=10, type=int, help="Request timeout in seconds.")
+@click.option(
+    "--timeout", default=10, type=int, help="Request timeout in seconds."
+)
 @click.option(
     "--no-exit",
     is_flag=True,
@@ -46,13 +54,17 @@ from app.telemetry.ttl_emit import trace_log, ttl_emit
     default=False,
     help="Treat warnings as failures (non-zero exit).",
 )
-def test_cockpit_pdf(host, path, job_id, user_id, timeout, no_exit, verbose, strict):
+def test_cockpit_pdf(
+    host, path, job_id, user_id, timeout, no_exit, verbose, strict
+):
     """
     CLI command to hit the Cockpit PDF test route and log results.
     """
     url = f"{host.rstrip('/')}{path}"
     if verbose:
-        click.echo(f"📡 Hitting Cockpit PDF test route: {url} (Timeout: {timeout}s)")
+        click.echo(
+            f"📡 Hitting Cockpit PDF test route: {url} (Timeout: {timeout}s)"
+        )
 
     ttl_key = "ttl:test:cockpit_pdf"
     ttl_val = 300
@@ -105,7 +117,9 @@ def test_cockpit_pdf(host, path, job_id, user_id, timeout, no_exit, verbose, str
             )
             trace_log(
                 "cli/cockpit_pdf_test_warn",
-                json.dumps({"message": "Unexpected status code", **trace_details}),
+                json.dumps(
+                    {"message": "Unexpected status code", **trace_details}
+                ),
             )
 
     except Exception as e:
@@ -113,7 +127,13 @@ def test_cockpit_pdf(host, path, job_id, user_id, timeout, no_exit, verbose, str
             click.echo(f"❌ Error hitting PDF route: {e}")
         error_type = type(e).__name__
         error_status = f"error:{error_type}"
-        ttl_emit(key=ttl_key, status=error_status, client=client, ttl=ttl_val, meta=meta_data)
+        ttl_emit(
+            key=ttl_key,
+            status=error_status,
+            client=client,
+            ttl=ttl_val,
+            meta=meta_data,
+        )
         error_payload = {
             "message": f"Network/Request error: {str(e)}",
             "error_type": error_type,

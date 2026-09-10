@@ -5,7 +5,7 @@
 #              circular-import problems. Keep IDs and FK types consistent
 #              with BankTransaction (both use Integer here).
 # =============================================================================
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -29,7 +29,9 @@ class BankAccount(db.Model):
     account_type = db.Column(db.String(32))
     account_number = db.Column(db.String(64), unique=True, nullable=False)
     balance = db.Column(db.Float, default=0.0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     last_synced_at = db.Column(db.DateTime)
     trace_status = db.Column(db.String(32), default="healthy")
 

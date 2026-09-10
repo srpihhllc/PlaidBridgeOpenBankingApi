@@ -6,11 +6,16 @@ def validate_ein(ein: str) -> bool:
 
 
 def check_license(license_number: str) -> bool:
-    return license_number.upper().startswith("LND") and len(license_number) >= 6
+    return (
+        license_number.upper().startswith("LND") and len(license_number) >= 6
+    )
 
 
 def verify_address(address: str) -> bool:
-    return any(keyword in address.lower() for keyword in ["street", "road", "avenue", "blvd"])
+    return any(
+        keyword in address.lower()
+        for keyword in ["street", "road", "avenue", "blvd"]
+    )
 
 
 def validate_owner(owner_name: str) -> bool:

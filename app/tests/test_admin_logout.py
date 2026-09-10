@@ -1,11 +1,12 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_admin_logout.py
 
+
 def test_admin_delete_user_cascade_api(client):
     """
     DIAGNOSTIC RUN: Profile database visibility and user loader boundary.
     """
     import random
-    import sys
+
     from flask_jwt_extended import create_access_token
     from werkzeug.security import generate_password_hash
 
@@ -54,11 +55,13 @@ def test_admin_delete_user_cascade_api(client):
         db.session.commit()
 
         # Verify local visibility inside the setup context
-        print("\n" + "="*50)
+        print("\n" + "=" * 50)
         print("[DIAGNOSTIC] DUMPING USERS IN APP_CONTEXT BEFORE REQUEST:")
         for u in User.query.all():
-            print(f"  -> Found User Row | ID: {u.id} (Type: {type(u.id)}) | Email: {u.email}")
-        print("="*50)
+            print(
+                f"  -> Found User Row | ID: {u.id} (Type: {type(u.id)}) | Email: {u.email}"
+            )
+        print("=" * 50)
 
         token = create_access_token(
             identity=admin_uuid,

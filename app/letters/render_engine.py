@@ -21,7 +21,9 @@ def load_template(template_name: str) -> str:
         return f.read()
 
 
-def render_letter(template_name: str, user: dict, bureau: dict, metadata: dict = None) -> str:
+def render_letter(
+    template_name: str, user: dict, bureau: dict, metadata: dict = None
+) -> str:
     """
     Render the selected template using Jinja2 with user + bureau data injected.
 

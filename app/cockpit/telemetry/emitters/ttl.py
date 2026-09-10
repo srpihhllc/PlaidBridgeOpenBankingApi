@@ -24,7 +24,9 @@ try:
     from app.telemetry import ttl_emit as core_ttl  # module
 
     _HAS_CORE = True
-except Exception as e:  # pragma: no cover - fallback in local/test environments
+except (
+    Exception
+) as e:  # pragma: no cover - fallback in local/test environments
     logger.debug("Core TTL emitter not available: %s", e)
     _HAS_CORE = False
     core_ttl = None
@@ -43,15 +45,20 @@ def emit_ttl_pulse(
     """
     if _HAS_CORE and core_ttl is not None:
         try:
-            core_ttl.ttl_emit(key=key, ttl=ttl_seconds, status=status, value=value)
+            core_ttl.ttl_emit(
+                key=key, ttl=ttl_seconds, status=status, value=value
+            )
             return
         except Exception as e:
-            logger.warning("emit_ttl_pulse: core ttl_emit failed: %s", e, exc_info=False)
+            logger.warning(
+                "emit_ttl_pulse: core ttl_emit failed: %s", e, exc_info=False
+            )
 
     # Fallback: maintain an in-memory timestamp to keep UI happy
     try:
         _fallback_store[key] = {
-            "expires_at": datetime.datetime.now() + datetime.timedelta(seconds=ttl_seconds),
+            "expires_at": datetime.datetime.now()
+            + datetime.timedelta(seconds=ttl_seconds),
             "remaining_seconds": ttl_seconds,
             "fresh": True,
             "value": value,
@@ -70,7 +77,9 @@ def ttl_summary() -> dict[str, Any]:
         try:
             return core_ttl.ttl_summary()
         except Exception as e:
-            logger.warning("ttl_summary: core ttl_summary failed: %s", e, exc_info=False)
+            logger.warning(
+                "ttl_summary: core ttl_summary failed: %s", e, exc_info=False
+            )
 
     # Fallback snapshot
     now = datetime.datetime.now()

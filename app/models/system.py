@@ -6,7 +6,7 @@
 #              Updated to use dynamic backref to prevent KeyError on User mapper.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -18,7 +18,9 @@ class RateLimit(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ip_address = db.Column(db.String(50), unique=True, nullable=False)
     requests = db.Column(db.Integer, default=0)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = db.Column(
+        db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
 
 
 class SystemVersion(db.Model):
@@ -36,7 +38,9 @@ class SystemVersion(db.Model):
     )
 
     version_hash = db.Column(db.String(40), nullable=False)
-    applied_at = db.Column(db.DateTime, default=datetime.utcnow)
+    applied_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # -------------------------------------------------------------------------
     # Relationships
@@ -45,7 +49,9 @@ class SystemVersion(db.Model):
     # ⭐ User Fix: Swapped back_populates to dynamic backref since User lacks 'system_events'
     user = db.relationship(
         "User",
-        backref=db.backref("system_events", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "system_events", lazy="dynamic", passive_deletes=True
+        ),
     )
 
     def __repr__(self):
@@ -59,7 +65,9 @@ class SystemBootLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     operator_id = db.Column(db.Integer)
     sequence_origin = db.Column(db.String(255))
-    ignition_timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    ignition_timestamp = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     message = db.Column(db.Text)
 
     def __repr__(self):

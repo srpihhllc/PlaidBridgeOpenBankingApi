@@ -5,12 +5,20 @@
 
 from flask import Blueprint, jsonify
 
-from app.utils.redis_utils import get_recent_logs  # Replace with your log reader
+from app.utils.redis_utils import (
+    get_recent_logs,
+)  # Replace with your log reader
 
-restart_monitor_bp = Blueprint("restart_monitor", __name__, url_prefix="/cockpit/restart-monitor")
+restart_monitor_bp = Blueprint(
+    "restart_monitor", __name__, url_prefix="/cockpit/restart-monitor"
+)
 
 # Markers for detection
-CLEAN_MARKERS = ["goodbye to uWSGI", "VACUUM: unix socket", "*** Starting uWSGI"]
+CLEAN_MARKERS = [
+    "goodbye to uWSGI",
+    "VACUUM: unix socket",
+    "*** Starting uWSGI",
+]
 CRASH_MARKERS = [
     "Traceback (most recent call last)",
     "Segmentation Fault",

@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 
 # System Execution Limits for Default MFA Token Rate Limiting Shims
 MFA_LIMIT_WINDOW_SECONDS: int = 60  # Tracking window bucket duration
-MFA_REQUEST_LIMIT: int = 3          # Maximum transmission allowance per execution window
+MFA_REQUEST_LIMIT: int = (
+    3  # Maximum transmission allowance per execution window
+)
 
 # -----------------------------------------------------------------------------
 # Canonical Import Shim Layer for MFA Core Helpers
@@ -25,17 +27,27 @@ MFA_REQUEST_LIMIT: int = 3          # Maximum transmission allowance per executi
 # -----------------------------------------------------------------------------
 try:
     # Attempt primary production service layer link
-    from app.services.mfa_helpers import check_mfa_send_rate_limit, record_mfa_send_request
+    from app.services.mfa_helpers import (
+        check_mfa_send_rate_limit,
+        record_mfa_send_request,
+    )
 except (ImportError, ModuleNotFoundError):
     try:
         # Fallback to secondary legacy engineering directory mappings
-        from app.services.security_helpers import check_mfa_send_rate_limit, record_mfa_send_request
+        from app.services.security_helpers import (
+            check_mfa_send_rate_limit,
+            record_mfa_send_request,
+        )
     except (ImportError, ModuleNotFoundError):
-        logger.warning("Production MFA services unresolvable. Engaging localized Mock Rate Limiting engines.")
+        logger.warning(
+            "Production MFA services unresolvable. Engaging localized Mock Rate Limiting engines."
+        )
 
         # --- FALLBACK ARCHITECTURE: LOCAL SECURITY TESTING CONTRAST SHIMS ---
 
-        def check_mfa_send_rate_limit(user_id: str | None, ip_address: str | None = None) -> bool:
+        def check_mfa_send_rate_limit(
+            user_id: str | None, ip_address: str | None = None
+        ) -> bool:
             """
             Evaluates transmission limits locally utilizing the Mock Redis subsystem.
             Returns True if allowable; False if blocked. Defaults to fail-open (True)
@@ -56,7 +68,11 @@ except (ImportError, ModuleNotFoundError):
                 user_count_str = client.get(user_key)
                 user_count = int(user_count_str) if user_count_str else 0
                 if user_count >= MFA_REQUEST_LIMIT:
-                    logger.warning("MFA rate limit exhausted for User ID: %s (Active load: %d)", user_id, user_count)
+                    logger.warning(
+                        "MFA rate limit exhausted for User ID: %s (Active load: %d)",
+                        user_id,
+                        user_count,
+                    )
                     return False
 
             # Assert execution limits against infrastructure ip addresses
@@ -65,11 +81,14 @@ except (ImportError, ModuleNotFoundError):
                 ip_count_str = client.get(ip_key)
                 ip_count = int(ip_count_str) if ip_count_str else 0
                 if ip_count >= MFA_REQUEST_LIMIT:
-                    logger.warning("MFA rate limit exhausted for Origin IP: %s (Active load: %d)", ip_address, ip_count)
+                    logger.warning(
+                        "MFA rate limit exhausted for Origin IP: %s (Active load: %d)",
+                        ip_address,
+                        ip_count,
+                    )
                     return False
 
             return True
-
 
         def record_mfa_send_request(
             user_id: str | None,
@@ -114,6 +133,7 @@ except (ImportError, ModuleNotFoundError):
 # =============================================================================
 # --- CORE MOCKING CONTAINERS (Telemetry, Data Structures & Infrastructure) ---
 # =============================================================================
+
 
 class MockRedisClient:
     """
@@ -167,7 +187,10 @@ class MockRedisClient:
             return new_value
 
         new_value = 1
-        self.store[key] = {"value": str(new_value), "expiry": time.time() + window}
+        self.store[key] = {
+            "value": str(new_value),
+            "expiry": time.time() + window,
+        }
         return new_value
 
     def expire(self, key: str, ex: int) -> bool:
@@ -188,7 +211,9 @@ class MockRedisClient:
         if key == "identity_events_stream" or key == "telemetry_stream":
             # Returns encoded byte strings to perfectly mirror production redis-py serialization interface
             return [
-                element.encode("utf-8") if isinstance(element, str) else element
+                element.encode("utf-8")
+                if isinstance(element, str)
+                else element
                 for element in self.event_stream[start : stop + 1]
             ]
         return []
@@ -235,6 +260,7 @@ def get_db_client() -> MockDBClient:
 # --- TELEMETRY ENGINE & SCHEMA STANDARDIZATION ---
 # =============================================================================
 
+
 def log_standard_event(
     actor_id: str,
     event_type: str,
@@ -247,7 +273,9 @@ def log_standard_event(
     """
     client = get_redis_client()
     if not client:
-        logger.warning("Target metrics infrastructure offline. Dropping structural event logs.")
+        logger.warning(
+            "Target metrics infrastructure offline. Dropping structural event logs."
+        )
         return
 
     event_payload: dict[str, Any] = {
@@ -262,12 +290,16 @@ def log_standard_event(
     try:
         client.lpush("telemetry_stream", json.dumps(event_payload))
     except Exception:
-        logger.exception("Structural telemetry pipeline failure tracking actor event %s", actor_id)
+        logger.exception(
+            "Structural telemetry pipeline failure tracking actor event %s",
+            actor_id,
+        )
 
 
 # =============================================================================
 # --- SYNTHETIC SUBSYSTEM HEALTH PROBE ---
 # =============================================================================
+
 
 def mock_jwt_generate(user: MockDBUser) -> str:
     jti_refresh = f"jtr-{user.id}-{int(time.time())}"
@@ -281,25 +313,39 @@ def synthetic_login_probe(username: str = "probe-user") -> dict[str, Any]:
     """
     start_execution_time = time.time()
     diagnostic_steps: dict[str, str] = {}
-    probe_response: dict[str, Any] = {"success": False, "duration_ms": 0.0, "steps": diagnostic_steps}
+    probe_response: dict[str, Any] = {
+        "success": False,
+        "duration_ms": 0.0,
+        "steps": diagnostic_steps,
+    }
 
     redis_cluster = get_redis_client()
     database_node = get_db_client()
 
     try:
-        diagnostic_steps["redis_ping"] = "PASS" if redis_cluster.ping() else "FAIL"
-        diagnostic_steps["db_query"] = "PASS" if database_node.check_connection() else "FAIL"
+        diagnostic_steps["redis_ping"] = (
+            "PASS" if redis_cluster.ping() else "FAIL"
+        )
+        diagnostic_steps["db_query"] = (
+            "PASS" if database_node.check_connection() else "FAIL"
+        )
         if "FAIL" in diagnostic_steps.values():
-            raise RuntimeError("Underlying component nodes faulted during initial probe compilation passes.")
+            raise RuntimeError(
+                "Underlying component nodes faulted during initial probe compilation passes."
+            )
     except Exception as exc:
         diagnostic_steps["infrastructure_check"] = f"FAIL: {str(exc)}"
-        probe_response["duration_ms"] = (time.time() - start_execution_time) * 1000
+        probe_response["duration_ms"] = (
+            time.time() - start_execution_time
+        ) * 1000
         return probe_response
 
     try:
         user_record = mock_db_lookup_user(username)
         if not user_record or not user_record.is_active:
-            diagnostic_steps["user_lookup"] = "FAIL: Target account missing or flagged disabled."
+            diagnostic_steps["user_lookup"] = (
+                "FAIL: Target account missing or flagged disabled."
+            )
             raise ValueError("Identity authentication boundaries unverified.")
 
         diagnostic_steps["user_lookup"] = "PASS"
@@ -320,7 +366,9 @@ def synthetic_login_probe(username: str = "probe-user") -> dict[str, Any]:
 
     except Exception as exc:
         probe_response["success"] = False
-        probe_response["error"] = f"Authentication pipeline error mapping logic states: {str(exc)}"
+        probe_response["error"] = (
+            f"Authentication pipeline error mapping logic states: {str(exc)}"
+        )
         diagnostic_steps["final_status"] = "FAIL"
 
     probe_response["duration_ms"] = (time.time() - start_execution_time) * 1000
@@ -338,7 +386,9 @@ def add_token_to_blacklist(jti: str, exp: int) -> bool:
     """Adds a cryptographic JSON Web Token unique identifier into the revocation index."""
     client = get_redis_client()
     if not client:
-        logger.error("State caching matrix unavailable. Blacklisting event abandoned.")
+        logger.error(
+            "State caching matrix unavailable. Blacklisting event abandoned."
+        )
         return False
 
     ttl_duration = max(0, exp - int(time.time()))
@@ -351,14 +401,18 @@ def is_token_blacklisted(jti: str) -> bool:
     """Queries cache signatures to verify signature termination states."""
     client = get_redis_client()
     if not client:
-        logger.warning("Cache layer link down. Bypassing blacklisting check for token safely.")
+        logger.warning(
+            "Cache layer link down. Bypassing blacklisting check for token safely."
+        )
         return False
 
     redis_key = f"{BLACKLIST_PREFIX}{jti}"
     return client.get(redis_key) is not None
 
 
-def token_revoked_check(jwt_header: dict[str, Any], jwt_payload: dict[str, Any]) -> bool:
+def token_revoked_check(
+    jwt_header: dict[str, Any], jwt_payload: dict[str, Any]
+) -> bool:
     """Callback hook mapped across authorization engines to track access token cancellation."""
     token_identifier = jwt_payload.get("jti")
     if not token_identifier:
@@ -371,10 +425,14 @@ def token_revoked_check(jwt_header: dict[str, Any], jwt_payload: dict[str, Any])
 # =============================================================================
 
 if __name__ == "__main__":
-    print("--- 1. Running Synthetic Infrastructure Health Probe Verification ---")
+    print(
+        "--- 1. Running Synthetic Infrastructure Health Probe Verification ---"
+    )
     results = synthetic_login_probe()
     status_flag = "SUCCESS" if results["success"] else "FAILURE"
-    print(f"Probe Resolution: {status_flag} (Processing Latency: {results['duration_ms']:.3f}ms)")
+    print(
+        f"Probe Resolution: {status_flag} (Processing Latency: {results['duration_ms']:.3f}ms)"
+    )
     print("Pipeline Trace Verification Matrix:")
     for step_key, step_status in results["steps"].items():
         print(f"  [STEP LOG] {step_key}: {step_status}")
@@ -391,10 +449,14 @@ if __name__ == "__main__":
     mock_redis = get_redis_client()
     # Explicitly check data streams mapped on mock clusters
     event_stream_output = mock_redis.lrange("telemetry_stream", 0, 10)
-    print(f"Captured Elements In Cache Buffer: {len(event_stream_output)} entry records located.")
+    print(
+        f"Captured Elements In Cache Buffer: {len(event_stream_output)} entry records located."
+    )
     for index, raw_bytes in enumerate(event_stream_output):
         parsed_record = json.loads(raw_bytes.decode("utf-8"))
-        print(f"  Record [{index + 1}]: Type={parsed_record['event_type']} | Actor={parsed_record['actor_id']} | Source={parsed_record['ip']}")
+        print(
+            f"  Record [{index + 1}]: Type={parsed_record['event_type']} | Actor={parsed_record['actor_id']} | Source={parsed_record['ip']}"
+        )
 
     print("\n--- 3. Token Termination Blacklist Integrity Run ---")
     mock_claims: dict[str, Any] = {
@@ -402,9 +464,15 @@ if __name__ == "__main__":
         "exp": int(time.time()) + 60,
         "type": "refresh",
     }
-    print(f"  Token Verification Baseline Status (Pre-revocation): Revoked={token_revoked_check({}, mock_claims)}")
-    add_token_to_blacklist(jti=str(mock_claims["jti"]), exp=int(mock_claims["exp"]))
-    print(f"  Token Verification Boundary Status (Post-revocation): Revoked={token_revoked_check({}, mock_claims)}")
+    print(
+        f"  Token Verification Baseline Status (Pre-revocation): Revoked={token_revoked_check({}, mock_claims)}"
+    )
+    add_token_to_blacklist(
+        jti=str(mock_claims["jti"]), exp=int(mock_claims["exp"])
+    )
+    print(
+        f"  Token Verification Boundary Status (Post-revocation): Revoked={token_revoked_check({}, mock_claims)}"
+    )
 
     print("\n--- 4. Multi-Factor Rate-Limiting Counter Exhaustion Test ---")
     identity_node = "user-101"
@@ -414,9 +482,13 @@ if __name__ == "__main__":
             print(f"  Transaction Iteration {current_pass}: PERMITTED")
             record_mfa_send_request(identity_node, network_origin)
         else:
-            print(f"  Transaction Iteration {current_pass}: DEGRADED / LOCKED OUT")
+            print(
+                f"  Transaction Iteration {current_pass}: DEGRADED / LOCKED OUT"
+            )
 
     if check_mfa_send_rate_limit(identity_node, network_origin):
         print("  Transaction Iteration 4: EXHAUSTION CONTROL FAILURE")
     else:
-        print("  Transaction Iteration 4: DENIED ACCORDING TO SPECIFICATION (SUCCESS)")
+        print(
+            "  Transaction Iteration 4: DENIED ACCORDING TO SPECIFICATION (SUCCESS)"
+        )

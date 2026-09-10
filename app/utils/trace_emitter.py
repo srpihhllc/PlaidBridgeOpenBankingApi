@@ -10,7 +10,9 @@ from typing import Any
 
 from flask import current_app
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 _logger = logging.getLogger(__name__)
 
@@ -49,7 +51,9 @@ def emit_trace(event_type: str, detail: Any, ttl: int = 60) -> None:
             extra={"key": key, "event_type": event_type, "error": str(exc)},
         )
         try:
-            current_app.logger.error(f"[emit_trace] Failed to emit trace {key}: {exc}")
+            current_app.logger.error(
+                f"[emit_trace] Failed to emit trace {key}: {exc}"
+            )
         except Exception:
             # Fallback if current_app is not available
             pass

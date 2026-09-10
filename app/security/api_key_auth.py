@@ -54,8 +54,12 @@ def require_api_key(f: Callable = None, permission: str | None = None):
         @wraps(func)
         def decorated_function(*args, **kwargs):
             # Get API key from header or query param
-            client_id = request.headers.get("X-Client-ID") or request.args.get("client_id")
-            api_key = request.headers.get("X-API-Key") or request.args.get("api_key")
+            client_id = request.headers.get("X-Client-ID") or request.args.get(
+                "client_id"
+            )
+            api_key = request.headers.get("X-API-Key") or request.args.get(
+                "api_key"
+            )
 
             if not client_id or not api_key:
                 current_app.logger.warning(
@@ -68,8 +72,13 @@ def require_api_key(f: Callable = None, permission: str | None = None):
                 abort(401, description="Invalid API key")
 
             # Check permissions if specified
-            if permission and permission not in API_KEYS[client_id]["permissions"]:
-                current_app.logger.warning(f"Insufficient permissions for {client_id}")
+            if (
+                permission
+                and permission not in API_KEYS[client_id]["permissions"]
+            ):
+                current_app.logger.warning(
+                    f"Insufficient permissions for {client_id}"
+                )
                 abort(
                     403,
                     description=f"This operation requires '{permission}' permission",

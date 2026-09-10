@@ -69,7 +69,9 @@ def drilldown_view():
         )
 
     # Apply syntax highlighting using Pygments
-    formatter = HtmlFormatter(linenos=True, anchorlinenos=True, full=False, cssclass="codehilite")
+    formatter = HtmlFormatter(
+        linenos=True, anchorlinenos=True, full=False, cssclass="codehilite"
+    )
     highlighted_code = highlight(code, PythonLexer(), formatter)
 
     # Render the template with the file content and styling

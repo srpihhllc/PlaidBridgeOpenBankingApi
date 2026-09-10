@@ -5,16 +5,17 @@
 #              produces a patch manifest.
 # =============================================================================
 
+import json
 import os
 import re
-import json
-import click
-from flask.cli import with_appcontext
-from flask import current_app
 
+import click
+from flask import current_app
+from flask.cli import with_appcontext
+
+from app.telemetry.ttl_emit import emit_schema_trace
 from app.utils.redis_utils import get_redis_client
 from app.utils.template_audit import audit_template_wiring
-from app.telemetry.ttl_emit import emit_schema_trace
 
 URL_FOR_RE = re.compile(r"url_for\(\s*[\"']([^\"']+)[\"']")
 
@@ -36,6 +37,7 @@ ENDPOINT_REWRITE_MAP = {
     "admin.dispute_logs": "admin.view_dispute_logs",
     "admin.route_registry_tile": "admin.route_registry_tile",
 }
+
 
 @click.command("audit-all")
 @with_appcontext
@@ -100,16 +102,20 @@ def audit_all():
                 if ep != correct:
                     fixes.setdefault(t_name, []).append((ep, correct))
 
-                    patched = source.replace(f"url_for('{ep}')", f"url_for('{correct}')")
-                    patched = patched.replace(f"url_for(\"{ep}\")", f"url_for(\"{correct}\")")
+                    patched = source.replace(
+                        f"url_for('{ep}')", f"url_for('{correct}')"
+                    )
+                    patched = patched.replace(
+                        f'url_for("{ep}")', f'url_for("{correct}")'
+                    )
 
-                    patch_output.append({
-                        "template": t_name,
-                        "old": ep,
-                        "new": correct
-                    })
+                    patch_output.append(
+                        {"template": t_name, "old": ep, "new": correct}
+                    )
 
-                    full_path = os.path.join(current_app.root_path, "templates", t_name)
+                    full_path = os.path.join(
+                        current_app.root_path, "templates", t_name
+                    )
                     with open(full_path, "w") as f:
                         f.write(patched)
 
@@ -124,10 +130,7 @@ def audit_all():
             value="success",
             status="ok",
             ttl=600,
-            meta={
-                "template_wiring": wiring_summary,
-                "endpoint_fixes": fixes
-            }
+            meta={"template_wiring": wiring_summary, "endpoint_fixes": fixes},
         )
 
     # ---------------------------------------------------------------------
@@ -135,10 +138,16 @@ def audit_all():
     # ---------------------------------------------------------------------
     click.echo("------------------------------------------------------------")
     click.echo("✅ Combined Template + Endpoint Audit Complete")
-    click.echo(f"Templates scanned: {wiring_summary.get('templates_scanned', 0)}")
-    click.echo(f"Missing endpoints: {wiring_summary.get('missing_endpoints', 0)}")
+    click.echo(
+        f"Templates scanned: {wiring_summary.get('templates_scanned', 0)}"
+    )
+    click.echo(
+        f"Missing endpoints: {wiring_summary.get('missing_endpoints', 0)}"
+    )
     click.echo(f"Autofix templates patched: {len(fixes)}")
-    click.echo(f"Total autofixes applied: {sum(len(v) for v in fixes.values())}")
+    click.echo(
+        f"Total autofixes applied: {sum(len(v) for v in fixes.values())}"
+    )
     click.echo("------------------------------------------------------------")
 
     if fixes:

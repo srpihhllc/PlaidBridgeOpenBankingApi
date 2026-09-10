@@ -1,0 +1,232 @@
+# Frontend -> Backend checklist for mobile-app (PlaidBridgeOpenBankingApi)
+# Generated: 2026-08-13
+version: 1
+summary: "Mapping of screens to exact tRPC/REST calls and required env vars (ready-to-checklist)."
+
+env_vars:
+  - EXPO_PUBLIC_OAUTH_PORTAL_URL: "OAuth portal host used to build login URL (OAUTH_PORTAL_URL)"
+  - EXPO_PUBLIC_OAUTH_SERVER_URL: "OAuth server URL (OAUTH_SERVER_URL) - SDK/back-channel"
+  - EXPO_PUBLIC_APP_ID: "App ID used by OAuth portal (APP_ID)"
+  - EXPO_PUBLIC_OWNER_OPEN_ID: "Owner openId used in some flows (OWNER_OPEN_ID)"
+  - EXPO_PUBLIC_OWNER_NAME: "Owner display name (OWNER_NAME)"
+  - EXPO_PUBLIC_API_BASE_URL: "Optional explicit API base URL (API_BASE_URL). If set, getApiBaseUrl() returns this."
+  - EXPO_WEB_PREVIEW_URL: "Optional frontend preview redirect used by backend when setting cookie"
+  - EXPO_PACKAGER_PROXY_URL: "Optional frontend preview redirect used by backend when setting cookie"
+
+screens:
+  - name: RootLayout
+    path: app/_layout.tsx
+    responsibilities:
+      - initialize trpc client and QueryClient
+      - provide safe-area and theme providers
+    calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "Start app; ensure trpc client is created without errors"
+      - "Verify QueryClientProvider and ThemeProvider mount correctly"
+
+  - name: Tabs Index (Tab navigator)
+    path: app/(tabs)/index.tsx
+    responsibilities:
+      - tab bar, handles auth redirect flow on web/native
+    tRPC_calls:
+      - accounts.list (trpc.accounts.list.useQuery)
+      - transactions.list (trpc.transactions.list.useQuery)
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+      - EXPO_PUBLIC_OAUTH_PORTAL_URL
+      - EXPO_PUBLIC_APP_ID
+    tests:
+      - "Open app, confirm tabs render and trpc queries return 200 OK"
+      - "Trigger login flow and confirm code/state extraction and exchange path"
+
+  - name: Accounts
+    path: app/(tabs)/accounts.tsx
+    tRPC_calls:
+      - accounts.list -> protectedProcedure.query() -> router.accounts.list
+      - accounts.get  -> protectedProcedure.query({id})
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    auth: "Bearer (native) or Cookie (web)"
+    tests:
+      - "With authenticated user, accounts.list returns user accounts"
+      - "accounts.get returns specific account for valid id; rejects unauthorized"
+
+  - name: Transactions (list)
+    path: app/(tabs)/transactions.tsx
+    tRPC_calls:
+      - transactions.list (input: { limit, offset })
+      - transactions.byAccount (input: { accountId, limit, offset }) - when filtering by account
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "Transactions list loads and paginates"
+      - "Filter by account uses transactions.byAccount and returns matching items"
+
+  - name: Transaction Details
+    path: app/transaction-details.tsx
+    tRPC_calls:
+      - transactions.get (input: { id })
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "Open a transaction detail; ensure transactions.get returns 200 and payload shown"
+
+  - name: Send Money
+    path: app/send-money.tsx
+    tRPC_calls:
+      - transactions.create (input: accountId, cardId?, transactionType, amount, ...)
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "Submit send money form -> transactions.create mutation successful and UI updated"
+      - "Validation errors handled client-side before submission"
+
+  - name: Beneficiaries (list)
+    path: app/(tabs)/beneficiaries.tsx
+    tRPC_calls:
+      - beneficiaries.list
+      - beneficiaries.delete (on delete action)
+      - beneficiaries.get (when editing)
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "List returns user's beneficiaries"
+      - "Create/edit/delete flows call appropriate tRPC mutations"
+
+  - name: Add Beneficiary
+    path: app/add-beneficiary.tsx
+    tRPC_calls:
+      - beneficiaries.create (input: beneficiaryName, accountNumber, bankName)
+    rest_calls: []
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "Add beneficiary triggers beneficiaries.create and then beneficiaries.list refresh"
+
+  - name: Cards
+    path: app/(tabs)/cards.tsx
+    tRPC_calls:
+      - cards.list
+      - cards.get
+      - cards.create (create mutation)
+      - cards.update (update mutation)
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "Cards list available; create/update mutations succeed"
+
+  - name: Profile
+    path: app/(tabs)/profile.tsx
+    tRPC_calls:
+      - preferences.get
+      - preferences.update
+    rest_calls:
+      - GET /api/auth/me (lib/api.getMe may also be used elsewhere)
+      - POST /api/auth/logout (lib/api.logout)
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL
+    tests:
+      - "preferences.get returns settings"
+      - "preferences.update persists changes"
+      - "Logout calls /api/auth/logout and clears local state"
+
+  - name: Plaid Link
+    path: app/(plaid)/link.tsx
+    responsibilities:
+      - Render Plaid Link and integrate that token with backend
+    rest_calls:
+      - External script: https://cdn.plaid.com/link/v2/stable/link-initialize.js
+      - Backend endpoint(s) for Plaid token exchange: (project README indicates backend endpoints like /create_link_token or /exchange_public_token; search: compat.api_generate_link_token -> /api/generate_link_token, and /exchange_public_token)
+      - Observed reference: server router "compat.api_generate_link_token" -> /api/generate_link_token (GET)
+      - Observed reference: server router "plaid.create_link_token" -> /create_link_token (OPTIONS,POST) and exchange_public_token -> /exchange_public_token
+    env_required:
+      - EXPO_PUBLIC_API_BASE_URL (frontend will call backend endpoints)
+      - PLAID_CLIENT_ID (backend)
+      - PLAID_SECRET (backend)
+      - PLAID_ENV (backend)
+    tests:
+      - "Plaid Link opens; token returned and backend exchange endpoints invoked"
+
+  - name: OAuth Callback (app)
+    path: app/oauth/callback.tsx
+    responsibilities:
+      - Handle deep-link or postMessage containing code/state
+      - Call lib/api.exchangeOAuthCode(code, state)
+    rest_calls:
+      - GET /api/oauth/mobile?code=...&state=...  (exchange OAuth code -> returns { app_session_id, user })
+      - Optional: POST /api/auth/session (establish cookie for web/iframe preview) via establishSession(token)
+    env_required:
+      - EXPO_PUBLIC_OAUTH_PORTAL_URL
+      - EXPO_PUBLIC_APP_ID
+      - EXPO_PUBLIC_API_BASE_URL
+      - EXPO_PUBLIC_OAUTH_SERVER_URL
+    tests:
+      - "Deep link with code & state triggers exchangeOAuthCode and stores sessionToken"
+      - "establishSession(token) sets cookie for preview scenarios if called"
+
+  - name: Modal
+    path: app/modal.tsx
+    responsibilities: UI modal screens, may host forms that call tRPC or REST
+    calls: vary by modal content
+    env_required: varies
+    tests: check each modal's contained API calls
+
+rest_endpoints:
+  - path: /api/health
+    method: GET
+    purpose: server health check
+
+  - path: /api/oauth/callback
+    method: GET
+    purpose: Web OAuth callback (sets cookie and redirects to EXPO_WEB_PREVIEW_URL)
+
+  - path: /api/oauth/mobile
+    method: GET
+    purpose: Mobile OAuth exchange; returns JSON { app_session_id, user }
+
+  - path: /api/auth/me
+    method: GET
+    purpose: Return current user (works with cookie or Bearer)
+
+  - path: /api/auth/logout
+    method: POST
+    purpose: Clear session cookie
+
+  - path: /api/auth/session
+    method: POST
+    purpose: Accept Bearer token and set cookie for domain (used by iframe/web preview)
+
+tRPC:
+  endpoint: /api/trpc (httpBatchLink)
+  transformer: superjson (client configured with transformer inside httpBatchLink)
+  client_auth:
+    - Native: Authorization: Bearer <sessionToken>
+    - Web: credentials: include -> cookie-based session
+  procedures:
+    - auth.me (public.query)
+    - auth.logout (public.mutation)
+    - accounts.list, accounts.get, accounts.create, accounts.update
+    - cards.list, cards.get, cards.create, cards.update
+    - transactions.list, transactions.byAccount, transactions.get, transactions.create, transactions.update
+    - beneficiaries.list, beneficiaries.get, beneficiaries.create, beneficiaries.update, beneficiaries.delete
+    - preferences.get, preferences.update
+    - system.* (systemRouter) - operational endpoints used by admin/debug UIs
+
+qa_checklist:
+  - "Set EXPO_PUBLIC_API_BASE_URL for local/dev/staging/production before running app"
+  - "Test web OAuth: open loginUrl (getLoginUrl) -> portal -> backend /api/oauth/callback -> cookie set -> call /api/auth/me"
+  - "Test native OAuth: open loginUrl on device -> portal -> deep link -> app extracts code -> GET /api/oauth/mobile -> app_session_id returned -> store and use Authorization: Bearer"
+  - "Verify tRPC mutations/queries return expected shapes; compare with server/routers.ts zod shapes"
+  - "Confirm CORS and credentials: backend returns Access-Control-Allow-Credentials and frontend fetch uses credentials: 'include' for cookie flows"
+
+notes:
+  - "Axios exists in package.json but frontend uses fetch + tRPC. Server SDK uses axios internally."
+  - "If you want, I can convert this YAML to JSON or commit it to mobile-app/docs/"

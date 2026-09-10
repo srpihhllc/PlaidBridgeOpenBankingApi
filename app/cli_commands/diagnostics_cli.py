@@ -20,7 +20,11 @@ from app.blueprints.diagnostics import get_full_diagnostics
 
 
 @click.command("diagnostics-full")
-@click.option("--watch", is_flag=True, help="Refresh diagnostics every 5 seconds continuously.")
+@click.option(
+    "--watch",
+    is_flag=True,
+    help="Refresh diagnostics every 5 seconds continuously.",
+)
 @with_appcontext
 def diagnostics_full(watch: bool) -> None:
     """
@@ -29,7 +33,7 @@ def diagnostics_full(watch: bool) -> None:
 
     def _execute_isolated_diagnostic() -> dict[str, Any]:
         """Executes the diagnostic pipeline within the established app context."""
-        
+
         # Cache the original state to guarantee zero permanent pollution
         original_mode = current_app.config.get("DIAGNOSTICS_CLI_MODE", False)
         current_app.config["DIAGNOSTICS_CLI_MODE"] = True
@@ -68,23 +72,34 @@ def diagnostics_full(watch: bool) -> None:
         return
 
     # Continuous Watch loop orchestration
-    click.secho("🛰️ Starting Neural Pulse Watcher... (Ctrl+C to stop)", fg="yellow", bold=True)
+    click.secho(
+        "🛰️ Starting Neural Pulse Watcher... (Ctrl+C to stop)",
+        fg="yellow",
+        bold=True,
+    )
     try:
         while True:
             data = _execute_isolated_diagnostic()
             sys.stdout.write("\033[H\033[2J")
             sys.stdout.flush()
-            
+
             timestamp = time.strftime("%H:%M:%S")
-            click.secho(f"--- LIVE PULSE | {timestamp} ---", fg="cyan", bold=True)
+            click.secho(
+                f"--- LIVE PULSE | {timestamp} ---", fg="cyan", bold=True
+            )
             click.echo(json.dumps(data, indent=2))
-            
+
             # Simple health check alert
             infra_map = data.get("infra", {})
             if isinstance(infra_map, dict):
                 db_map = infra_map.get("database", {})
                 if isinstance(db_map, dict) and not db_map.get("online", True):
-                    click.secho("\n🚨 CRITICAL ERROR: DB OFFLINE", fg="red", bold=True, blink=True)
+                    click.secho(
+                        "\n🚨 CRITICAL ERROR: DB OFFLINE",
+                        fg="red",
+                        bold=True,
+                        blink=True,
+                    )
 
             time.sleep(5)
     except KeyboardInterrupt:
@@ -96,17 +111,17 @@ def diagnostics_full(watch: bool) -> None:
 def mail_debug():
     """Inspects currently loaded Mail configurations vs OS environment."""
     click.echo("--- Mail Configuration Debug ---")
-    keys = ['MAIL_SERVER', 'MAIL_PORT', 'MAIL_USE_TLS', 'MAIL_USERNAME']
-    
+    keys = ["MAIL_SERVER", "MAIL_PORT", "MAIL_USE_TLS", "MAIL_USERNAME"]
+
     for key in keys:
         config_val = current_app.config.get(key)
         env_val = os.environ.get(key, "NOT SET IN OS")
-        
+
         if config_val is None and env_val == "NOT SET IN OS":
             status = "⚠️ MISSING"
         elif str(config_val) == str(env_val):
             status = "✅ MATCH"
         else:
             status = "❌ MISMATCH"
-            
+
         click.echo(f"{key:15}: {config_val} (OS: {env_val}) [{status}]")

@@ -5,12 +5,12 @@
 # to run both providers in a single test case.
 # =============================================================================
 
-import time
 import base64
+import time
 
 import jwt  # PyJWT
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 from app.oauth.provider import OAuthProvider, ProviderName
 
@@ -55,7 +55,10 @@ def test_google_flow_happy_path(monkeypatch, client, app):
                 return None
 
             def json(self):
-                return {"access_token": "fake-google-token", "id_token": "fake-id"}
+                return {
+                    "access_token": "fake-google-token",
+                    "id_token": "fake-id",
+                }
 
         return Resp()
 
@@ -65,7 +68,11 @@ def test_google_flow_happy_path(monkeypatch, client, app):
                 return None
 
             def json(self):
-                return {"email": "test@google.com", "sub": "sub-123", "name": "Google Tester"}
+                return {
+                    "email": "test@google.com",
+                    "sub": "sub-123",
+                    "name": "Google Tester",
+                }
 
         return Resp()
 
@@ -77,7 +84,9 @@ def test_google_flow_happy_path(monkeypatch, client, app):
     with client.session_transaction() as sess:
         sess["oauth_state:google"] = test_state
 
-    resp = client.get(f"/callback/{ProviderName.GOOGLE.value}?code=abc123&state={test_state}")
+    resp = client.get(
+        f"/callback/{ProviderName.GOOGLE.value}?code=abc123&state={test_state}"
+    )
     assert resp.status_code in (302, 303)
 
 
@@ -117,7 +126,9 @@ def test_apple_flow_happy_path(monkeypatch, client, app):
         "email": "test@apple.example",
         "email_verified": "true",
     }
-    id_token = jwt.encode(payload, private_pem, algorithm="RS256", headers={"kid": kid})
+    id_token = jwt.encode(
+        payload, private_pem, algorithm="RS256", headers={"kid": kid}
+    )
     jwks = {"keys": [jwk]}
 
     # Patch JWKS fetcher and code exchange
@@ -136,6 +147,6 @@ def test_apple_flow_happy_path(monkeypatch, client, app):
 
     resp = client.post(
         f"/callback/{ProviderName.APPLE.value}",
-        data={"code": "abc123", "state": test_state}
+        data={"code": "abc123", "state": test_state},
     )
     assert resp.status_code in (302, 303)

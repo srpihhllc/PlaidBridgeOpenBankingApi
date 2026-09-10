@@ -50,7 +50,9 @@ def build_summary(txns: Iterable[TransactionDTO]) -> TransactionSummary:
     )
 
 
-def build_category_breakdown(txns: Iterable[TransactionDTO]) -> CategoryBreakdown:
+def build_category_breakdown(
+    txns: Iterable[TransactionDTO],
+) -> CategoryBreakdown:
     bucket = defaultdict(float)
     for t in txns:
         bucket[t.category] += t.amount

@@ -6,7 +6,7 @@
 # =============================================================================
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from app.extensions import db
 from app.models import BankAccount, BankTransaction
@@ -55,7 +55,9 @@ def generate_mock_bank_transfer(from_account, to_account, days_back=30):
         ach_trace_number = None
 
     amount = round(random.uniform(25, 2500), 2)
-    timestamp = datetime.utcnow() - timedelta(days=random.randint(0, days_back))
+    timestamp = datetime.now(timezone.utc) - timedelta(
+        days=random.randint(0, days_back)
+    )
 
     txn = BankTransaction(
         from_account_id=from_account.id if from_account else None,
@@ -68,10 +70,14 @@ def generate_mock_bank_transfer(from_account, to_account, days_back=30):
         ach_sec_code=ach_sec_code,
         wire_reference=wire_reference,
         originating_routing=(
-            _random_routing_number() if payment_channel in ("ACH", "WIRE") else None
+            _random_routing_number()
+            if payment_channel in ("ACH", "WIRE")
+            else None
         ),
         receiving_routing=(
-            _random_routing_number() if payment_channel in ("ACH", "WIRE") else None
+            _random_routing_number()
+            if payment_channel in ("ACH", "WIRE")
+            else None
         ),
         payment_channel=payment_channel,
     )

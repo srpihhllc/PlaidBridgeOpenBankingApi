@@ -16,7 +16,9 @@ logger = logging.getLogger(__name__)
 account_balance: float = 0.0
 
 
-def compute_new_balance(statements: list[dict[str, Any]], start_balance: float) -> float:
+def compute_new_balance(
+    statements: list[dict[str, Any]], start_balance: float
+) -> float:
     """
     Pure function: Calculates what the balance WOULD be without mutating global state.
     Used for validation, dry-runs, and unit testing.
@@ -41,9 +43,11 @@ def update_account_balance(statements: list[dict[str, Any]]) -> None:
     the current global total.
     """
     global account_balance
-    
+
     try:
         account_balance = compute_new_balance(statements, account_balance)
-        logger.info(f"Account balance globally updated to: {account_balance:.2f}")
+        logger.info(
+            f"Account balance globally updated to: {account_balance:.2f}"
+        )
     except Exception as e:
         logger.error(f"Failed to update account balance: {e}", exc_info=True)

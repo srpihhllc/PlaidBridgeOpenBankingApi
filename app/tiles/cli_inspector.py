@@ -2,7 +2,9 @@
 
 from flask import Blueprint, current_app, jsonify
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 tile_cli_inspector = Blueprint("tile_cli_inspector", __name__)
 
@@ -15,7 +17,9 @@ def cli_inspector_view():
     """
     r = get_redis_client()
     if not r:
-        current_app.logger.error("[cli_inspector] Redis unavailable — cannot fetch CLI commands")
+        current_app.logger.error(
+            "[cli_inspector] Redis unavailable — cannot fetch CLI commands"
+        )
         return jsonify({"error": "Redis unavailable"}), 503
 
     commands = []
@@ -32,7 +36,9 @@ def cli_inspector_view():
                 }
             )
     except Exception as e:
-        current_app.logger.error(f"[cli_inspector] Failed to scan CLI keys: {e}")
+        current_app.logger.error(
+            f"[cli_inspector] Failed to scan CLI keys: {e}"
+        )
         return jsonify({"error": "Failed to fetch CLI commands"}), 500
 
     return jsonify({"commands": sorted(commands, key=lambda x: x["command"])})

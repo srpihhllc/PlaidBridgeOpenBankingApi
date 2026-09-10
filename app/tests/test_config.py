@@ -52,19 +52,28 @@ _DB_PORT = os.getenv("DB_PORT", "3306")
 _DB_NAME = os.getenv("DB_NAME")
 
 _IS_PROD_OR_MIGRATION = (
-    os.getenv("FLASK_ENV") == "production" or os.getenv("ALEMBIC_RUNNING") == "1"
+    os.getenv("FLASK_ENV") == "production"
+    or os.getenv("ALEMBIC_RUNNING") == "1"
 )
 
 # ⭐ FINAL COMPONENT GUARD: Close every hole for Production/Migrations
 if _IS_PROD_OR_MIGRATION:
     if not _DB_USER:
-        raise RuntimeError("CRITICAL: DB_USER missing in production/migration context.")
+        raise RuntimeError(
+            "CRITICAL: DB_USER missing in production/migration context."
+        )
     if not _DB_PASSWORD:
-        raise RuntimeError("CRITICAL: DB_PASSWORD missing or empty. Refusing to continue.")
+        raise RuntimeError(
+            "CRITICAL: DB_PASSWORD missing or empty. Refusing to continue."
+        )
     if not _DB_HOST:
-        raise RuntimeError("CRITICAL: DB_HOST missing in production/migration context.")
+        raise RuntimeError(
+            "CRITICAL: DB_HOST missing in production/migration context."
+        )
     if not _DB_NAME:
-        raise RuntimeError("CRITICAL: DB_NAME missing in production/migration context.")
+        raise RuntimeError(
+            "CRITICAL: DB_NAME missing in production/migration context."
+        )
 
 _HAS_COMPONENTS = all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME])
 
@@ -78,20 +87,28 @@ if _HAS_COMPONENTS:
 else:
     _SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
     if not _SQLALCHEMY_DATABASE_URI and _IS_PROD_OR_MIGRATION:
-        raise RuntimeError("CRITICAL: No database components found and no URI override provided.")
+        raise RuntimeError(
+            "CRITICAL: No database components found and no URI override provided."
+        )
 
 # ⭐ MIGRATION INTROSPECTION HOOK (THE COCKPIT)
 if os.getenv("ALEMBIC_RUNNING") == "1":
-    _masked_uri = f"mysql+pymysql://{_DB_USER}:****@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
+    _masked_uri = (
+        f"mysql+pymysql://{_DB_USER}:****@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
+    )
     print("\n" + "═" * 60)
     print(" 🚀 FLASK MIGRATION MODE ACTIVATED")
     print(f" [CONFIG] 🛰️  Target Host:  {_DB_HOST}")
     print(f" [CONFIG] 🔍  Auth Profile: user={_DB_USER}, db={_DB_NAME}")
     print(
-        f" [CONFIG] 🧩  Component-Built URI: " f"{'✅ YES' if _HAS_COMPONENTS else '⚠️  FALLBACK'}"
+        f" [CONFIG] 🧩  Component-Built URI: "
+        f"{'✅ YES' if _HAS_COMPONENTS else '⚠️  FALLBACK'}"
     )
     print(f" [CONFIG] 🔗  Effective URI: {_masked_uri}")
-    print(f" [CONFIG] 🧪  Integrity:    Auth={'✅' if _DB_PASSWORD else '❌'}, " f"Port={_DB_PORT}")
+    print(
+        f" [CONFIG] 🧪  Integrity:    Auth={'✅' if _DB_PASSWORD else '❌'}, "
+        f"Port={_DB_PORT}"
+    )
     print("═" * 60 + "\n")
 # ---------------------------------------------------------------------------
 
@@ -118,8 +135,12 @@ class BaseConfig:
     @classmethod
     def validate(cls):
         if cls.ENV == "production":
-            if cls.SECRET_KEY.startswith("DEV_") or cls.JWT_SECRET_KEY.startswith("DEV_"):
-                raise RuntimeError("Production secrets must be set via environment variables.")
+            if cls.SECRET_KEY.startswith(
+                "DEV_"
+            ) or cls.JWT_SECRET_KEY.startswith("DEV_"):
+                raise RuntimeError(
+                    "Production secrets must be set via environment variables."
+                )
 
     @classmethod
     def summarize(cls):

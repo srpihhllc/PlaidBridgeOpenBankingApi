@@ -42,7 +42,9 @@ def _normalize_prefix(prefix: str) -> str:
     return p
 
 
-def _normalize_expected_map(raw_expected: dict[str, Any]) -> tuple[dict[str, str], dict[str, bool]]:
+def _normalize_expected_map(
+    raw_expected: dict[str, Any],
+) -> tuple[dict[str, str], dict[str, bool]]:
     """
     Accepts either:
       - { name: "/prefix" }
@@ -58,7 +60,9 @@ def _normalize_expected_map(raw_expected: dict[str, Any]) -> tuple[dict[str, str
         elif isinstance(val, dict):
             p = _normalize_prefix(val.get("prefix", ""))
             if not p:
-                raise ValueError(f"Expected map for '{name}' missing 'prefix'.")
+                raise ValueError(
+                    f"Expected map for '{name}' missing 'prefix'."
+                )
             prefixes[name] = p
             required[name] = bool(val.get("required", True))
         else:
@@ -92,7 +96,9 @@ def _compare(
             continue
         act_prefix = actual_norm[name].get("url_prefix")
         if act_prefix != exp_prefix:
-            drift.append({"name": name, "expected": exp_prefix, "actual": act_prefix})
+            drift.append(
+                {"name": name, "expected": exp_prefix, "actual": act_prefix}
+            )
 
     # Extras
     for name in actual_norm.keys():
@@ -114,7 +120,8 @@ def init_app(app):
         is_flag=True,
         default=False,
         help=(
-            "Fetch via HTTP from /admin/cockpit/debug/blueprints instead of local " "introspection."
+            "Fetch via HTTP from /admin/cockpit/debug/blueprints instead of local "
+            "introspection."
         ),
     )
     @click.option(
@@ -189,15 +196,21 @@ def init_app(app):
             if expect:
                 raw_expected = json.loads(expect)
             else:
-                raw_expected = current_app.config.get("EXPECTED_BLUEPRINTS", {})
+                raw_expected = current_app.config.get(
+                    "EXPECTED_BLUEPRINTS", {}
+                )
             if not isinstance(raw_expected, dict):
                 raise ValueError(
                     "EXPECTED_BLUEPRINTS must be a dict of {name: prefix} or "
                     "{name: {prefix, required}}."
                 )
-            expected_prefixes, required_flags = _normalize_expected_map(raw_expected)
+            expected_prefixes, required_flags = _normalize_expected_map(
+                raw_expected
+            )
         except Exception as e:
-            click.echo(f"[ERROR] Could not load expected mapping: {e}", err=True)
+            click.echo(
+                f"[ERROR] Could not load expected mapping: {e}", err=True
+            )
             ttl_emit(key=ttl_key, status="error", client=r, ttl=300)
             sys.exit(2)
 
@@ -206,7 +219,9 @@ def init_app(app):
             if use_http:
                 base = current_app.config.get("COCKPIT_BASE_URL")
                 if not base:
-                    raise RuntimeError("COCKPIT_BASE_URL not set; cannot use --use-http.")
+                    raise RuntimeError(
+                        "COCKPIT_BASE_URL not set; cannot use --use-http."
+                    )
                 url = base.rstrip("/") + "/admin/cockpit/debug/blueprints"
                 actual = _fetch_blueprints_via_http(url)
             else:
@@ -262,13 +277,17 @@ def init_app(app):
             key = last_key
             value = json.dumps(summary, ensure_ascii=False)
 
-            client = getattr(current_app, "redis_client", None) or get_redis_client()
+            client = (
+                getattr(current_app, "redis_client", None)
+                or get_redis_client()
+            )
             if client:
                 try:
                     client.setex(key, tile_ttl, value)
                 except Exception as e:
                     current_app.logger.error(
-                        f"[cli_commands.audit_blueprints] Redis setex failed for " f"{key} — {e}"
+                        f"[cli_commands.audit_blueprints] Redis setex failed for "
+                        f"{key} — {e}"
                     )
             else:
                 current_app.logger.error(
@@ -292,7 +311,9 @@ def init_app(app):
             )
             r.expire(tile_key, tile_ttl)
         except Exception as e:
-            click.echo(f"[WARN] Failed to write audit result to Redis: {e}", err=True)
+            click.echo(
+                f"[WARN] Failed to write audit result to Redis: {e}", err=True
+            )
 
         # Optional JSON output for CI/pipelines
         if print_json:
@@ -311,13 +332,16 @@ def init_app(app):
             if summary["result"]["missing"]:
                 click.echo("\nMissing blueprints:")
                 for name in summary["result"]["missing"]:
-                    click.echo(f"  - {name} (expected prefix: {expected_prefixes.get(name)})")
+                    click.echo(
+                        f"  - {name} (expected prefix: {expected_prefixes.get(name)})"
+                    )
 
             if summary["result"]["drift"]:
                 click.echo("\nPrefix drift detected:")
                 for d in summary["result"]["drift"]:
                     click.echo(
-                        f"  - {d['name']}: expected='{d['expected']}' " f"actual='{d['actual']}'"
+                        f"  - {d['name']}: expected='{d['expected']}' "
+                        f"actual='{d['actual']}'"
                     )
 
             if summary["result"]["extras"]:

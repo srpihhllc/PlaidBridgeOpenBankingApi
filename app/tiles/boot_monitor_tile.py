@@ -4,7 +4,7 @@
 #              Avoids module-qualified model strings and reports actionable
 #              recommendations without causing registry lookups.
 # =============================================================================
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
@@ -14,13 +14,15 @@ from app.utils.redis_utils import get_redis_client
 def collect_boot_errors():
     return {
         "tile": "trace:boot_monitor",
-        "last_boot": datetime.utcnow().isoformat(),
+        "last_boot": datetime.now(timezone.utc).isoformat(),
         "errors": [
             {
                 "type": "ImportError",
                 "path": "app.utils.telemetry.emit_ttl_pulse",
                 "status": "❌ missing function",
-                "recommendation": ("Define emit_ttl_pulse in telemetry.py or refactor CLI import"),
+                "recommendation": (
+                    "Define emit_ttl_pulse in telemetry.py or refactor CLI import"
+                ),
             },
             {
                 "type": "TemplateNotFound",
@@ -35,14 +37,17 @@ def collect_boot_errors():
                 "type": "LoginManagerError",
                 "source": "Flask-Login",
                 "status": "❌ Missing user_loader",
-                "recommendation": ("Define user_loader or request_loader in app/__init__.py"),
+                "recommendation": (
+                    "Define user_loader or request_loader in app/__init__.py"
+                ),
             },
             {
                 "type": "ImportError",
                 "path": "SubscriberProfile",
                 "status": "❌ not exposed via app/models/__init__.py",
                 "recommendation": (
-                    "Ensure SubscriberProfile is defined and exported properly from " "app/models"
+                    "Ensure SubscriberProfile is defined and exported properly from "
+                    "app/models"
                 ),
             },
             {
@@ -65,14 +70,17 @@ def collect_boot_errors():
                 "route": "auth.register_subscriber",
                 "status": "❌ unresolved url_for()",
                 "recommendation": (
-                    "Verify Blueprint route naming and registration inside " "auth_routes.py"
+                    "Verify Blueprint route naming and registration inside "
+                    "auth_routes.py"
                 ),
             },
             {
                 "type": "DBAuthError",
                 "user": "srpollardsihhllc",
                 "status": "❌ denied",
-                "recommendation": ("Check DB_USER and DB_PASSWORD in .env for validity"),
+                "recommendation": (
+                    "Check DB_USER and DB_PASSWORD in .env for validity"
+                ),
             },
         ],
     }
@@ -96,7 +104,8 @@ def emit_boot_monitor():
             )
         except Exception as e:
             current_app.logger.error(
-                "[tiles.boot_monitor_tile.emit_boot_monitor] Redis setex failed " f"for {key} — {e}"
+                "[tiles.boot_monitor_tile.emit_boot_monitor] Redis setex failed "
+                f"for {key} — {e}"
             )
     else:
         current_app.logger.error(

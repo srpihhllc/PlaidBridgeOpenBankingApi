@@ -4,7 +4,7 @@
 #              status, and cockpit‑grade auditability. UUID FK + cascade‑safe.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -30,7 +30,9 @@ class UnderwriterAgent(db.Model):
     status = db.Column(db.String(50), default="active", nullable=False)
 
     # Audit timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # Relationship back to User
     user = db.relationship("User", back_populates="underwriter_profiles")

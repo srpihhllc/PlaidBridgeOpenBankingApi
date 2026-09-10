@@ -50,7 +50,9 @@ class MFACode(db.Model):
     )
 
     code = db.Column(db.String(32), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=_get_naive_utc_now, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=_get_naive_utc_now, nullable=False
+    )
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
     fail_count = db.Column(db.Integer, default=0, nullable=False)
 
@@ -58,9 +60,7 @@ class MFACode(db.Model):
     # Relationships (Switched to backref to avoid modifying the User model)
     # -------------------------------------------------------------------------
     user = db.relationship(
-        "User", 
-        backref=db.backref("mfa_codes", lazy="dynamic"), 
-        lazy="joined"
+        "User", backref=db.backref("mfa_codes", lazy="dynamic"), lazy="joined"
     )
 
     # -------------------------------------------------------------------------
@@ -68,7 +68,11 @@ class MFACode(db.Model):
     # -------------------------------------------------------------------------
     @classmethod
     def create_or_replace(
-        cls, user_id: str, code: str, ttl_seconds: int = 600, commit: bool = True
+        cls,
+        user_id: str,
+        code: str,
+        ttl_seconds: int = 600,
+        commit: bool = True,
     ) -> MFACode:
         """
         Atomically create a new MFACode for a user, deleting any existing one first.
@@ -105,7 +109,9 @@ class MFACode(db.Model):
 
         except SQLAlchemyError:
             db.session.rollback()
-            logger.exception("Failed to create_or_replace MFACode for user_id=%s", user_id)
+            logger.exception(
+                "Failed to create_or_replace MFACode for user_id=%s", user_id
+            )
             raise
 
     @classmethod
@@ -184,10 +190,14 @@ class MFACode(db.Model):
 
         except SQLAlchemyError:
             db.session.rollback()
-            logger.exception("Failed to consume MFACode id=%s", getattr(self, "id", None))
+            logger.exception(
+                "Failed to consume MFACode id=%s", getattr(self, "id", None)
+            )
             raise
 
-    def validate_and_consume(self, submitted_code: str, max_failures: int = 10) -> bool:
+    def validate_and_consume(
+        self, submitted_code: str, max_failures: int = 10
+    ) -> bool:
         """
         Validate a submitted code against this instance.
         - If valid and not expired: consume and return True.
@@ -201,7 +211,8 @@ class MFACode(db.Model):
             except SQLAlchemyError:
                 db.session.rollback()
                 logger.exception(
-                    "Failed to delete expired MFACode id=%s", getattr(self, "id", None)
+                    "Failed to delete expired MFACode id=%s",
+                    getattr(self, "id", None),
                 )
             return False
 
@@ -237,7 +248,9 @@ class MFACode(db.Model):
         """
         now = _get_naive_utc_now()
         threshold = (
-            now if older_than_seconds is None else now - timedelta(seconds=older_than_seconds)
+            now
+            if older_than_seconds is None
+            else now - timedelta(seconds=older_than_seconds)
         )
 
         try:
@@ -254,13 +267,21 @@ class MFACode(db.Model):
     @classmethod
     def list_for_user(cls, user_id: str) -> list[dict]:
         """Return serialisable summaries of MFACode rows for audit/troubleshooting."""
-        rows = cls.query.filter_by(user_id=user_id).order_by(cls.created_at.desc()).all()
+        rows = (
+            cls.query.filter_by(user_id=user_id)
+            .order_by(cls.created_at.desc())
+            .all()
+        )
         return [
             {
                 "id": r.id,
                 "code": r.code,
-                "created_at": r.created_at.isoformat() if r.created_at else None,
-                "expires_at": r.expires_at.isoformat() if r.expires_at else None,
+                "created_at": r.created_at.isoformat()
+                if r.created_at
+                else None,
+                "expires_at": r.expires_at.isoformat()
+                if r.expires_at
+                else None,
                 "time_remaining": r.time_remaining(),
                 "fail_count": r.fail_count,
             }
@@ -278,8 +299,12 @@ class MFACode(db.Model):
         return {
             "id": self.id,
             "user_id": self.user_id,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "expires_at": self.expires_at.isoformat() if self.expires_at else None,
+            "created_at": self.created_at.isoformat()
+            if self.created_at
+            else None,
+            "expires_at": self.expires_at.isoformat()
+            if self.expires_at
+            else None,
             "time_remaining": self.time_remaining(),
             "fail_count": self.fail_count,
         }

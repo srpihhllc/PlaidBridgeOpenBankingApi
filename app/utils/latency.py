@@ -67,7 +67,9 @@ def _call_ttl_emit(r: Any, key: str, value: str, ttl_seconds: int) -> None:
         "ttl_emit signature mismatch for key=%s; no call succeeded; cannot call it reliably",
         key,
     )
-    raise TypeError("ttl_emit has an unexpected signature; cannot call it reliably.")
+    raise TypeError(
+        "ttl_emit has an unexpected signature; cannot call it reliably."
+    )
 
 
 def _compute_duration_ms(start_ts: Any) -> int:
@@ -97,7 +99,9 @@ def emit_latency_trace(*args: Any, **kwargs: Any) -> None:
     # --- New signature (positional, with r passed as positional arg) ---
     if len(args) >= 4:
         stage, request_uuid, start_ts, r = args[:4]
-        ttl_seconds = args[4] if len(args) >= 5 else kwargs.get("ttl_seconds", 300)
+        ttl_seconds = (
+            args[4] if len(args) >= 5 else kwargs.get("ttl_seconds", 300)
+        )
         duration_ms = _compute_duration_ms(start_ts)
         key = f"ttl:flow:oauth:google:{stage}:latency:{request_uuid}"
         value = f"latency_ms:{duration_ms}"

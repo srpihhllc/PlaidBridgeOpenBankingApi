@@ -28,6 +28,8 @@ def test_build_pdf_creates_file(tmp_path):
 def test_render_pdf_from_markdown(tmp_path):
     md = "# Header\n\nSome content."
     export_dir = tmp_path / "exports"
-    meta = render_pdf_from_markdown(md, title="Doc", export_dir=str(export_dir))
+    meta = render_pdf_from_markdown(
+        md, title="Doc", export_dir=str(export_dir)
+    )
 
     assert Path(meta["filepath"]).exists()

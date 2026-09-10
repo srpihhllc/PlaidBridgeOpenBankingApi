@@ -1,15 +1,19 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_factory_maximizer.py
 
 import os
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from flask import Flask
+
 from app import create_app
 
 
 def test_factory_production_config_loading():
     """Forces the factory through the production environment configuration branches."""
-    with patch.dict(os.environ, {"FLASK_ENV": "production", "SECRET_KEY": "prod_secret_key"}):
+    with patch.dict(
+        os.environ,
+        {"FLASK_ENV": "production", "SECRET_KEY": "prod_secret_key"},
+    ):
         try:
             app = create_app()
             assert app.config["ENV"] == "production"
@@ -53,7 +57,7 @@ def test_factory_missing_extensions_graceful_skips():
 
     mock_app.logger = MagicMock()
 
-    from app import _register_login_manager_loader, _register_jwt_loaders
+    from app import _register_jwt_loaders, _register_login_manager_loader
 
     # Execute both loaders — they should detect missing extensions and exit cleanly
     _register_login_manager_loader(mock_app)

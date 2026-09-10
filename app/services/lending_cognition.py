@@ -1,7 +1,7 @@
 # app/services/lending_cognition.py
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 
@@ -17,7 +17,9 @@ class CreditReflexManager:
         """Creates a virtual card and logs it into credit_ledger."""
         api_key = os.getenv("TREASURY_PRIME_API_KEY")
         if not api_key:
-            raise RuntimeError("Missing TREASURY_PRIME_API_KEY environment variable")
+            raise RuntimeError(
+                "Missing TREASURY_PRIME_API_KEY environment variable"
+            )
 
         try:
             response = requests.post(
@@ -41,7 +43,10 @@ class CreditReflexManager:
         card_id = data.get("id") or "mock_card_xyz123"
 
         ledger = CreditLedger(
-            user_id=user_id, card_id=card_id, credit_limit=limit, balance_used=0.00
+            user_id=user_id,
+            card_id=card_id,
+            credit_limit=limit,
+            balance_used=0.00,
         )
         db.session.add(ledger)
         db.session.commit()
@@ -55,7 +60,7 @@ class CreditReflexManager:
             card_id=None,
             user_id=borrower_id,
             amount=amount,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source_type="external_lender",
         )
         db.session.add(log)
@@ -68,14 +73,18 @@ class CreditReflexManager:
         ledger_entries = CreditLedger.query.filter_by(user_id=user_id).all()
         repayments = PaymentLog.query.filter_by(user_id=user_id).all()
 
-        total_credit_limit = sum(entry.credit_limit for entry in ledger_entries)
+        total_credit_limit = sum(
+            entry.credit_limit for entry in ledger_entries
+        )
         total_repaid = sum(p.amount for p in repayments)
 
         overexposure = total_credit_limit - total_repaid
         threshold = 0.20 * total_credit_limit
 
         if overexposure > threshold:
-            print(f"⚠️ Violation: User {user_id} overexposed by ${overexposure:.2f}")
+            print(
+                f"⚠️ Violation: User {user_id} overexposed by ${overexposure:.2f}"
+            )
             return True
         print(f"✅ User {user_id} credit behavior normal.")
         return False

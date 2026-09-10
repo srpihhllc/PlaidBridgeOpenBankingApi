@@ -1,14 +1,18 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/openapi/validator.py
 
+import yaml
 from openapi_core import create_spec
+from openapi_core.contrib.flask import (
+    FlaskOpenAPIRequest,
+    FlaskOpenAPIResponse,
+)
 from openapi_core.validation.request.validators import RequestValidator
 from openapi_core.validation.response.validators import ResponseValidator
-from openapi_core.contrib.flask import FlaskOpenAPIRequest, FlaskOpenAPIResponse
-import yaml
 
 _spec = None
 _request_validator = None
 _response_validator = None
+
 
 def load_spec(path: str):
     global _spec, _request_validator, _response_validator
@@ -18,11 +22,13 @@ def load_spec(path: str):
     _request_validator = RequestValidator(_spec)
     _response_validator = ResponseValidator(_spec)
 
+
 def validate_flask_request(req):
     openapi_req = FlaskOpenAPIRequest(req)
     result = _request_validator.validate(openapi_req)
     result.raise_for_errors()  # raises exception on first error
     return result
+
 
 def validate_flask_response(req, resp):
     openapi_req = FlaskOpenAPIRequest(req)

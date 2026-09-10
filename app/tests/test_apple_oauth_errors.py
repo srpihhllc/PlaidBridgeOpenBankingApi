@@ -4,6 +4,7 @@
 # =============================================================================
 
 import json
+
 import requests
 from flask import url_for
 
@@ -15,20 +16,28 @@ def test_apple_token_exchange_failure(monkeypatch, client, app):
     def mock_exchange(self, code):
         raise requests.exceptions.Timeout("simulated timeout")
 
-    monkeypatch.setattr("app.oauth.provider.OAuthProvider.exchange_code", mock_exchange)
+    monkeypatch.setattr(
+        "app.oauth.provider.OAuthProvider.exchange_code", mock_exchange
+    )
 
     # Set expected state in test session for CSRF check
     test_state = "test-state-apple"
     with client.session_transaction() as sess:
         sess["oauth_state:apple"] = test_state
 
+    # Build URL within test request context
+    with app.test_request_context():
+        target_url = url_for(
+            "oauth.callback_provider", provider=ProviderName.APPLE.value
+        )
+
     # POST form with code and matching state
     resp = client.post(
-        url_for("oauth.callback_provider", provider=ProviderName.APPLE.value), 
+        target_url,
         data={
             "code": "abc123",
             "state": test_state,
-        }
+        },
     )
     assert resp.status_code == 502
 
@@ -51,21 +60,31 @@ def test_apple_profile_fetch_failure(monkeypatch, client, app):
     def mock_fetch(self, token_data):
         raise requests.exceptions.HTTPError("profile service down")
 
-    monkeypatch.setattr("app.oauth.provider.OAuthProvider.exchange_code", mock_exchange)
-    monkeypatch.setattr("app.oauth.provider.OAuthProvider.fetch_profile", mock_fetch)
+    monkeypatch.setattr(
+        "app.oauth.provider.OAuthProvider.exchange_code", mock_exchange
+    )
+    monkeypatch.setattr(
+        "app.oauth.provider.OAuthProvider.fetch_profile", mock_fetch
+    )
 
     # Set expected state in test session for CSRF check
     test_state = "test-state-apple"
     with client.session_transaction() as sess:
         sess["oauth_state:apple"] = test_state
 
+    # Build URL within test request context
+    with app.test_request_context():
+        target_url = url_for(
+            "oauth.callback_provider", provider=ProviderName.APPLE.value
+        )
+
     # POST form with code and matching state
     resp = client.post(
-        url_for("oauth.callback_provider", provider=ProviderName.APPLE.value), 
+        target_url,
         data={
             "code": "abc123",
             "state": test_state,
-        }
+        },
     )
     assert resp.status_code == 502
 

@@ -33,4 +33,6 @@ def blueprint_emit():
     # Operator feedback
     click.echo("✅ Blueprint audit trace emitted.")
     click.echo(f"Status: {audit.get('status')}")
-    click.echo(f"Expected: {audit.get('expected')}, Actual: {audit.get('actual')}")
+    click.echo(
+        f"Expected: {audit.get('expected')}, Actual: {audit.get('actual')}"
+    )

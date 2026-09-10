@@ -1,5 +1,6 @@
 # =============================================================================
-# FILE: /home/srpihhllc/PlaidBridgeOpenBankingApi/app/blueprints/fintech_routes.py
+# FILE: /home/srpihhllc/PlaidBridgeOpenBankingApi/app/blueprints/
+#       fintech_routes.py
 # DESCRIPTION: Blueprint exposing FinTech verification, lender trust-gate
 #              workflows, and Transaction CRUD endpoints.
 # =============================================================================
@@ -7,7 +8,7 @@
 import base64
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 from typing import Any
 
@@ -16,7 +17,7 @@ from flask_jwt_extended import current_user, get_jwt_identity, jwt_required
 from werkzeug.exceptions import BadRequest, Forbidden, NotFound, Unauthorized
 
 from app.api.validation import validate_json_schema
-from app.extensions import csrf, db, limiter
+from app.extensions import csrf, db
 from app.models import Transaction
 from app.models.bank_account import BankAccount
 from app.models.lender import Lender
@@ -32,10 +33,20 @@ logger = logging.getLogger(__name__)
 _logger = logger
 
 
-# --- Rate Limit Guard (Deferred to Request Time) ---
+# --------------------------------------------------------------------------
+# Rate Limiting
+# --------------------------------------------------------------------------
+
+
 def _rate_limit(limit_str: str):
     """
-    Safe rate limit decorator that defers ALL context checks to request time.
+    Deferred rate-limit decorator.
+
+    The limiter is retrieved from the current Flask application at
+    request-execution time rather than module-import time.
+
+    This prevents blueprint import failures and preserves application-
+    specific limiter ownership established during app factory execution.
     """
 
     def decorator(func):
@@ -45,8 +56,16 @@ def _rate_limit(limit_str: str):
                 return func(*args, **kwargs)
             if current_app.config.get("TESTING"):
                 return func(*args, **kwargs)
-            rate_limited_func = limiter.limit(limit_str)(func)
-            return rate_limited_func(*args, **kwargs)
+
+            limiter = current_app.extensions.get("limiter")
+            if limiter is None:
+                current_app.logger.warning(
+                    "[LIMITER] Missing limiter extension; bypassing limit for %s",
+                    request.path,
+                )
+                return func(*args, **kwargs)
+
+            return limiter.limit(limit_str)(func)(*args, **kwargs)
 
         return wrapper
 
@@ -58,7 +77,6 @@ def _rate_limit(limit_str: str):
 # -----------------------------------------------------------------------------
 fintech_bp = Blueprint("fintech_bp", __name__, url_prefix="/api/v1/fintech")
 csrf.exempt(fintech_bp)
-
 
 
 # -----------------------------------------------------------------------------
@@ -77,12 +95,16 @@ def handle_bad_request(e):
 # -----------------------------------------------------------------------------
 
 
-def _parse_json(required_fields: dict[str, str] | None = None) -> dict[str, Any]:
+def _parse_json(
+    required_fields: dict[str, str] | None = None,
+) -> dict[str, Any]:
     """Parse request JSON and enforce required fields if provided."""
     try:
         payload = request.get_json(force=True, silent=False)
     except BadRequest as exc:
-        raise BadRequest("Invalid JSON: unable to parse request body.") from exc
+        raise BadRequest(
+            "Invalid JSON: unable to parse request body."
+        ) from exc
 
     if not isinstance(payload, dict):
         raise BadRequest("Invalid JSON: expected an object at the top level.")
@@ -111,8 +133,12 @@ def _envelope_success(data: dict[str, Any]) -> tuple:
     return jsonify({"status": "success", "data": data}), 200
 
 
-def _envelope_error(message: str, vendor: str | None = None, code: int | None = None) -> tuple:
-    """Standardized error envelope with optional vendor and HTTP code override."""
+def _envelope_error(
+    message: str, vendor: str | None = None, code: int | None = None
+) -> tuple:
+    """
+    Standardized error envelope with optional vendor and HTTP code override.
+    """
     return (
         jsonify(
             {
@@ -132,10 +158,14 @@ def _assert_lender_verified(lender: Lender):
     """Verify lender is authenticated and verified before allowing access."""
     if not lender or not lender.is_verified:
         increment_counter("lender_not_verified_block")
-        raise Forbidden("Lender must be verified and linked before requesting access.")
+        raise Forbidden(
+            "Lender must be verified and linked before requesting access."
+        )
 
 
-def _emit_event(user_id: int, event_type: str, detail: str, origin: str = "api"):
+def _emit_event(
+    user_id: int, event_type: str, detail: str, origin: str = "api"
+):
     """Record an audit event to the database."""
     db.session.add(
         SchemaEvent(
@@ -143,7 +173,7 @@ def _emit_event(user_id: int, event_type: str, detail: str, origin: str = "api")
             event_type=event_type,
             detail=detail,
             origin=origin,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
     )
 
@@ -155,8 +185,14 @@ def _emit_event(user_id: int, event_type: str, detail: str, origin: str = "api")
 
 @fintech_bp.route("/health", methods=["GET"])
 def health():
-    """Lightweight health probe for the fintech API (mounted under /api/v1/fintech)."""
-    routes = sorted(r.rule for r in current_app.url_map.iter_rules() if "/fintech" in r.rule)
+    """
+    Lightweight health probe for fintech API (mounted under /api/v1/fintech).
+    """
+    routes = sorted(
+        r.rule
+        for r in current_app.url_map.iter_rules()
+        if "/fintech" in r.rule
+    )
     return jsonify({"status": "ok", "routes": routes}), 200
 
 
@@ -174,7 +210,9 @@ def verify_truelayer():
         _logger.warning("TrueLayer verification error: %s", result["error"])
         return _envelope_error(result["error"], vendor="TrueLayer")
 
-    return _envelope_success(result if isinstance(result, dict) else {"result": result})
+    return _envelope_success(
+        result if isinstance(result, dict) else {"result": result}
+    )
 
 
 @fintech_bp.route("/verify/tink", methods=["POST"])
@@ -191,7 +229,9 @@ def verify_tink():
         _logger.warning("Tink verification error: %s", result["error"])
         return _envelope_error(result["error"], vendor="Tink")
 
-    return _envelope_success(result if isinstance(result, dict) else {"result": result})
+    return _envelope_success(
+        result if isinstance(result, dict) else {"result": result}
+    )
 
 
 # =============================================================================
@@ -230,7 +270,9 @@ def lender_self_link():
             )
             db.session.add(acct)
         else:
-            raise BadRequest("Provide 'aggregator' or 'manual_meta' for lender linking.")
+            raise BadRequest(
+                "Provide 'aggregator' or 'manual_meta' for lender linking."
+            )
 
         from app.compliance import check_lender_compliance
         from app.compliance_ai import predict_fraud_trends
@@ -242,11 +284,17 @@ def lender_self_link():
 
         ai_brain = SymphonyAI()
         risk_report = ai_brain.run(
-            instruction=f"Evaluate lender {lender.id} for fraud, ethics, and compliance risk.",
+            instruction=(
+                f"Evaluate lender {lender.id} for fraud, ethics, "
+                "and compliance risk."
+            ),
             user_id=lender.user_id,
         )
 
-        if fraud_trends.get("status") == "high risk" or compliance.get("violations", 0) > 3:
+        if (
+            fraud_trends.get("status") == "high risk"
+            or compliance.get("violations", 0) > 3
+        ):
             notify_authorities(
                 "Lender Risk Alert",
                 {
@@ -274,7 +322,10 @@ def lender_self_link():
             jsonify(
                 {
                     "status": "success",
-                    "msg": "Lender account linked and verified after compliance checks.",
+                    "msg": (
+                        "Lender account linked and verified after "
+                        "compliance checks."
+                    ),
                     "lender_verified": True,
                 }
             ),
@@ -285,7 +336,12 @@ def lender_self_link():
         db.session.rollback()
         _logger.warning("Lender self-link blocked: %s", exc)
         return (
-            jsonify({"status": "error", "error": {"code": "E_LENDER_RISK", "message": str(exc)}}),
+            jsonify(
+                {
+                    "status": "error",
+                    "error": {"code": "E_LENDER_RISK", "message": str(exc)},
+                }
+            ),
             403,
         )
     except Exception as exc:
@@ -293,7 +349,15 @@ def lender_self_link():
         _logger.exception("Lender self-link failed: %s", exc)
         increment_counter("lender_self_link_fail")
         return (
-            jsonify({"status": "error", "error": {"code": "E_LINK", "message": "Failed to link lender"}}),
+            jsonify(
+                {
+                    "status": "error",
+                    "error": {
+                        "code": "E_LINK",
+                        "message": "Failed to link lender",
+                    },
+                }
+            ),
             500,
         )
 
@@ -318,7 +382,9 @@ def request_manual_link():
         _emit_event(
             user_id=subscriber.id,
             event_type="LINK_REQUESTED",
-            detail=f"Lender {current_user.id} requested access. Reason: {reason}",
+            detail=(
+                f"Lender {current_user.id} requested access. Reason: {reason}"
+            ),
             origin="lender_request",
         )
         db.session.commit()
@@ -328,7 +394,10 @@ def request_manual_link():
             jsonify(
                 {
                     "status": "success",
-                    "msg": "Link request submitted. Awaiting subscriber approval.",
+                    "msg": (
+                        "Link request submitted. Awaiting subscriber "
+                        "approval."
+                    ),
                     "subscriber_id": subscriber.id,
                 }
             ),
@@ -340,7 +409,15 @@ def request_manual_link():
         _logger.exception("Manual link request failed: %s", exc)
         increment_counter("link_request_fail")
         return (
-            jsonify({"status": "error", "error": {"code": "E_REQUEST", "message": "Failed to submit link request"}}),
+            jsonify(
+                {
+                    "status": "error",
+                    "error": {
+                        "code": "E_REQUEST",
+                        "message": "Failed to submit link request",
+                    },
+                }
+            ),
             500,
         )
 
@@ -364,7 +441,8 @@ def approve_manual_link():
             user_id=subscriber_id,
             code_type="link_code",
             code_value=MFACode.generate_code(length=10),
-            expires_at=datetime.utcnow() + timedelta(seconds=ttl_seconds),
+            expires_at=datetime.now(timezone.utc)
+            + timedelta(seconds=ttl_seconds),
             metadata={"lender_user_id": lender_user_id},
         )
         db.session.add(code)
@@ -382,7 +460,10 @@ def approve_manual_link():
             jsonify(
                 {
                     "status": "success",
-                    "msg": "Approval recorded. Provide this code to the lender to complete linking.",
+                    "msg": (
+                        "Approval recorded. Provide this code to the "
+                        "lender to complete linking."
+                    ),
                     "link_code": code.code_value,
                     "expires_at": code.expires_at.isoformat() + "Z",
                 }
@@ -395,7 +476,15 @@ def approve_manual_link():
         _logger.exception("Approval code issuance failed: %s", exc)
         increment_counter("link_code_issue_fail")
         return (
-            jsonify({"status": "error", "error": {"code": "E_CODE", "message": "Failed to issue approval code"}}),
+            jsonify(
+                {
+                    "status": "error",
+                    "error": {
+                        "code": "E_CODE",
+                        "message": "Failed to issue approval code",
+                    },
+                }
+            ),
             500,
         )
 
@@ -413,7 +502,9 @@ def redeem_manual_link():
     lender = Lender.query.filter_by(user_id=current_user.id).first()
     _assert_lender_verified(lender)
 
-    code = MFACode.query.filter_by(code_value=code_value, code_type="link_code").first()
+    code = MFACode.query.filter_by(
+        code_value=code_value, code_type="link_code"
+    ).first()
     if not code:
         increment_counter("link_code_not_found")
         raise NotFound("Link approval code not found.")
@@ -442,7 +533,16 @@ def redeem_manual_link():
         increment_counter("link_finalized_success")
 
         return (
-            jsonify({"status": "success", "msg": "Manual link finalized. Lender now has access per policy.", "subscriber_id": subscriber.id}),
+            jsonify(
+                {
+                    "status": "success",
+                    "msg": (
+                        "Manual link finalized. Lender now has access "
+                        "per policy."
+                    ),
+                    "subscriber_id": subscriber.id,
+                }
+            ),
             200,
         )
 
@@ -451,7 +551,15 @@ def redeem_manual_link():
         _logger.exception("Manual link finalization failed: %s", exc)
         increment_counter("link_finalized_fail")
         return (
-            jsonify({"status": "error", "error": {"code": "E_FINALIZE", "message": "Failed to finalize link"}}),
+            jsonify(
+                {
+                    "status": "error",
+                    "error": {
+                        "code": "E_FINALIZE",
+                        "message": "Failed to finalize link",
+                    },
+                }
+            ),
             500,
         )
 
@@ -467,7 +575,9 @@ def redeem_manual_link():
 def sandbox_account_snapshot():
     lender_user_id = get_jwt_identity()
 
-    account_meta = MockDataService.generate_mock_account_metadata(lender_user_id)
+    account_meta = MockDataService.generate_mock_account_metadata(
+        lender_user_id
+    )
     balance = MockDataService.generate_mock_balance()
     txns = MockDataService.generate_mock_transactions(days=30)
     analytics = MockDataService.generate_mock_analytics(txns)
@@ -546,11 +656,14 @@ TRANSACTION_CREATE_SCHEMA = {
 @csrf.exempt
 def create_transaction():
     """
-    Create a new transaction with strict JSON validation and schema enforcement.
+    Create a new transaction with strict JSON validation and schema
+    enforcement.
 
     Behavior:
-    - If TESTING=True, returns a deterministic mock transaction without requiring auth.
-    - Otherwise requires a valid JWT (identity from token) and creates a DB record.
+    - If TESTING=True, returns a deterministic mock transaction without
+      requiring auth.
+    - Otherwise requires a valid JWT (identity from token) and creates a DB
+      record.
     """
 
     # 1) JSON must be present
@@ -564,16 +677,30 @@ def create_transaction():
 
     # 3) Auto-fill date
     if "date" not in raw_data or not raw_data["date"]:
-        raw_data["date"] = datetime.utcnow().isoformat()
+        raw_data["date"] = datetime.now(timezone.utc).isoformat()
 
     # 4) Keep only allowed fields
-    allowed_fields = {"plaid_account_id", "account_id", "amount", "currency", "date", "name", "category"}
+    allowed_fields = {
+        "plaid_account_id",
+        "account_id",
+        "amount",
+        "currency",
+        "date",
+        "name",
+        "category",
+    }
     data = {k: v for k, v in raw_data.items() if k in allowed_fields}
 
     # 5) Explicit required-fields check (protects against DB insertion of nulls)
-    missing_required = [f for f in ("amount", "date", "name") if f not in data or data[f] in (None, "", [])]
+    missing_required = [
+        f
+        for f in ("amount", "date", "name")
+        if f not in data or data[f] in (None, "", [])
+    ]
     if missing_required:
-        return _envelope_error(f"Missing required fields: {', '.join(missing_required)}", code=422)
+        return _envelope_error(
+            f"Missing required fields: {', '.join(missing_required)}", code=422
+        )
 
     # 6) Schema validation (attempt to use existing validator)
     try:
@@ -602,7 +729,7 @@ def create_transaction():
 
     # 8) Non-testing: verify JWT inside function (no decorator pre-flight)
     try:
-        from flask_jwt_extended import verify_jwt_in_request, decode_token
+        from flask_jwt_extended import decode_token, verify_jwt_in_request
         from flask_jwt_extended.exceptions import UserLookupError
 
         identity = None
@@ -610,7 +737,10 @@ def create_transaction():
             verify_jwt_in_request(optional=False)
             identity = get_jwt_identity()
         except UserLookupError as ule:
-            current_app.logger.warning("user_lookup returned None; attempting token decode fallback: %s", ule)
+            current_app.logger.warning(
+                "user_lookup returned None; attempting token decode fallback: %s",
+                ule,
+            )
             auth_hdr = request.headers.get("Authorization", "")
             if auth_hdr.startswith("Bearer "):
                 token = auth_hdr.split(None, 1)[1]
@@ -620,7 +750,11 @@ def create_transaction():
                 except Exception:
                     identity = None
         except Exception as exc:
-            current_app.logger.warning("JWT verification failed in create_transaction: %s", exc, exc_info=True)
+            current_app.logger.warning(
+                "JWT verification failed in create_transaction: %s",
+                exc,
+                exc_info=True,
+            )
             auth_hdr = request.headers.get("Authorization", "")
             if auth_hdr.startswith("Bearer "):
                 token = auth_hdr.split(None, 1)[1]
@@ -634,7 +768,9 @@ def create_transaction():
             return _envelope_error("Unauthorized", code=401)
 
         # parse date (accept ISO w/ or w/o 'Z')
-        parsed_date = datetime.fromisoformat(data["date"].replace("Z", "+00:00"))
+        parsed_date = datetime.fromisoformat(
+            data["date"].replace("Z", "+00:00")
+        )
 
         new_txn = Transaction(
             user_id=identity,
@@ -650,7 +786,9 @@ def create_transaction():
         db.session.add(new_txn)
         db.session.commit()
 
-        _logger.info("Transaction %s created for user %s", new_txn.id, identity)
+        _logger.info(
+            "Transaction %s created for user %s", new_txn.id, identity
+        )
 
         return (
             jsonify(
@@ -671,4 +809,6 @@ def create_transaction():
     except Exception as e:
         db.session.rollback()
         _logger.exception("Transaction creation failed: %s", e)
-        return _envelope_error("Internal Server Error during transaction creation.", code=500)
+        return _envelope_error(
+            "Internal Server Error during transaction creation.", code=500
+        )

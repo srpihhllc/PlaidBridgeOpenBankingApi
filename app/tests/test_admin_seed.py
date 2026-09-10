@@ -5,6 +5,7 @@
 
 import pytest
 from werkzeug.security import generate_password_hash
+
 from app.models.user import User
 
 
@@ -54,6 +55,8 @@ def test_admin_seeded_records(db_session):
     user = db_session.query(User).filter_by(email=target_email).first()
 
     assert user is not None, "Admin user must exist"
-    assert user.id == admin_uuid, "Admin record must map to core operator ID sequence"
+    assert (
+        user.id == admin_uuid
+    ), "Admin record must map to core operator ID sequence"
     assert user.is_admin is True, "Admin flag constraint missing on seeded row"
     assert user.role == "admin", "Admin role validation mismatch"

@@ -50,7 +50,11 @@ def update_profile() -> Any:
             masked[k] = "***REDACTED***"
         elif "email" in lower:
             parts = (v or "").split("@")
-            masked[k] = (parts[0][:3] + "***@" + parts[1]) if len(parts) == 2 else "***REDACTED***"
+            masked[k] = (
+                (parts[0][:3] + "***@" + parts[1])
+                if len(parts) == 2
+                else "***REDACTED***"
+            )
         elif any(s in lower for s in ("phone", "tel")):
             masked[k] = f"****{(v or '')[-4:]}" if v else ""
         else:
@@ -71,13 +75,15 @@ def update_profile() -> Any:
 
         if "first_name" in form_data:
             try:
-                current_user.first_name = form_data.get("first_name") or getattr(
-                    current_user, "first_name", None
-                )
+                current_user.first_name = form_data.get(
+                    "first_name"
+                ) or getattr(current_user, "first_name", None)
                 persisted.append("first_name")
                 changed = True
             except Exception:
-                logger.debug("Could not set first_name on user model", exc_info=True)
+                logger.debug(
+                    "Could not set first_name on user model", exc_info=True
+                )
 
         if "last_name" in form_data:
             try:
@@ -87,17 +93,21 @@ def update_profile() -> Any:
                 persisted.append("last_name")
                 changed = True
             except Exception:
-                logger.debug("Could not set last_name on user model", exc_info=True)
+                logger.debug(
+                    "Could not set last_name on user model", exc_info=True
+                )
 
         if "primary_phone" in form_data:
             try:
-                current_user.primary_phone = form_data.get("primary_phone") or getattr(
-                    current_user, "primary_phone", None
-                )
+                current_user.primary_phone = form_data.get(
+                    "primary_phone"
+                ) or getattr(current_user, "primary_phone", None)
                 persisted.append("primary_phone")
                 changed = True
             except Exception:
-                logger.debug("Could not set primary_phone on user model", exc_info=True)
+                logger.debug(
+                    "Could not set primary_phone on user model", exc_info=True
+                )
 
         if "business_phone" in form_data:
             try:

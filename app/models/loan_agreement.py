@@ -3,7 +3,7 @@
 # DESCRIPTION: Cockpit-grade LoanAgreement model.
 #              Represents the legal and financial bond between two Users.
 # =============================================================================
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -33,13 +33,21 @@ class LoanAgreement(db.Model):
     # Attributes
     # -------------------------------------------------------------------------
     terms = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(20), default="active")  # active, closed, defaulted
+    status = db.Column(
+        db.String(20), default="active"
+    )  # active, closed, defaulted
     ai_flagged = db.Column(db.Boolean, default=False)
     locked = db.Column(db.Boolean, default=False)
     violation_count = db.Column(db.Integer, default=0)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
     # -------------------------------------------------------------------------
     # Relationships (The Runtime Symmetry Fix)
@@ -50,14 +58,18 @@ class LoanAgreement(db.Model):
     borrower = db.relationship(
         "User",
         foreign_keys=[borrower_id],
-        backref=db.backref("borrowed_loan_agreements", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "borrowed_loan_agreements", lazy="dynamic", passive_deletes=True
+        ),
         lazy="joined",  # Optimized for fetching borrower details with the loan
     )
 
     lender = db.relationship(
         "User",
         foreign_keys=[lender_id],
-        backref=db.backref("lent_loan_agreements", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "lent_loan_agreements", lazy="dynamic", passive_deletes=True
+        ),
         lazy="joined",
     )
 

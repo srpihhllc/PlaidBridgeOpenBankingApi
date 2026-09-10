@@ -29,14 +29,18 @@ def _init_fernet() -> Fernet | None:
 
     key = os.getenv("PII_ENCRYPTION_KEY")
     if not key:
-        logger.warning("PII_ENCRYPTION_KEY not set. Falling back to stub mode.")
+        logger.warning(
+            "PII_ENCRYPTION_KEY not set. Falling back to stub mode."
+        )
         return None
 
     try:
         _FERNET = Fernet(key.encode("utf-8"))
         return _FERNET
     except Exception as e:
-        logger.error(f"Invalid PII_ENCRYPTION_KEY. Falling back to stub mode: {e}")
+        logger.error(
+            f"Invalid PII_ENCRYPTION_KEY. Falling back to stub mode: {e}"
+        )
         return None
 
 

@@ -28,7 +28,11 @@ class TransactionDTO:
             currency=txn.currency or "USD",
             category=txn.category,
             description=txn.description,
-            date=(txn.date.isoformat() if isinstance(txn.date, datetime) else str(txn.date)),
+            date=(
+                txn.date.isoformat()
+                if isinstance(txn.date, datetime)
+                else str(txn.date)
+            ),
             # Plaid-style fields
             account=txn.account_id,
             verification_status="pending" if txn.is_pending else "posted",

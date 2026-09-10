@@ -6,15 +6,33 @@ document.addEventListener("DOMContentLoaded", function () {
     const driftList = document.querySelector(".drift-list");
     const okPill = document.querySelector(".status-pill.ok");
 
+    let errorCount = 0;
+    const MAX_ERRORS = 5;
+
     async function fetchPulse() {
+        // 1. Circuit Breaker: Stop hammering the server if it's dead
+        if (errorCount >= MAX_ERRORS) {
+            console.error(`Blueprint drift pulse suspended after ${MAX_ERRORS} consecutive failures.`);
+            if (ttlBadge) {
+                ttlBadge.textContent = "TTL: ERR";
+                ttlBadge.classList.add("ttl-fail");
+            }
+            return; 
+        }
+
         try {
             const res = await fetch(pulseUrl, { cache: "no-store" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
 
+            // Reset error count on successful fetch
+            errorCount = 0;
+
             // Update TTL badge
             if (ttlBadge) {
-                ttlBadge.textContent = `TTL: ${data.ttl_remaining}s`;
+                // Defensive check in case the dummy route doesn't have ttl_remaining yet
+                const ttl = data.ttl_remaining !== undefined ? data.ttl_remaining : "N/A";
+                ttlBadge.textContent = `TTL: ${ttl}s`;
                 ttlBadge.classList.remove("ttl-ok", "ttl-fail");
                 ttlBadge.classList.add(data.status === "fail" ? "ttl-fail" : "ttl-ok");
             }
@@ -42,12 +60,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (driftList) driftList.innerHTML = "";
             }
 
+            // 2. Recursive Scheduling: Only queue the next request AFTER this one succeeds
+            setTimeout(fetchPulse, 7000);
+
         } catch (err) {
-            console.warn("Blueprint Drift Pulse fetch failed:", err);
+            errorCount++;
+            console.warn(`Blueprint Drift Pulse fetch failed (${errorCount}/${MAX_ERRORS}):`, err);
+            
+            // Queue a retry, but it will abort at the top of the function once MAX_ERRORS is hit
+            setTimeout(fetchPulse, 7000);
         }
     }
 
-    // Initial fetch + interval
+    // Initial fetch starts the cycle
     fetchPulse();
-    setInterval(fetchPulse, 7000);
 });

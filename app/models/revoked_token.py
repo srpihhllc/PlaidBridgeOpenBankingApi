@@ -4,7 +4,7 @@
 #              Used by Flask-JWT-Extended's token_in_blocklist_loader.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import DeclarativeBase
 
@@ -35,7 +35,9 @@ class RevokedToken(Model):
         nullable=False,
     )
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     # Relationship back to User
     user = db.relationship(

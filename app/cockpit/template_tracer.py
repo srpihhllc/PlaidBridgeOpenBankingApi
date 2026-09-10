@@ -12,7 +12,7 @@ import traceback
 import uuid
 from pathlib import Path
 
-from flask import Blueprint, current_app, g, render_template, has_app_context
+from flask import Blueprint, current_app, g, has_app_context, render_template
 
 bp = Blueprint("tracer", __name__, url_prefix="/cockpit")
 
@@ -96,7 +96,10 @@ def trace_templates(app=None):
             continue
 
         # Only trace if rule supports GET, or if it's explicitly parameterized
-        if "GET" not in methods and rule.endpoint not in PARAMETERIZED_ENDPOINTS:
+        if (
+            "GET" not in methods
+            and rule.endpoint not in PARAMETERIZED_ENDPOINTS
+        ):
             continue
 
         # Use a local trace tracking variable to preserve test context compatibility
@@ -127,7 +130,11 @@ def trace_templates(app=None):
                 status_code = None
                 if hasattr(response, "status_code"):
                     status_code = getattr(response, "status_code")
-                elif isinstance(response, (list, tuple)) and len(response) >= 2 and isinstance(response[1], int):
+                elif (
+                    isinstance(response, (list, tuple))
+                    and len(response) >= 2
+                    and isinstance(response[1], int)
+                ):
                     status_code = response[1]
 
                 if status_code is not None and status_code >= 400:
@@ -137,7 +144,9 @@ def trace_templates(app=None):
                 tmpl = getattr(response, "template", None)
                 if tmpl and not template_exists(tmpl):
                     placeholder_path = create_placeholder(tmpl)
-                    raise ValueError(f"MISSING_TEMPLATE: Created placeholder at {placeholder_path}")
+                    raise ValueError(
+                        f"MISSING_TEMPLATE: Created placeholder at {placeholder_path}"
+                    )
 
             results.append(
                 {
@@ -180,7 +189,11 @@ def template_tracer():
             "redis_status": (
                 "OK"
                 if r["status"] == "ok"
-                else ("MISSING_TEMPLATE" if r["status"] == "missing_template" else "ERROR")
+                else (
+                    "MISSING_TEMPLATE"
+                    if r["status"] == "missing_template"
+                    else "ERROR"
+                )
             ),
             "redis_ttl": "N/A",
             "redis_value": r["error"] or "—",
@@ -190,7 +203,9 @@ def template_tracer():
 
     fresh_count = sum(1 for item in telemetry_data if item["fresh"] == "True")
     total_count = len(telemetry_data)
-    health_percent = round((fresh_count / total_count) * 100, 2) if total_count > 0 else 0
+    health_percent = (
+        round((fresh_count / total_count) * 100, 2) if total_count > 0 else 0
+    )
 
     return render_template(
         "cockpit/cockpit_dashboard.html",

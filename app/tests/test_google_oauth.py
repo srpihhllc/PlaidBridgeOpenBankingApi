@@ -24,7 +24,10 @@ class TestGoogleOAuth(BaseOAuthTest):
                     return None
 
                 def json(self):
-                    return {"access_token": "fake-google-token", "id_token": "fake-id"}
+                    return {
+                        "access_token": "fake-google-token",
+                        "id_token": "fake-id",
+                    }
 
             return Resp()
 
@@ -51,7 +54,9 @@ class TestGoogleOAuth(BaseOAuthTest):
         with client.session_transaction() as sess:
             sess["oauth_state:google"] = test_state
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
+        resp = client.get(
+            url_for("oauth.callback_google", code="abc123", state=test_state)
+        )
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")
 
@@ -72,7 +77,9 @@ class TestGoogleOAuth(BaseOAuthTest):
             ),
         ],
     )
-    def test_google_token_failure_variants(self, monkeypatch, client, app, mock_exception):
+    def test_google_token_failure_variants(
+        self, monkeypatch, client, app, mock_exception
+    ):
         """Simulate different token exchange failure modes."""
 
         def mock_post(url, data=None, timeout=10):
@@ -84,13 +91,17 @@ class TestGoogleOAuth(BaseOAuthTest):
         with client.session_transaction() as sess:
             sess["oauth_state:google"] = test_state
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
+        resp = client.get(
+            url_for("oauth.callback_google", code="abc123", state=test_state)
+        )
         assert resp.status_code == 502
 
         with app.app_context():
             self.assert_events(
                 ["OAUTH_TOKEN_ERROR"],
-                details={"OAUTH_TOKEN_ERROR": {"error": mock_exception.args[0]}},
+                details={
+                    "OAUTH_TOKEN_ERROR": {"error": mock_exception.args[0]}
+                },
             )
             self.assert_no_user()
 
@@ -125,21 +136,35 @@ class TestGoogleOAuth(BaseOAuthTest):
         with client.session_transaction() as sess:
             sess["oauth_state:google"] = test_state
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
+        resp = client.get(
+            url_for("oauth.callback_google", code="abc123", state=test_state)
+        )
         assert resp.status_code == 401
 
         with app.app_context():
             self.assert_events(
                 ["OAUTH_LOGIN_FAILURE"],
-                details={"OAUTH_LOGIN_FAILURE": {"reason": "Profile payload missing email"}},
+                details={
+                    "OAUTH_LOGIN_FAILURE": {
+                        "reason": "Profile payload missing email"
+                    }
+                },
             )
             self.assert_no_user()
 
     @pytest.mark.parametrize(
         ("profile_payload", "missing_fields"),
         [
-            pytest.param({"email": "test@google.com"}, ["sub", "name"], id="missing-sub-and-name"),
-            pytest.param({"email": "test@google.com", "sub": "123"}, ["name"], id="missing-name"),
+            pytest.param(
+                {"email": "test@google.com"},
+                ["sub", "name"],
+                id="missing-sub-and-name",
+            ),
+            pytest.param(
+                {"email": "test@google.com", "sub": "123"},
+                ["name"],
+                id="missing-name",
+            ),
             pytest.param(
                 {"email": "test@google.com", "name": "Tester User"},
                 ["sub"],
@@ -158,7 +183,10 @@ class TestGoogleOAuth(BaseOAuthTest):
                     return None
 
                 def json(self):
-                    return {"access_token": "fake-google-token", "id_token": "fake-id"}
+                    return {
+                        "access_token": "fake-google-token",
+                        "id_token": "fake-id",
+                    }
 
             return Resp()
 
@@ -180,6 +208,8 @@ class TestGoogleOAuth(BaseOAuthTest):
         with client.session_transaction() as sess:
             sess["oauth_state:google"] = test_state
 
-        resp = client.get(url_for("oauth.callback_google", code="abc123", state=test_state))
+        resp = client.get(
+            url_for("oauth.callback_google", code="abc123", state=test_state)
+        )
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")

@@ -3,12 +3,16 @@
 from app.extensions import redis_client
 from app.models.borrower_card import BorrowerCard
 from app.models.user import User
-from app.models.vault_transaction import VaultTransaction  # ✅ Clean, TTL-ready, cockpit-grade
+from app.models.vault_transaction import (
+    VaultTransaction,
+)  # ✅ Clean, TTL-ready, cockpit-grade
 
 
 def get_vault_transaction_tile():
     transactions = (
-        VaultTransaction.query.order_by(VaultTransaction.received_at.desc()).limit(50).all()
+        VaultTransaction.query.order_by(VaultTransaction.received_at.desc())
+        .limit(50)
+        .all()
     )
     tile_data = []
 

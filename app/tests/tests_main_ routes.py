@@ -37,7 +37,9 @@ class DummyRedis:
 
     def keys(self, pattern="*"):
         # Match keys directly as str, return as bytes
-        return [key.encode() for key in self.store if fnmatch.fnmatch(key, pattern)]
+        return [
+            key.encode() for key in self.store if fnmatch.fnmatch(key, pattern)
+        ]
 
 
 # ─── FIXTURES ──────────────────────────────────────────────────────────────────
@@ -53,7 +55,9 @@ def app(monkeypatch):
     monkeypatch.setattr(app, "redis_client", dummy)
 
     # Stub out telemetry emitter
-    monkeypatch.setattr("app.routes.main.emit_narrative_trace", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "app.routes.main.emit_narrative_trace", lambda *a, **k: None
+    )
 
     return app
 
@@ -94,7 +98,9 @@ def test_main_dispute_form(client):
 def test_main_process_transaction_api_errors(
     client, payload, content_type, expected_status, expected_snip
 ):
-    resp = client.post("/api/transactions", data=payload, content_type=content_type)
+    resp = client.post(
+        "/api/transactions", data=payload, content_type=content_type
+    )
     assert resp.status_code == expected_status
     assert expected_snip in resp.data
 

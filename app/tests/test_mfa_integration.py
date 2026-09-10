@@ -8,6 +8,7 @@
 # =============================================================================
 
 import time
+
 import pyotp
 import pytest
 
@@ -53,7 +54,9 @@ def test_login_with_redis_mfa(client, app):
         User.query.filter_by(username="redis_user").delete()
         db.session.commit()
 
-        user = User(username="redis_user", email="redis_user+redis@example.com")
+        user = User(
+            username="redis_user", email="redis_user+redis@example.com"
+        )
         user.set_password("secret")
         user.mfa_enabled = True
         db.session.add(user)
@@ -62,25 +65,43 @@ def test_login_with_redis_mfa(client, app):
 
     try:
         with client:
-            resp = client.post("/auth/login", data={"email": "redis_user+redis@example.com", "password": "secret"})
+            resp = client.post(
+                "/auth/login",
+                data={
+                    "email": "redis_user+redis@example.com",
+                    "password": "secret",
+                },
+            )
             assert resp.status_code == 302
             assert "/auth/mfa_prompt" in resp.location
 
-            resp = client.post("/auth/mfa_prompt", data={"code": "000000"}, follow_redirects=True)
-            assert resp.status_code == 200
-            assert _body_contains_tokens(resp, ["invalid", "mfa"]) or _body_contains_tokens(
-                resp, ["invalid", "totp"]
+            resp = client.post(
+                "/auth/mfa_prompt",
+                data={"code": "000000"},
+                follow_redirects=True,
             )
-            assert assert_event_with_retry("MFA_LOGIN_REDIS_FAIL", user_id=user_id)
+            assert resp.status_code == 200
+            assert _body_contains_tokens(
+                resp, ["invalid", "mfa"]
+            ) or _body_contains_tokens(resp, ["invalid", "totp"])
+            assert assert_event_with_retry(
+                "MFA_LOGIN_REDIS_FAIL", user_id=user_id
+            )
 
             with client.session_transaction() as sess:
                 sess["mfa_user_id"] = user_id
                 sess["mfa_setup_code"] = "123456"
 
-            resp = client.post("/auth/mfa_prompt", data={"code": "123456"}, follow_redirects=True)
+            resp = client.post(
+                "/auth/mfa_prompt",
+                data={"code": "123456"},
+                follow_redirects=True,
+            )
             assert resp.status_code == 200
             assert _body_contains_tokens(resp, ["mfa", "successful"])
-            assert assert_event_with_retry("MFA_LOGIN_REDIS_SUCCESS", user_id=user_id)
+            assert assert_event_with_retry(
+                "MFA_LOGIN_REDIS_SUCCESS", user_id=user_id
+            )
 
     finally:
         with app.app_context():
@@ -110,27 +131,45 @@ def test_login_with_totp_mfa(client, app):
 
     try:
         with client:
-            resp = client.post("/auth/login", data={"email": "totp_user+totp@example.com", "password": "secret"})
+            resp = client.post(
+                "/auth/login",
+                data={
+                    "email": "totp_user+totp@example.com",
+                    "password": "secret",
+                },
+            )
             assert resp.status_code == 302
             assert "/auth/mfa_prompt" in resp.location
 
             with client.session_transaction() as sess:
                 sess["mfa_user_id"] = user_id
 
-            resp = client.post("/auth/mfa_prompt", data={"code": totp.now()}, follow_redirects=True)
+            resp = client.post(
+                "/auth/mfa_prompt",
+                data={"code": totp.now()},
+                follow_redirects=True,
+            )
             assert resp.status_code == 200
             assert _body_contains_tokens(resp, ["mfa", "successful"])
-            assert assert_event_with_retry("MFA_LOGIN_TOTP_SUCCESS", user_id=user_id)
+            assert assert_event_with_retry(
+                "MFA_LOGIN_TOTP_SUCCESS", user_id=user_id
+            )
 
             with client.session_transaction() as sess:
                 sess["mfa_user_id"] = user_id
 
-            resp = client.post("/auth/mfa_prompt", data={"code": "000000"}, follow_redirects=True)
-            assert resp.status_code == 200
-            assert _body_contains_tokens(resp, ["invalid", "totp"]) or _body_contains_tokens(
-                resp, ["invalid", "mfa"]
+            resp = client.post(
+                "/auth/mfa_prompt",
+                data={"code": "000000"},
+                follow_redirects=True,
             )
-            assert assert_event_with_retry("MFA_LOGIN_TOTP_FAIL", user_id=user_id)
+            assert resp.status_code == 200
+            assert _body_contains_tokens(
+                resp, ["invalid", "totp"]
+            ) or _body_contains_tokens(resp, ["invalid", "mfa"])
+            assert assert_event_with_retry(
+                "MFA_LOGIN_TOTP_FAIL", user_id=user_id
+            )
 
     finally:
         with app.app_context():
@@ -149,7 +188,10 @@ def test_mfa_rate_limit_lockout(client, app):
         User.query.filter_by(username="rate_limit_user").delete()
         db.session.commit()
 
-        user = User(username="rate_limit_user", email="rate_limit_user+rate@example.com")
+        user = User(
+            username="rate_limit_user",
+            email="rate_limit_user+rate@example.com",
+        )
         user.set_password("secret")
         user.mfa_enabled = True
         db.session.add(user)
@@ -158,20 +200,32 @@ def test_mfa_rate_limit_lockout(client, app):
 
     try:
         with client:
-            resp = client.post("/auth/login", data={"email": "rate_limit_user+rate@example.com", "password": "secret"})
+            resp = client.post(
+                "/auth/login",
+                data={
+                    "email": "rate_limit_user+rate@example.com",
+                    "password": "secret",
+                },
+            )
             assert resp.status_code == 302
             assert "/auth/mfa_prompt" in resp.location
 
             for _ in range(6):
                 with client.session_transaction() as sess:
                     sess["mfa_user_id"] = user_id
-                resp = client.post("/auth/mfa_prompt", data={"code": "000000"}, follow_redirects=True)
+                resp = client.post(
+                    "/auth/mfa_prompt",
+                    data={"code": "000000"},
+                    follow_redirects=True,
+                )
 
             assert resp.status_code == 200
-            assert _body_contains_tokens(resp, ["too many", "mfa", "attempt"]) or _body_contains_tokens(
-                resp, ["temporarily", "locked"]
+            assert _body_contains_tokens(
+                resp, ["too many", "mfa", "attempt"]
+            ) or _body_contains_tokens(resp, ["temporarily", "locked"])
+            assert assert_event_with_retry(
+                "MFA_PROMPT_RATE_LIMIT", user_id=user_id
             )
-            assert assert_event_with_retry("MFA_PROMPT_RATE_LIMIT", user_id=user_id)
 
     finally:
         with app.app_context():

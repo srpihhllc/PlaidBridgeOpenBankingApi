@@ -14,12 +14,13 @@ logger = logging.getLogger(__name__)
 # 1. SPECIALIZED GRANT TEMPLATES (From your original blueprint logic)
 # =============================================================================
 
+
 def _compose_sbir(payload: Dict[str, Any]) -> str:
     org = payload.get("org_profile", {})
     project = payload.get("project", {})
     mission = org.get("mission", "Our mission is to empower communities.")
     goals = project.get("goals", "N/A")
-    
+
     return f"""
 [GRANT TYPE]: SBIR PROPOSAL NARRATIVE
 
@@ -36,25 +37,30 @@ We believe this aligns with the federal mandate to accelerate commercial readine
 for high-tech entrepreneurs.
 """.strip()
 
+
 def _compose_cdbg(payload: Dict[str, Any]) -> str:
     org_name = payload.get("org_profile", {}).get("name", "Organization")
     return f"📜 [CDBG] Community Development Block Grant Narrative for {org_name} - Pipeline Pending."
+
 
 def _compose_rbdg(payload: Dict[str, Any]) -> str:
     project_title = payload.get("project", {}).get("title", "Project")
     return f"🌾 [RBDG] Rural Business Development Grant Narrative for {project_title} - Pipeline Pending."
 
+
 def _compose_eda(payload: Dict[str, Any]) -> str:
     return "📈 [EDA] Economic Development Administration Proposal Narrative - Pipeline Pending."
+
 
 # =============================================================================
 # 2. GENERAL NOFO FALLBACK (From your original service logic)
 # =============================================================================
 
+
 def _compose_general_nofo(payload: Dict[str, Any]) -> str:
     grant_type = payload.get("grant_type", "general")
     nofo = payload.get("nofo", "No NOFO guidance provided.")
-    
+
     return f"""
 [GRANT TYPE]: {grant_type.upper()}
 
@@ -77,6 +83,7 @@ All documentation and funding will be tracked via FinBrain's orchestration memor
 published via the org_score logs.
 """.strip()
 
+
 # =============================================================================
 # 3. AUTHORITATIVE DISPATCH REGISTRY
 # =============================================================================
@@ -88,6 +95,7 @@ _GRANT_DISPATCHER = {
     "eda": _compose_eda,
 }
 
+
 def compose_grant(payload: Dict[str, Any]) -> str:
     """
     Main entry point for SymphonyAI and subscriber services.
@@ -97,20 +105,24 @@ def compose_grant(payload: Dict[str, Any]) -> str:
         payload (dict): Requires a 'grant_type'. Can include 'org_profile', 'project', or 'nofo' strings.
     """
     grant_type = payload.get("grant_type", "general")
-    
+
     if not grant_type:
-        logger.warning("Empty grant_type provided. Defaulting to general NOFO payload.")
+        logger.warning(
+            "Empty grant_type provided. Defaulting to general NOFO payload."
+        )
         grant_type = "general"
 
     normalized_type = grant_type.strip().lower()
-    
+
     # Check if we have a specialized template (like SBIR)
     dispatcher = _GRANT_DISPATCHER.get(normalized_type)
-    
+
     if dispatcher:
         # Use specialized template
         return dispatcher(payload)
     else:
         # Fall back to the generic NOFO logic
-        logger.info(f"Using generic NOFO template for grant type: {grant_type}")
+        logger.info(
+            f"Using generic NOFO template for grant type: {grant_type}"
+        )
         return _compose_general_nofo(payload)

@@ -8,6 +8,10 @@ def notify_authorities(report):
     from app.models.schema_event import SchemaEvent
 
     db.session.add(
-        SchemaEvent(event_type="REGULATOR_ALERT_ISSUED", origin="comms", detail=str(report))
+        SchemaEvent(
+            event_type="REGULATOR_ALERT_ISSUED",
+            origin="comms",
+            detail=str(report),
+        )
     )
     db.session.commit()

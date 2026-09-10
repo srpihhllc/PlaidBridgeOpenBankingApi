@@ -5,7 +5,9 @@ from flask import Blueprint, current_app, render_template
 
 from app.cockpit.telemetry.emitters.ttl import ttl_summary
 
-cockpit_bp = Blueprint("cockpit_bp", __name__, template_folder="../../templates")
+cockpit_bp = Blueprint(
+    "cockpit_bp", __name__, template_folder="../../templates"
+)
 
 
 @cockpit_bp.route("/cockpit/telemetry")
@@ -50,7 +52,9 @@ def telemetry_dashboard():
 
     fresh_count = sum(1 for item in telemetry_data if item["fresh"] == "True")
     total_count = len(telemetry_data)
-    health_percent = round((fresh_count / total_count) * 100, 2) if total_count > 0 else 0
+    health_percent = (
+        round((fresh_count / total_count) * 100, 2) if total_count > 0 else 0
+    )
 
     return render_template(
         "cockpit_dashboard.html",

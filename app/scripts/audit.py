@@ -12,7 +12,12 @@ from flask import Flask
 
 from app.blueprints import register_blueprints
 from app.cli_commands import cli_audit, ttl_audit
-from app.utils import nav_audit, relationship_audit, route_audit, template_audit
+from app.utils import (
+    nav_audit,
+    relationship_audit,
+    route_audit,
+    template_audit,
+)
 from app.utils.redis_utils import get_redis_client
 
 
@@ -36,7 +41,9 @@ def collect_templates(template_root="app/templates"):
     for root, _, files in os.walk(template_root):
         for f in files:
             if f.endswith((".html", ".htm", ".txt", ".md")):
-                rel_path = os.path.relpath(os.path.join(root, f), template_root)
+                rel_path = os.path.relpath(
+                    os.path.join(root, f), template_root
+                )
                 templates.append(rel_path.replace("\\", "/"))
     return templates
 
@@ -53,7 +60,9 @@ def run_blueprint_template_audit(redis_client=None):
 
     manifest = []
     for r in routes:
-        tpl_candidates = [t for t in templates if r["endpoint"].split(".")[-1] in t]
+        tpl_candidates = [
+            t for t in templates if r["endpoint"].split(".")[-1] in t
+        ]
         manifest.append(
             {
                 "endpoint": r["endpoint"],
@@ -69,10 +78,16 @@ def run_blueprint_template_audit(redis_client=None):
 
     if redis_client:
         try:
-            redis_client.setex("audit:blueprint_templates", 600, json.dumps(manifest))
-            print("📡 Blueprint/template manifest emitted to Redis (key=audit:blueprint_templates)")
+            redis_client.setex(
+                "audit:blueprint_templates", 600, json.dumps(manifest)
+            )
+            print(
+                "📡 Blueprint/template manifest emitted to Redis (key=audit:blueprint_templates)"
+            )
         except Exception as e:
-            print(f"⚠️ Failed to emit blueprint/template manifest to Redis: {e}")
+            print(
+                f"⚠️ Failed to emit blueprint/template manifest to Redis: {e}"
+            )
 
 
 def run_all_audits():
@@ -102,7 +117,9 @@ def run_all_audits():
     if redis_client:
         try:
             redis_client.setex("audit:all_audits_summary", 300, "complete")
-            print("📡 Audit summary emitted to Redis (key=audit:all_audits_summary)")
+            print(
+                "📡 Audit summary emitted to Redis (key=audit:all_audits_summary)"
+            )
         except Exception as e:
             print(f"⚠️ Failed to emit audit summary to Redis: {e}")
 

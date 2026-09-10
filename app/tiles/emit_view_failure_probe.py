@@ -19,7 +19,8 @@ def emit_view_failure_probe():
         try:
             client.setex(key, 300, str(payload))  # TTL = 5 minutes
             current_app.logger.info(
-                "[tiles.emit_view_failure_probe.emit_view_failure_probe] TTL emitted " f"for {key}"
+                "[tiles.emit_view_failure_probe.emit_view_failure_probe] TTL emitted "
+                f"for {key}"
             )
         except Exception as e:
             current_app.logger.error(

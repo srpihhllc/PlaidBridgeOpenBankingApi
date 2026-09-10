@@ -1,6 +1,7 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_pkce_state.py
 
 import re
+
 from app.oauth.provider import ProviderName
 
 
@@ -21,7 +22,9 @@ def test_pkce_and_state_are_set_on_login(client, app):
         m = re.search(r"state=([^&]+)", resp2.headers["Location"])
         assert m
         state = m.group(1)
-        cb = client.get(f"/callback/{ProviderName.GOOGLE.value}?code=abc123&state={state}")
+        cb = client.get(
+            f"/callback/{ProviderName.GOOGLE.value}?code=abc123&state={state}"
+        )
         assert cb.status_code != 400
 
 
@@ -30,5 +33,7 @@ def test_state_mismatch_returns_400(client, app):
     resp = client.get(f"/login/{ProviderName.GOOGLE.value}")
     assert resp.status_code in (302, 303)
     # Call callback with wrong state
-    resp2 = client.get(f"/callback/{ProviderName.GOOGLE.value}?code=abc123&state=invalid-state")
+    resp2 = client.get(
+        f"/callback/{ProviderName.GOOGLE.value}?code=abc123&state=invalid-state"
+    )
     assert resp2.status_code == 400

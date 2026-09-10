@@ -1,4 +1,5 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils.py
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils_legacy.py
+
 
 """
 Utility functions for monitoring, loan analysis, fraud detection,
@@ -16,13 +17,13 @@ from __future__ import annotations
 import base64
 import os
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 from io import BytesIO
 from typing import Any
 
 import requests
 from fpdf import FPDF
-from PyPDF2 import PdfReader, PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 # ==========================
 # PythonAnywhere API Monitoring
@@ -63,7 +64,10 @@ def analyze_loan_agreement(agreement_text: str) -> dict[str, str]:
     text = agreement_text.lower()
     for term in unethical_terms:
         if term in text:
-            return {"status": "flagged", "reason": f"Contains unethical term: {term}"}
+            return {
+                "status": "flagged",
+                "reason": f"Contains unethical term: {term}",
+            }
     return {"status": "approved"}
 
 
@@ -91,12 +95,21 @@ def execute_smart_contract(loan_agreement_id: int) -> dict[str, Any]:
     from app.extensions import db
     from app.models.loan_agreement import LoanAgreement
 
-    agreement: LoanAgreement | None = LoanAgreement.query.get(loan_agreement_id)
+    # Modern SQLAlchemy 2.x lookup
+    agreement: LoanAgreement | None = db.session.get(
+        LoanAgreement, loan_agreement_id
+    )
     if agreement is not None and agreement.status == "active":
         agreement.status = "under_contract"
         db.session.commit()
-        return {"contract_status": "executed", "loan_agreement_id": loan_agreement_id}
-    return {"contract_status": "failed", "reason": "Invalid agreement or status."}
+        return {
+            "contract_status": "executed",
+            "loan_agreement_id": loan_agreement_id,
+        }
+    return {
+        "contract_status": "failed",
+        "reason": "Invalid agreement or status.",
+    }
 
 
 def notify_authorities(issue_details: str) -> dict[str, str]:
@@ -107,7 +120,7 @@ def notify_authorities(issue_details: str) -> dict[str, str]:
 
 def time_since(dt: datetime) -> str:
     """Return a compact human‑readable delta (e.g., '5m', '2h', '3d')."""
-    delta = datetime.utcnow() - dt
+    delta = datetime.now(timezone.utc) - dt
     if delta.days > 0:
         return f"{delta.days}d"
     if delta.seconds > 3600:
@@ -122,7 +135,9 @@ def time_since(dt: datetime) -> str:
 # ==========================
 
 
-def create_bank_statement(data: Mapping[str, Any], signature_base64: str | None = None) -> BytesIO:
+def create_bank_statement(
+    data: Mapping[str, Any], signature_base64: str | None = None
+) -> BytesIO:
     """Generate a bank statement PDF using FPDF and return it as a BytesIO stream."""
     pdf = FPDF()
     pdf.add_page()
@@ -133,7 +148,7 @@ def create_bank_statement(data: Mapping[str, Any], signature_base64: str | None 
     pdf.cell(
         200,
         10,
-        f"Date: {datetime.utcnow().strftime('%Y-%m-%d')}",
+        f"Date: {datetime.now(timezone.utc).strftime('%Y-%m-%d')}",
         ln=True,
         align="C",
     )
@@ -141,7 +156,9 @@ def create_bank_statement(data: Mapping[str, Any], signature_base64: str | None 
 
     # Account details
     pdf.cell(100, 10, f"Account Holder: {data.get('name', '')}", ln=True)
-    pdf.cell(100, 10, f"Account Number: {data.get('account_number', '')}", ln=True)
+    pdf.cell(
+        100, 10, f"Account Number: {data.get('account_number', '')}", ln=True
+    )
     pdf.ln(5)
     pdf.cell(100, 10, f"Balance: ${data.get('balance', 0)}", ln=True)
     pdf.ln(10)
@@ -179,7 +196,9 @@ def create_bank_statement(data: Mapping[str, Any], signature_base64: str | None 
 # ==========================
 
 
-def merge_pdfs(pdf_list: Iterable[BytesIO | str | os.PathLike[str]]) -> BytesIO:
+def merge_pdfs(
+    pdf_list: Iterable[BytesIO | str | os.PathLike[str]],
+) -> BytesIO:
     """
     Combine multiple PDFs into a single document.
 

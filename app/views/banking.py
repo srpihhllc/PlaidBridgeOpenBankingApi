@@ -40,7 +40,9 @@ def view_accounts(user_id: int):
         accounts = BankAccount.query.filter_by(user_id=user_id).all()
         return render_template("accounts.html", user=user, accounts=accounts)
     except Exception as e:
-        current_app.logger.error(f"❌ Error rendering accounts for user {user_id}: {e}")
+        current_app.logger.error(
+            f"❌ Error rendering accounts for user {user_id}: {e}"
+        )
         abort(500, description="Unable to load accounts at this time.")
 
 
@@ -64,7 +66,9 @@ def account_txns(account_id: int):
             velocity=velocity,
         )
     except Exception as e:
-        current_app.logger.error(f"❌ Error rendering transactions for account {account_id}: {e}")
+        current_app.logger.error(
+            f"❌ Error rendering transactions for account {account_id}: {e}"
+        )
         abort(500, description="Unable to load transactions at this time.")
 
 
@@ -102,5 +106,7 @@ def account_info(account_id: int):
             statements=statement_data,
         )
     except Exception as e:
-        current_app.logger.error(f"❌ Error rendering account info for account {account_id}: {e}")
+        current_app.logger.error(
+            f"❌ Error rendering account info for account {account_id}: {e}"
+        )
         abort(500, description="Unable to load account info at this time.")

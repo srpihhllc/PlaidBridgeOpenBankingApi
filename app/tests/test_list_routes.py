@@ -11,4 +11,6 @@ def test_list_routes(app):
     print("--- End routes ---\n")
 
     # Sanity assertion so pytest prints the output even if nothing else runs
-    assert any(r.rule.startswith("/dashboard") for r in rules), "No dashboard rules found"
+    assert any(
+        r.rule.startswith("/dashboard") for r in rules
+    ), "No dashboard rules found"

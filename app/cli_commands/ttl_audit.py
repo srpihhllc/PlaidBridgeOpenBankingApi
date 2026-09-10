@@ -4,11 +4,10 @@
 # =============================================================================
 
 import click
-from flask import current_app
 from flask.cli import with_appcontext
 
-from app.utils.redis_utils import get_redis_client
 from app.telemetry.ttl_emit import emit_schema_trace
+from app.utils.redis_utils import get_redis_client
 
 
 @click.command("ttl_audit")
@@ -20,7 +19,7 @@ from app.telemetry.ttl_emit import emit_schema_trace
 @with_appcontext
 def ttl_audit(domain: str):
     """
-    Scans Redis for all ttl:{domain}:* keys, dynamically determines their 
+    Scans Redis for all ttl:{domain}:* keys, dynamically determines their
     underlying Redis data type, extracts payload data, and audits TTL states.
     Emits a schema-compliant summary trace back into Redis for observability.
     """
@@ -36,7 +35,9 @@ def ttl_audit(domain: str):
     cursor = 0
     try:
         while True:
-            cursor, partial = redis_client.scan(cursor=cursor, match=pattern, count=100)
+            cursor, partial = redis_client.scan(
+                cursor=cursor, match=pattern, count=100
+            )
             keys.extend(partial)
             if cursor == 0:
                 break
@@ -48,14 +49,20 @@ def ttl_audit(domain: str):
         click.echo(f"⚠️ No telemetry keys found under {pattern}")
         return
 
-    click.echo(f"📡 Found {len(keys)} telemetry keys under domain '{domain}':\n")
+    click.echo(
+        f"📡 Found {len(keys)} telemetry keys under domain '{domain}':\n"
+    )
 
     readable = 0
     unreadable = 0
     status_counts = {}
 
     for key_bytes in keys:
-        key = key_bytes.decode("utf-8") if isinstance(key_bytes, bytes) else key_bytes
+        key = (
+            key_bytes.decode("utf-8")
+            if isinstance(key_bytes, bytes)
+            else key_bytes
+        )
 
         try:
             ttl = redis_client.ttl(key)
@@ -72,15 +79,20 @@ def ttl_audit(domain: str):
             if key_type == "string":
                 val = redis_client.get(key)
                 if val:
-                    decoded = val.decode("utf-8") if isinstance(val, bytes) else str(val)
+                    decoded = (
+                        val.decode("utf-8")
+                        if isinstance(val, bytes)
+                        else str(val)
+                    )
                     value_summary = decoded
                     status = "string"
 
             elif key_type == "hash":
                 fields = redis_client.hgetall(key)
                 decoded = {
-                    (k.decode("utf-8") if isinstance(k, bytes) else k):
-                    (v.decode("utf-8") if isinstance(v, bytes) else v)
+                    (k.decode("utf-8") if isinstance(k, bytes) else k): (
+                        v.decode("utf-8") if isinstance(v, bytes) else v
+                    )
                     for k, v in fields.items()
                 }
                 value_summary = f"HashData({decoded})"
@@ -105,17 +117,23 @@ def ttl_audit(domain: str):
                 status_str = f"Readable → {value_summary[:70]}"
             else:
                 unreadable += 1
-                status_counts["unreadable"] = status_counts.get("unreadable", 0) + 1
+                status_counts["unreadable"] = (
+                    status_counts.get("unreadable", 0) + 1
+                )
                 status_str = "Unreadable (unknown type)"
 
             click.echo(f"🔹 {key}")
-            click.echo(f"    TTL: {ttl}s | Type: {key_type} | Status: {status_str}\n")
+            click.echo(
+                f"    TTL: {ttl}s | Type: {key_type} | Status: {status_str}\n"
+            )
 
         except Exception as e:
             unreadable += 1
             status_counts["error"] = status_counts.get("error", 0) + 1
             click.echo(f"🔹 {key}")
-            click.echo(f"    TTL: Error | Status: unreadable (Exception: {str(e)[:40]})\n")
+            click.echo(
+                f"    TTL: Error | Status: unreadable (Exception: {str(e)[:40]})\n"
+            )
 
     # ------------------------------
     # Summary

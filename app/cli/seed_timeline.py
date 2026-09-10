@@ -1,7 +1,7 @@
 # FILE: app/cli/seed_timeline.py
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import click
 from flask.cli import with_appcontext
@@ -27,7 +27,7 @@ def seed_timeline():
             user_id=user.id,
             label=f"Activity {i+1}",
             value=random.randint(10, 100),
-            timestamp=datetime.utcnow() - timedelta(days=i * 3),
+            timestamp=datetime.now(timezone.utc) - timedelta(days=i * 3),
         )
         db.session.add(evt)
 

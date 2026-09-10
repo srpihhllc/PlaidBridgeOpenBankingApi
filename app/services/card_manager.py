@@ -32,7 +32,9 @@ def suspend_card(card_id: str) -> bool:
     headers = _auth_headers()
 
     try:
-        res: Response = requests.post(url, headers=headers, timeout=REQUEST_TIMEOUT)
+        res: Response = requests.post(
+            url, headers=headers, timeout=REQUEST_TIMEOUT
+        )
         return res.status_code == 200
     except RequestException as e:
         logger.error(f"Network error suspending card {card_id}: {e}")
@@ -45,10 +47,13 @@ def unfreeze_card(card_id: str) -> bool:
     headers = _auth_headers()
 
     try:
-        res: Response = requests.post(url, headers=headers, timeout=REQUEST_TIMEOUT)
+        res: Response = requests.post(
+            url, headers=headers, timeout=REQUEST_TIMEOUT
+        )
         return res.status_code == 200
     except RequestException as e:
         logger.error(f"Network error unfreezing card {card_id}: {e}")
         return False
+
 
 __all__ = ["suspend_card", "unfreeze_card"]

@@ -9,10 +9,14 @@ from wtforms.validators import DataRequired, Length
 
 
 class MFAForm(FlaskForm):
-    code = StringField("MFA Code", validators=[DataRequired(), Length(min=6, max=10)])
+    code = StringField(
+        "MFA Code", validators=[DataRequired(), Length(min=6, max=10)]
+    )
     submit = SubmitField("Verify")
 
 
 class MFAEnableForm(FlaskForm):
-    code = StringField("Setup Code", validators=[DataRequired(), Length(min=6, max=10)])
+    code = StringField(
+        "Setup Code", validators=[DataRequired(), Length(min=6, max=10)]
+    )
     submit = SubmitField("Enable MFA")

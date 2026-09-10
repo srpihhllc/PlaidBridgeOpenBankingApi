@@ -23,7 +23,9 @@ _in_progress = False
 _warned_no_redis = False
 
 # Queue entries: (key, timestamp, value, status, ttl_seconds, meta)
-_emit_queue: list[tuple[str, str, str | None, str | None, int, dict[str, Any] | None]] = []
+_emit_queue: list[
+    tuple[str, str, str | None, str | None, int, dict[str, Any] | None]
+] = []
 _queue_lock = threading.Lock()
 
 
@@ -46,7 +48,9 @@ def _attempt_flush_queue(client: Any) -> int:
         items = list(_emit_queue)
         count = len(items)
 
-        use_pipeline = hasattr(client, "pipeline") and callable(client.pipeline)
+        use_pipeline = hasattr(client, "pipeline") and callable(
+            client.pipeline
+        )
         try:
             if use_pipeline:
                 pipe = client.pipeline()
@@ -74,11 +78,16 @@ def _attempt_flush_queue(client: Any) -> int:
                         )
                         return count
                     except Exception as e:
-                        logger.warning("⚠️ Flush attempt %d failed: %s", attempt, e)
+                        logger.warning(
+                            "⚠️ Flush attempt %d failed: %s", attempt, e
+                        )
                         if attempt < 2:
                             sleep(0.1)
                         else:
-                            logger.error("❌ Final flush failed; queue intact.", exc_info=True)
+                            logger.error(
+                                "❌ Final flush failed; queue intact.",
+                                exc_info=True,
+                            )
                             return 0
 
             else:
@@ -99,7 +108,9 @@ def _attempt_flush_queue(client: Any) -> int:
                             client.set(key, json.dumps(payload), int(ttl_s))
 
                 _emit_queue.clear()
-                logger.info("🟢 Flushed %d queued TTL emits (serial fallback).", count)
+                logger.info(
+                    "🟢 Flushed %d queued TTL emits (serial fallback).", count
+                )
                 return count
 
         except Exception as e:
@@ -180,7 +191,8 @@ def ttl_emit(
 
         with _data_lock:
             _ttl_data[key] = {
-                "expires_at": datetime.datetime.now() + datetime.timedelta(seconds=ttl),
+                "expires_at": datetime.datetime.now()
+                + datetime.timedelta(seconds=ttl),
                 "ttl_seconds": ttl,
                 "value": str_val,
                 "status": status,
@@ -232,13 +244,20 @@ def ttl_emit(
                     pipe.execute()
                     return
                 except Exception:
-                    logger.debug("Pipeline emit failed; falling through to no-op", exc_info=True)
+                    logger.debug(
+                        "Pipeline emit failed; falling through to no-op",
+                        exc_info=True,
+                    )
 
-            logger.debug("Telemetry: resolved client is not Redis-like; treating ttl_emit as no-op")
+            logger.debug(
+                "Telemetry: resolved client is not Redis-like; treating ttl_emit as no-op"
+            )
             return
 
         except Exception as e:
-            logger.warning("Error while writing TTL emit to client: %s", e, exc_info=False)
+            logger.warning(
+                "Error while writing TTL emit to client: %s", e, exc_info=False
+            )
 
     finally:
         _in_progress = False
@@ -306,7 +325,9 @@ def emit_boot_trace(*args: Any, **kwargs: Any) -> Any:
         detail = args[2]
 
     if not (domain and event and detail):
-        raise TypeError("emit_boot_trace requires either a 'key' kwarg or domain/event/detail")
+        raise TypeError(
+            "emit_boot_trace requires either a 'key' kwarg or domain/event/detail"
+        )
 
     value = kwargs.get("value", None)
     status = kwargs.get("status", "ok")

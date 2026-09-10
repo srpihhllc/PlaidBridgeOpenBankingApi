@@ -26,7 +26,9 @@ def get_tradeline_details(tradeline_id: int) -> dict[str, Any] | None:
     try:
         tradeline = Tradeline.query.get(tradeline_id)
         if not tradeline:
-            logger.warning(f"[get_tradeline_details] Tradeline {tradeline_id} not found.")
+            logger.warning(
+                f"[get_tradeline_details] Tradeline {tradeline_id} not found."
+            )
             return None
 
         return {
@@ -63,7 +65,9 @@ def update_tradeline(tradeline_id: int, updates: dict[str, Any]) -> bool:
     try:
         tradeline = Tradeline.query.get(tradeline_id)
         if not tradeline:
-            logger.warning(f"[update_tradeline] Tradeline {tradeline_id} not found for update.")
+            logger.warning(
+                f"[update_tradeline] Tradeline {tradeline_id} not found for update."
+            )
             return False
 
         updated_fields = []

@@ -1,12 +1,14 @@
 # app/cockpit/tiles/fk_constraint_inspector.py
 
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, current_app, render_template
 from sqlalchemy import inspect
 
 from app.extensions import db
 from app.utils.telemetry import log_identity_event
 
-fk_inspector_bp = Blueprint("fk_inspector_bp", __name__, url_prefix="/cockpit/fk")
+fk_inspector_bp = Blueprint(
+    "fk_inspector_bp", __name__, url_prefix="/cockpit/fk"
+)
 
 
 @fk_inspector_bp.route("/")
@@ -43,6 +45,8 @@ def index():
             details={"issues": len(fk_issues)},
         )
     else:
-        log_identity_event(user_id=0, event_type="FK_INSPECTOR_OK", details={"issues": 0})
+        log_identity_event(
+            user_id=0, event_type="FK_INSPECTOR_OK", details={"issues": 0}
+        )
 
     return render_template("cockpit/fk_inspector.html", fk_issues=fk_issues)

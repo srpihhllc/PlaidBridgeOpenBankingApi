@@ -24,7 +24,9 @@ class PasswordResetForm(FlaskForm):
 
 
 class ChangePasswordForm(FlaskForm):
-    current_password = PasswordField("Current Password", validators=[DataRequired()])
+    current_password = PasswordField(
+        "Current Password", validators=[DataRequired()]
+    )
     new_password = PasswordField(
         "New Password",
         validators=[
@@ -33,5 +35,7 @@ class ChangePasswordForm(FlaskForm):
             EqualTo("confirm", message="Passwords must match"),
         ],
     )
-    confirm = PasswordField("Confirm New Password", validators=[DataRequired()])
+    confirm = PasswordField(
+        "Confirm New Password", validators=[DataRequired()]
+    )
     submit = SubmitField("Change Password")

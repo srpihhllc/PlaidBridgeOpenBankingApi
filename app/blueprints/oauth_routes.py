@@ -3,6 +3,7 @@
 # =============================================================================
 
 from __future__ import annotations
+
 import base64
 import hashlib
 import json
@@ -12,14 +13,22 @@ import secrets
 import traceback
 import uuid
 
-from flask import Blueprint, current_app, jsonify, redirect, request, session, url_for
 import requests
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 
+import app.services.oauth as oauth_services
 from app.cockpit import ttl_emit as cockpit_ttl_emit
 from app.extensions import db
 from app.models import TraceEvent
 from app.oauth.provider import OAuthProvider, ProviderName
-import app.services.oauth as oauth_services
 
 logger = logging.getLogger(__name__)
 oauth_bp = Blueprint("oauth", __name__)
@@ -28,6 +37,7 @@ oauth_bp = Blueprint("oauth", __name__)
 # ---------------------------------------------------------------------------
 # Telemetry Bridge
 # ---------------------------------------------------------------------------
+
 
 def _safe_ttl_emit(key: str, status: str, ttl: int = 60, **kwargs) -> None:
     """
@@ -47,7 +57,10 @@ def _safe_ttl_emit(key: str, status: str, ttl: int = 60, **kwargs) -> None:
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _emit_oauth_failure_ttl(provider: str, reason: str = "missing_code") -> None:
+
+def _emit_oauth_failure_ttl(
+    provider: str, reason: str = "missing_code"
+) -> None:
     """Emit failure traces via the safe telemetry bridge."""
     _safe_ttl_emit(
         key=f"ttl:flow:oauth:{provider}:failure",
@@ -59,7 +72,9 @@ def _emit_oauth_failure_ttl(provider: str, reason: str = "missing_code") -> None
 
 def _generate_pkce_pair() -> tuple[str, str]:
     """Generates PKCE verifier and challenge for secure OAuth flows."""
-    verifier = base64.urlsafe_b64encode(os.urandom(40)).rstrip(b"=").decode("ascii")
+    verifier = (
+        base64.urlsafe_b64encode(os.urandom(40)).rstrip(b"=").decode("ascii")
+    )
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     challenge = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
     return verifier, challenge
@@ -68,6 +83,7 @@ def _generate_pkce_pair() -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 # OAuth Routes
 # ---------------------------------------------------------------------------
+
 
 @oauth_bp.route("/login/<provider>", methods=["GET"])
 def login(provider: str):
@@ -88,9 +104,15 @@ def login(provider: str):
     provider_obj = OAuthProvider(
         prov,
         config={
-            "client_id": current_app.config.get(f"{prov.value.upper()}_CLIENT_ID"),
-            "client_secret": current_app.config.get(f"{prov.value.upper()}_CLIENT_SECRET"),
-            "redirect_uri": current_app.config.get(f"{prov.value.upper()}_REDIRECT_URI"),
+            "client_id": current_app.config.get(
+                f"{prov.value.upper()}_CLIENT_ID"
+            ),
+            "client_secret": current_app.config.get(
+                f"{prov.value.upper()}_CLIENT_SECRET"
+            ),
+            "redirect_uri": current_app.config.get(
+                f"{prov.value.upper()}_REDIRECT_URI"
+            ),
         },
     )
 
@@ -102,7 +124,9 @@ def login(provider: str):
     )
 
     if not get_auth_url_func:
-        raise AttributeError(f"OAuthProvider has no authorization URL method defined for {prov.value}")
+        raise AttributeError(
+            f"OAuthProvider has no authorization URL method defined for {prov.value}"
+        )
 
     # Pass optional kwargs safely based on method signature
     kwargs = {"state": state}
@@ -210,9 +234,14 @@ def callback_provider(provider: str):
 
             return jsonify({"error": err_msg}), 401
 
-        if "id token validation failed" in err_msg_lower or "invalid apple id token" in err_msg_lower:
+        if (
+            "id token validation failed" in err_msg_lower
+            or "invalid apple id token" in err_msg_lower
+        ):
             _emit_oauth_failure_ttl(prov.value, reason="invalid_id_token")
-            logger.error(f"OAuth ID token validation failed: {err_msg}", exc_info=True)
+            logger.error(
+                f"OAuth ID token validation failed: {err_msg}", exc_info=True
+            )
             return jsonify({"error": err_msg}), 401
 
         _emit_oauth_failure_ttl(prov.value, reason="value_error")
@@ -237,6 +266,7 @@ def callback_provider(provider: str):
 # ---------------------------------------------------------------------------
 # Explicit Test Sentinels & Routing Snapshots Compatibility Layer
 # ---------------------------------------------------------------------------
+
 
 @oauth_bp.route("/callback/google", methods=["GET", "POST"])
 def callback_google():

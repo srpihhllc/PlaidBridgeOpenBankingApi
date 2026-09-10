@@ -2,11 +2,8 @@
 
 
 from app.extensions import db
-from app.models import (
-    FinancialAuditLog,  # Added FinancialAuditLog
-    LoanAgreement,
-    User,
-)
+from app.models import FinancialAuditLog  # Added FinancialAuditLog
+from app.models import LoanAgreement, User
 
 
 def check_lender_compliance(lender_id):
@@ -18,10 +15,14 @@ def check_lender_compliance(lender_id):
     if not lender:
         return {"error": "Lender not found"}
 
-    lender_agreements = LoanAgreement.query.filter_by(lender_id=lender_id).all()
+    lender_agreements = LoanAgreement.query.filter_by(
+        lender_id=lender_id
+    ).all()
 
     # Logic: Identify "Bad" agreements (e.g., those with internal violation flags)
-    current_violations = [a for a in lender_agreements if getattr(a, "violation_count", 0) > 0]
+    current_violations = [
+        a for a in lender_agreements if getattr(a, "violation_count", 0) > 0
+    ]
 
     if current_violations:
         for v in current_violations:
@@ -39,7 +40,9 @@ def check_lender_compliance(lender_id):
     # 3. Strike 3 Rule: Automatic Lockout
     if lender.violation_count >= 3 and not lender.is_locked:
         lender.is_locked = True
-        lender.lock_reason = "Automated Lock: Exceeded 3 compliance violations."
+        lender.lock_reason = (
+            "Automated Lock: Exceeded 3 compliance violations."
+        )
 
         lock_audit = FinancialAuditLog(
             actor_id=lender.id,
@@ -63,7 +66,9 @@ lender_compliance = {
     lender.id: check_lender_compliance(lender.id)
     for lender in User.query.filter(
         (User.role == "lender")
-        | (User.is_admin.is_(False))  # Or any logic that excludes non-participants
+        | (
+            User.is_admin.is_(False)
+        )  # Or any logic that excludes non-participants
     ).all()
     if lender.lent_loan_agreements.count() > 0
 }

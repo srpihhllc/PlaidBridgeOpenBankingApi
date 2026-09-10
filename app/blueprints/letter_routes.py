@@ -31,7 +31,9 @@ def generate_letter_pdf(template_name):
 
         response = make_response(pdf_data)
         response.headers["Content-Type"] = "application/pdf"
-        response.headers["Content-Disposition"] = f"attachment; filename={template_name}.pdf"
+        response.headers["Content-Disposition"] = (
+            f"attachment; filename={template_name}.pdf"
+        )
         return response
 
     except Exception as e:

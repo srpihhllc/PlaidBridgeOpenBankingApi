@@ -31,11 +31,15 @@ def render():
         # Expecting f to be tuple or object with name/line/link
         failures.append(
             {
-                "name": getattr(f, "name", f[0] if isinstance(f, list | tuple) else str(f)),
+                "name": getattr(
+                    f, "name", f[0] if isinstance(f, list | tuple) else str(f)
+                ),
                 "line": getattr(
                     f,
                     "line",
-                    f[1] if isinstance(f, list | tuple) and len(f) > 1 else None,
+                    f[1]
+                    if isinstance(f, list | tuple) and len(f) > 1
+                    else None,
                 ),
                 "link": getattr(f, "link", None),
             }
@@ -64,7 +68,9 @@ def pulse():
     try:
         # Prefer the lightweight emitter if available (faster, less I/O)
         try:
-            from app.tiles.blueprint_drift_pulse_tile import emit as pulse_emit  # local import
+            from app.tiles.blueprint_drift_pulse_tile import (
+                emit as pulse_emit,
+            )  # local import
         except Exception:
             pulse_emit = None
 
@@ -101,9 +107,13 @@ def pulse():
     except Exception as exc:  # ensure we never return an empty response
         # Log the full stacktrace to diagnose intermittent crashes/timeouts
         try:
-            current_app.logger.exception("Blueprint drift pulse failed: %s", exc)
+            current_app.logger.exception(
+                "Blueprint drift pulse failed: %s", exc
+            )
         except Exception:
-            logger.exception("Blueprint drift pulse failed (no current_app): %s", exc)
+            logger.exception(
+                "Blueprint drift pulse failed (no current_app): %s", exc
+            )
 
         # Always return a safe JSON object so the browser never receives an empty response
         return (

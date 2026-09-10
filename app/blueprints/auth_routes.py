@@ -2,8 +2,9 @@
 # FILE: app/blueprints/auth_routes.py
 # DESCRIPTION: Authentication, identity, and profile management routes.
 # - Session (Flask-Login) and API tokens (Flask-JWT-Extended).
-# - Cockpit-grade operational clarity: explicit telemetry, defensive fallbacks,
-#   DB-backed MFA codes, safe redirect logic, rate-limits, and operator-friendly logs.
+# - Cockpit-grade operational clarity: explicit telemetry, defensive
+#   fallbacks, DB-backed MFA codes, safe redirect logic, rate-limits,
+#   and operator-friendly logs.
 # =============================================================================
 
 from __future__ import annotations
@@ -12,8 +13,6 @@ import json
 import logging
 import secrets
 from datetime import datetime, timezone
-
-
 
 from flask import (
     Blueprint,
@@ -39,7 +38,6 @@ from sqlalchemy.exc import IntegrityError
 from werkzeug.routing import BuildError
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.utils.security_utils import is_safe_url
 from app.extensions import csrf, db
 from app.forms import (
     AccountUpdateForm,
@@ -62,7 +60,7 @@ from app.services.rate_limiter import apply_rate_limit, is_rate_limited
 from app.services.sms import send_mfa_code as send_mfa_sms
 from app.services.totp_service import verify_totp_code
 from app.utils.redis_utils import get_redis_client
-from app.utils.security_utils import hash_pii_for_key
+from app.utils.security_utils import hash_pii_for_key, is_safe_url
 from app.utils.telemetry import log_identity_event
 
 logger = logging.getLogger(__name__)
@@ -76,21 +74,23 @@ jwt = JWTManager()
 ROLE_REDIRECTS = {
     "admin": ("admin.admin_home", "admin.admin_home"),
     "super_admin": ("admin.admin_home", "admin.admin_home"),
-    # subscriber should go to the subscriber UI index endpoint (tests expect /sub/)
+    # subscriber should go to subscriber UI index endpoint (tests expect /sub/)
     "subscriber": ("sub_ui.dashboard", "sub_ui.dashboard"),
-    # explicit 'none' role or a None-role user should go to the subscriber index
+    # explicit 'none' role or None-role user goes to subscriber index
     "none": ("sub_ui.sub_index", "sub_ui.dashboard"),
 }
-# Default for users without special role - keep main.dashboard as ultimate fallback,
-# but we handle None-role above before relying on DEFAULT_REDIRECT.
+# Default for users without special role - keep main.dashboard as ultimate
+# fallback, but we handle None-role above before relying on DEFAULT_REDIRECT.
 DEFAULT_REDIRECT = "main.dashboard"
+
 
 def redirect_for_role(user: User, prefer_safe: bool = False):
     """
     Resolve a redirect for the given user role.
 
     - Treat role==None as subscriber (test expectation).
-    - Try named endpoints (url_for) first, then fallback to literal paths useful in tests.
+    - Try named endpoints (url_for) first, then fallback to literal paths
+      useful in tests.
     """
     ROLE_LITERAL_PATHS = {
         "admin": "/admin/cockpit",
@@ -102,24 +102,35 @@ def redirect_for_role(user: User, prefer_safe: bool = False):
 
     # Admin-preferring logic (unchanged)
     try:
-        if getattr(user, "is_admin", False) or getattr(user, "role", None) in ("admin", "super_admin"):
+        if getattr(user, "is_admin", False) or getattr(user, "role", None) in (
+            "admin",
+            "super_admin",
+        ):
             for endpoint in ("admin.admin_index", "admin.admin_home"):
                 try:
                     return redirect(url_for(endpoint))
                 except BuildError:
-                    current_app.logger.warning("redirect_for_role: missing endpoint %s", endpoint)
+                    current_app.logger.warning(
+                        "redirect_for_role: missing endpoint %s", endpoint
+                    )
             return redirect(ROLE_LITERAL_PATHS.get("admin", "/"))
     except Exception:
-        current_app.logger.exception("redirect_for_role: unexpected error when resolving admin redirect")
+        current_app.logger.exception(
+            "redirect_for_role: unexpected error when resolving admin "
+            "redirect"
+        )
 
     # Prefer safe dashboard redirect if requested
     if prefer_safe:
         try:
             return redirect(url_for("auth.me_dashboard"))
         except Exception:
-            current_app.logger.exception("redirect_for_role: failed safe redirect; falling back")
+            current_app.logger.exception(
+                "redirect_for_role: failed safe redirect; falling back"
+            )
 
-    # Normalize role: treat None as explicit 'none' which we map to subscriber index
+    # Normalize role: treat None as explicit 'none' which we map to subscriber
+    # index
     role = getattr(user, "role", None)
     if role is None:
         role = "none"
@@ -131,19 +142,28 @@ def redirect_for_role(user: User, prefer_safe: bool = False):
         return redirect(url_for(primary))
     except BuildError:
         current_app.logger.warning(
-            "redirect_for_role: missing endpoint %s; trying fallback %s", primary, fallback
+            "redirect_for_role: missing endpoint %s; trying fallback %s",
+            primary,
+            fallback,
         )
         if fallback:
             try:
                 return redirect(url_for(fallback))
             except BuildError:
-                current_app.logger.error("redirect_for_role: missing fallback endpoint %s", fallback)
+                current_app.logger.error(
+                    "redirect_for_role: missing fallback endpoint %s",
+                    fallback,
+                )
 
     # Try default endpoint name and then literal fallback for role
     try:
         return redirect(url_for(DEFAULT_REDIRECT))
     except Exception:
-        current_app.logger.error("redirect_for_role: failed to resolve DEFAULT_REDIRECT %s", DEFAULT_REDIRECT, exc_info=True)
+        current_app.logger.error(
+            "redirect_for_role: failed to resolve DEFAULT_REDIRECT %s",
+            DEFAULT_REDIRECT,
+            exc_info=True,
+        )
         literal = ROLE_LITERAL_PATHS.get(role)
         if literal:
             return redirect(literal)
@@ -157,7 +177,9 @@ def _resolve_mfa_user() -> User | None:
     try:
         return db.session.get(User, uid)
     except Exception:
-        current_app.logger.exception("Failed to load user from session.mfa_user_id")
+        current_app.logger.exception(
+            "Failed to load user from session.mfa_user_id"
+        )
         return None
 
 
@@ -186,15 +208,26 @@ def send_mfa_code(user: User, code: str | None = None) -> str:
     else:
         masked = "unknown"
 
-    current_app.logger.info("[MOCK MFA SEND] user_id=%s dest=%s", getattr(user, "id", "unknown"), masked)
+    current_app.logger.info(
+        "[MOCK MFA SEND] user_id=%s dest=%s",
+        getattr(user, "id", "unknown"),
+        masked,
+    )
 
     try:
         try:
-            if not check_mfa_send_rate_limit(user.id if getattr(user, "id", None) else masked):
-                current_app.logger.warning("MFA send rate-limited for user=%s", getattr(user, "id", None))
+            if not check_mfa_send_rate_limit(
+                user.id if getattr(user, "id", None) else masked
+            ):
+                current_app.logger.warning(
+                    "MFA send rate-limited for user=%s",
+                    getattr(user, "id", None),
+                )
                 raise MFASendTransient("rate limited")
         except Exception:
-            current_app.logger.debug("check_mfa_send_rate_limit failed", exc_info=True)
+            current_app.logger.debug(
+                "check_mfa_send_rate_limit failed", exc_info=True
+            )
 
         send_mfa_sms(user, code)
 
@@ -202,15 +235,20 @@ def send_mfa_code(user: User, code: str | None = None) -> str:
             record_mfa_send_request(
                 user.id if getattr(user, "id", None) else None,
                 channel="sms_or_email",
-                masked_dest=masked
+                masked_dest=masked,
             )
         except Exception:
-            current_app.logger.debug("record_mfa_send_request failed", exc_info=True)
+            current_app.logger.debug(
+                "record_mfa_send_request failed", exc_info=True
+            )
 
     except MFASendTransient:
         raise
     except Exception as e:
-        current_app.logger.exception("MFA send provider exception for user=%s", getattr(user, "id", None))
+        current_app.logger.exception(
+            "MFA send provider exception for user=%s",
+            getattr(user, "id", None),
+        )
         raise MFASendTransient(str(e)) from e
 
     return code
@@ -225,8 +263,12 @@ def mfa_prompt():
       - DB-backed MFACode record
       - fallback to TOTP for users with a totp_secret
     """
+
     def emit(evt: str, details: dict | None = None):
-        """Emit an identity event; use log_identity_event primarily and fallback to Redis push if it fails."""
+        """
+        Emit an identity event; use log_identity_event primarily and fallback
+        to Redis push if it fails.
+        """
         details = details or {}
         try:
             log_identity_event(
@@ -238,7 +280,11 @@ def mfa_prompt():
             )
             return
         except Exception:
-            current_app.logger.debug("log_identity_event failed for %s; attempting Redis fallback", evt, exc_info=True)
+            current_app.logger.debug(
+                "log_identity_event failed for %s; attempting Redis fallback",
+                evt,
+                exc_info=True,
+            )
         # Redis fallback to ensure tests which assert events can observe them
         try:
             client = get_redis_client()
@@ -252,13 +298,21 @@ def mfa_prompt():
                     "details": details,
                 }
                 client.rpush("identity_events_stream", json.dumps(ev))
-                current_app.logger.info("emit: fallback pushed event %s for user=%s", evt, getattr(user, "id", None))
+                current_app.logger.info(
+                    "emit: fallback pushed event %s for user=%s",
+                    evt,
+                    getattr(user, "id", None),
+                )
         except Exception:
-            current_app.logger.debug("Redis fallback for identity event failed", exc_info=True)
+            current_app.logger.debug(
+                "Redis fallback for identity event failed", exc_info=True
+            )
 
     def fail_and_render(message: str, ttl=None):
         flash(message, "danger")
-        return render_template("auth/mfa_prompt.html", form=form, user=user, ttl=ttl)
+        return render_template(
+            "auth/mfa_prompt.html", form=form, user=user, ttl=ttl
+        )
 
     def increment_failure_and_render(ttl=None):
         try:
@@ -266,11 +320,18 @@ def mfa_prompt():
             db.session.commit()
         except Exception:
             db.session.rollback()
-            current_app.logger.debug("Failed to increment mfa_failures for user %s", getattr(user, "id", None), exc_info=True)
+            current_app.logger.debug(
+                "Failed to increment mfa_failures for user %s",
+                getattr(user, "id", None),
+                exc_info=True,
+            )
 
         if getattr(user, "mfa_failures", 0) >= MFA_ATTEMPT_LIMIT:
             emit("MFA_PROMPT_RATE_LIMIT")
-            return fail_and_render("Too many MFA attempts. Your access is temporarily locked.", ttl)
+            return fail_and_render(
+                "Too many MFA attempts. Your access is temporarily locked.",
+                ttl,
+            )
 
         return fail_and_render("Invalid MFA code.", ttl)
 
@@ -280,7 +341,11 @@ def mfa_prompt():
             db.session.commit()
         except Exception:
             db.session.rollback()
-            current_app.logger.debug("Failed to reset mfa_failures for user %s", getattr(user, "id", None), exc_info=True)
+            current_app.logger.debug(
+                "Failed to reset mfa_failures for user %s",
+                getattr(user, "id", None),
+                exc_info=True,
+            )
 
         remember_flag = bool(session.get("remember_me"))
         login_user(user, remember=remember_flag)
@@ -293,22 +358,39 @@ def mfa_prompt():
         return redirect_for_role(user, prefer_safe=True)
 
     def verify_totp_code_fallback(submitted_code: str) -> bool:
-        """Return True/False for TOTP verification using service function with a safe fallback implementation."""
+        """
+        Return True/False for TOTP verification using service function
+        with a safe fallback implementation.
+        """
         try:
             if getattr(user, "totp_secret", None):
                 try:
                     # primary service-level verification (may raise)
-                    return bool(verify_totp_code(user.totp_secret, submitted_code))
+                    return bool(
+                        verify_totp_code(user.totp_secret, submitted_code)
+                    )
                 except Exception:
-                    # best-effort pyotp fallback if service isn't available or raises
+                    # best-effort pyotp fallback if service isn't available
                     try:
                         import pyotp
+
                         totp = pyotp.TOTP(user.totp_secret)
-                        return bool(totp.verify(submitted_code, valid_window=1))
+                        return bool(
+                            totp.verify(submitted_code, valid_window=1)
+                        )
                     except Exception:
-                        current_app.logger.debug("pyotp fallback failed during TOTP verify for user %s", getattr(user, "id", None), exc_info=True)
+                        current_app.logger.debug(
+                            "pyotp fallback failed during TOTP verify "
+                            "for user %s",
+                            getattr(user, "id", None),
+                            exc_info=True,
+                        )
         except Exception:
-            current_app.logger.debug("Unexpected error during TOTP verification for user %s", getattr(user, "id", None), exc_info=True)
+            current_app.logger.debug(
+                "Unexpected error during TOTP verification for user %s",
+                getattr(user, "id", None),
+                exc_info=True,
+            )
         return False
 
     # Test-mode GET bypass (renders the template as tests expect)
@@ -319,7 +401,9 @@ def mfa_prompt():
     # Resolve MFA user
     user = _resolve_mfa_user()
     if not user:
-        current_app.logger.info("mfa_prompt: no mfa_user_id in session; redirecting to login")
+        current_app.logger.info(
+            "mfa_prompt: no mfa_user_id in session; redirecting to login"
+        )
         return redirect(url_for("auth.login"))
 
     form = MFAForm()
@@ -329,10 +413,14 @@ def mfa_prompt():
         try:
             code = send_mfa_code(user)
             MFACode.create_or_replace(user.id, code, ttl_seconds=600)
-            current_app.logger.info("mfa_prompt: MFA code sent for user_id=%s", user.id)
+            current_app.logger.info(
+                "mfa_prompt: MFA code sent for user_id=%s", user.id
+            )
             emit("MFA_LOGIN_REDIS_SENT")
         except Exception:
-            current_app.logger.exception("mfa_prompt: MFA send failed for user_id=%s", user.id)
+            current_app.logger.exception(
+                "mfa_prompt: MFA send failed for user_id=%s", user.id
+            )
             flash("Unable to send MFA code. Please try again.", "danger")
             emit("MFA_LOGIN_REDIS_SEND_FAIL")
         return render_template("auth/mfa_prompt.html", form=form, user=user)
@@ -344,13 +432,18 @@ def mfa_prompt():
         # Lockout check
         if getattr(user, "mfa_failures", 0) >= MFA_ATTEMPT_LIMIT:
             emit("MFA_PROMPT_RATE_LIMIT")
-            return fail_and_render("Too many MFA attempts. Your access is temporarily locked.")
+            return fail_and_render(
+                "Too many MFA attempts. Your access is temporarily locked."
+            )
 
         # SESSION-BACKED MFA CODE (used for setup flows/tests)
         session_code = session.get("mfa_setup_code")
         if session_code is not None:
             if submitted == str(session_code):
-                emit("MFA_LOGIN_REDIS_SUCCESS", {"method": "session_setup_code"})
+                emit(
+                    "MFA_LOGIN_REDIS_SUCCESS",
+                    {"method": "session_setup_code"},
+                )
                 return login_success()
             emit("MFA_LOGIN_REDIS_FAIL", {"method": "session_setup_code"})
             return increment_failure_and_render()
@@ -359,13 +452,16 @@ def mfa_prompt():
         try:
             record = MFACode.get_active_for_user(user.id)
         except Exception:
-            current_app.logger.exception("mfa_prompt: failed to load MFACode for user=%s", user.id)
+            current_app.logger.exception(
+                "mfa_prompt: failed to load MFACode for user=%s", user.id
+            )
             record = None
 
         # NO MFACode → TOTP fallback
         if not record:
             current_app.logger.info(
-                "mfa_prompt: no MFACode record for user=%s on POST — attempting TOTP fallback",
+                "mfa_prompt: no MFACode record for user=%s on POST "
+                "— attempting TOTP fallback",
                 user.id,
             )
             # log that we attempted fallback
@@ -374,31 +470,48 @@ def mfa_prompt():
             try:
                 totp_ok = verify_totp_code_fallback(submitted)
             except Exception:
-                current_app.logger.exception("Unexpected error during TOTP fallback verify for user=%s", user.id)
+                current_app.logger.exception(
+                    "Unexpected error during TOTP fallback verify for user=%s",
+                    user.id,
+                )
 
             if totp_ok:
-                current_app.logger.info("mfa_prompt: TOTP verified for user=%s", user.id)
+                current_app.logger.info(
+                    "mfa_prompt: TOTP verified for user=%s", user.id
+                )
                 emit("MFA_LOGIN_TOTP_SUCCESS")
                 return login_success()
 
-            # TOTP failure - ensure both TOTP_FAIL and a redis/mfa fail event are emitted
-            current_app.logger.info("mfa_prompt: TOTP verification failed for user=%s", user.id)
+            # TOTP failure - ensure both TOTP_FAIL and a redis/mfa fail event
+            # are emitted
+            current_app.logger.info(
+                "mfa_prompt: TOTP verification failed for user=%s", user.id
+            )
             emit("MFA_LOGIN_TOTP_FAIL")
             emit("MFA_LOGIN_REDIS_FAIL", {"reason": "totp_fallback"})
             return increment_failure_and_render()
 
         # MFACode expired
         if not record.is_valid():
-            flash("Your MFA code has expired. A new one has been sent.", "warning")
+            flash(
+                "Your MFA code has expired. A new one has been sent.",
+                "warning",
+            )
             try:
                 code = send_mfa_code(user)
                 MFACode.create_or_replace(user.id, code, ttl_seconds=600)
             except Exception:
-                current_app.logger.exception("mfa_prompt: resend failed for user_id=%s", user.id)
-            return render_template("auth/mfa_prompt.html", form=form, user=user, ttl=None)
+                current_app.logger.exception(
+                    "mfa_prompt: resend failed for user_id=%s", user.id
+                )
+            return render_template(
+                "auth/mfa_prompt.html", form=form, user=user, ttl=None
+            )
 
         # MFACode present but invalid
-        if not record.validate_and_consume(submitted, max_failures=MFA_ATTEMPT_LIMIT):
+        if not record.validate_and_consume(
+            submitted, max_failures=MFA_ATTEMPT_LIMIT
+        ):
             emit("MFA_LOGIN_REDIS_FAIL", {"method": "db_mfa_code"})
             return increment_failure_and_render(ttl=record.time_remaining())
 
@@ -459,8 +572,14 @@ def register_subscriber():
             flash("Password must be at least 8 characters.", "danger")
             return render_template("auth/register_subscriber.html")
 
-        masked_email = email.split("@")[0][:3] + "***@" + email.split("@")[1] if "@" in email else "***"
-        masked_account = f"****{account_ending[-4:]}" if account_ending else "***"
+        masked_email = (
+            email.split("@")[0][:3] + "***@" + email.split("@")[1]
+            if "@" in email
+            else "***"
+        )
+        masked_account = (
+            f"****{account_ending[-4:]}" if account_ending else "***"
+        )
 
         try:
             user = User(
@@ -494,25 +613,53 @@ def register_subscriber():
             db.session.add(profile)
             db.session.commit()
 
-            log_identity_event(user.id, "AUTH_REGISTER_SUBSCRIBER_SUCCESS", ip=ip, user_agent=user_agent, details={
-                "username": username, "email_masked": masked_email, "acct_masked": masked_account
-            })
+            log_identity_event(
+                user.id,
+                "AUTH_REGISTER_SUBSCRIBER_SUCCESS",
+                ip=ip,
+                user_agent=user_agent,
+                details={
+                    "username": username,
+                    "email_masked": masked_email,
+                    "acct_masked": masked_account,
+                },
+            )
 
             login_user(user)
-            flash("Subscriber account created and signed in. Welcome.", "success")
+            flash(
+                "Subscriber account created and signed in. Welcome.",
+                "success",
+            )
             return redirect(url_for("main.dashboard"))
 
         except IntegrityError:
             db.session.rollback()
-            log_identity_event(0, "AUTH_REGISTER_SUBSCRIBER_FAIL_DUPLICATE", ip=ip, user_agent=user_agent, details={"email_masked": masked_email})
+            log_identity_event(
+                0,
+                "AUTH_REGISTER_SUBSCRIBER_FAIL_DUPLICATE",
+                ip=ip,
+                user_agent=user_agent,
+                details={"email_masked": masked_email},
+            )
             flash("Email or Username already registered.", "danger")
             return render_template("auth/register_subscriber.html")
 
         except Exception as exc:
             db.session.rollback()
-            current_app.logger.exception("Internal error during subscriber registration")
-            log_identity_event(0, "AUTH_REGISTER_SUBSCRIBER_FAIL_INTERNAL", ip=ip, user_agent=user_agent, details={"error": str(exc), "email_masked": masked_email})
-            flash("An internal error occurred. Please try again later.", "danger")
+            current_app.logger.exception(
+                "Internal error during subscriber registration"
+            )
+            log_identity_event(
+                0,
+                "AUTH_REGISTER_SUBSCRIBER_FAIL_INTERNAL",
+                ip=ip,
+                user_agent=user_agent,
+                details={"error": str(exc), "email_masked": masked_email},
+            )
+            flash(
+                "An internal error occurred. Please try again later.",
+                "danger",
+            )
             return render_template("auth/register_subscriber.html")
 
     return render_template("auth/register_subscriber.html")
@@ -526,9 +673,20 @@ def login_view():
     ip = request.remote_addr
     user_agent = request.user_agent.string
 
-    if not current_app.config.get("TESTING") and is_rate_limited(ip, "login", limit=5, period=60):
-        flash("Too many login attempts. Please try again in one minute.", "danger")
-        log_identity_event(0, "AUTH_LOGIN_FAIL_RATE_LIMIT", ip=ip, user_agent=user_agent, details={"ip": ip})
+    if not current_app.config.get("TESTING") and is_rate_limited(
+        ip, "login", limit=5, period=60
+    ):
+        flash(
+            "Too many login attempts. Please try again in one minute.",
+            "danger",
+        )
+        log_identity_event(
+            0,
+            "AUTH_LOGIN_FAIL_RATE_LIMIT",
+            ip=ip,
+            user_agent=user_agent,
+            details={"ip": ip},
+        )
         return render_template("auth/login.html")
 
     if request.method == "POST":
@@ -536,7 +694,9 @@ def login_view():
         password = request.form.get("password", "")
 
         user = db.session.query(User).filter_by(email=email).first()
-        password_ok = bool(user) and check_password_hash(user.password_hash, password)
+        password_ok = bool(user) and check_password_hash(
+            user.password_hash, password
+        )
         apply_rate_limit(ip, "login", is_failure=not password_ok)
 
         if password_ok:
@@ -546,11 +706,15 @@ def login_view():
             if user.mfa_enabled or user.mfa_pending_setup:
                 session["mfa_user_id"] = user.id
                 session["remember_me"] = remember_flag
-                log_identity_event(user.id, "MFA_INITIATED", ip=ip, user_agent=user_agent)
+                log_identity_event(
+                    user.id, "MFA_INITIATED", ip=ip, user_agent=user_agent
+                )
                 return redirect(url_for("auth.mfa_prompt"))
 
             login_user(user, remember=remember_flag)
-            log_identity_event(user.id, "AUTH_LOGIN_SUCCESS", ip=ip, user_agent=user_agent)
+            log_identity_event(
+                user.id, "AUTH_LOGIN_SUCCESS", ip=ip, user_agent=user_agent
+            )
             flash("Logged in successfully.", "success")
 
             next_url = request.args.get("next")
@@ -559,22 +723,40 @@ def login_view():
 
             return redirect_for_role(user)
 
-        log_identity_event(0, "AUTH_LOGIN_FAIL", ip=ip, user_agent=user_agent, details={"email_attempted": email})
+        log_identity_event(
+            0,
+            "AUTH_LOGIN_FAIL",
+            ip=ip,
+            user_agent=user_agent,
+            details={"email_attempted": email},
+        )
         flash("Invalid email or password.", "danger")
         return redirect(url_for("auth.login"))
 
     return render_template("auth/login.html")
 
-# Aliases for convenience
-@auth_bp.route("/subscriber_login", methods=["GET", "POST"], endpoint="subscriber_login")
-def subscriber_login_alias(): return login_view()
 
-@auth_bp.route("/login_subscriber", methods=["GET", "POST"], endpoint="login_subscriber")
+# Aliases for convenience
+@auth_bp.route(
+    "/subscriber_login", methods=["GET", "POST"], endpoint="subscriber_login"
+)
+def subscriber_login_alias():
+    return login_view()
+
+
+@auth_bp.route(
+    "/login_subscriber", methods=["GET", "POST"], endpoint="login_subscriber"
+)
 def login_subscriber():
-    return render_template("auth/login_subscriber.html") if request.method == "GET" else login_view()
+    if request.method == "GET":
+        return render_template("auth/login_subscriber.html")
+    return login_view()
+
 
 @auth_bp.route("/login_operator", methods=["GET"])
-def login_operator(): return render_template("auth/operator_login.html")
+def login_operator():
+    return render_template("auth/operator_login.html")
+
 
 # API Logout
 @auth_bp.route("/api/logout", methods=["POST"])
@@ -594,9 +776,10 @@ def api_logout():
             "AUTH_JWT_REFRESH_REVOKED_API",
             ip=ip,
             user_agent=user_agent,
-            details={"jti": jti}
+            details={"jti": jti},
         )
     return jsonify({"msg": "API logout successful"}), 200
+
 
 # Standard Web Logout (Protected path: /auth/logout)
 @auth_bp.route("/logout", methods=["GET"])
@@ -609,12 +792,12 @@ def logout():
 
 
 @auth_bp.route("/forgot_password", methods=["GET", "POST"])
-def forgot_password_alias():
+def forgot_password():
     # GET → render template (what the test expects)
     if request.method == "GET":
         return render_template("auth/forgot_password.html")
 
-    # POST → preserve your existing redirect behavior
+    # POST → preserve existing redirect behavior
     return redirect(url_for("auth.reset_request"))
 
 
@@ -635,7 +818,9 @@ def reset_request():
 
     # Basic rate limiting
     if is_rate_limited(ip, "password_reset_request", limit=10, period=60):
-        log_identity_event(0, "PASSWORD_RESET_RATE_LIMIT", ip=ip, user_agent=user_agent)
+        log_identity_event(
+            0, "PASSWORD_RESET_RATE_LIMIT", ip=ip, user_agent=user_agent
+        )
         flash("Too many requests. Please try again shortly.", "danger")
         return render_template("auth/reset_request.html", form=form)
 
@@ -651,7 +836,10 @@ def reset_request():
 
             if redis:
                 try:
-                    redis_key = f"pulse:password_reset_request:{hashed_email_key}:{reset_salt}"
+                    redis_key = (
+                        f"pulse:password_reset_request:{hashed_email_key}:"
+                        f"{reset_salt}"
+                    )
                     redis.set(redis_key, token, ex=1800)
 
                     reset_link = url_for(
@@ -663,14 +851,22 @@ def reset_request():
                     )
 
                     masked = email.split("@")[0] + "@***"
-                    logger.info("Password reset link (MOCK) for %s: %s", masked, reset_link)
+                    logger.info(
+                        "Password reset link (MOCK) for %s: %s",
+                        masked,
+                        reset_link,
+                    )
                     log_identity_event(
-                        user.id, "PASSWORD_RESET_REQUEST", ip=ip, user_agent=user_agent
+                        user.id,
+                        "PASSWORD_RESET_REQUEST",
+                        ip=ip,
+                        user_agent=user_agent,
                     )
 
                 except Exception:
                     current_app.logger.exception(
-                        "Failed to write password reset token to redis for user %s",
+                        "Failed to write password reset token to redis for "
+                        "user %s",
                         getattr(user, "id", None),
                     )
                     log_identity_event(
@@ -682,7 +878,9 @@ def reset_request():
 
             else:
                 current_app.logger.warning(
-                    "Redis unavailable when creating password reset for email=%s", email
+                    "Redis unavailable when creating password reset for "
+                    "email=%s",
+                    email,
                 )
                 log_identity_event(
                     user.id,
@@ -691,7 +889,10 @@ def reset_request():
                     user_agent=user_agent,
                 )
 
-        flash("If an account exists, a password reset link has been sent.", "info")
+        flash(
+            "If an account exists, a password reset link has been sent.",
+            "info",
+        )
         apply_rate_limit(ip, "password_reset_request", is_failure=True)
         return redirect(url_for("auth.login"))
 
@@ -720,7 +921,12 @@ def reset_password():
     redis_key = f"pulse:password_reset_request:{hashed_email_key}:{salt}"
 
     if not redis:
-        log_identity_event(user.id, "PASSWORD_RESET_REDIS_FAILURE", ip=ip, user_agent=user_agent)
+        log_identity_event(
+            user.id,
+            "PASSWORD_RESET_REDIS_FAILURE",
+            ip=ip,
+            user_agent=user_agent,
+        )
         flash("Internal error during reset verification.", "danger")
         return redirect(url_for("auth.login"))
 
@@ -730,7 +936,9 @@ def reset_password():
         if isinstance(stored_token, bytes):
             stored_token = stored_token.decode()
     except Exception as e:
-        current_app.logger.exception("Redis read error for password reset key %s", redis_key)
+        current_app.logger.exception(
+            "Redis read error for password reset key %s", redis_key
+        )
         log_identity_event(
             user.id,
             "PASSWORD_RESET_REDIS_READ_ERROR",
@@ -746,7 +954,9 @@ def reset_password():
             redis.delete(redis_key)
         except Exception:
             current_app.logger.debug(
-                "Failed to delete invalid reset key %s", redis_key, exc_info=True
+                "Failed to delete invalid reset key %s",
+                redis_key,
+                exc_info=True,
             )
         log_identity_event(
             user.id,
@@ -780,12 +990,22 @@ def reset_password():
                     redis_key,
                     exc_info=True,
                 )
-            log_identity_event(user.id, "PASSWORD_RESET_SUCCESS", ip=ip, user_agent=user_agent)
-            flash("Your password has been successfully reset. Please log in.", "success")
+            log_identity_event(
+                user.id,
+                "PASSWORD_RESET_SUCCESS",
+                ip=ip,
+                user_agent=user_agent,
+            )
+            flash(
+                "Your password has been successfully reset. Please log in.",
+                "success",
+            )
             return redirect(url_for("auth.login"))
         except Exception as exc:
             db.session.rollback()
-            current_app.logger.exception("Failed to reset password for user %s", user.id)
+            current_app.logger.exception(
+                "Failed to reset password for user %s", user.id
+            )
             log_identity_event(
                 user.id,
                 "PASSWORD_RESET_FAIL_INTERNAL",
@@ -794,7 +1014,8 @@ def reset_password():
                 details={"error": str(exc)},
             )
             flash(
-                "An error occurred while resetting your password. Please try again later.",
+                "An error occurred while resetting your password. "
+                "Please try again later.",
                 "danger",
             )
             return render_template(
@@ -806,7 +1027,11 @@ def reset_password():
             )
 
     return render_template(
-        "auth/reset_password.html", form=form, email=email, token=token, salt=salt
+        "auth/reset_password.html",
+        form=form,
+        email=email,
+        token=token,
+        salt=salt,
     )
 
 
@@ -819,7 +1044,9 @@ def change_password():
         ip = request.remote_addr
         user_agent = request.user_agent.string
 
-        if not check_password_hash(user.password_hash, form.current_password.data):
+        if not check_password_hash(
+            user.password_hash, form.current_password.data
+        ):
             log_identity_event(
                 user.id,
                 "PASSWORD_CHANGE_FAIL_CURRENT_PASSWORD",
@@ -837,12 +1064,19 @@ def change_password():
         try:
             user.password_hash = generate_password_hash(new_password)
             db.session.commit()
-            log_identity_event(user.id, "PASSWORD_CHANGE_SUCCESS", ip=ip, user_agent=user_agent)
+            log_identity_event(
+                user.id,
+                "PASSWORD_CHANGE_SUCCESS",
+                ip=ip,
+                user_agent=user_agent,
+            )
             flash("Your password has been successfully updated.", "success")
             return redirect(url_for("auth.me_dashboard"))
         except Exception as exc:
             db.session.rollback()
-            current_app.logger.exception("Failed to change password for user %s", user.id)
+            current_app.logger.exception(
+                "Failed to change password for user %s", user.id
+            )
             log_identity_event(
                 user.id,
                 "PASSWORD_CHANGE_FAIL_INTERNAL",
@@ -851,7 +1085,8 @@ def change_password():
                 details={"error": str(exc)},
             )
             flash(
-                "An error occurred while updating your password. Please try again later.",
+                "An error occurred while updating your password. "
+                "Please try again later.",
                 "danger",
             )
 
@@ -893,14 +1128,16 @@ def me_dashboard():
                 ).count()
             else:
                 current_app.logger.warning(
-                    "me_dashboard: LoanAgreement missing expected FK columns; columns=%s",
+                    "me_dashboard: LoanAgreement missing expected FK columns; "
+                    "columns=%s",
                     ", ".join(sorted(cols)),
                 )
                 loan_count = 0
 
     except Exception:
         current_app.logger.exception(
-            "Failed to load loan_count for user %s", getattr(user, "id", "unknown")
+            "Failed to load loan_count for user %s",
+            getattr(user, "id", "unknown"),
         )
         loan_count = 0
 
@@ -926,15 +1163,26 @@ def account_settings():
                 profile.state = form.state.data
                 profile.zip_code = form.zip_code.data
             db.session.commit()
-            log_identity_event(user.id, "PROFILE_UPDATE_SUCCESS", ip=ip, user_agent=user_agent)
+            log_identity_event(
+                user.id,
+                "PROFILE_UPDATE_SUCCESS",
+                ip=ip,
+                user_agent=user_agent,
+            )
             flash("Account settings updated successfully.", "success")
             return redirect(url_for("auth.account_settings"))
         except Exception:
             db.session.rollback()
             current_app.logger.exception(
-                "Profile update failed for user %s", getattr(user, "id", "unknown")
+                "Profile update failed for user %s",
+                getattr(user, "id", "unknown"),
             )
-            log_identity_event(user.id, "PROFILE_UPDATE_FAIL_DB", ip=ip, user_agent=user_agent)
+            log_identity_event(
+                user.id,
+                "PROFILE_UPDATE_FAIL_DB",
+                ip=ip,
+                user_agent=user_agent,
+            )
             flash("An error occurred while saving changes.", "danger")
 
     return render_template("auth/account_settings.html", form=form, user=user)
@@ -951,18 +1199,29 @@ def api_token():
 
     if is_rate_limited(ip, "api_token", limit=10, period=60):
         log_identity_event(
-            0, "API_TOKEN_RATE_LIMIT", ip=ip, user_agent=user_agent, details={"ip": ip}
+            0,
+            "API_TOKEN_RATE_LIMIT",
+            ip=ip,
+            user_agent=user_agent,
+            details={"ip": ip},
         )
         return jsonify(error="Too many attempts, try later"), 429
 
     user = User.query.filter_by(email=email).first()
     if user and check_password_hash(user.password_hash, password):
         if user.mfa_enabled:
-            log_identity_event(user.id, "API_AUTH_FAIL_MFA_REQUIRED", ip=ip, user_agent=user_agent)
+            log_identity_event(
+                user.id,
+                "API_AUTH_FAIL_MFA_REQUIRED",
+                ip=ip,
+                user_agent=user_agent,
+            )
             return jsonify(error="MFA required; use session flow"), 403
         access_token = create_access_token(identity=user.id, fresh=True)
         refresh_token = create_refresh_token(identity=user.id)
-        log_identity_event(user.id, "API_TOKEN_GRANTED", ip=ip, user_agent=user_agent)
+        log_identity_event(
+            user.id, "API_TOKEN_GRANTED", ip=ip, user_agent=user_agent
+        )
         return (
             jsonify(
                 access_token=access_token,
@@ -995,12 +1254,19 @@ def api_refresh():
 
     if token_revoked_check({}, jwt_data):
         log_identity_event(
-            current_user_id, "API_REFRESH_REVOKED_TOKEN", ip=ip, user_agent=user_agent
+            current_user_id,
+            "API_REFRESH_REVOKED_TOKEN",
+            ip=ip,
+            user_agent=user_agent,
         )
         return jsonify(error="Refresh token has been revoked."), 401
 
-    new_access_token = create_access_token(identity=current_user_id, fresh=False)
-    log_identity_event(current_user_id, "API_TOKEN_REFRESH", ip=ip, user_agent=user_agent)
+    new_access_token = create_access_token(
+        identity=current_user_id, fresh=False
+    )
+    log_identity_event(
+        current_user_id, "API_TOKEN_REFRESH", ip=ip, user_agent=user_agent
+    )
     return jsonify(access_token=new_access_token), 200
 
 
@@ -1017,13 +1283,18 @@ def identity_events_view():
                     events.append(json.loads(ev.decode("utf-8")))
                 except Exception:
                     current_app.logger.debug(
-                        "Failed to decode an identity event entry", exc_info=True
+                        "Failed to decode an identity event entry",
+                        exc_info=True,
                     )
         except Exception:
-            current_app.logger.exception("Failed to fetch identity events from Redis")
+            current_app.logger.exception(
+                "Failed to fetch identity events from Redis"
+            )
             flash("Error loading identity events.", "danger")
     else:
-        current_app.logger.warning("Redis unavailable — cannot load identity events.")
+        current_app.logger.warning(
+            "Redis unavailable — cannot load identity events."
+        )
         flash("Redis unavailable — cannot load identity events.", "warning")
     return render_template("auth/identity_events.html", events=events)
 
@@ -1054,7 +1325,10 @@ def auth_health():
         probe = {"success": False}
 
     overall = all(status.values())
-    return jsonify({"ok": overall, "components": status, "probe": probe}), (200 if overall else 503)
+    return (
+        jsonify({"ok": overall, "components": status, "probe": probe}),
+        200 if overall else 503,
+    )
 
 
 @auth_bp.route("/probe")

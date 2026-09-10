@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import os, re
+import os
+import re
 
 ROOT = "app/templates"
 EXT = re.compile(r'{%\s*extends\s+"([^"]+)"\s*%}')

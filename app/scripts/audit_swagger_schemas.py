@@ -26,8 +26,12 @@ for root, _, files in os.walk(APP_DIR):
                         VIOLATIONS.append((filepath, line_idx, line.strip()))
 
 if VIOLATIONS:
-    print(f" Found {len(VIOLATIONS)} potential Swagger 2.0 schema violations:\n")
+    print(
+        f" Found {len(VIOLATIONS)} potential Swagger 2.0 schema violations:\n"
+    )
     for file, line_num, text in VIOLATIONS:
         print(f"  {file}:{line_num} -> {text}")
 else:
-    print(" No legacy `in: body` parameter violations found across blueprint definitions.")
+    print(
+        " No legacy `in: body` parameter violations found across blueprint definitions."
+    )

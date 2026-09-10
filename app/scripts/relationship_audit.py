@@ -41,7 +41,9 @@ def _has_fk_for_relationship(rel: RelationshipProperty) -> bool:
     - For one-to-many: FK usually lives on the 'many' side; we check remote side columns
     """
     try:
-        local_cols = list(rel.local_columns) if hasattr(rel, "local_columns") else []
+        local_cols = (
+            list(rel.local_columns) if hasattr(rel, "local_columns") else []
+        )
         has_local_fk = any(col.foreign_keys for col in local_cols)
 
         target_table = rel.mapper.local_table
@@ -80,7 +82,10 @@ def _check_back_populates_pair(rel: RelationshipProperty) -> tuple[bool, str]:
         counterpart = getattr(target_mapper.class_, bp).property
         if not isinstance(counterpart, RelationshipProperty):
             return False, f"'{bp}' exists on target but is not a relationship"
-        if counterpart.back_populates and counterpart.back_populates != rel.key:
+        if (
+            counterpart.back_populates
+            and counterpart.back_populates != rel.key
+        ):
             return (
                 False,
                 "counterpart back_populates points to "
@@ -107,18 +112,24 @@ def relationship_audit_command() -> None:
 
         mappers = _collect_models()
         if not mappers:
-            click.echo("❌ No mappers found. Ensure app.models imports all model files.")
+            click.echo(
+                "❌ No mappers found. Ensure app.models imports all model files."
+            )
             return
 
         click.echo("=== Relationship Audit ===")
         problems: list[str] = []
 
-        for _model_name, mapper in sorted(mappers.items(), key=lambda kv: kv[0].lower()):
+        for _model_name, mapper in sorted(
+            mappers.items(), key=lambda kv: kv[0].lower()
+        ):
             rels = mapper.relationships
             if not rels:
                 continue
 
-            click.echo(f"\nModel: {mapper.class_.__name__} (table: {mapper.local_table.name})")
+            click.echo(
+                f"\nModel: {mapper.class_.__name__} (table: {mapper.local_table.name})"
+            )
             for rel in sorted(rels, key=lambda r: r.key.lower()):
                 target = rel.mapper.class_.__name__
                 bp = rel.back_populates or "-"
@@ -127,18 +138,25 @@ def relationship_audit_command() -> None:
                 ok_bp, bp_msg = _check_back_populates_pair(rel)
                 status_parts = []
                 status_parts.append(
-                    "back_populates=OK" if ok_bp else f"back_populates=BAD({bp_msg})"
+                    "back_populates=OK"
+                    if ok_bp
+                    else f"back_populates=BAD({bp_msg})"
                 )
                 status_parts.append(f"fk={'OK' if fk_ok else 'MISSING'}")
 
                 status = ", ".join(status_parts)
-                click.echo(f" - {rel.key} -> {target}  [back_populates: {bp}]  [{status}]")
+                click.echo(
+                    f" - {rel.key} -> {target}  [back_populates: {bp}]  [{status}]"
+                )
 
                 if not ok_bp:
-                    problems.append(f"{mapper.class_.__name__}.{rel.key}: {bp_msg}")
+                    problems.append(
+                        f"{mapper.class_.__name__}.{rel.key}: {bp_msg}"
+                    )
                 if not fk_ok:
                     problems.append(
-                        f"{mapper.class_.__name__}.{rel.key}: missing/undetected " "ForeignKey link"
+                        f"{mapper.class_.__name__}.{rel.key}: missing/undetected "
+                        "ForeignKey link"
                     )
 
         click.echo("\n=== Summary ===")
@@ -147,12 +165,16 @@ def relationship_audit_command() -> None:
             for p in problems:
                 click.echo(f" - {p}")
             click.echo("\nTip:")
-            click.echo(" - Ensure both sides define matching back_populates names.")
+            click.echo(
+                " - Ensure both sides define matching back_populates names."
+            )
             click.echo(
                 " - Ensure a ForeignKey exists on the appropriate side (e.g., child "
                 "table has db.ForeignKey('parent.id'))."
             )
-            click.echo(" - For unconventional schemas, set primaryjoin/secondary explicitly.")
+            click.echo(
+                " - For unconventional schemas, set primaryjoin/secondary explicitly."
+            )
         else:
             click.echo("✅ No back_populates or FK issues detected.")
 

@@ -1,22 +1,20 @@
 # =============================================================================
-# FILE: /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_baseline.py
+# FILE: app/tests/test_baseline.py
 # DESCRIPTION: Essential environment and database integrity checks.
 # =============================================================================
 
-import uuid
-import pkgutil
 import importlib
+import pkgutil
+import uuid
 
 import pytest
 import sqlalchemy as sa
 
+import app.models as models_pkg
 from app.extensions import db
-from app.models.timeline import TimelineEvent  # noqa: F401
-from app.models.todo import Todo  # noqa: F401
-from app.models.user import User  # noqa: F401
-
-import app.models as models_pkg  # noqa: F401
-
+from app.models.timeline import TimelineEvent
+from app.models.todo import Todo
+from app.models.user import User
 
 # --- HELPERS ---
 
@@ -24,7 +22,9 @@ import app.models as models_pkg  # noqa: F401
 def get_admin_id(conn) -> str | None:
     """Return the id of the seeded admin (if present)."""
     res = conn.execute(
-        sa.text("SELECT id FROM users WHERE email='srpollardsihhllc@gmail.com' OR is_admin = 1")
+        sa.text(
+            "SELECT id FROM users WHERE email='srpollardsihhllc@gmail.com' OR is_admin = 1"
+        )
     ).fetchone()
     return res[0] if res else None
 
@@ -40,8 +40,10 @@ def _fk_has_ondelete(engine, table_name: str, referred_table: str) -> bool:
         try:
             with engine.connect() as conn:
                 row = conn.execute(
-                    sa.text("SELECT sql FROM sqlite_master WHERE type='table' AND name = :t"),
-                    {"t": table_name}
+                    sa.text(
+                        "SELECT sql FROM sqlite_master WHERE type='table' AND name = :t"
+                    ),
+                    {"t": table_name},
                 ).fetchone()
             if not row or not row[0]:
                 return False
@@ -55,7 +57,10 @@ def _fk_has_ondelete(engine, table_name: str, referred_table: str) -> bool:
             fks = inspector.get_foreign_keys(table_name)
             for fk in fks:
                 if fk.get("referred_table") == referred_table:
-                    if fk.get("options", {}).get("ondelete", "").upper() == "CASCADE":
+                    if (
+                        fk.get("options", {}).get("ondelete", "").upper()
+                        == "CASCADE"
+                    ):
                         return True
             return False
         except Exception:
@@ -68,7 +73,9 @@ def _fk_has_ondelete(engine, table_name: str, referred_table: str) -> bool:
 def test_admin_user_exists(app):
     """Verify the baseline admin exists and has correct privileges."""
     with app.app_context():
-        for finder, modname, ispkg in pkgutil.iter_modules(models_pkg.__path__):
+        for finder, modname, ispkg in pkgutil.iter_modules(
+            models_pkg.__path__
+        ):
             importlib.import_module(f"app.models.{modname}")
 
         db.create_all()
@@ -76,7 +83,9 @@ def test_admin_user_exists(app):
 
         conn = db.session.connection()
         row = conn.execute(
-            sa.text("SELECT id, username, email, is_admin FROM users WHERE email='srpollardsihhllc@gmail.com' OR is_admin = 1")
+            sa.text(
+                "SELECT id, username, email, is_admin FROM users WHERE email='srpollardsihhllc@gmail.com' OR is_admin = 1"
+            )
         ).fetchone()
 
         if row is None:
@@ -111,13 +120,13 @@ USER_FK_TABLES = [
         lambda: {"id": str(uuid.uuid4())},
     ),
     (
-        "timeline_events",
+        TimelineEvent.__tablename__,
         "user_id",
         "INSERT INTO timeline_events (user_id, event_type) VALUES (:uid, 'test_event')",
         lambda: {},
     ),
     (
-        "todos",
+        Todo.__tablename__,
         "user_id",
         "INSERT INTO todos (user_id, text, completed, priority, created_at, updated_at)"
         " VALUES (:uid, 'test_todo', 0, 'normal', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
@@ -126,24 +135,33 @@ USER_FK_TABLES = [
 ]
 
 
-@pytest.mark.parametrize(("table_name", "column", "sql", "extra_params"), USER_FK_TABLES)
+@pytest.mark.parametrize(
+    ("table_name", "column", "sql", "extra_params"), USER_FK_TABLES
+)
 def test_user_foreign_key_cascades(app, table_name, column, sql, extra_params):
     """
     For each user-related table, insert a record keyed to a temp user, delete the user,
     and assert the child record was removed by cascade.
     """
     with app.app_context():
-        for finder, modname, ispkg in pkgutil.iter_modules(models_pkg.__path__):
+        for finder, modname, ispkg in pkgutil.iter_modules(
+            models_pkg.__path__
+        ):
             importlib.import_module(f"app.models.{modname}")
 
         db.create_all()
 
         inspector = sa.inspect(db.engine)
         if table_name not in inspector.get_table_names():
-            pytest.skip(f"Table '{table_name}' not present after create_all(); skipping cascade test.")
+            pytest.skip(
+                f"Table '{table_name}' not present after create_all(); skipping cascade test."
+            )
 
         conn = db.session.connection()
-        conn.execute(sa.text("PRAGMA foreign_keys = ON;"))
+        if db.engine.name == "sqlite":
+            conn.execute(sa.text("PRAGMA foreign_keys = ON;"))
+        elif db.engine.name in ("mysql", "mariadb"):
+            conn.execute(sa.text("SET FOREIGN_KEY_CHECKS = 1;"))
 
         temp_uid = str(uuid.uuid4())
         test_user = User(
@@ -161,13 +179,17 @@ def test_user_foreign_key_cascades(app, table_name, column, sql, extra_params):
         try:
             conn.execute(sa.text(sql), params)
         except sa.exc.OperationalError as oe:
-            pytest.skip(f"Skipping insertion for '{table_name}' due to DB schema mismatch: {oe}")
+            pytest.skip(
+                f"Skipping insertion for '{table_name}' due to DB schema mismatch: {oe}"
+            )
 
         check_exists = conn.execute(
             sa.text(f"SELECT 1 FROM {table_name} WHERE {column} = :uid"),
             {"uid": temp_uid},
         ).fetchone()
-        assert check_exists is not None, f"Failed to insert test record into {table_name}"
+        assert (
+            check_exists is not None
+        ), f"Failed to insert test record into {table_name}"
 
         db.session.delete(test_user)
         db.session.commit()
@@ -177,7 +199,9 @@ def test_user_foreign_key_cascades(app, table_name, column, sql, extra_params):
             sa.text(f"SELECT 1 FROM {table_name} WHERE {column} = :uid"),
             {"uid": temp_uid},
         ).fetchone()
-        assert check_deleted is None, f"CASCADE FAILED: Record still exists in {table_name} after user deletion!"
+        assert (
+            check_deleted is None
+        ), f"CASCADE FAILED: Record still exists in {table_name} after user deletion!"
 
 
 def test_bank_transactions_fk_and_cascade(app):
@@ -185,14 +209,18 @@ def test_bank_transactions_fk_and_cascade(app):
     Verifies bank_transactions references valid accounts and cleans up on delete.
     """
     with app.app_context():
-        for finder, modname, ispkg in pkgutil.iter_modules(models_pkg.__path__):
+        for finder, modname, ispkg in pkgutil.iter_modules(
+            models_pkg.__path__
+        ):
             importlib.import_module(f"app.models.{modname}")
 
         db.create_all()
 
         engine = db.engine
         if not _fk_has_ondelete(engine, "bank_transactions", "bank_accounts"):
-            pytest.skip("bank_transactions → bank_accounts FK missing ON DELETE CASCADE; skipping cascade test.")
+            pytest.skip(
+                "bank_transactions → bank_accounts FK missing ON DELETE CASCADE; skipping cascade test."
+            )
 
         with db.session.begin_nested():
             conn = db.session.connection()
@@ -212,14 +240,20 @@ def test_bank_transactions_fk_and_cascade(app):
                 admin_id = temp_admin.id
 
             conn.execute(
-                sa.text("INSERT INTO bank_accounts (id, user_id, account_type, account_number, balance, created_at) VALUES (99031, :uid, 'checking', 'ACC_X', 10.0, CURRENT_TIMESTAMP)"),
+                sa.text(
+                    "INSERT INTO bank_accounts (id, user_id, account_type, account_number, balance, created_at) VALUES (99031, :uid, 'checking', 'ACC_X', 10.0, CURRENT_TIMESTAMP)"
+                ),
                 {"uid": admin_id},
             )
             conn.execute(
-                sa.text("INSERT INTO bank_transactions (id, from_account_id, to_account_id, amount) VALUES (99099, 99031, 99031, 50.0)"),
+                sa.text(
+                    "INSERT INTO bank_transactions (id, from_account_id, to_account_id, amount) VALUES (99099, 99031, 99031, 50.0)"
+                ),
             )
 
-            txn = conn.execute(sa.text("SELECT id FROM bank_transactions WHERE id = 99099")).fetchone()
+            txn = conn.execute(
+                sa.text("SELECT id FROM bank_transactions WHERE id = 99099")
+            ).fetchone()
             assert txn is not None, "Failed to insert test bank_transaction"
 
         db.session.rollback()

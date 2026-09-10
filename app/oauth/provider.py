@@ -44,7 +44,9 @@ def _get_apple_jwks() -> Dict[str, Any]:
 
 
 class OAuthProvider:
-    def __init__(self, provider: ProviderName, config: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self, provider: ProviderName, config: Optional[Dict[str, Any]] = None
+    ) -> None:
         self.provider = provider
         self.config = config or {}
 
@@ -66,7 +68,9 @@ class OAuthProvider:
 
         base_url = endpoints.get(self.provider)
         if not base_url:
-            raise NotImplementedError(f"Provider {self.provider} not supported")
+            raise NotImplementedError(
+                f"Provider {self.provider} not supported"
+            )
 
         params: Dict[str, Any] = {
             "client_id": self.config.get("client_id", ""),
@@ -121,7 +125,9 @@ class OAuthProvider:
             return resp.json()
 
         if self.provider == ProviderName.MICROSOFT:
-            token_url = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+            token_url = (
+                "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+            )
             resp = requests.post(
                 token_url,
                 data={
@@ -144,13 +150,19 @@ class OAuthProvider:
             private_key = self.config.get("apple_private_key")
             aud = self.config.get("apple_aud", "https://appleid.apple.com")
 
-            if not all((client_id, redirect_uri, team_id, key_id, private_key)):
-                raise RuntimeError("Apple OAuth requires apple_team_id, apple_key_id and apple_private_key in config")
+            if not all(
+                (client_id, redirect_uri, team_id, key_id, private_key)
+            ):
+                raise RuntimeError(
+                    "Apple OAuth requires apple_team_id, apple_key_id and apple_private_key in config"
+                )
 
             try:
                 import jwt
             except ImportError as exc:
-                raise RuntimeError("PyJWT is required for Apple client assertion") from exc
+                raise RuntimeError(
+                    "PyJWT is required for Apple client assertion"
+                ) from exc
 
             now = int(time.time())
             payload = {
@@ -161,7 +173,9 @@ class OAuthProvider:
                 "sub": client_id,
             }
             headers = {"kid": key_id}
-            client_assertion = jwt.encode(payload, private_key, algorithm="ES256", headers=headers)
+            client_assertion = jwt.encode(
+                payload, private_key, algorithm="ES256", headers=headers
+            )
 
             token_url = "https://appleid.apple.com/auth/token"
             resp = requests.post(
@@ -184,24 +198,42 @@ class OAuthProvider:
         if self.provider == ProviderName.GOOGLE:
             access_token = token_data.get("access_token")
             profile_url = "https://openidconnect.googleapis.com/v1/userinfo"
-            resp = requests.get(profile_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+            resp = requests.get(
+                profile_url,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
             resp.raise_for_status()
             d = resp.json()
-            return {"email": d.get("email"), "sub": d.get("sub"), "name": d.get("name")}
+            return {
+                "email": d.get("email"),
+                "sub": d.get("sub"),
+                "name": d.get("name"),
+            }
 
         if self.provider == ProviderName.MICROSOFT:
             access_token = token_data.get("access_token")
             profile_url = "https://graph.microsoft.com/v1.0/me"
-            resp = requests.get(profile_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=10)
+            resp = requests.get(
+                profile_url,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
             resp.raise_for_status()
             d = resp.json()
             email = d.get("mail") or d.get("userPrincipalName")
-            return {"email": email, "sub": d.get("id"), "name": d.get("displayName")}
+            return {
+                "email": email,
+                "sub": d.get("id"),
+                "name": d.get("displayName"),
+            }
 
         if self.provider == ProviderName.APPLE:
             id_token = token_data.get("id_token")
             if not id_token:
-                raise RuntimeError("Apple token response did not include id_token")
+                raise RuntimeError(
+                    "Apple token response did not include id_token"
+                )
 
             try:
                 import jwt
@@ -209,8 +241,15 @@ class OAuthProvider:
             except ImportError:
                 try:
                     import jwt
-                    payload = jwt.decode(id_token, options={"verify_signature": False})
-                    return {"email": payload.get("email"), "sub": payload.get("sub"), "name": payload.get("name")}
+
+                    payload = jwt.decode(
+                        id_token, options={"verify_signature": False}
+                    )
+                    return {
+                        "email": payload.get("email"),
+                        "sub": payload.get("sub"),
+                        "name": payload.get("name"),
+                    }
                 except Exception:
                     return {"email": None, "sub": None, "name": None}
 
@@ -228,18 +267,37 @@ class OAuthProvider:
                         key_dict = k
                         break
                 if not key_dict:
-                    raise RuntimeError("No matching Apple JWKS key found for kid")
+                    raise RuntimeError(
+                        "No matching Apple JWKS key found for kid"
+                    )
 
                 public_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
-                payload = jwt.decode(id_token, public_key, algorithms=["RS256"], audience=client_id)
-                return {"email": payload.get("email"), "sub": payload.get("sub"), "name": payload.get("name")}
+                payload = jwt.decode(
+                    id_token,
+                    public_key,
+                    algorithms=["RS256"],
+                    audience=client_id,
+                )
+                return {
+                    "email": payload.get("email"),
+                    "sub": payload.get("sub"),
+                    "name": payload.get("name"),
+                }
 
             except jwt.PyJWTError as exc:
-                logger.error("Apple id_token signature verification failed: %s", exc)
+                logger.error(
+                    "Apple id_token signature verification failed: %s", exc
+                )
                 raise RuntimeError("Invalid Apple ID Token signature") from exc
             except Exception as exc:
                 logger.debug("System error during parsing: %s", exc)
-                payload = jwt.decode(id_token, options={"verify_signature": False})
-                return {"email": payload.get("email"), "sub": payload.get("sub"), "name": payload.get("name")}
+                payload = jwt.decode(
+                    id_token, options={"verify_signature": False}
+                )
+                return {
+                    "email": payload.get("email"),
+                    "sub": payload.get("sub"),
+                    "name": payload.get("name"),
+                }
 
         raise NotImplementedError(f"Provider {self.provider} not supported")

@@ -9,6 +9,8 @@ from wtforms.validators import DataRequired, Length
 
 
 class ProfileUpdateForm(FlaskForm):
-    full_name = StringField("Full Name", validators=[DataRequired(), Length(max=120)])
+    full_name = StringField(
+        "Full Name", validators=[DataRequired(), Length(max=120)]
+    )
     address = StringField("Address", validators=[Length(max=255)])
     submit = SubmitField("Update Profile")

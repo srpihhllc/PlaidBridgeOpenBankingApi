@@ -5,15 +5,30 @@
 # =============================================================================
 
 import logging
+
 from app.constants.telemetry_keys import REDIS_FAIL_TTL, REDIS_QUEUE_FLUSH_TTL
-# Import the underlying function directly to avoid the broken wrapper
-from app.telemetry.ttl_emit import safe_emit, ttl_emit as raw_ttl_emit
+
+# Explicit re-export alias prevents F401 unused import warnings
+from app.telemetry.ttl_emit import safe_emit as safe_emit
+from app.telemetry.ttl_emit import ttl_emit as raw_ttl_emit
 from app.utils.redis_utils import get_redis_client
 
 logger = logging.getLogger(__name__)
 
-# ROBUST WRAPPER: This ensures positional arguments and keyword arguments 
-# are passed through. If the underlying function signature is strict, 
+__all__ = [
+    "safe_emit",
+    "ttl_emit",
+    "safe_import",
+    "register_cockpit_tiles",
+    "cockpit_bp",
+    "trace_bp",
+    "fk_inspector_bp",
+    "drilldown_bp",
+]
+
+
+# ROBUST WRAPPER: This ensures positional arguments and keyword arguments
+# are passed through. If the underlying function signature is strict,
 # this wrapper will strip unsupported arguments and retry.
 def robust_ttl_emit(*args, **kwargs):
     try:
@@ -22,17 +37,19 @@ def robust_ttl_emit(*args, **kwargs):
         # If the underlying function signature is strict (e.g., no 'meta' or 'client'),
         # strip the offending keywords and try one more time.
         filtered_kwargs = {
-            k: v for k, v in kwargs.items() 
-            if k not in ['meta', 'client']
+            k: v for k, v in kwargs.items() if k not in ["meta", "client"]
         }
         try:
             return raw_ttl_emit(*args, **filtered_kwargs)
         except Exception as e:
-            logger.debug(f"Telemetry pulse finally failed after filtering: {e}")
+            logger.debug(
+                f"Telemetry pulse finally failed after filtering: {e}"
+            )
             return None
     except Exception as e:
         logger.debug(f"Telemetry pulse suppressed: {e}")
         return None
+
 
 # Replace the broken wrapper with the robust one
 ttl_emit = robust_ttl_emit
@@ -45,10 +62,20 @@ def _emit_cockpit_pulse(ttl_key: str, status: str, ttl: int):
     """
     try:
         client = get_redis_client()
-        ttl_emit(key=f"ttl:boot:cockpit:{ttl_key}", status=status, client=client, ttl=ttl)
+        ttl_emit(
+            key=f"ttl:boot:cockpit:{ttl_key}",
+            status=status,
+            client=client,
+            ttl=ttl,
+        )
     except Exception as exc:
         # client=None will queue the emit
-        ttl_emit(key=f"ttl:boot:cockpit:{ttl_key}", status=status, client=None, ttl=ttl)
+        ttl_emit(
+            key=f"ttl:boot:cockpit:{ttl_key}",
+            status=status,
+            client=None,
+            ttl=ttl,
+        )
         logger.debug(f"Cockpit pulse queued [{ttl_key}]: {status} ({exc})")
 
 
@@ -70,12 +97,20 @@ def safe_import(module_path: str, attr_name: str, ttl_key: str):
 
 
 # Safe imports — missing tiles won’t crash the package
-cockpit_bp = safe_import("app.cockpit.routes.telemetry_dashboard", "cockpit_bp", "cockpit_bp")
-trace_bp = safe_import("app.admin.cockpit.trace.event_id", "trace_bp", "trace_bp")
-fk_inspector_bp = safe_import(
-    "app.cockpit.tiles.fk_constraint_inspector", "fk_inspector_bp", "fk_inspector_bp"
+cockpit_bp = safe_import(
+    "app.cockpit.routes.telemetry_dashboard", "cockpit_bp", "cockpit_bp"
 )
-drilldown_bp = safe_import("app.cockpit.routes.drilldown", "drilldown_bp", "drilldown_bp")
+trace_bp = safe_import(
+    "app.admin.cockpit.trace.event_id", "trace_bp", "trace_bp"
+)
+fk_inspector_bp = safe_import(
+    "app.cockpit.tiles.fk_constraint_inspector",
+    "fk_inspector_bp",
+    "fk_inspector_bp",
+)
+drilldown_bp = safe_import(
+    "app.cockpit.routes.drilldown", "drilldown_bp", "drilldown_bp"
+)
 
 
 def register_cockpit_tiles(app):
@@ -90,9 +125,13 @@ def register_cockpit_tiles(app):
             try:
                 # Guard against duplicate registration
                 if bp.name in app.blueprints:
-                    app.logger.warning(f"⚠️ Skipping duplicate cockpit tile: {name}")
+                    app.logger.warning(
+                        f"⚠️ Skipping duplicate cockpit tile: {name}"
+                    )
                     continue
                 app.register_blueprint(bp)
                 app.logger.info(f"✅ Registered cockpit tile: {name}")
             except Exception as e:
-                app.logger.error(f"❌ Failed to register cockpit tile '{name}': {e}")
+                app.logger.error(
+                    f"❌ Failed to register cockpit tile '{name}': {e}"
+                )

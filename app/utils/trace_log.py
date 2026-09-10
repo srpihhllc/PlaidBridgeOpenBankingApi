@@ -39,6 +39,10 @@ def log_identity_event(
         DeprecationWarning,
         stacklevel=2,
     )
-    logger.warning("Deprecated log_identity_event called from app.utils.trace_log")
+    logger.warning(
+        "Deprecated log_identity_event called from app.utils.trace_log"
+    )
 
-    return canonical_logger(user_id=user_id, event_type=event_type, details=details, **kwargs)
+    return canonical_logger(
+        user_id=user_id, event_type=event_type, details=details, **kwargs
+    )

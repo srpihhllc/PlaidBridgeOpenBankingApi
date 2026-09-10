@@ -1,12 +1,14 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes/funds.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, redirect, render_template, request
 
 from app import db
 from app.models import BankAccount, BankTransaction
-from app.utils.redis_utils import get_redis_client  # centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # centralised, SSL‑safe client
 
 funds_bp = Blueprint("funds_bp", __name__, url_prefix="/transfer")
 
@@ -21,20 +23,32 @@ def transfer_funds():
             to_id = int(request.form.get("to_id", "0"))
             amount = float(request.form.get("amount", "0"))
         except ValueError:
-            current_app.logger.warning("[funds.transfer_funds] invalid form values")
-            return render_template("transfer.html", accounts=accounts, error="Invalid input")
+            current_app.logger.warning(
+                "[funds.transfer_funds] invalid form values"
+            )
+            return render_template(
+                "transfer.html", accounts=accounts, error="Invalid input"
+            )
 
         from_acct = BankAccount.query.get(from_id)
         to_acct = BankAccount.query.get(to_id)
 
         if not from_acct or not to_acct:
-            current_app.logger.warning("[funds.transfer_funds] account not found")
-            return render_template("transfer.html", accounts=accounts, error="Account not found")
+            current_app.logger.warning(
+                "[funds.transfer_funds] account not found"
+            )
+            return render_template(
+                "transfer.html", accounts=accounts, error="Account not found"
+            )
 
         if amount <= 0:
-            current_app.logger.warning("[funds.transfer_funds] non-positive transfer amount")
+            current_app.logger.warning(
+                "[funds.transfer_funds] non-positive transfer amount"
+            )
             return render_template(
-                "transfer.html", accounts=accounts, error="Amount must be positive"
+                "transfer.html",
+                accounts=accounts,
+                error="Amount must be positive",
             )
 
         if from_acct.balance >= amount:
@@ -47,7 +61,7 @@ def transfer_funds():
                 amount=amount,
                 txn_type="transfer",
                 method="manual",
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
             )
             db.session.add(txn)
 
@@ -67,12 +81,16 @@ def transfer_funds():
                             f"[funds.transfer_funds] Redis write failed: {e}"
                         )
                 except Exception as e:
-                    current_app.logger.warning(f"[funds.transfer_funds] DB flush failed: {e}")
+                    current_app.logger.warning(
+                        f"[funds.transfer_funds] DB flush failed: {e}"
+                    )
 
             db.session.commit()
             # Redirect to account page by user_id (BankAccount.user_id is the canonical owner)
             return redirect(f"/accounts/{from_acct.user_id}")
 
-        return render_template("transfer.html", accounts=accounts, error="Insufficient funds")
+        return render_template(
+            "transfer.html", accounts=accounts, error="Insufficient funds"
+        )
 
     return render_template("transfer.html", accounts=accounts)

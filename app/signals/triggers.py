@@ -3,9 +3,11 @@
 
 def handle_schema_update(revision):
     # Place logic hooks here
-    from datetime import datetime
+    from datetime import datetime, timezone
 
-    print(f"[TRIGGER] Schema hash {revision} at {datetime.utcnow().isoformat()}")
+    print(
+        f"[TRIGGER] Schema hash {revision} at {datetime.now(timezone.utc).isoformat()}"
+    )
     # Examples:
     # - Push to /tmp/hash for watchdogs
     # - Notify Slack or Discord

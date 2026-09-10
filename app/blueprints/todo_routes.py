@@ -1,9 +1,17 @@
 # app/blueprints/todo_routes.py
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
-from flask import Blueprint, abort, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from app.extensions import db
@@ -55,7 +63,9 @@ def _apply_sort_and_filter(query, settings: dict):
     Apply sort/filter preferences from UserDashboard.settings to a Todo query.
     """
     sort = settings.get("todo_sort", "created")  # created | priority | due
-    flt = settings.get("todo_filter", "all")  # all | pending | completed | overdue | high
+    flt = settings.get(
+        "todo_filter", "all"
+    )  # all | pending | completed | overdue | high
 
     # Filter
     if flt == "pending":
@@ -63,7 +73,9 @@ def _apply_sort_and_filter(query, settings: dict):
     elif flt == "completed":
         query = query.filter_by(completed=True)
     elif flt == "overdue":
-        query = query.filter_by(completed=False).filter(Todo.due_date < datetime.utcnow().date())
+        query = query.filter_by(completed=False).filter(
+            Todo.due_date < datetime.now(timezone.utc).date()
+        )
     elif flt == "high":
         query = query.filter_by(priority="high")
 
@@ -95,7 +107,7 @@ def _apply_sort_and_filter(query, settings: dict):
 def list_todos():
     # --- GOD MODE BYPASS ---
     if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
-        today = datetime.utcnow().date()
+        today = datetime.now(timezone.utc).date()
         return render_template(
             "sub/todo/todo_list.html",
             todos=[],
@@ -114,13 +126,19 @@ def list_todos():
     query = _apply_sort_and_filter(query, settings)
     todos = query.all()
 
-    today = datetime.utcnow().date()
+    today = datetime.now(timezone.utc).date()
 
     # Derived counts
-    pending_count = Todo.query.filter_by(user_id=user.id, completed=False).count()
-    completed_count = Todo.query.filter_by(user_id=user.id, completed=True).count()
+    pending_count = Todo.query.filter_by(
+        user_id=user.id, completed=False
+    ).count()
+    completed_count = Todo.query.filter_by(
+        user_id=user.id, completed=True
+    ).count()
     overdue_count = (
-        Todo.query.filter_by(user_id=user.id, completed=False).filter(Todo.due_date < today).count()
+        Todo.query.filter_by(user_id=user.id, completed=False)
+        .filter(Todo.due_date < today)
+        .count()
     )
 
     return render_template(
@@ -154,7 +172,9 @@ def add_todo():
         flash("Todo text cannot be empty.", "warning")
         return redirect(url_for("todo.list"))
 
-    priority = request.form.get("priority") or settings.get("default_priority", "normal")
+    priority = request.form.get("priority") or settings.get(
+        "default_priority", "normal"
+    )
     category = request.form.get("category") or settings.get("default_category")
     due_date_raw = request.form.get("due_date") or None
     notes = request.form.get("notes") or None
@@ -203,7 +223,9 @@ def toggle(todo_id):
     todo.completed = not todo.completed
     db.session.commit()
 
-    logger.info(f"Todo toggled by user={user.id}: id={todo_id}, completed={todo.completed}")
+    logger.info(
+        f"Todo toggled by user={user.id}: id={todo_id}, completed={todo.completed}"
+    )
 
     return redirect(url_for("todo.list"))
 

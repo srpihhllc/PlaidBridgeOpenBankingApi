@@ -8,7 +8,14 @@ import logging
 import os
 
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Attachment, Disposition, FileContent, FileName, FileType, Mail
+from sendgrid.helpers.mail import (
+    Attachment,
+    Disposition,
+    FileContent,
+    FileName,
+    FileType,
+    Mail,
+)
 
 from app.utils.redis_utils import set_job_status  # cockpit Redis tracking
 from app.utils.telemetry import _get_safe_redis_client  # TTL pulse emitter
@@ -17,7 +24,9 @@ _logger = logging.getLogger(__name__)
 
 # Load API key and sender email from environment
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-SENDGRID_FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "noreply@yourdomain.com")
+SENDGRID_FROM_EMAIL = os.getenv(
+    "SENDGRID_FROM_EMAIL", "noreply@yourdomain.com"
+)
 
 
 def send_email_with_attachment(
@@ -78,10 +87,14 @@ def send_email_with_attachment(
         # Cockpit TTL pulse for successful send
         _get_safe_redis_client(pulse_key="ttl:email:dispute_blast", ttl=300)
 
-        _logger.info("Email sent successfully to %s (job_id=%s)", to_email, job_id)
+        _logger.info(
+            "Email sent successfully to %s (job_id=%s)", to_email, job_id
+        )
 
     except Exception as e:
-        _logger.exception("Failed to send email to %s (job_id=%s)", to_email, job_id)
+        _logger.exception(
+            "Failed to send email to %s (job_id=%s)", to_email, job_id
+        )
 
         # Log failure to Redis
         if job_id:
@@ -92,11 +105,15 @@ def send_email_with_attachment(
             )
 
         # Cockpit TTL pulse for failed send
-        _get_safe_redis_client(pulse_key="ttl:email:dispute_blast_error", ttl=300)
+        _get_safe_redis_client(
+            pulse_key="ttl:email:dispute_blast_error", ttl=300
+        )
         raise
 
 
-def send_password_reset_email(to_email: str, reset_token: str, job_id: str | None = None) -> None:
+def send_password_reset_email(
+    to_email: str, reset_token: str, job_id: str | None = None
+) -> None:
     """
     Sends a password reset email using the existing email sending infrastructure.
     This function is a specific-purpose wrapper for reset tokens.

@@ -8,7 +8,7 @@
 #   - Resilient ingestion (one bad record never breaks the batch)
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.extensions import db
 from app.models.transactions import Transaction
@@ -27,7 +27,7 @@ def _safe_parse_date(value: str | None) -> datetime:
     Falls back to UTC now if parsing fails.
     """
     if not value:
-        return datetime.utcnow()
+        return datetime.now(timezone.utc)
 
     try:
         return datetime.fromisoformat(value.replace("Z", ""))
@@ -35,13 +35,15 @@ def _safe_parse_date(value: str | None) -> datetime:
         try:
             return datetime.strptime(value[:10], "%Y-%m-%d")
         except Exception:
-            return datetime.utcnow()
+            return datetime.now(timezone.utc)
 
 
 # -----------------------------------------------------------------------------
 # Ingestion / Upsert
 # -----------------------------------------------------------------------------
-def sync_user_transactions_from_plaid(user_id: int, plaid_access_token: str) -> int:
+def sync_user_transactions_from_plaid(
+    user_id: int, plaid_access_token: str
+) -> int:
     """
     Fetches recent Plaid transactions and upserts them into the Transaction table.
     Returns the count of newly inserted rows (not updates).
@@ -59,7 +61,9 @@ def sync_user_transactions_from_plaid(user_id: int, plaid_access_token: str) -> 
 
             # Normalize category
             category_list = p.get("category") or []
-            category_name = category_list[0] if category_list else "Uncategorized"
+            category_name = (
+                category_list[0] if category_list else "Uncategorized"
+            )
 
             # -----------------------------------------------------------------
             # Update existing transaction
@@ -98,7 +102,9 @@ def sync_user_transactions_from_plaid(user_id: int, plaid_access_token: str) -> 
 
         except Exception as e:
             # Ingestion must be resilient — log and continue
-            print(f"[WARN] Failed to ingest transaction {p.get('transaction_id')}: {e}")
+            print(
+                f"[WARN] Failed to ingest transaction {p.get('transaction_id')}: {e}"
+            )
 
     if upserted:
         db.session.commit()

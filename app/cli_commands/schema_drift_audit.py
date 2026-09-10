@@ -1,16 +1,22 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/schema_drift_audit.py
 
-import click
 import shutil
 import sys
-from flask.cli import with_appcontext
+
+import click
 from flask import current_app
+from flask.cli import with_appcontext
 
 from app.utils.generate_model_manifest import generate_manifest
 from app.utils.schema_drift_detector import detect_schema_drift
 
+
 @click.command("audit-schema")
-@click.option("--update-baseline", is_flag=True, help="Set the current schema as the new stable baseline.")
+@click.option(
+    "--update-baseline",
+    is_flag=True,
+    help="Set the current schema as the new stable baseline.",
+)
 @with_appcontext
 def schema_drift_audit(update_baseline):
     """Generates manifest and checks for structural drift."""
@@ -21,10 +27,20 @@ def schema_drift_audit(update_baseline):
     # 2. Handle baseline reset
     if update_baseline:
         try:
-            shutil.copy("storage/manifest/model_manifest.json", "storage/manifest/model_manifest_stable.json")
-            click.secho("✅ Baseline updated. Current database schema is now marked as STABLE.", fg="green", bold=True)
+            shutil.copy(
+                "storage/manifest/model_manifest.json",
+                "storage/manifest/model_manifest_stable.json",
+            )
+            click.secho(
+                "✅ Baseline updated. Current database schema is now marked as STABLE.",
+                fg="green",
+                bold=True,
+            )
         except FileNotFoundError:
-            click.secho("❌ Failed to update baseline: Current manifest not found.", fg="red")
+            click.secho(
+                "❌ Failed to update baseline: Current manifest not found.",
+                fg="red",
+            )
         return
 
     # 3. Perform standard drift audit

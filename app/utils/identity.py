@@ -1,4 +1,4 @@
-#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/identity.py
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/identity.py
 
 import logging
 import warnings
@@ -16,7 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 def log_identity_event(
-    user_id: str, event_type: str, details: dict | None = None, reason: str = None, **kwargs
+    user_id: str,
+    event_type: str,
+    details: dict | None = None,
+    reason: str = None,
+    **kwargs,
 ):
     """
     Deprecated: Logs an event related to user identity.
@@ -24,7 +28,9 @@ def log_identity_event(
     Please update your imports to use the canonical logger directly.
     """
     # Log a warning to the application logger for structured monitoring
-    logger.warning("Deprecated log_identity_event called from app.utils.identity")
+    logger.warning(
+        "Deprecated log_identity_event called from app.utils.identity"
+    )
 
     if details is None:
         details = {}
@@ -39,4 +45,6 @@ def log_identity_event(
         merged_kwargs.pop(_dup, None)
 
     # Call the canonical function, which handles all the Redis and DB logic
-    return canonical_logger(event_type=event_type, user_id=user_id, reason=reason, **merged_kwargs)
+    return canonical_logger(
+        event_type=event_type, user_id=user_id, reason=reason, **merged_kwargs
+    )

@@ -16,7 +16,9 @@ def mysql_auth_health():
         ttl_emit("ttl:mysql:access:srpihhllc", status="success")
         return {
             "status": "✅ connected",
-            "latency_ms": result.context.execution_options.get("max_row_buffer", "n/a"),
+            "latency_ms": result.context.execution_options.get(
+                "max_row_buffer", "n/a"
+            ),
         }
     except OperationalError as e:
         ttl_emit("ttl:mysql:access:srpihhllc", status="error")

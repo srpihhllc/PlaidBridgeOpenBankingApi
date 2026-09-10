@@ -4,7 +4,7 @@
 #              and cockpit‑grade relationship clarity.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 from .vault_transaction import VaultTransaction
@@ -40,11 +40,15 @@ class LedgerEntry(db.Model):
 
     amount = db.Column(db.Float, nullable=False)
     method = db.Column(db.String(64))
-    received_at = db.Column(db.DateTime, default=datetime.utcnow)
+    received_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     reconciled = db.Column(db.Boolean, default=False)
 
     # Reverse relationship to User
-    borrower = db.relationship("User", back_populates="ledger_entries", foreign_keys=[borrower_id])
+    borrower = db.relationship(
+        "User", back_populates="ledger_entries", foreign_keys=[borrower_id]
+    )
 
     def __repr__(self):
         return (

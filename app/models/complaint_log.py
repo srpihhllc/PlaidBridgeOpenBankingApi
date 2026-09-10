@@ -1,6 +1,6 @@
 # =============================================================================
 # FILE: app/models/complaint_log.py
-# DESCRIPTION: Finalized relationship constraints coordinating both dynamic 
+# DESCRIPTION: Finalized relationship constraints coordinating both dynamic
 #              backrefs (for User) and strict back_populates (for Transaction).
 # =============================================================================
 
@@ -39,12 +39,16 @@ class ComplaintLog(db.Model):
     # ⭐ User Fix: Kept as backref because User model lacks 'complaint_logs'.
     user = db.relationship(
         "User",
-        backref=db.backref("complaint_logs", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "complaint_logs", lazy="dynamic", passive_deletes=True
+        ),
     )
 
-    # ⭐ Transaction Fix: Reverted to back_populates because Transaction 
+    # ⭐ Transaction Fix: Reverted to back_populates because Transaction
     # explicitly defines 'complaint_logs' on its own end.
-    transaction = db.relationship("Transaction", back_populates="complaint_logs")
+    transaction = db.relationship(
+        "Transaction", back_populates="complaint_logs"
+    )
 
     def __repr__(self):
         return f"<ComplaintLog {self.id}>"

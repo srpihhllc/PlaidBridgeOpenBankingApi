@@ -1,9 +1,11 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/agents/tracer.py
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 # Use the centralised Redis client
 redis_client = get_redis_client()
@@ -19,7 +21,7 @@ def log_trace(agent, service, redis_key, ui_path):
         "service": service,
         "redis": redis_key,
         "ui": ui_path,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     if redis_client:

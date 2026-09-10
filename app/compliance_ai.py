@@ -1,7 +1,7 @@
 # app/compliance_ai.py
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from app.models import FraudReport, Transaction  # ✅ Keep this!
 
@@ -16,7 +16,8 @@ def predict_fraud_trends():
     try:
         # Analyze recent fraud cases within the last 30 days
         fraud_cases = FraudReport.query.filter(
-            FraudReport.timestamp >= datetime.utcnow() - timedelta(days=30)
+            FraudReport.timestamp
+            >= datetime.now(timezone.utc) - timedelta(days=30)
         ).all()
 
         if not fraud_cases:
@@ -35,7 +36,11 @@ def predict_fraud_trends():
 
         # Determine risk level based on transaction patterns
         max_category = max(risk_categories, key=risk_categories.get)
-        risk_level = "high risk" if risk_categories[max_category] > 5 else "moderate risk"
+        risk_level = (
+            "high risk"
+            if risk_categories[max_category] > 5
+            else "moderate risk"
+        )
 
         fraud_summary = {
             "status": risk_level,

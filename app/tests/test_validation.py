@@ -6,14 +6,15 @@
 # =============================================================================
 
 
-
 def test_validate_json_schema_invalid_json(client):
     """
     Posting non-JSON with application/json header should return 422
     with 'Malformed JSON body.' message.
     """
     resp = client.post(
-        "/dummy_invalid", data="not-json", headers={"Content-Type": "application/json"}
+        "/dummy_invalid",
+        data="not-json",
+        headers={"Content-Type": "application/json"},
     )
     assert resp.status_code == 422
     assert b"Malformed JSON body." in resp.data

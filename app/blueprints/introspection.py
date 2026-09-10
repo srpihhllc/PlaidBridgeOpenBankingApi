@@ -6,7 +6,9 @@ from flask_login import login_required
 from app.decorators import admin_required
 from app.utils.redis_utils import call_reflector_ai, get_redis_client
 
-introspection_bp = Blueprint("introspection", __name__, url_prefix="/introspection")
+introspection_bp = Blueprint(
+    "introspection", __name__, url_prefix="/introspection"
+)
 
 
 @introspection_bp.route("/cortex_map")
@@ -36,7 +38,8 @@ def cortex_map():
 def cortex_overlay():
     redis = get_redis_client()
     usage_data = {
-        key.decode().split(":")[1]: int(redis.get(key) or 0) for key in redis.keys("route_hits:*")
+        key.decode().split(":")[1]: int(redis.get(key) or 0)
+        for key in redis.keys("route_hits:*")
     }
     return render_template("admin/cortex_overlay.svg", hits=usage_data)
 
@@ -62,7 +65,8 @@ def diagnose_brain():
 
     traces.sort(key=lambda x: int(x["hits"]), reverse=True)
     analysis_prompt = "\n".join(
-        f"- {t['endpoint']} ({t['hits']} hits, last seen {t['last_accessed']})" for t in traces
+        f"- {t['endpoint']} ({t['hits']} hits, last seen {t['last_accessed']})"
+        for t in traces
     )
 
     if request.method == "POST":

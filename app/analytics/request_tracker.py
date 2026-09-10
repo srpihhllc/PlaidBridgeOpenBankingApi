@@ -26,7 +26,8 @@ def init_request_tracking(app):
             return response
 
         # Calculate duration and convert to milliseconds
-        duration_ms = int((time.time() - g.get("start_time", time.time())) * 1000)
+        start_time = g.get("start_time", time.time())
+        duration_ms = int((time.time() - start_time) * 1000)
 
         # Add request ID header to response
         response.headers["X-Request-ID"] = g.request_id
@@ -61,7 +62,13 @@ def init_request_tracking(app):
         return response
 
 
-def record_api_metrics(method: str, path: str, status_code: int, duration_ms: int, endpoint: str):
+def record_api_metrics(
+    method: str,
+    path: str,
+    status_code: int,
+    duration_ms: int,
+    endpoint: str,
+):
     """Record API metrics to monitoring system"""
     # Example implementation using a simple counter pattern
     # In production, use a proper metrics system
@@ -77,16 +84,21 @@ def record_api_metrics(method: str, path: str, status_code: int, duration_ms: in
     # Increment counters and histograms
     try:
         # Request count
-        current_app.logger.info(f"📈 METRIC_INC: api_request_count | Tags: {tags}")
+        current_app.logger.info(
+            f"📈 METRIC_INC: api_request_count | Tags: {tags}"
+        )
 
         # Latency histogram
         current_app.logger.info(
-            f"📊 METRIC_HISTOGRAM: api_request_duration_ms | Value: {duration_ms} | Tags: {tags}"
+            "📊 METRIC_HISTOGRAM: api_request_duration_ms | "
+            f"Value: {duration_ms} | Tags: {tags}"
         )
 
         # Status code counter
         status_category = status_code // 100
-        current_app.logger.info(f"📈 METRIC_INC: api_status_{status_category}xx | Tags: {tags}")
+        current_app.logger.info(
+            f"📈 METRIC_INC: api_status_{status_category}xx | Tags: {tags}"
+        )
     except Exception as e:
         # Ensure metric recording never breaks the app
         current_app.logger.error(f"Failed to record metrics: {e}")

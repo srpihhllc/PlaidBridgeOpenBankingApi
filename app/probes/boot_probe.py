@@ -1,6 +1,11 @@
 # app/probes/boot_probe.py
 
-from app.tracing import emit_context_entry, emit_context_exit, trace_boot, trace_error
+from app.tracing import (
+    emit_context_entry,
+    emit_context_exit,
+    trace_boot,
+    trace_error,
+)
 from app.utils.telemetry import log_identity_event
 
 

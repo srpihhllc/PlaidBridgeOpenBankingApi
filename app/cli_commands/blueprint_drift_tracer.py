@@ -65,7 +65,9 @@ def audit_blueprint_attributes(
             if not found:
                 # Try any explicitly preferred names (e.g., admin_bp, sub_bp)
                 for name in preferred_names:
-                    if hasattr(mod, name) and isinstance(getattr(mod, name), Blueprint):
+                    if hasattr(mod, name) and isinstance(
+                        getattr(mod, name), Blueprint
+                    ):
                         found.append(name)
                         break
 

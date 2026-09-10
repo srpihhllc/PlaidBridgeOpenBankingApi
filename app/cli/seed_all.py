@@ -1,6 +1,7 @@
 # FILE: app/cli/seed_all.py
 
 from subprocess import call
+
 import click
 from flask.cli import with_appcontext
 

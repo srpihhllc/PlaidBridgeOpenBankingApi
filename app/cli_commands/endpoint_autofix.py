@@ -3,15 +3,16 @@
 # DESCRIPTION: Modernized auto-fixer for broken url_for() namespace references.
 # =============================================================================
 
+import json
 import os
 import re
-import json
-import click
-from flask.cli import with_appcontext
-from flask import current_app
 
-from app.utils.redis_utils import get_redis_client
+import click
+from flask import current_app
+from flask.cli import with_appcontext
+
 from app.telemetry.ttl_emit import emit_schema_trace
+from app.utils.redis_utils import get_redis_client
 
 # Matches url_for("endpoint") or url_for('endpoint') with any spacing
 URL_FOR_RE = re.compile(r"url_for\(\s*[\"']([^\"']+)[\"']")
@@ -23,32 +24,26 @@ ENDPOINT_REWRITE_MAP = {
     # Diagnostics rewires
     "main.db_health": "diagnostics.db_health",
     "main.cache_health": "diagnostics.cache_health",
-
     # Admin UI rewires
     "main.schema_diagram": "admin.schema_diagram",
     "main.rate_limits_dashboard": "admin.rate_limits_dashboard",
     "main.log_viewer": "admin.log_viewer",
-
     # Renamed admin functions
     "main.approve_user": "admin.approval_queue",
     "main.delete_redis_key": "admin.sweep_expired_keys",
-
     # Panel & Tile rewires
     "main.redis_panel": "admin.redis_panel",
     "admin.model_summary_tile": "admin.tile_schema_versions",
     "admin.route_registry_tile": "diagnostics.route_list",
-
     # Data export & Health
     "main.export_users": "admin_api.admin_list_users",
     "api.health_check": "admin.system_health",
-
     # Sidebar & Tile Mappings
     "admin.agent_activity": "admin.tile_agent_activity",
     "admin.schema_events": "admin.tile_schema_events",
     "admin.schema_versions": "admin.tile_schema_versions",
     "admin.statements_heatmap": "admin.tile_statements_heatmap",
     "admin.statements_timeline": "admin.tile_statements_timeline",
-
     # Advanced System Tools
     "admin.route_list": "diagnostics.route_list",
     "admin.brain_diagnosis": "introspection.diagnose_brain",
@@ -56,6 +51,7 @@ ENDPOINT_REWRITE_MAP = {
     "admin.schema_viewer": "admin.schema_diagram",
     "admin.db_trace_panel": "admin.tile_trace_viewer",
 }
+
 
 @click.command("endpoint_autofix")
 @with_appcontext
@@ -113,7 +109,9 @@ def endpoint_autofix():
                         )
 
         if template_changed:
-            full_path = os.path.join(current_app.root_path, "templates", t_name)
+            full_path = os.path.join(
+                current_app.root_path, "templates", t_name
+            )
             os.makedirs(os.path.dirname(full_path), exist_ok=True)
             with open(full_path, "w", encoding="utf-8") as f:
                 f.write(patched_source)

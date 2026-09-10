@@ -1,5 +1,7 @@
 from flask import Flask
+
 from app.utils import security_utils
+
 
 def test_inject_request_id_registers_hooks():
     app = Flask("test_app")

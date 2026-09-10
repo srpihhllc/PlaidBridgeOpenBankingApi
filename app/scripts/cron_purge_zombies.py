@@ -23,7 +23,9 @@ def nightly_purge():
                     redis_client.delete(k)
                     purged_count += 1
 
-        print(f"[{datetime.now()}] Success: Purged {purged_count} zombie keys.")
+        print(
+            f"[{datetime.now()}] Success: Purged {purged_count} zombie keys."
+        )
     except Exception as e:
         print(f"[{datetime.now()}] Error during nightly purge: {e}")
 

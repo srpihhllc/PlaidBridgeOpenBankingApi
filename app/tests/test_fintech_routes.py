@@ -6,8 +6,8 @@
 
 import pytest
 from flask_jwt_extended import create_access_token
-from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app import create_app, db
 from app.models import User
@@ -104,7 +104,8 @@ def test_verify_truelayer_error(client, monkeypatch):
 
 def test_verify_tink_success(client, monkeypatch):
     monkeypatch.setattr(
-        "app.services.fintech_api.verify_via_tink", lambda payload: {"verified": True}
+        "app.services.fintech_api.verify_via_tink",
+        lambda payload: {"verified": True},
     )
     resp = client.post("/api/v1/fintech/verify/tink", json={"foo": "bar"})
     assert resp.status_code == 200
@@ -122,11 +123,17 @@ def test_create_transaction_and_get(client, app, auth_header):
         "category": "TestCat",
     }
     # Create
-    resp = client.post("/api/v1/fintech/transactions", json=payload, headers=auth_header)
+    resp = client.post(
+        "/api/v1/fintech/transactions", json=payload, headers=auth_header
+    )
     assert resp.status_code in (200, 201)
     body = resp.get_json()
     assert body["status"] == "success"
-    txn_id = body["data"]["transaction_id"] if "data" in body else body.get("transaction_id")
+    txn_id = (
+        body["data"]["transaction_id"]
+        if "data" in body
+        else body.get("transaction_id")
+    )
 
     # Retrieve using the core/test endpoint if available (fallback)
     resp2 = client.get("/api/v1/core/transactions", headers=auth_header)
@@ -141,6 +148,10 @@ def test_create_transaction_and_get(client, app, auth_header):
 
 def test_create_transaction_invalid_schema(client, auth_header):
     # Missing required fields
-    resp = client.post("/api/v1/fintech/transactions", json={"foo": "bar"}, headers=auth_header)
+    resp = client.post(
+        "/api/v1/fintech/transactions",
+        json={"foo": "bar"},
+        headers=auth_header,
+    )
     assert resp.status_code in (400, 422)
     assert resp.get_json()["status"] == "error"

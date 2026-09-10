@@ -38,10 +38,16 @@ def test_login_invalid_credentials(client, app):
         data={"email": "bad@x.com", "password": "wrong"},
         follow_redirects=True,
     )
-    assert resp.status_code == 200  # After following redirect, login page rendered
+    assert (
+        resp.status_code == 200
+    )  # After following redirect, login page rendered
 
     # Check for presence of login form or an indicative phrase.
-    assert b"Login" in resp.data or b"Invalid" in resp.data or b"email" in resp.data
+    assert (
+        b"Login" in resp.data
+        or b"Invalid" in resp.data
+        or b"email" in resp.data
+    )
 
 
 def test_register_subscriber_missing_fields(client, templates):

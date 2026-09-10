@@ -5,7 +5,9 @@ from flask_login import login_required
 
 from app.models import CreditLedger, PaymentLog, User
 
-cockpit_bp = Blueprint("cockpit_routes_bp", __name__, url_prefix="/admin/cockpit")
+cockpit_bp = Blueprint(
+    "cockpit_routes_bp", __name__, url_prefix="/admin/cockpit"
+)
 
 
 @cockpit_bp.route("/cockpit/exposure/<int:user_id>")

@@ -14,13 +14,19 @@ def inspect_blueprints():
     Gathers URL rules from the Flask app and groups them by blueprint name.
     """
     route_map = [
-        {"endpoint": rule.endpoint, "methods": list(rule.methods), "url": str(rule)}
+        {
+            "endpoint": rule.endpoint,
+            "methods": list(rule.methods),
+            "url": str(rule),
+        }
         for rule in current_app.url_map.iter_rules()
     ]
 
     blueprints = {}
     for bp_name in current_app.blueprints:
-        bp_routes = [r for r in route_map if r["endpoint"].startswith(bp_name + ".")]
+        bp_routes = [
+            r for r in route_map if r["endpoint"].startswith(bp_name + ".")
+        ]
         blueprints[bp_name] = {"status": "registered", "routes": bp_routes}
 
     return blueprints
@@ -45,7 +51,13 @@ def blueprint_inspector_tile():
             ttl=120,
         )
 
-        return jsonify({"status": "success", "tile": "blueprint_inspector", "payload": payload})
+        return jsonify(
+            {
+                "status": "success",
+                "tile": "blueprint_inspector",
+                "payload": payload,
+            }
+        )
 
     except Exception as e:
         current_app.logger.exception("⚠️ blueprint_inspector_tile failed")

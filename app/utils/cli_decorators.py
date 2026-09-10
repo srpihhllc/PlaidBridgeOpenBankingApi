@@ -28,7 +28,7 @@ def cli_safe(
         use_test_mode_env: The environment variable key to check for test mode.
 
     Note:
-        The wrapped function MUST accept `_cli_mode` (str | None) and 
+        The wrapped function MUST accept `_cli_mode` (str | None) and
         `_imports` (dict[str, Any]) as keyword arguments.
     """
 

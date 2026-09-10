@@ -7,7 +7,7 @@
 # =============================================================================
 
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -39,7 +39,9 @@ class Subscription(db.Model):
         back_populates="subscriptions",
     )
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     def __repr__(self) -> str:
         return f"<Subscription id={self.id} status={self.status}>"
@@ -69,17 +71,21 @@ class SubscriberProfile(db.Model):
     )
 
     api_key = db.Column(db.String(64), unique=True, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------
 
-    # ⭐ User Fix: Swapped back_populates to dynamic backref. 
+    # ⭐ User Fix: Swapped back_populates to dynamic backref.
     # Added uselist=False to preserve the strict 1:1 relationship structural framing.
     user = db.relationship(
         "User",
-        backref=db.backref("subscriber_profile", uselist=False, passive_deletes=True),
+        backref=db.backref(
+            "subscriber_profile", uselist=False, passive_deletes=True
+        ),
     )
 
     subscriptions = db.relationship(

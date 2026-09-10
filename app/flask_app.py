@@ -7,8 +7,10 @@ to protect the application boot sequence from circular dependencies.
 """
 
 from __future__ import annotations
+
 import os
 from typing import Any
+
 from app import create_app as create_package_app
 
 # Global instantiation variable reserved strictly for legacy callers
@@ -17,7 +19,12 @@ app: Any | None = None
 
 if os.getenv("EXPORT_LEGACY_APP", "0") == "1":
     app = create_package_app()
-    app.config.setdefault("ENABLE_SERVICE_WORKER", os.getenv("ENABLE_SERVICE_WORKER", "1").lower() in ("1", "true", "yes"))
+    app.config.setdefault(
+        "ENABLE_SERVICE_WORKER",
+        os.getenv("ENABLE_SERVICE_WORKER", "1").lower()
+        in ("1", "true", "yes"),
+    )
+
 
 def get_app() -> Any:
     """
@@ -28,7 +35,12 @@ def get_app() -> Any:
         return app
 
     flask_app = create_package_app()
-    flask_app.config.setdefault("ENABLE_SERVICE_WORKER", os.getenv("ENABLE_SERVICE_WORKER", "1").lower() in ("1", "true", "yes"))
+    flask_app.config.setdefault(
+        "ENABLE_SERVICE_WORKER",
+        os.getenv("ENABLE_SERVICE_WORKER", "1").lower()
+        in ("1", "true", "yes"),
+    )
     return flask_app
+
 
 __all__ = ["get_app", "app"]

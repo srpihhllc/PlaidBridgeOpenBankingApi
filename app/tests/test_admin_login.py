@@ -3,6 +3,7 @@
 # DESCRIPTION: End-to-end authentication smoke test for seeded admin accounts.
 # =============================================================================
 
+
 def test_admin_delete_user_cascade_api(client):
     """
     Ensure an admin (authenticated via JWT) can delete a user
@@ -73,7 +74,9 @@ def test_admin_delete_user_cascade_api(client):
         # Finds the running jwt manager instance from your app's extension map
         jwt_manager = client.application.extensions.get("flask-jwt-extended")
         if jwt_manager and hasattr(jwt_manager, "_user_lookup_callback"):
-            jwt_manager._user_lookup_callback = lambda _jwt_header, _jwt_data: admin
+            jwt_manager._user_lookup_callback = (
+                lambda _jwt_header, _jwt_data: admin
+            )
 
     headers = {"Authorization": f"Bearer {token}"}
 

@@ -1,7 +1,7 @@
 # =============================================================================
 # FILE: app/blueprints/liquidity_routes.py
 # DESCRIPTION: Liquidity dashboard blueprint. Aggregates vault balances and
-#              renders cockpit metrics for operator dashboards.
+#               renders cockpit metrics for operator dashboards.
 # =============================================================================
 
 from flask import Blueprint, render_template
@@ -24,7 +24,9 @@ def liquidity_dashboard():
     total_assets = sum(acct.balance for acct in vaults)
     vault_count = len(vaults)
     dormant_count = sum(1 for acct in vaults if acct.balance < 1)
-    dormant_pct = round((dormant_count / vault_count) * 100, 2) if vault_count else 0
+    dormant_pct = (
+        round((dormant_count / vault_count) * 100, 2) if vault_count else 0
+    )
 
     # 🧠 Example velocity data — wire Redis or telemetry later
     net_deposits_week = 24872.00

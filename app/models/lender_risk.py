@@ -1,7 +1,9 @@
 # app/models/lender_risk.py
 
-from datetime import datetime
+from datetime import datetime, timezone
+
 from app.extensions import db
+
 
 class LenderRisk(db.Model):
     __tablename__ = "lender_risk"
@@ -11,7 +13,7 @@ class LenderRisk(db.Model):
         db.Integer,
         db.ForeignKey("lenders.id", ondelete="CASCADE"),
         nullable=False,
-        unique=True
+        unique=True,
     )
 
     # Core risk metrics
@@ -21,7 +23,9 @@ class LenderRisk(db.Model):
     underwriting_quality = db.Column(db.Float, default=0.0)
 
     # Metadata
-    last_evaluated_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_evaluated_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # Relationship
     lender = db.relationship("Lender", back_populates="risk_profile")
@@ -34,5 +38,9 @@ class LenderRisk(db.Model):
             "fraud_index": self.fraud_index,
             "liquidity_exposure": self.liquidity_exposure,
             "underwriting_quality": self.underwriting_quality,
-            "last_evaluated_at": self.last_evaluated_at.isoformat() if self.last_evaluated_at else None,
+            "last_evaluated_at": (
+                self.last_evaluated_at.isoformat()
+                if self.last_evaluated_at
+                else None
+            ),
         }

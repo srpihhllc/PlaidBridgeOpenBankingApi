@@ -6,7 +6,9 @@ from collections import Counter
 
 from flask import current_app
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 
 def scan_keys(pattern):
@@ -86,7 +88,9 @@ def dump_traces(pattern):
 def show_counts(ip_list):
     r = get_redis_client()
     if not r:
-        current_app.logger.error("[trace_probe] Redis unavailable — cannot show counts")
+        current_app.logger.error(
+            "[trace_probe] Redis unavailable — cannot show counts"
+        )
         return
 
     print("\n📊 Repeat Offender Counts\n")
@@ -99,7 +103,9 @@ def show_counts(ip_list):
 def rank_offenders(keys):
     r = get_redis_client()
     if not r:
-        current_app.logger.error("[trace_probe] Redis unavailable — cannot rank offenders")
+        current_app.logger.error(
+            "[trace_probe] Redis unavailable — cannot rank offenders"
+        )
         return
 
     ip_list = []
@@ -121,10 +127,18 @@ def rank_offenders(keys):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pattern", type=str, default="trace:route_mismatch:*")
-    parser.add_argument("--count", nargs="*", help="IP(s) to check repeat count", default=[])
-    parser.add_argument("--rank", action="store_true", help="Rank offending IPs by frequency")
-    parser.add_argument("--boot", action="store_true", help="Inspect boot rollback skip traces")
+    parser.add_argument(
+        "--pattern", type=str, default="trace:route_mismatch:*"
+    )
+    parser.add_argument(
+        "--count", nargs="*", help="IP(s) to check repeat count", default=[]
+    )
+    parser.add_argument(
+        "--rank", action="store_true", help="Rank offending IPs by frequency"
+    )
+    parser.add_argument(
+        "--boot", action="store_true", help="Inspect boot rollback skip traces"
+    )
     args = parser.parse_args()
 
     if args.boot:

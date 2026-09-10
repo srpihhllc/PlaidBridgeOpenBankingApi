@@ -1,12 +1,15 @@
 # app/utils/generate_model_manifest.py
 
+import hashlib
 import importlib
 import json
 import os
-import hashlib
 from datetime import datetime, timezone
+
 from sqlalchemy import inspect
+
 from app.models import __all__ as model_names
+
 
 def generate_manifest(output_path="storage/manifest/model_manifest.json"):
     """Generates a full introspective manifest of all SQLAlchemy models."""
@@ -31,32 +34,39 @@ def generate_manifest(output_path="storage/manifest/model_manifest.json"):
             }
 
             schema_hash = hashlib.sha256(
-                json.dumps({
-                    "columns": sorted(columns),
-                    "relationships": sorted(relationships.keys()),
-                }).encode()
+                json.dumps(
+                    {
+                        "columns": sorted(columns),
+                        "relationships": sorted(relationships.keys()),
+                    }
+                ).encode()
             ).hexdigest()
 
-            manifest.append({
-                "name": name,
-                "table_name": inspector.tables[0].name if inspector.tables else "N/A",
-                "columns": columns,
-                "column_count": len(columns),
-                "relationships": relationships,
-                "schema_hash": schema_hash,
-                "status": "active",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
+            manifest.append(
+                {
+                    "name": name,
+                    "table_name": (
+                        inspector.tables[0].name if inspector.tables else "N/A"
+                    ),
+                    "columns": columns,
+                    "column_count": len(columns),
+                    "relationships": relationships,
+                    "schema_hash": schema_hash,
+                    "status": "active",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
 
         except Exception as e:
-            manifest.append({
-                "name": name,
-                "status": f"error: {str(e)}",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            })
+            manifest.append(
+                {
+                    "name": name,
+                    "status": f"error: {str(e)}",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            )
 
     with open(output_path, "w") as f:
         json.dump(manifest, f, indent=2)
 
     return manifest
-

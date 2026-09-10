@@ -11,18 +11,18 @@
 import base64
 import time
 
-import pytest
 import jwt  # PyJWT
-from cryptography.hazmat.primitives.asymmetric import rsa
+import pytest
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from flask import url_for
 
 from app.oauth.provider import ProviderName
 
-
 # ---------------------------------------------------------------------------
 # Helpers: RSA key generation + JWK formatting
 # ---------------------------------------------------------------------------
+
 
 def _int_to_base64url(n: int) -> str:
     """Convert integer to URL-safe base64 without padding."""
@@ -63,6 +63,7 @@ def _generate_rsa_jwk_and_pem(kid: str = "test-kid"):
 # Fixture: Signed Apple id_token + JWKS monkeypatch
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def apple_jwk_and_token(monkeypatch, app):
     """
@@ -70,7 +71,9 @@ def apple_jwk_and_token(monkeypatch, app):
     Monkeypatch the JWKS fetcher so provider.fetch_profile verifies correctly.
     """
     app.config.setdefault("APPLE_CLIENT_ID", "com.example.app")
-    app.config.setdefault("APPLE_REDIRECT_URI", "https://example.com/oauth/callback/apple")
+    app.config.setdefault(
+        "APPLE_REDIRECT_URI", "https://example.com/oauth/callback/apple"
+    )
 
     private_pem, jwk, kid = _generate_rsa_jwk_and_pem(kid="test-kid-1")
 
@@ -85,7 +88,9 @@ def apple_jwk_and_token(monkeypatch, app):
         "email_verified": "true",
     }
 
-    id_token = jwt.encode(payload, private_pem, algorithm="RS256", headers={"kid": kid})
+    id_token = jwt.encode(
+        payload, private_pem, algorithm="RS256", headers={"kid": kid}
+    )
     jwks = {"keys": [jwk]}
 
     # Monkeypatch JWKS fetcher
@@ -102,6 +107,7 @@ def apple_jwk_and_token(monkeypatch, app):
 # ---------------------------------------------------------------------------
 # Main Test: End-to-End Apple OAuth Flow
 # ---------------------------------------------------------------------------
+
 
 def test_apple_oauth_end_to_end(monkeypatch, client, app, apple_jwk_and_token):
     """
@@ -127,7 +133,9 @@ def test_apple_oauth_end_to_end(monkeypatch, client, app, apple_jwk_and_token):
         assert code == "abc123"
         return token_response
 
-    monkeypatch.setattr("app.oauth.provider.OAuthProvider.exchange_code", mock_exchange)
+    monkeypatch.setattr(
+        "app.oauth.provider.OAuthProvider.exchange_code", mock_exchange
+    )
 
     # -------------------------------------------------------------------------
     # FIX: Intercept jwt.decode globally and locally inside the provider namespace
@@ -145,6 +153,7 @@ def test_apple_oauth_end_to_end(monkeypatch, client, app, apple_jwk_and_token):
 
     # 2. Patch the provider module namespace directly if it binds 'from jwt import decode'
     import app.oauth.provider as oauth_provider
+
     if hasattr(oauth_provider, "decode"):
         monkeypatch.setattr(oauth_provider, "decode", mock_jwt_decode)
     # -------------------------------------------------------------------------
@@ -154,9 +163,15 @@ def test_apple_oauth_end_to_end(monkeypatch, client, app, apple_jwk_and_token):
     with client.session_transaction() as sess:
         sess["oauth_state:apple"] = test_state
 
+    # Resolve URL within test request context before dispatching request
+    with app.test_request_context():
+        target_url = url_for(
+            "oauth.callback_provider", provider=ProviderName.APPLE.value
+        )
+
     # POST form (Apple form_post) with code and matching state
     resp = client.post(
-        url_for("oauth.callback_provider", provider=ProviderName.APPLE.value),
+        target_url,
         data={
             "code": "abc123",
             "state": test_state,
@@ -169,7 +184,7 @@ def test_apple_oauth_end_to_end(monkeypatch, client, app, apple_jwk_and_token):
 
     # Validate user + TraceEvents
     with app.app_context():
-        from app.models import User, TraceEvent
+        from app.models import TraceEvent, User
 
         u = User.query.filter_by(email=expected_profile["email"]).first()
         assert u is not None

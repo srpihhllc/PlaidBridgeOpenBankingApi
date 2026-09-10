@@ -7,13 +7,13 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from flask import current_app
 
 import jwt
+from flask import current_app
 
-from app.models import User, TraceEvent
-from app.oauth.provider import OAuthProvider, ProviderName
 from app.extensions import db
+from app.models import TraceEvent, User
+from app.oauth.provider import OAuthProvider, ProviderName
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +37,15 @@ def verify_ms_token(id_token: str | None, *args, **kwargs) -> dict:
 # ---------------------------------------------------------------------------
 def exchange_code_for_user(provider: ProviderName, code: str) -> User:
     config = {
-        "client_id": current_app.config.get(f"{provider.value.upper()}_CLIENT_ID"),
-        "client_secret": current_app.config.get(f"{provider.value.upper()}_CLIENT_SECRET"),
-        "redirect_uri": current_app.config.get(f"{provider.value.upper()}_REDIRECT_URI"),
+        "client_id": current_app.config.get(
+            f"{provider.value.upper()}_CLIENT_ID"
+        ),
+        "client_secret": current_app.config.get(
+            f"{provider.value.upper()}_CLIENT_SECRET"
+        ),
+        "redirect_uri": current_app.config.get(
+            f"{provider.value.upper()}_REDIRECT_URI"
+        ),
     }
 
     provider_obj = OAuthProvider(provider, config=config)
@@ -49,7 +55,11 @@ def exchange_code_for_user(provider: ProviderName, code: str) -> User:
 
     # 2. Microsoft-specific ID token validation
     if provider == ProviderName.MICROSOFT:
-        id_token = token_response.get("id_token") if isinstance(token_response, dict) else None
+        id_token = (
+            token_response.get("id_token")
+            if isinstance(token_response, dict)
+            else None
+        )
 
         try:
             claims = verify_ms_token(id_token)

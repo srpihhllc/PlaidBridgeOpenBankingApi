@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import json
 import uuid
+
 import pytest
 import sqlalchemy as sa
 
@@ -76,7 +77,9 @@ def _seed_user_and_card():
 
 
 def _compute_hmac_signature(secret: str, raw_bytes: bytes) -> str:
-    return hmac.new(secret.encode("utf-8"), raw_bytes, hashlib.sha256).hexdigest()
+    return hmac.new(
+        secret.encode("utf-8"), raw_bytes, hashlib.sha256
+    ).hexdigest()
 
 
 # -------------------------------------------------------------------------
@@ -88,10 +91,10 @@ def test_ach_listener_creates_txn_success(client, app):
 
     payload = {"borrower_id": user_id, "card_id": card_id, "amount": 50.0}
     raw_body = json.dumps(payload).encode("utf-8")
-    
+
     headers = {
         "X-ACH-Signature": _compute_hmac_signature(TEST_ACH_SECRET, raw_body),
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     # UPDATED: Target the route directly mapped under the blueprint registration prefix
@@ -114,10 +117,10 @@ def test_ach_listener_creates_txn_success(client, app):
 def test_ach_listener_rejects_missing_fields(client):
     payload = {"borrower_id": "missing_card_and_amount"}
     raw_body = json.dumps(payload).encode("utf-8")
-    
+
     headers = {
         "X-ACH-Signature": _compute_hmac_signature(TEST_ACH_SECRET, raw_body),
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     resp = client.post("/webhooks/ach", data=raw_body, headers=headers)
@@ -132,9 +135,9 @@ def test_ach_listener_rejects_invalid_signature(client):
     payload = {"borrower_id": "1", "card_id": 1, "amount": 50.0}
     headers = {
         "X-ACH-Signature": "invalid_signature_hash",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
-    
+
     resp = client.post("/webhooks/ach", json=payload, headers=headers)
     assert resp.status_code == 401
     assert resp.get_json()["code"] == "E_WEBHOOK_ACH_INVALID_SIGNATURE"
@@ -149,10 +152,12 @@ def test_plaid_listener_creates_txn_success(client, app):
 
     payload = {"borrower_id": user_id, "card_id": card_id, "amount": "75.0"}
     raw_body = json.dumps(payload).encode("utf-8")
-    
+
     headers = {
-        "X-Plaid-Signature": _compute_hmac_signature(TEST_PLAID_SECRET, raw_body),
-        "Content-Type": "application/json"
+        "X-Plaid-Signature": _compute_hmac_signature(
+            TEST_PLAID_SECRET, raw_body
+        ),
+        "Content-Type": "application/json",
     }
 
     resp = client.post("/webhooks/plaid", data=raw_body, headers=headers)
@@ -169,10 +174,12 @@ def test_plaid_listener_rejects_invalid_amount(client, app):
 
     payload = {"borrower_id": user_id, "card_id": card_id, "amount": -10}
     raw_body = json.dumps(payload).encode("utf-8")
-    
+
     headers = {
-        "X-Plaid-Signature": _compute_hmac_signature(TEST_PLAID_SECRET, raw_body),
-        "Content-Type": "application/json"
+        "X-Plaid-Signature": _compute_hmac_signature(
+            TEST_PLAID_SECRET, raw_body
+        ),
+        "Content-Type": "application/json",
     }
 
     resp = client.post("/webhooks/plaid", data=raw_body, headers=headers)
@@ -227,17 +234,21 @@ def test_reconcile_returns_not_found_for_missing_txn(client, app):
 def test_webhook_cross_tenant_violation_rejection(client, app):
     with app.app_context():
         user_id, card_id = _seed_user_and_card()
-        rogue_user = User(id=str(uuid.uuid4()), email="attacker@example.com", password_hash="malicious")
+        rogue_user = User(
+            id=str(uuid.uuid4()),
+            email="attacker@example.com",
+            password_hash="malicious",
+        )
         db.session.add(rogue_user)
         db.session.commit()
         rogue_id = rogue_user.id
 
     payload = {"borrower_id": rogue_id, "card_id": card_id, "amount": 50.0}
     raw_body = json.dumps(payload).encode("utf-8")
-    
+
     headers = {
         "X-ACH-Signature": _compute_hmac_signature(TEST_ACH_SECRET, raw_body),
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     resp = client.post("/webhooks/ach", data=raw_body, headers=headers)

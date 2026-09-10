@@ -20,7 +20,9 @@ def collect_templates():
     for root, _, files in os.walk(TEMPLATES_DIR):
         for f in files:
             if f.endswith((".html", ".jinja2")):
-                rel_path = os.path.relpath(os.path.join(root, f), TEMPLATES_DIR)
+                rel_path = os.path.relpath(
+                    os.path.join(root, f), TEMPLATES_DIR
+                )
                 templates.add(rel_path.replace("\\", "/"))
     return templates
 
@@ -35,7 +37,9 @@ def grep_routes():
                 path = os.path.join(root, f)
                 with open(path, encoding="utf-8", errors="ignore") as fh:
                     text = fh.read()
-                for match in re.findall(r'render_template\(\s*[\'"]([^\'"]+)[\'"]', text):
+                for match in re.findall(
+                    r'render_template\(\s*[\'"]([^\'"]+)[\'"]', text
+                ):
                     render_calls.append((path, match))
     return render_calls
 

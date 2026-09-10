@@ -1,0 +1,114 @@
+name: Production Deployment Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  e2e-sync-tests:
+    name: E2E Sync Smoke Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        ports: ['5432:5432']
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: plaidbridge_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi
+      DB_DSN: postgresql://postgres:postgres@127.0.0.1:5432/plaidbridge_test
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f PlaidBridgeOpenBankingApi/requirements.txt ]; then pip install -r PlaidBridgeOpenBankingApi/requirements.txt; fi
+          pip install pytest psycopg2-binary requests
+
+      - name: Run E2E Sync Harness
+        run: |
+          if [ -f tests/e2e/test_sync_harness.py ]; then
+            python -m pytest -q tests/e2e/test_sync_harness.py
+          else
+            echo "E2E harness script not found; skipping smoke tests."
+          fi
+
+  deploy-pythonanywhere:
+    name: Deploy to PythonAnywhere Host
+    needs: e2e-sync-tests
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PA_SSH_KEY }}
+
+      - name: Execute Remote Deployment Steps
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.PA_USER }}@ssh.pythonanywhere.com "
+            set -euo pipefail
+            REMOTE_DIR=~/PlaidBridgeOpenBankingApi
+            mkdir -p \$REMOTE_DIR
+            cd \$REMOTE_DIR
+            git fetch --all --tags
+            git checkout ${{ github.ref_name }}
+            source ~/.virtualenvs/${{ secrets.PA_USER }}-python3.12/bin/activate || source ~/.virtualenvs/myenv/bin/activate
+            pip install --no-cache-dir -r PlaidBridgeOpenBankingApi/requirements.txt || pip install --no-cache-dir -r requirements.txt
+            cd PlaidBridgeOpenBankingApi || true
+            python -m alembic -c alembic.ini upgrade head || python -m alembic -c migrations/alembic.ini upgrade head || true
+            touch /var/www/${{ secrets.PA_USER }}_pythonanywhere_com_wsgi.py
+          "
+
+  verify-deployment:
+    name: Post-Deployment Health Verification
+    needs: deploy-pythonanywhere
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Endpoint Readiness
+        run: |
+          echo "Waiting 15s for PythonAnywhere WSGI worker reload..."
+          sleep 15
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.PA_USER }}.pythonanywhere.com/api/v1/health || curl -s -o /dev/null -w "%{http_code}" https://${{ secrets.PA_USER }}.pythonanywhere.com/health || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Deployment succeeded. Health endpoint returned status 200."
+          else
+            echo "⚠️ Production endpoint responded with status code: $STATUS"
+            exit 1
+          fi

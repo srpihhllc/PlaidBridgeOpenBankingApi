@@ -72,7 +72,9 @@ def dispute_status(log_id):
                 content_hash = hashlib.sha256(f.read()).hexdigest()
             hash_verified = content_hash == log.content_hash
         except Exception as e:
-            logger.error(f"Hash verification failed for DisputeLog {log_id}: {e}")
+            logger.error(
+                f"Hash verification failed for DisputeLog {log_id}: {e}"
+            )
 
     status = {
         "txt": "available" if os.path.exists(txt_path) else "missing",

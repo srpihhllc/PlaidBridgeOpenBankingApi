@@ -2,8 +2,7 @@
 from copy import deepcopy
 
 import pytest
-from hypothesis import given, settings
-from hypothesis import HealthCheck
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from app.services.discrepancy import correct_discrepancies
@@ -19,7 +18,9 @@ invalid_amount_st = st.one_of(
     st.just("50 USD"),
     # Strings that contain at least one character outside [0-9.-]
     st.text(
-        alphabet=st.characters(blacklist_characters="-.0123456789", min_codepoint=33),
+        alphabet=st.characters(
+            blacklist_characters="-.0123456789", min_codepoint=33
+        ),
         min_size=1,
     ),
     st.lists(st.integers(), max_size=3),  # complex types
@@ -28,7 +29,9 @@ invalid_amount_st = st.one_of(
 # Valid inputs: integers, floats, or decimal strings with up to two places.
 valid_amount_st = st.one_of(
     st.integers(min_value=-(10**6), max_value=10**6),
-    st.floats(min_value=-1e6, max_value=1e6, allow_nan=False, allow_infinity=False),
+    st.floats(
+        min_value=-1e6, max_value=1e6, allow_nan=False, allow_infinity=False
+    ),
     st.from_regex(r"^-?\d+(\.\d{1,2})?$", fullmatch=True),
 )
 
@@ -44,7 +47,10 @@ def statement_record_strategy():
     )
     # Then optionally inject an 'amount' key with either valid or invalid data
     return st.builds(
-        lambda base, amt: {**base, **({"amount": amt} if amt is not None else {})},
+        lambda base, amt: {
+            **base,
+            **({"amount": amt} if amt is not None else {}),
+        },
         base=other_keys,
         amt=st.one_of(invalid_amount_st, valid_amount_st, st.none()),
     )
@@ -84,7 +90,9 @@ def test_discrepancy_correction_invariants(statements):
                 # float() accepts numeric types and numeric strings
                 float(corr_rec["amount"])
             except (ValueError, TypeError):
-                pytest.fail(f"Non-convertible amount {corr_rec['amount']!r} for record {orig_rec}")
+                pytest.fail(
+                    f"Non-convertible amount {corr_rec['amount']!r} for record {orig_rec}"
+                )
 
         # 4) No new keys beyond those in orig_rec or 'amount'
         allowed_keys = set(orig_rec.keys()) | {"amount"}

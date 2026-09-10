@@ -6,7 +6,9 @@ from flask import Blueprint, render_template
 
 from app.utils.redis_utils import get_redis_client
 
-tile_bp = Blueprint("template_audit_tile", __name__, url_prefix="/cockpit/template_audit")
+tile_bp = Blueprint(
+    "template_audit_tile", __name__, url_prefix="/cockpit/template_audit"
+)
 
 
 @tile_bp.route("/", methods=["GET"])
@@ -39,4 +41,6 @@ def index():
     except Exception:
         history = []
 
-    return render_template("tiles/template_audit.html", summary=summary, history=history)
+    return render_template(
+        "tiles/template_audit.html", summary=summary, history=history
+    )

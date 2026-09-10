@@ -1,13 +1,13 @@
 # app/tiles/view_failure_probe.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def collect_view_failures():
     return {
         "tile": "trace:view_failure_probe",
         "summary": "Last 500 Errors in Live Environment",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "failures": [
             {
                 "route": "/login_subscriber",

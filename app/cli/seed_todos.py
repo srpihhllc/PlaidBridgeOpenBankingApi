@@ -1,7 +1,7 @@
 # FILE: app/cli/seed_todos.py
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 import click
 from flask.cli import with_appcontext
@@ -36,7 +36,8 @@ def seed_todos():
             user_id=user.id,
             title=title,
             priority="normal",
-            due_date=datetime.utcnow() + timedelta(days=random.randint(1, 10)),
+            due_date=datetime.now(timezone.utc)
+            + timedelta(days=random.randint(1, 10)),
             is_completed=random.choice([True, False]),
         )
         db.session.add(todo)

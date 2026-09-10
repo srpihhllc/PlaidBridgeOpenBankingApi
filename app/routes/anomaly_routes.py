@@ -1,11 +1,13 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes/anomaly_routes.py
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, current_app, render_template
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 anomaly_bp = Blueprint("anomaly_bp", __name__, url_prefix="/dashboard")
 
@@ -19,7 +21,7 @@ def anomaly_dashboard():
 
     if r:
         for i in range(7):
-            day = (datetime.utcnow() - timedelta(days=i)).date()
+            day = (datetime.now(timezone.utc) - timedelta(days=i)).date()
             anomaly_labels.append(day.strftime("%Y-%m-%d"))
             keys = r.keys("vault_anomalies:*")
             count = 0
@@ -35,7 +37,10 @@ def anomaly_dashboard():
                     if ts.startswith(str(day)):
                         count += 1
                         for flag in obj.get("flags", []):
-                            if "High-Value" in flag or "Unknown Method" in flag:
+                            if (
+                                "High-Value" in flag
+                                or "Unknown Method" in flag
+                            ):
                                 high_count += 1
                             elif "Zero Balance" in flag:
                                 medium_count += 1
@@ -44,7 +49,9 @@ def anomaly_dashboard():
 
             anomaly_counts.append(count)
     else:
-        current_app.logger.error("[anomaly_dashboard] Redis unavailable — no anomaly data loaded")
+        current_app.logger.error(
+            "[anomaly_dashboard] Redis unavailable — no anomaly data loaded"
+        )
 
     return render_template(
         "admin/dashboard_anomalies.html",  # 👈 Fixed: Prefix added to match disk path
@@ -73,7 +80,9 @@ def trace_viewer(acct_id):
             f"[trace_viewer] Redis unavailable — cannot load anomalies for acct_id={acct_id}"
         )
 
-    return render_template("anomalies_trace.html", acct_id=acct_id, anomalies=anomalies)
+    return render_template(
+        "anomalies_trace.html", acct_id=acct_id, anomalies=anomalies
+    )
 
 
 @anomaly_bp.route("/log-asset-degradation", methods=["POST"])
@@ -82,7 +91,9 @@ def log_asset_degradation():
 
     if client:
         try:
-            client.setex("asset:styles_health", 900, "degraded")  # 🧨 TTL 15 min
+            client.setex(
+                "asset:styles_health", 900, "degraded"
+            )  # 🧨 TTL 15 min
         except Exception as e:
             current_app.logger.error(
                 f"[log_asset_degradation] Failed to set asset:styles_health in Redis: {e}"

@@ -7,7 +7,12 @@ import logging
 
 from app.utils.telemetry import log_identity_event
 
-from .access import admin_required, require_admin, roles_required, super_admin_required
+from .access import (
+    admin_required,
+    require_admin,
+    roles_required,
+    super_admin_required,
+)
 
 logger = logging.getLogger(__name__)
 

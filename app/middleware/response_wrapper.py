@@ -36,11 +36,17 @@ def init_response_handling(app):
             return response
 
         # If already using our standard format, return as-is
-        if isinstance(data, dict) and "status" in data and ("data" in data or "code" in data):
+        if (
+            isinstance(data, dict)
+            and "status" in data
+            and ("data" in data or "code" in data)
+        ):
             return response
 
         # Calculate request duration
-        duration_ms = int((time.time() - g.get("start_time", time.time())) * 1000)
+        duration_ms = int(
+            (time.time() - g.get("start_time", time.time())) * 1000
+        )
 
         # Create standard response envelope
         if response.status_code >= 400:

@@ -23,7 +23,10 @@ def is_admin() -> bool:
     Checks if the current authenticated user is an admin.
     Uses Flask-Login authentication and the `is_admin` attribute.
     """
-    return bool(current_user.is_authenticated and getattr(current_user, "is_admin", False))
+    return bool(
+        current_user.is_authenticated
+        and getattr(current_user, "is_admin", False)
+    )
 
 
 # =============================================================================
@@ -63,7 +66,9 @@ def requires_auth(f: Callable[..., Any]) -> Callable[..., Any]:
         if not current_user.is_authenticated:
             # Fallback to JWT check for API routes
             if not request.headers.get("Authorization"):
-                current_app.logger.warning("Missing Authorization Header on protected route")
+                current_app.logger.warning(
+                    "Missing Authorization Header on protected route"
+                )
                 return {
                     "status": "error",
                     "error": {
@@ -75,7 +80,9 @@ def requires_auth(f: Callable[..., Any]) -> Callable[..., Any]:
             try:
                 verify_jwt_in_request()
             except Exception as exc:
-                current_app.logger.warning("Invalid or expired JWT", extra={"error": str(exc)})
+                current_app.logger.warning(
+                    "Invalid or expired JWT", extra={"error": str(exc)}
+                )
                 return {
                     "status": "error",
                     "error": {
@@ -106,7 +113,10 @@ def roles_required(
             user_role: str | None = getattr(current_user, "role", None)
 
             # mypy-safe comparison: user_role is now Optional[str]
-            if not current_user.is_authenticated or user_role not in allowed_roles:
+            if (
+                not current_user.is_authenticated
+                or user_role not in allowed_roles
+            ):
                 flash(
                     "🚫 You do not have the required role to view this page.",
                     "danger",

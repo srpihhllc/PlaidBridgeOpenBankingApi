@@ -9,10 +9,14 @@ def test_admin_access_required(client):
     user_email = "regular_tester@example.com"
 
     with client.application.app_context():
+        # Modern SQLAlchemy 2.x select
+        from sqlalchemy import select
+
         from app.extensions import db
         from app.models.user import User
 
-        test_user = User.query.filter_by(id=user_id).first()
+        stmt = select(User).filter_by(id=user_id)
+        test_user = db.session.execute(stmt).scalar_one_or_none()
         if not test_user:
             test_user = User(
                 id=user_id,
@@ -24,7 +28,9 @@ def test_admin_access_required(client):
             db.session.add(test_user)
             db.session.commit()
 
-        access_token = create_access_token(identity=user_id, additional_claims={"is_admin": False})
+        access_token = create_access_token(
+            identity=user_id, additional_claims={"is_admin": False}
+        )
 
     headers = {"Authorization": f"Bearer {access_token}"}
     response = client.get("/admin/api/v1/users", headers=headers)
@@ -55,7 +61,11 @@ def test_admin_delete_user_cascade_api(client):
 
     with client.application.app_context():
         # Ensure admin user exists in test DB
-        admin = User.query.filter_by(email="admin@example.com").first()
+        # Modern SQLAlchemy 2.x select
+        from sqlalchemy import select
+
+        stmt = select(User).filter_by(email="admin@example.com")
+        admin = db.session.execute(stmt).scalar_one_or_none()
         if not admin:
             admin = User(
                 id=1,  # Set explicit integer ID for JWT compatibility
@@ -116,7 +126,13 @@ def test_admin_delete_user_cascade_api(client):
     with client.application.app_context():
         db.session.expunge_all()
 
-        assert User.query.get(dummy_id) is None, "User was not deleted"
+        # Modern SQLAlchemy 2.x lookup
+        assert db.session.get(User, dummy_id) is None, "User was not deleted"
+
+        # Modern SQLAlchemy 2.x select
+        from sqlalchemy import select
+
+        stmt = select(PlaidItem).filter_by(user_id=dummy_id)
         assert (
-            PlaidItem.query.filter_by(user_id=dummy_id).first() is None
+            db.session.execute(stmt).scalar_one_or_none() is None
         ), "PlaidItem was not cascade-deleted"

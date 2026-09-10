@@ -10,9 +10,9 @@ import hashlib
 import logging
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urljoin, urlparse
 
 from flask import g, jsonify, request
 
@@ -106,7 +106,7 @@ def success_response(
         "data": data or {},
         "message": message,
         "meta": {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "request_id": get_request_id(),
         },
     }
@@ -124,7 +124,7 @@ def error_response(
         "error": {"code": code, "message": message},
         "data": data or {},
         "meta": {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "request_id": get_request_id(),
         },
     }
@@ -205,7 +205,9 @@ class _RequestIdFilter(logging.Filter):
         return True
 
 
-def attach_request_id_log_filter(logger: Optional[logging.Logger] = None) -> None:
+def attach_request_id_log_filter(
+    logger: Optional[logging.Logger] = None,
+) -> None:
     """
     Add a RequestId filter to the given logger (or root logger) so formatters
     can reference %(request_id)s without KeyError.

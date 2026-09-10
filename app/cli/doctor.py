@@ -1,4 +1,4 @@
-#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli/doctor.py
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli/doctor.py
 
 import click
 from flask import current_app
@@ -100,9 +100,14 @@ def doctor():
     try:
         # Report presence of key extensions rather than touching them at import time
         jwt_ok = bool(getattr(app, "jwt", None) or app.extensions.get("jwt"))
-        lm_ok = bool(getattr(app, "login_manager", None) or app.extensions.get("login_manager"))
+        lm_ok = bool(
+            getattr(app, "login_manager", None)
+            or app.extensions.get("login_manager")
+        )
         limiter_ok = bool(app.extensions.get("limiter"))
-        echo(f"✔ Extensions initialized: jwt={jwt_ok}, login_manager={lm_ok}, limiter={limiter_ok}")
+        echo(
+            f"✔ Extensions initialized: jwt={jwt_ok}, login_manager={lm_ok}, limiter={limiter_ok}"
+        )
     except Exception as exc:
         echo(f"✖ Extension initialization check failed: {exc}")
 

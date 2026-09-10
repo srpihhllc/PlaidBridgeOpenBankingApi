@@ -12,12 +12,16 @@ def fresh_auth_headers(app):
     """Fixture to provide fresh JWT auth headers for testing."""
     from flask_jwt_extended import create_access_token
 
-    from app.extensions import db  # Import here to avoid module-level import issues
-    from app.models.user import User  # Import here to avoid module-level import issues
+    from app.extensions import (
+        db,
+    )  # Import here to avoid module-level import issues
+    from app.models.user import (
+        User,
+    )  # Import here to avoid module-level import issues
 
     with app.app_context():
-        # Ensure a test user exists (ID 1)
-        user = User.query.get(1)
+        # Ensure a test user exists (ID 1) using modern SQLAlchemy 2.x Session.get
+        user = db.session.get(User, 1)
         if not user:
             user = User(
                 id=1,

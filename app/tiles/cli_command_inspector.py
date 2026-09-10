@@ -25,6 +25,14 @@ def cli_inspector_view():
             )
     else:
         # Optional: mark Redis as unavailable in the response
-        commands.append({"command": None, "last_run": None, "status": "❌ Redis unavailable"})
+        commands.append(
+            {
+                "command": None,
+                "last_run": None,
+                "status": "❌ Redis unavailable",
+            }
+        )
 
-    return jsonify({"commands": sorted(commands, key=lambda x: (x["command"] or ""))})
+    return jsonify(
+        {"commands": sorted(commands, key=lambda x: (x["command"] or ""))}
+    )

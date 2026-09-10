@@ -1,6 +1,8 @@
 # name=app/tests/test_ttl_emit_smoke.py
-import pytest
 from importlib import import_module
+
+import pytest
+
 
 def test_ttl_emit_import_and_call(app):
     """

@@ -4,7 +4,7 @@
 #              string-based relationship targets and column-based foreign_keys
 #              to avoid import-time coupling and circular imports.
 # =============================================================================
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -28,15 +28,21 @@ class BankTransaction(db.Model):
     amount = db.Column(db.Float, nullable=False)
     txn_type = db.Column(db.String(32))  # transfer, ach, wire, internal
     method = db.Column(db.String(64))  # online, teller, mobile
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # 🔹 ACH / Wire metadata (optional but realistic)
     ach_trace_number = db.Column(db.String(20), nullable=True)
-    ach_sec_code = db.Column(db.String(10), nullable=True)  # PPD, CCD, WEB, TEL
+    ach_sec_code = db.Column(
+        db.String(10), nullable=True
+    )  # PPD, CCD, WEB, TEL
     wire_reference = db.Column(db.String(50), nullable=True)
     originating_routing = db.Column(db.String(9), nullable=True)
     receiving_routing = db.Column(db.String(9), nullable=True)
-    payment_channel = db.Column(db.String(20), nullable=True)  # ACH, WIRE, INTERNAL
+    payment_channel = db.Column(
+        db.String(20), nullable=True
+    )  # ACH, WIRE, INTERNAL
 
     from_account = db.relationship(
         "BankAccount",

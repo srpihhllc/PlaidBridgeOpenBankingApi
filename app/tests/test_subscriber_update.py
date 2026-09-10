@@ -18,10 +18,10 @@ import re
 from flask import url_for
 from werkzeug.security import generate_password_hash
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _extract_csrf(response_data: bytes) -> str | None:
     """Extract CSRF token value from an HTML response using a simple regex."""
@@ -29,7 +29,9 @@ def _extract_csrf(response_data: bytes) -> str | None:
         html = response_data.decode("utf-8")
     except Exception:
         html = str(response_data)
-    m = re.search(r'name=["\']csrf_token["\']\s+value=["\']([^"\']+)["\']', html)
+    m = re.search(
+        r'name=["\']csrf_token["\']\s+value=["\']([^"\']+)["\']', html
+    )
     return m.group(1) if m else None
 
 
@@ -75,6 +77,7 @@ def _get_csrf_token(client) -> str:
 # Test
 # ---------------------------------------------------------------------------
 
+
 def test_subscriber_update_smoke(client, db, user_factory):
     """
     Smoke test: create a subscriber, sign in, POST an update to
@@ -115,9 +118,10 @@ def test_subscriber_update_smoke(client, db, user_factory):
         follow_redirects=False,
     )
     # Accept redirect (302) or direct success (200)
-    assert login_resp.status_code in (200, 302), (
-        f"Login failed with status {login_resp.status_code}"
-    )
+    assert login_resp.status_code in (
+        200,
+        302,
+    ), f"Login failed with status {login_resp.status_code}"
     if login_resp.status_code == 302:
         # Follow the first redirect to ensure the session cookie is fully established
         client.get(login_resp.headers["Location"])
@@ -127,7 +131,9 @@ def test_subscriber_update_smoke(client, db, user_factory):
     app = client.application
     known_endpoints = {r.endpoint for r in app.url_map.iter_rules()}
     if "main.dashboard" in known_endpoints:
-        auth_check = client.get(url_for("main.dashboard"), follow_redirects=False)
+        auth_check = client.get(
+            url_for("main.dashboard"), follow_redirects=False
+        )
         assert auth_check.status_code != 302 or "/auth/login" not in (
             auth_check.headers.get("Location", "")
         ), (
@@ -161,10 +167,10 @@ def test_subscriber_update_smoke(client, db, user_factory):
         # including them keeps the POST realistic and won't cause errors)
         "subscriber_id": getattr(user, "id", ""),
         "ssn_last4": "1234",
-        "phone": "5551234567",           # ignored by handler
-        "bank_name": "Test Bank",        # ignored by handler
-        "routing_number": "111000025",   # ignored by handler
-        "account_ending": "6789",        # ignored by handler
+        "phone": "5551234567",  # ignored by handler
+        "bank_name": "Test Bank",  # ignored by handler
+        "routing_number": "111000025",  # ignored by handler
+        "account_ending": "6789",  # ignored by handler
         "business_address": "1 Test Way",
         "ein": "12-3456789",
         "business_city": "Memphis",

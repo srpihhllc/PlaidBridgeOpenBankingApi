@@ -23,15 +23,39 @@ class ServiceEntry:
 # Comprehensive mapping from filename to structural cockpit assets
 _SERVICE_META = {
     "balance.py": ("Balance Engine", "fa-wallet", "core"),
-    "bank_statement_generator.py": ("Bank Statements", "fa-file-invoice-dollar", "core"),
-    "bank_transaction_generator.py": ("Transaction Generator", "fa-random", "core"),
+    "bank_statement_generator.py": (
+        "Bank Statements",
+        "fa-file-invoice-dollar",
+        "core",
+    ),
+    "bank_transaction_generator.py": (
+        "Transaction Generator",
+        "fa-random",
+        "core",
+    ),
     "card_manager.py": ("Card Manager", "fa-credit-card", "core"),
-    "category_analytics.py": ("Category Analytics", "fa-chart-pie", "analytics"),
+    "category_analytics.py": (
+        "Category Analytics",
+        "fa-chart-pie",
+        "analytics",
+    ),
     "fraud.py": ("Fraud Core Detection", "fa-user-shield", "fraud"),
     "fraud_analytics.py": ("Fraud Analytics", "fa-shield-alt", "fraud"),
-    "timeline_analytics.py": ("Timeline Analytics", "fa-chart-line", "analytics"),
-    "transaction_analysis.py": ("Transaction Analysis", "fa-chart-bar", "analytics"),
-    "transaction_ingestion.py": ("Transaction Ingestion", "fa-cloud-download-alt", "core"),
+    "timeline_analytics.py": (
+        "Timeline Analytics",
+        "fa-chart-line",
+        "analytics",
+    ),
+    "transaction_analysis.py": (
+        "Transaction Analysis",
+        "fa-chart-bar",
+        "analytics",
+    ),
+    "transaction_ingestion.py": (
+        "Transaction Ingestion",
+        "fa-cloud-download-alt",
+        "core",
+    ),
     "merchant_generator.py": ("Merchant Engine", "fa-store", "core"),
     "pdf_generator.py": ("PDF Generator", "fa-file-pdf", "pdf"),
     "pdf_template_engine.py": ("PDF Template Engine", "fa-layer-group", "pdf"),
@@ -43,10 +67,22 @@ _SERVICE_META = {
     "pii_manager.py": ("PII Manager", "fa-user-secret", "security"),
     "rate_limiter.py": ("Rate Limiter", "fa-tachometer-alt", "security"),
     "oauth.py": ("OAuth Core Bridge", "fa-shield-alt", "security"),
-    "discrepancy.py": ("Discrepancy Engine", "fa-exclamation-circle", "compliance"),
-    "payment_auditor.py": ("Payment Auditor", "fa-search-dollar", "compliance"),
+    "discrepancy.py": (
+        "Discrepancy Engine",
+        "fa-exclamation-circle",
+        "compliance",
+    ),
+    "payment_auditor.py": (
+        "Payment Auditor",
+        "fa-search-dollar",
+        "compliance",
+    ),
     "lender_verifier.py": ("Lender Verifier", "fa-user-check", "compliance"),
-    "tradeline_service.py": ("Tradeline Service", "fa-balance-scale", "compliance"),
+    "tradeline_service.py": (
+        "Tradeline Service",
+        "fa-balance-scale",
+        "compliance",
+    ),
     "mock_data_service.py": ("Mock Data Service", "fa-database", "core"),
     "statement_service.py": ("Statement Service", "fa-file-contract", "core"),
     "plaid_api.py": ("Plaid API", "fa-link", "core"),
@@ -68,7 +104,7 @@ def _infer_display_name(module_name: str) -> str:
 
 def get_service_registry() -> list[ServiceEntry]:
     """
-    Scans filesystem modules and builds the fully hydrated array 
+    Scans filesystem modules and builds the fully hydrated array
     of ServiceEntry elements to expose downstream to the cockpit interface.
     """
     entries: list[ServiceEntry] = []

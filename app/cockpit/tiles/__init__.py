@@ -21,7 +21,9 @@ def register_tiles(app: Flask):
     """
     try:
         app.register_blueprint(mysql_monitor, url_prefix="/cockpit")
-        print("[✔] MySQL Auth Health Monitor registered at /cockpit/mysql-auth-health")
+        print(
+            "[✔] MySQL Auth Health Monitor registered at /cockpit/mysql-auth-health"
+        )
     except Exception as e:
         print(f"[❌] Error registering mysql_monitor: {e}")
 
@@ -57,6 +59,8 @@ def register_tiles(app: Flask):
 
     try:
         app.register_blueprint(tile_blueprint_inspector, url_prefix="/cockpit")
-        print("[✔] Blueprint Inspector registered at /cockpit/blueprint_inspector")
+        print(
+            "[✔] Blueprint Inspector registered at /cockpit/blueprint_inspector"
+        )
     except Exception as e:
         print(f"[❌] Error registering Blueprint Inspector: {e}")

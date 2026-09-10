@@ -15,7 +15,9 @@ def test_redis_connection(app):
     # 1. Pull the client from the app object (where init_extensions stored it)
     rc = getattr(app, "redis_client", None)
 
-    assert rc is not None, "Redis client was not found on the app instance. Check init_extensions."
+    assert (
+        rc is not None
+    ), "Redis client was not found on the app instance. Check init_extensions."
 
     # 2. Try a basic Write/Read operation
     test_key = "infra_smoke_test"
@@ -42,7 +44,11 @@ def test_database_connectivity(app):
         try:
             # result = db.session.execute(db.text("SELECT 1")).scalar()
             # If 'db' is also giving issues, access it via app.extensions
-            result = app.extensions["sqlalchemy"].session.execute(db.text("SELECT 1")).scalar()
+            result = (
+                app.extensions["sqlalchemy"]
+                .session.execute(db.text("SELECT 1"))
+                .scalar()
+            )
             assert result == 1
         except Exception as e:
             pytest.fail(f"Database infrastructure is DOWN: {e}")
@@ -52,7 +58,9 @@ def test_jwt_extension_loading(app):
     """
     Verify JWT manager is correctly attached to the app.
     """
-    assert "jwt" in app.extensions, "JWT extension failed to register during init_extensions"
+    assert (
+        "jwt" in app.extensions
+    ), "JWT extension failed to register during init_extensions"
 
 
 def test_user_table_exists(app):
@@ -64,4 +72,6 @@ def test_user_table_exists(app):
 
         inspector = inspect(db.engine)
         tables = inspector.get_table_names()
-        assert "user" in tables or "users" in tables, f"User table missing! Found: {tables}"
+        assert (
+            "user" in tables or "users" in tables
+        ), f"User table missing! Found: {tables}"

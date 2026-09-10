@@ -55,7 +55,9 @@ class TestMicrosoftOAuth(BaseOAuthTest):
             sess["oauth_state:microsoft"] = test_state
 
         resp = client.get(
-            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+            url_for(
+                "oauth.callback_microsoft", code="def456", state=test_state
+            )
         )
         assert resp.status_code in (302, 303)
         self.assert_url_redirect(resp, "/dashboard")
@@ -77,7 +79,9 @@ class TestMicrosoftOAuth(BaseOAuthTest):
             ),
         ],
     )
-    def test_ms_token_failure_variants(self, monkeypatch, client, app, mock_exception):
+    def test_ms_token_failure_variants(
+        self, monkeypatch, client, app, mock_exception
+    ):
         """Simulate different token exchange failure modes."""
 
         def mock_post(url, data=None, timeout=10):
@@ -90,14 +94,18 @@ class TestMicrosoftOAuth(BaseOAuthTest):
             sess["oauth_state:microsoft"] = test_state
 
         resp = client.get(
-            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+            url_for(
+                "oauth.callback_microsoft", code="def456", state=test_state
+            )
         )
         assert resp.status_code == 502
 
         with app.app_context():
             self.assert_events(
                 ["OAUTH_TOKEN_ERROR"],
-                details={"OAUTH_TOKEN_ERROR": {"error": mock_exception.args[0]}},
+                details={
+                    "OAUTH_TOKEN_ERROR": {"error": mock_exception.args[0]}
+                },
             )
             self.assert_no_user()
 
@@ -136,14 +144,20 @@ class TestMicrosoftOAuth(BaseOAuthTest):
             sess["oauth_state:microsoft"] = test_state
 
         resp = client.get(
-            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+            url_for(
+                "oauth.callback_microsoft", code="def456", state=test_state
+            )
         )
         assert resp.status_code == 401
 
         with app.app_context():
             self.assert_events(
                 ["OAUTH_LOGIN_FAILURE"],
-                details={"OAUTH_LOGIN_FAILURE": {"reason": "Profile payload missing email"}},
+                details={
+                    "OAUTH_LOGIN_FAILURE": {
+                        "reason": "Profile payload missing email"
+                    }
+                },
             )
             self.assert_no_user()
 
@@ -168,10 +182,14 @@ class TestMicrosoftOAuth(BaseOAuthTest):
         def mock_verify_token(token, *args, **kwargs):
             raise jwt.PyJWTError("Invalid ID token")
 
-        monkeypatch.setattr("app.services.oauth.verify_ms_token", mock_verify_token)
+        monkeypatch.setattr(
+            "app.services.oauth.verify_ms_token", mock_verify_token
+        )
 
         def mock_get(url, headers=None, timeout=10):
-            raise AssertionError("Profile endpoint should not be called when ID token is invalid")
+            raise AssertionError(
+                "Profile endpoint should not be called when ID token is invalid"
+            )
 
         monkeypatch.setattr("requests.get", mock_get)
 
@@ -180,13 +198,19 @@ class TestMicrosoftOAuth(BaseOAuthTest):
             sess["oauth_state:microsoft"] = test_state
 
         resp = client.get(
-            url_for("oauth.callback_microsoft", code="def456", state=test_state)
+            url_for(
+                "oauth.callback_microsoft", code="def456", state=test_state
+            )
         )
         assert resp.status_code == 401
 
         with app.app_context():
             self.assert_events(
                 ["OAUTH_IDTOKEN_INVALID"],
-                details={"OAUTH_IDTOKEN_INVALID": {"reason": "ID token validation failed"}},
+                details={
+                    "OAUTH_IDTOKEN_INVALID": {
+                        "reason": "ID token validation failed"
+                    }
+                },
             )
             self.assert_no_user()

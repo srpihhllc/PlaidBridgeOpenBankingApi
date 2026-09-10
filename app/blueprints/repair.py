@@ -26,7 +26,9 @@ def system_heartbeat():
         )
     except Exception as e:
         current_app.logger.exception("Unable to fetch heartbeat timestamp")
-        return jsonify({"error": "Could not read WSGI mtime", "details": str(e)}), 500
+        return jsonify(
+            {"error": "Could not read WSGI mtime", "details": str(e)}
+        ), 500
 
 
 @repair_bp.route("/self_repair", methods=["POST"])
@@ -40,7 +42,9 @@ def self_repair():
             redis.expire(key, 300)
             repaired.append(key.decode())
     return render_template(
-        "admin/repair_result.html", repaired_keys=repaired, repaired_count=len(repaired)
+        "admin/repair_result.html",
+        repaired_keys=repaired,
+        repaired_count=len(repaired),
     )
 
 

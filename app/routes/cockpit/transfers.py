@@ -1,10 +1,10 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/routes/cockpit/transfers.py
 
-from app.services.bank_transaction_fraud import score_bank_transaction_fraud
 from flask import render_template
 from flask_login import login_required
 
 from app.models import BankTransaction
+from app.services.bank_transaction_fraud import score_bank_transaction_fraud
 
 from . import cockpit_ui
 
@@ -13,7 +13,11 @@ from . import cockpit_ui
 @login_required
 def transfers_dashboard():
     # Pull recent transfers
-    recent = BankTransaction.query.order_by(BankTransaction.timestamp.desc()).limit(200).all()
+    recent = (
+        BankTransaction.query.order_by(BankTransaction.timestamp.desc())
+        .limit(200)
+        .all()
+    )
 
     suspicious = []
     for txn in recent:

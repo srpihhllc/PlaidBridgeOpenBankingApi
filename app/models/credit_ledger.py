@@ -28,8 +28,10 @@ class CreditLedger(db.Model):
     credit_limit = db.Column(db.Float, default=5000.00)
     balance_used = db.Column(db.Float, default=0.0)
     last_payment_ts = db.Column(db.DateTime)
-    
-    created_at = db.Column(db.DateTime, server_default=db.func.current_timestamp())
+
+    created_at = db.Column(
+        db.DateTime, server_default=db.func.current_timestamp()
+    )
     updated_at = db.Column(
         db.DateTime,
         server_default=db.func.current_timestamp(),
@@ -42,11 +44,13 @@ class CreditLedger(db.Model):
     # -------------------------------------------------------------------------
 
     # ⭐ SENIOR FIX: Swapped back_populates for explicit dynamic backref.
-    # This dynamically binds 'credit_ledger_entries' into the User mapper framework 
+    # This dynamically binds 'credit_ledger_entries' into the User mapper framework
     # at initialization, bypassing strict missing-attribute compilation checks.
     user = db.relationship(
         "User",
-        backref=db.backref("credit_ledger_entries", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "credit_ledger_entries", lazy="dynamic", passive_deletes=True
+        ),
     )
 
     def __repr__(self) -> str:

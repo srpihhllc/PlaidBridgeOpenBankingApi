@@ -26,11 +26,18 @@ def _emit_schema_event(
     Always include user_id when available for cockpit‑grade provenance.
     """
     try:
-        ev = SchemaEvent(user_id=user_id, event_type=event_type, origin=origin, detail=detail)
+        ev = SchemaEvent(
+            user_id=user_id,
+            event_type=event_type,
+            origin=origin,
+            detail=detail,
+        )
         db.session.add(ev)
         db.session.commit()
     except Exception as exc:
-        _logger.exception("Failed to persist SchemaEvent %s: %s", event_type, exc)
+        _logger.exception(
+            "Failed to persist SchemaEvent %s: %s", event_type, exc
+        )
         try:
             db.session.rollback()
         except Exception:
@@ -88,7 +95,9 @@ def generate_reset_token(email: str) -> str:
     return token
 
 
-def verify_reset_token(token: str, expiration: int | None = None) -> str | None:
+def verify_reset_token(
+    token: str, expiration: int | None = None
+) -> str | None:
     """
     Validate a reset token and emit success/failure events.
     Returns the email on success or None on failure.
@@ -107,11 +116,15 @@ def verify_reset_token(token: str, expiration: int | None = None) -> str | None:
         )
         return None
 
-    expiration = expiration or current_app.config.get("RESET_TOKEN_EXPIRATION", 3600)
+    expiration = expiration or current_app.config.get(
+        "RESET_TOKEN_EXPIRATION", 3600
+    )
     serializer = URLSafeTimedSerializer(secret)
 
     try:
-        email = serializer.loads(token, salt="password-reset-salt", max_age=expiration)
+        email = serializer.loads(
+            token, salt="password-reset-salt", max_age=expiration
+        )
         user = User.query.filter_by(email=email).first()
 
         _emit_schema_event(

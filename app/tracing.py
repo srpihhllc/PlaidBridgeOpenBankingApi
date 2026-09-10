@@ -1,11 +1,13 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tracing.py
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 
 # -------------------------------------------------------------------------
@@ -31,12 +33,12 @@ def trace_log(event_type, payload, ttl=3600):
         _log_unavailable(f"trace_log({event_type})")
         return
 
-    key = f"trace:{event_type}:{datetime.utcnow().isoformat()}"
+    key = f"trace:{event_type}:{datetime.now(timezone.utc).isoformat()}"
     value = json.dumps(
         {
             "event_type": event_type,
             "payload": payload,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
     )
 

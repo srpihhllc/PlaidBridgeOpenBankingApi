@@ -27,12 +27,14 @@ diagnostics_bp = Blueprint("diagnostics", __name__, url_prefix="/diagnostics")
 # COCKPIT-GRADE UTILITIES
 # =============================================================================
 
+
 def cli_safe_auth(f):
     """
     🛡️ Cockpit-Grade Bypass Decorator
-    If DIAGNOSTICS_CLI_MODE is True (set by CLI), we skip Flask-Login/Admin checks.
+    If DIAGNOSTICS_CLI_MODE is True, skip Flask-Login/Admin checks.
     Otherwise, we enforce full production security for web requests.
     """
+
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if current_app.config.get("DIAGNOSTICS_CLI_MODE"):
@@ -44,11 +46,26 @@ def cli_safe_auth(f):
             return f(*args, **kwargs)
 
         return wrapper()
+
     return decorated_function
+
 
 # =============================================================================
 # DIAGNOSTIC ROUTES
 # =============================================================================
+
+
+@diagnostics_bp.route("/mfa-status")
+@cli_safe_auth
+def mfa_status():
+    """Diagnostic MFA status endpoint."""
+    return jsonify(
+        {
+            "status": "ok",
+            "mfa_enabled": current_app.config.get("MFA_ENABLED", False),
+        }
+    ), 200
+
 
 @diagnostics_bp.route("/console")
 @login_required
@@ -56,6 +73,7 @@ def cli_safe_auth(f):
 def neural_console():
     """Renders the central admin cockpit UI."""
     return render_template("admin/neural_console.html")
+
 
 @diagnostics_bp.route("/full")
 @cli_safe_auth
@@ -119,14 +137,21 @@ def get_full_diagnostics():
     invalid_states = [None, "Unknown", "Error", "N/A"]
     normalized_head = str(current_head).strip()
     normalized_db = str(current_db_rev).strip()
-    migration_synced = normalized_head not in invalid_states and normalized_head == normalized_db
+    migration_synced = (
+        normalized_head not in invalid_states
+        and normalized_head == normalized_db
+    )
 
     # 4. Model Statistics
     try:
         db_stats = {
             "total_users": User.query.count(),
-            "unapproved_users": User.query.filter_by(is_approved=False).count(),
-            "orphaned_transactions": Transaction.query.filter_by(user_id=None).count(),
+            "unapproved_users": User.query.filter_by(
+                is_approved=False
+            ).count(),
+            "orphaned_transactions": Transaction.query.filter_by(
+                user_id=None
+            ).count(),
         }
     except Exception:
         db_stats = {"error": "Stats unavailable"}
@@ -138,8 +163,10 @@ def get_full_diagnostics():
         cache_stats = {
             "total_keys": len(keys),
             "volatile_alerts": sum(
-                1 for k in keys
-                if redis.ttl(k) == -1 and k.decode().startswith(("mfa", "rate", "session"))
+                1
+                for k in keys
+                if redis.ttl(k) == -1
+                and k.decode().startswith(("mfa", "rate", "session"))
             ),
         }
     except Exception:
@@ -148,7 +175,11 @@ def get_full_diagnostics():
     # 6. Template Wiring Audit
     try:
         template_report = run_template_audit()
-        wiring_status = "healthy" if template_report.get("missing_endpoints", 0) == 0 else "degraded"
+        wiring_status = (
+            "healthy"
+            if template_report.get("missing_endpoints", 0) == 0
+            else "degraded"
+        )
     except Exception as e:
         wiring_status = "error"
         template_report = {"error": str(e), "missing_endpoints": -1}
@@ -158,22 +189,36 @@ def get_full_diagnostics():
             {
                 "meta": {
                     "timestamp": time.time(),
-                    "generation_ms": round((time.time() - start_total) * 1000, 2),
-                    "app_version": current_app.config.get("APP_VERSION", "1.0.0"),
+                    "generation_ms": round(
+                        (time.time() - start_total) * 1000, 2
+                    ),
+                    "app_version": current_app.config.get(
+                        "APP_VERSION", "1.0.0"
+                    ),
                     "env": current_app.config.get("ENV", "production"),
-                    "maintenance_mode": current_app.config.get("MAINTENANCE_MODE", False),
+                    "maintenance_mode": current_app.config.get(
+                        "MAINTENANCE_MODE", False
+                    ),
                 },
                 "infra": {
                     "database": {
                         "online": db_connected,
                         "latency_ms": db_latency_ms,
-                        "degraded": db_latency_ms > LATENCY_THRESHOLD_MS if db_connected else False,
+                        "degraded": (
+                            db_latency_ms > LATENCY_THRESHOLD_MS
+                            if db_connected
+                            else False
+                        ),
                         "message": db_message,
                     },
                     "redis": {
                         "online": redis_ok,
                         "latency_ms": redis_latency_ms,
-                        "degraded": redis_latency_ms > LATENCY_THRESHOLD_MS if redis_ok else False,
+                        "degraded": (
+                            redis_latency_ms > LATENCY_THRESHOLD_MS
+                            if redis_ok
+                            else False
+                        ),
                         "message": redis_msg,
                     },
                 },
@@ -184,7 +229,7 @@ def get_full_diagnostics():
                 },
                 "wiring": {
                     "status": wiring_status,
-                    "audit": template_report
+                    "audit": template_report,
                 },
                 "stats": {"db": db_stats, "cache": cache_stats},
                 "config_summary": config_obj.summarize(),
@@ -193,7 +238,9 @@ def get_full_diagnostics():
         200,
     )
 
+
 # --- Standard UI Routes ---
+
 
 @diagnostics_bp.route("/routes")
 @login_required
@@ -211,11 +258,13 @@ def route_list():
     routes.sort(key=lambda r: r["url"])
     return render_template("admin/route_list.html", routes=routes)
 
+
 @diagnostics_bp.route("/cache_health")
 @login_required
 @admin_required
 def cache_health():
     return render_template("cache_health.html")
+
 
 @diagnostics_bp.route("/db_health")
 @login_required

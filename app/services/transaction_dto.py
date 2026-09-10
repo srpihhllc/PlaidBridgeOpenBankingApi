@@ -40,7 +40,8 @@ def from_model(txn: Transaction) -> TransactionDTO:
         category=txn.category or "Uncategorized",
         amount=txn.amount or 0.0,
         status="pending" if getattr(txn, "is_pending", False) else "posted",
-        verification_status=getattr(txn, "verification_status", "") or "unverified",
+        verification_status=getattr(txn, "verification_status", "")
+        or "unverified",
     )
 
 

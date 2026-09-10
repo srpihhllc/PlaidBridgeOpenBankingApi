@@ -13,10 +13,18 @@ import os
 import re
 import secrets
 import string
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from flask import Blueprint, jsonify, request, session, redirect, url_for, flash
+from flask import (
+    Blueprint,
+    flash,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 from flask_jwt_extended import get_jwt, jwt_required
 from flask_login import current_user, login_required
 
@@ -36,7 +44,9 @@ logger = logging.getLogger(__name__)
 # 1. BLUEPRINTS (API ONLY)
 # =============================================================================
 
-admin_api_core_bp = Blueprint("admin_api_core", __name__, url_prefix="/admin/api")
+admin_api_core_bp = Blueprint(
+    "admin_api_core", __name__, url_prefix="/admin/api"
+)
 admin_api_bp = Blueprint("admin_api", __name__, url_prefix="/admin/api/v1")
 
 # =============================================================================
@@ -61,6 +71,7 @@ return v
 # =============================================================================
 # 3. HYBRID MODEL LAYER (Mocks for Dev / Real for Prod)
 # =============================================================================
+
 
 class MockQuery:
     def __init__(self, model_class):
@@ -197,17 +208,11 @@ SchemaEvent: Any
 if not is_mock:
     try:
         # import-untyped is possible for in-repo models; guard with type:ignore for analysis
-        from app.models.credit_ledger import (
-            CreditLedger as _CreditLedger,  # type: ignore[import-untyped]
-        )
+        from app.models.credit_ledger import CreditLedger as _CreditLedger  # type: ignore[import-untyped]
         from app.models.lender import Lender as _Lender  # type: ignore[import-untyped]
         from app.models.payment_log import PaymentLog as _PaymentLog  # type: ignore[import-untyped]
-        from app.models.schema_event import (
-            SchemaEvent as _SchemaEvent,  # type: ignore[import-untyped]
-        )
-        from app.models.transaction import (
-            Transaction as _Transaction,  # type: ignore[import-untyped]
-        )
+        from app.models.schema_event import SchemaEvent as _SchemaEvent  # type: ignore[import-untyped]
+        from app.models.transaction import Transaction as _Transaction  # type: ignore[import-untyped]
 
         # assign to the predeclared names
         CreditLedger = _CreditLedger
@@ -237,16 +242,21 @@ DisputeLog = MockDisputeLog
 # 4. INTERNAL HELPERS
 # =============================================================================
 
+
 def _make_operator_key(code: str) -> str:
     return f"operator:code:v1:{code}"
+
 
 def _generate_code(length: int = 8) -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
+
 def _audit_emit(event_type: str, metadata: dict):
     # FIXED: 'current_user' is the proxy object, not a function.
-    user_identifier = getattr(current_user, "id", 0) if current_user.is_authenticated else 0
+    user_identifier = (
+        getattr(current_user, "id", 0) if current_user.is_authenticated else 0
+    )
 
     safe_details = {
         "target_user": metadata.get("target_user"),
@@ -269,6 +279,7 @@ def _audit_emit(event_type: str, metadata: dict):
         # Failsafe so a broken log doesn't crash the operator login
         logger.warning(f"Audit emit failed: {e}")
 
+
 def get_remote_address():
     return request.remote_addr
 
@@ -277,27 +288,37 @@ def get_remote_address():
 # 5. BASIC ADMIN API ROUTES
 # =============================================================================
 
+
 @admin_api_bp.route("/traces/recent", methods=["GET"])
 @csrf.exempt
 @jwt_required()
 @roles_required("admin")
 def api_get_recent_traces():
-    query_results = SchemaEvent.query.order_by(SchemaEvent.timestamp.desc()).limit(20).all()
+    query_results = (
+        SchemaEvent.query.order_by(SchemaEvent.timestamp.desc())
+        .limit(20)
+        .all()
+    )
     traces = [
         {
-            "timestamp": getattr(t, "timestamp", datetime.utcnow()).isoformat(),
+            "timestamp": getattr(
+                t, "timestamp", datetime.now(timezone.utc)
+            ).isoformat(),
             "event": getattr(t, "event_type", "UNKNOWN"),
             "id": getattr(t, "id", None),
             "details": getattr(t, "details", {}),
         }
         for t in query_results
     ]
-    return success_response({"traces": traces, "status": "ok"}, message="Traces fetched.")
+    return success_response(
+        {"traces": traces, "status": "ok"}, message="Traces fetched."
+    )
 
 
 # =============================================================================
 # 6. OPERATOR CODE API
 # =============================================================================
+
 
 # FIX: @bp.route must be outermost decorator so Flask registers the route.
 # auth/csrf decorators go inside (closer to the function).
@@ -315,18 +336,24 @@ def operator_code_generate():
 
     r = get_redis_client()
     if not r:
-        return jsonify({"status": "error", "message": "Redis unavailable"}), 503
+        return jsonify(
+            {"status": "error", "message": "Redis unavailable"}
+        ), 503
 
     payload = {
         "created_by_ip": request.remote_addr,
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "ttl": ttl,
         "admin_user_id": getattr(current_user, "id", "unknown"),
     }
     r.setex(key, ttl, json.dumps(payload))
 
-    _audit_emit("OPERATOR_CODE_GENERATED", {"code_prefix": code[:4], "ttl": ttl})
-    return jsonify({"status": "ok", "operator_code": code, "expires_in": ttl}), 201
+    _audit_emit(
+        "OPERATOR_CODE_GENERATED", {"code_prefix": code[:4], "ttl": ttl}
+    )
+    return jsonify(
+        {"status": "ok", "operator_code": code, "expires_in": ttl}
+    ), 201
 
 
 @admin_api_bp.route("/operator_code/invalidate", methods=["POST"])
@@ -337,13 +364,17 @@ def operator_code_invalidate():
     try:
         r = get_redis_client()
         if not r:
-            return jsonify({"status": "error", "message": "Redis unavailable"}), 503
+            return jsonify(
+                {"status": "error", "message": "Redis unavailable"}
+            ), 503
 
         keys_to_delete = list(r.scan_iter("operator:code:v1:*"))
         count = r.delete(*keys_to_delete) if keys_to_delete else 0
 
         _audit_emit("OPERATOR_CODE_INVALIDATED_ALL", {"keys_deleted": count})
-        return jsonify({"status": "ok", "message": f"Invalidated {count} codes."}), 200
+        return jsonify(
+            {"status": "ok", "message": f"Invalidated {count} codes."}
+        ), 200
     except Exception:
         return jsonify({"status": "error", "message": "server_error"}), 500
 
@@ -362,7 +393,10 @@ def operator_entry():
 
     # 2. Validate against your Regex
     if not code or not OPERATOR_CODE_REGEX.match(code):
-        flash("Invalid operator ignition format. Please check your code.", "danger")
+        flash(
+            "Invalid operator ignition format. Please check your code.",
+            "danger",
+        )
         return redirect(url_for("admin.operator_login"))
 
     # 3. Check Redis for the Operator Key
@@ -380,15 +414,23 @@ def operator_entry():
             flash("Ignition code expired or invalid.", "danger")
             return redirect(url_for("admin.operator_login"))
 
-        meta = json.loads(raw.decode("utf-8")) if isinstance(raw, bytes) else json.loads(raw)
+        meta = (
+            json.loads(raw.decode("utf-8"))
+            if isinstance(raw, bytes)
+            else json.loads(raw)
+        )
         ttl = meta.get("ttl", 600)
 
         # 4. Success - Ignite Cortex Mode
         session[OPERATOR_MODE_KEY] = True
         session[OPERATOR_MODE_TTL_SECONDS_KEY] = ttl
-        session[OPERATOR_MODE_START_TIME_KEY] = datetime.utcnow().timestamp()
+        session[OPERATOR_MODE_START_TIME_KEY] = datetime.now(
+            timezone.utc
+        ).timestamp()
 
-        _audit_emit("OPERATOR_CODE_CONSUMED", {"code_prefix": code[:4], "ttl": ttl})
+        _audit_emit(
+            "OPERATOR_CODE_CONSUMED", {"code_prefix": code[:4], "ttl": ttl}
+        )
 
         # 5. Redirect straight to the Cockpit
         flash("Cortex Operator Mode Active. Welcome.", "success")
@@ -404,18 +446,23 @@ def operator_entry():
 # 7. AUDIT & USER MANAGEMENT API
 # =============================================================================
 
+
 @admin_api_bp.route("/audit", methods=["GET"])
 @csrf.exempt
 @login_required
 @admin_required
 def audit_viewer_api():
-    events = [{"id": i, "event_type": "MOCK_EVENT", "ip": f"192.168.1.{i}"} for i in range(1, 5)]
+    events = [
+        {"id": i, "event_type": "MOCK_EVENT", "ip": f"192.168.1.{i}"}
+        for i in range(1, 5)
+    ]
     return jsonify({"status": "ok", "events": events})
 
 
 # ---------------------------
 # LIST USERS
 # ---------------------------
+
 
 @admin_api_bp.route("/users", methods=["GET"])
 @csrf.exempt
@@ -431,6 +478,7 @@ def admin_list_users():
 # ---------------------------
 # DELETE USER ENDPOINT
 # ---------------------------
+
 
 @admin_api_bp.route("/users/<string:user_id>", methods=["DELETE"])
 @csrf.exempt
@@ -451,7 +499,9 @@ def admin_delete_user(user_id):
 
     try:
         # Explicit transaction control to clear dependencies first
-        PlaidItem.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+        PlaidItem.query.filter_by(user_id=user_id).delete(
+            synchronize_session=False
+        )
 
         real_db.session.delete(user)
         real_db.session.commit()
@@ -460,7 +510,12 @@ def admin_delete_user(user_id):
 
     except Exception as e:
         real_db.session.rollback()
-        return jsonify({
-            "status": "error",
-            "message": f"Database transaction failed during cascade execution: {str(e)}"
-        }), 500
+        return (
+            jsonify(
+                {
+                    "status": "error",
+                    "message": f"Database transaction failed during cascade execution: {str(e)}",
+                }
+            ),
+            500,
+        )

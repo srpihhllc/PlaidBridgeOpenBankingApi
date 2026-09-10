@@ -7,8 +7,9 @@ import json
 import os
 import threading
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import datetime, timezone
 
+from flask import session  # Hoisted to top-level for full blueprint access
 from flask import (
     Blueprint,
     abort,
@@ -18,19 +19,24 @@ from flask import (
     render_template,
     render_template_string,
     request,
-    session,  # Hoisted to top-level for full blueprint access
     url_for,
 )
 from flask_login import current_user, login_required
 
 from app.auth_handlers import SystemOperator  # Resolved missing reference
-from app.constants import BLUEPRINT_AUDIT_KEY, DEFAULT_TTL, OPERATOR_MODE_KEY  # Hoisted
+from app.constants import (
+    BLUEPRINT_AUDIT_KEY,
+    DEFAULT_TTL,  # Hoisted
+    OPERATOR_MODE_KEY,
+)
 from app.dto.transaction_dto import TransactionDTO
 from app.extensions import db
+from app.models.registry import (
+    Registry,
+)  # 🟢 ADDED: Live database model for services
 from app.models.todo import Todo
 from app.models.transactions import Transaction
 from app.models.user_dashboard import UserDashboard
-from app.models.registry import Registry  # 🟢 ADDED: Live database model for services
 from app.services.category_analytics import compute_category_summary
 from app.services.fraud_analytics import compute_fraud_summary
 from app.services.timeline_analytics import compute_timeline
@@ -79,11 +85,12 @@ _EXPECTED_TEMPLATES_MANIFEST: set[str] = {
     "sub/profile.html",
     "sub/fraud_drilldown.html",
     "sub/settings.html",
+    "sub/vault_dashboard.html",  # 🟢 Added to prevent false-positive template drift
 }
 
 TTL_SECONDS = DEFAULT_TTL
 _TEMPLATE_CACHE: list[str] = []
-_TEMPLATE_CACHE_LAST_WALK = datetime.min
+_TEMPLATE_CACHE_LAST_WALK = datetime.min.replace(tzinfo=timezone.utc)
 _TEMPLATE_CACHE_EXPIRY_SECONDS = 300
 _TEMPLATE_CACHE_LOCK = threading.Lock()
 
@@ -93,7 +100,7 @@ def list_templates() -> Iterator[str]:
 
     force_refresh = current_app.config.get("FORCE_TEMPLATE_REFRESH", False)
     expired = (
-        datetime.utcnow() - _TEMPLATE_CACHE_LAST_WALK
+        datetime.now(timezone.utc) - _TEMPLATE_CACHE_LAST_WALK
     ).total_seconds() >= _TEMPLATE_CACHE_EXPIRY_SECONDS
 
     if not force_refresh and _TEMPLATE_CACHE and not expired:
@@ -113,7 +120,7 @@ def list_templates() -> Iterator[str]:
                     all_templates.append(rel.replace(os.sep, "/"))
 
         _TEMPLATE_CACHE = all_templates
-        _TEMPLATE_CACHE_LAST_WALK = datetime.utcnow()
+        _TEMPLATE_CACHE_LAST_WALK = datetime.now(timezone.utc)
 
     return iter(_TEMPLATE_CACHE)
 
@@ -133,11 +140,13 @@ def _emit_blueprint_audit_trace() -> dict:
 
     # Normalized keys to perfectly fit the UI data binding contract
     audit_data = {
-        "last_audit_date": datetime.utcnow().isoformat(),
+        "last_audit_date": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "audit_status": status,
         "expected_sub": len(expected),
-        "actual_sub": sum(1 for t in all_templates if is_subscriber_template(t)),
+        "actual_sub": sum(
+            1 for t in all_templates if is_subscriber_template(t)
+        ),
         "missing": len(missing),
         "extras": len(extras),
         "audit_issues": len(missing) + len(extras),
@@ -169,7 +178,7 @@ def get_audit_info() -> dict:
         return _emit_blueprint_audit_trace()
     except Exception as e:
         return {
-            "last_audit_date": datetime.utcnow().isoformat(),
+            "last_audit_date": datetime.now(timezone.utc).isoformat(),
             "status": "unavailable",
             "audit_status": "UNAVAILABLE",
             "audit_issues": 0,
@@ -183,7 +192,9 @@ def get_audit_info() -> dict:
 # =============================================================================
 
 
-def _emit_subscriber_ui_rendered(user, view_name: str, template_name: str, extra=None):
+def _emit_subscriber_ui_rendered(
+    user, view_name: str, template_name: str, extra=None
+):
     details = {
         "view": view_name,
         "template": template_name,
@@ -214,7 +225,10 @@ def sub_index():
             tpl_list = []
         return jsonify({"templates": tpl_list}), 200
 
-    is_sub = getattr(current_user, "is_authenticated", False) and getattr(current_user, "role", None) == "subscriber"
+    is_sub = (
+        getattr(current_user, "is_authenticated", False)
+        and getattr(current_user, "role", None) == "subscriber"
+    )
     is_operator = session.get(OPERATOR_MODE_KEY) is True
 
     if is_sub or is_operator:
@@ -241,28 +255,59 @@ def dashboard():
     user = current_user._get_current_object()
 
     # ⭐ GOD-MODE BYPASS: Structured fallback contract for transient operator sessions
-    if isinstance(user, SystemOperator) or getattr(user, "id", None) == "TERENCE_CORTEX_PRIME":
+    if (
+        isinstance(user, SystemOperator)
+        or getattr(user, "id", None) == "TERENCE_CORTEX_PRIME"
+    ):
         # 🛡️ Safely attach template context properties to prevent dynamic evaluation panics
         try:
-            setattr(user, "total_balance", getattr(user, "total_balance", 0.00))
+            setattr(
+                user, "total_balance", getattr(user, "total_balance", 0.00)
+            )
             setattr(user, "first_name", getattr(user, "first_name", "Terence"))
-            setattr(user, "last_name", getattr(user, "last_name", "Operator"))
+            setattr(
+                user, "last_name", getattr(user, "last_name", "Pollard Sr")
+            )
         except AttributeError:
             pass  # Protective catch if the model doesn't permit active mutation
 
         # authoritative mock profile context dict to match standard template contract
         profile_ctx = {
             "username": getattr(user, "username", "TERENCE_CORTEX_PRIME"),
-            "full_name": "Terence Operator"
+            "full_name": "Terence Pollard Sr",
         }
+
+        # 🟢 THE FIX: Force a global database dump of all provisioned services
+        all_services = Registry.query.all()
+        operator_registry = []
+        for svc in all_services:
+            try:
+                # Extract the config to expose the endpoint route to the UI
+                config_dict = (
+                    json.loads(svc.config_blob)
+                    if isinstance(svc.config_blob, str)
+                    else svc.config_blob
+                )
+                operator_registry.append(
+                    {
+                        "id": svc.id,
+                        "name": svc.name,
+                        "endpoint": config_dict.get(
+                            "endpoint", "#"
+                        ),  # Crucial for the HTML form action
+                        "config": config_dict,
+                    }
+                )
+            except Exception:
+                continue
 
         return render_template(
             "sub/subscriber_dashboard.html",
             audit_info={
-                "last_audit_date": datetime.utcnow().isoformat(),
+                "last_audit_date": datetime.now(timezone.utc).isoformat(),
                 "audit_status": "COCKPIT_ACTIVE",
                 "audit_issues": 0,
-                "environment": "CORTEX_PRIME"
+                "environment": "CORTEX_PRIME",
             },
             profile=profile_ctx,
             bank_accounts=[],
@@ -276,11 +321,9 @@ def dashboard():
             dashboard_settings={"theme": "dark", "compact_mode": False},
             pending_todos=[],
             completed_todos=[],
-            services=[],  # 🟢 FIXED: Changed from service_registry={} to services=[]
-            is_operator=True
+            service_registry=operator_registry,  # 🟢 ALIGNED: Uses the God-Mode registry list
+            is_operator=True,  # 🟢 ALIGNED: Hardcoded to True for God-Mode
         )
-
-
 
     # -------------------------------------------------------------------------
     # Standard Persistent Database Resolution Path (For Real Subscribers Only)
@@ -300,11 +343,13 @@ def dashboard():
         if not audit_info or not isinstance(audit_info, dict):
             raise ValueError("Malformed audit data struct")
     except Exception as e:
-        current_app.logger.warning(f"Defaulting sparse audit payload: {str(e)}")
+        current_app.logger.warning(
+            f"Defaulting sparse audit payload: {str(e)}"
+        )
         audit_info = {
-            "last_audit_date": datetime.utcnow().isoformat(),
+            "last_audit_date": datetime.now(timezone.utc).isoformat(),
             "audit_status": "INITIALIZING",
-            "audit_issues": 0
+            "audit_issues": 0,
         }
 
     # Profile DTO
@@ -320,10 +365,16 @@ def dashboard():
         db.session.add(dashboard_model)
         db.session.commit()
 
-    dashboard_settings = dashboard_model.settings or UserDashboard.default_settings()
+    dashboard_settings = (
+        dashboard_model.settings or UserDashboard.default_settings()
+    )
 
     # Transaction feed processing
-    raw_txns = Transaction.query.filter_by(user_id=user.id).order_by(Transaction.date.desc()).all()
+    raw_txns = (
+        Transaction.query.filter_by(user_id=user.id)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
     transactions = [TransactionDTO.from_model(t) for t in raw_txns]
 
     # Compute Analytics Metrics
@@ -333,7 +384,10 @@ def dashboard():
 
     # Optional Downstream Analysis Engine Lookups
     try:
-        from app.services.transaction_analysis import compute_transaction_summary
+        from app.services.transaction_analysis import (
+            compute_transaction_summary,
+        )
+
         transaction_summary = compute_transaction_summary(transactions)
     except Exception:
         transaction_summary = None
@@ -350,17 +404,19 @@ def dashboard():
     pending_todos = todo_q.filter_by(completed=False).all()
     completed_todos = todo_q.filter_by(completed=True).all()
 
-    # 🟢 FIXED: Discovery Services Infrastructure (Now Live From Database)
+    # Discovery Services Infrastructure (Now Live From Database)
     seeded_services = Registry.query.filter_by(user_id=user.id).all()
     processed_services = []
     for svc in seeded_services:
         try:
-            config_dict = json.loads(svc.config_blob) if isinstance(svc.config_blob, str) else svc.config_blob
-            processed_services.append({
-                'id': svc.id,
-                'name': svc.name,
-                'config': config_dict
-            })
+            config_dict = (
+                json.loads(svc.config_blob)
+                if isinstance(svc.config_blob, str)
+                else svc.config_blob
+            )
+            processed_services.append(
+                {"id": svc.id, "name": svc.name, "config": config_dict}
+            )
         except Exception:
             continue
 
@@ -394,7 +450,7 @@ def dashboard():
         dashboard_settings=dashboard_settings,
         pending_todos=pending_todos,
         completed_todos=completed_todos,
-        services=processed_services,  # 🟢 FIXED: Pass the array of dictionary objects
+        service_registry=processed_services,  # 🟢 FIX: Aligned template variable to 'service_registry'
         is_operator=is_operator,
     )
 
@@ -408,7 +464,7 @@ def settings():
     if getattr(user, "id", None) == "TERENCE_CORTEX_PRIME":
         return render_template(
             "sub/settings.html",
-            dashboard_settings={"theme": "dark", "layout": "default"}
+            dashboard_settings={"theme": "dark", "layout": "default"},
         )
 
     log_identity_event(
@@ -424,7 +480,9 @@ def settings():
         db.session.add(dashboard_model)
         db.session.commit()
 
-    dashboard_settings = dashboard_model.settings or UserDashboard.default_settings()
+    dashboard_settings = (
+        dashboard_model.settings or UserDashboard.default_settings()
+    )
     template_name = "sub/settings.html"
 
     _emit_subscriber_ui_rendered(
@@ -450,10 +508,14 @@ def fraud_drilldown():
             "sub/fraud_drilldown.html",
             fraud_summary={"risk_score": 0, "flagged_count": 0},
             flagged_transactions=[],
-            timeline=[]
+            timeline=[],
         )
 
-    raw_txns = Transaction.query.filter_by(user_id=user.id).order_by(Transaction.date.desc()).all()
+    raw_txns = (
+        Transaction.query.filter_by(user_id=user.id)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
     transactions = [TransactionDTO.from_model(t) for t in raw_txns]
 
     fraud_summary = compute_fraud_summary(transactions)
@@ -534,7 +596,7 @@ def vault_dashboard():
             summary={},
             flow_labels=[],
             flow_values=[],
-            fraud_signals=[]
+            fraud_signals=[],
         )
 
     from app.dto.vault_dto import VaultTransactionDTO
@@ -585,7 +647,8 @@ def vault_dashboard():
 @login_required
 def debug_dto():
     return render_template_string(
-        "<h1>DTO Inspector (Placeholder)</h1>" "<p>This tool will inspect DTO mappings.</p>"
+        "<h1>DTO Inspector (Placeholder)</h1>"
+        "<p>This tool will inspect DTO mappings.</p>"
     )
 
 
@@ -630,13 +693,17 @@ def render_sub_template(tpl):
     if getattr(current_user, "is_authenticated", False):
         user = require_subscriber()
         _emit_subscriber_ui_rendered(
-            user, view_name="sub_ui.render_sub_template", template_name=search_tpl
+            user,
+            view_name="sub_ui.render_sub_template",
+            template_name=search_tpl,
         )
 
     class MockUser:
         id = 0
         username = "preview_user"
         full_name = "Preview User"
+        email = "preview@example.com"
+        is_active = True
         role = "subscriber"
         total_balance = 0.0
         user_dashboard = None
@@ -647,8 +714,16 @@ def render_sub_template(tpl):
         "current_user": mock_user,
         "user": mock_user,
         "dashboard_settings": {"theme": "dark", "compact_mode": False},
-        "audit_info": {"status": "ok", "audit_status": "COCKPIT_ACTIVE", "audit_issues": 0, "last_audit_date": datetime.utcnow().isoformat()},
-        "profile": {"username": "smoke_test_user", "full_name": "Smoke Test Operator"},
+        "audit_info": {
+            "status": "ok",
+            "audit_status": "COCKPIT_ACTIVE",
+            "audit_issues": 0,
+            "last_audit_date": datetime.now(timezone.utc).isoformat(),
+        },
+        "profile": {
+            "username": "smoke_test_user",
+            "full_name": "Smoke Test Operator",
+        },
         "transactions": [],
         "flagged_transactions": [],
         "category_summary": {},
@@ -659,13 +734,13 @@ def render_sub_template(tpl):
         "total_pages": 1,
         "pending_todos": [],
         "completed_todos": [],
-        "services": [],  # 🟢 FIXED: Changed from service_registry={}
+        "service_registry": [],  # 🟢 FIXED: Changed back to service_registry to match template contract
         "is_operator": False,
         "vault_txns": [],
         "summary": {},
         "flow_labels": [],
         "flow_values": [],
-        "fraud_signals": []
+        "fraud_signals": [],
     }
 
     return render_template(search_tpl, **mock_context)

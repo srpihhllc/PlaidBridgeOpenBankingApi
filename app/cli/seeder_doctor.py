@@ -6,7 +6,13 @@ import click
 from flask.cli import with_appcontext
 
 from app.extensions import db
-from app.models import BankAccount, BankInstitution, SubscriberProfile, User, UserDashboard
+from app.models import (
+    BankAccount,
+    BankInstitution,
+    SubscriberProfile,
+    User,
+    UserDashboard,
+)
 
 
 @click.command("seeder-doctor")
@@ -106,11 +112,23 @@ def seeder_doctor():
     click.echo("🩺 Seeder Doctor Report")
     click.echo("----------------------------------------")
     click.echo(f"🔧 UUIDs repaired:                 {report['fixed_uuid']}")
-    click.echo(f"🔧 Missing dashboards fixed:       {report['fixed_missing_dashboards']}")
-    click.echo(f"🔧 Missing profiles fixed:         {report['fixed_missing_profiles']}")
-    click.echo(f"🔧 Orphan institutions removed:    {report['fixed_orphan_institutions']}")
-    click.echo(f"🔧 Orphan accounts removed:        {report['fixed_orphan_accounts']}")
-    click.echo(f"🔧 Missing API keys generated:     {report['fixed_missing_api_keys']}")
-    click.echo(f"🔧 Mismatched roles corrected:     {report['fixed_mismatched_roles']}")
+    click.echo(
+        f"🔧 Missing dashboards fixed:       {report['fixed_missing_dashboards']}"
+    )
+    click.echo(
+        f"🔧 Missing profiles fixed:         {report['fixed_missing_profiles']}"
+    )
+    click.echo(
+        f"🔧 Orphan institutions removed:    {report['fixed_orphan_institutions']}"
+    )
+    click.echo(
+        f"🔧 Orphan accounts removed:        {report['fixed_orphan_accounts']}"
+    )
+    click.echo(
+        f"🔧 Missing API keys generated:     {report['fixed_missing_api_keys']}"
+    )
+    click.echo(
+        f"🔧 Mismatched roles corrected:     {report['fixed_mismatched_roles']}"
+    )
     click.echo("----------------------------------------")
     click.echo("✅ Seeder Doctor completed.\n")

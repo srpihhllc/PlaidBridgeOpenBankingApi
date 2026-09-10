@@ -49,8 +49,12 @@ def trace_templates_command():
     redis_client = get_redis_client()
     if redis_client:
         try:
-            redis_client.setex("audit:template_wiring", 600, json.dumps(results))
-            click.echo("✅ Template wiring audit emitted to Redis (key=audit:template_wiring)")
+            redis_client.setex(
+                "audit:template_wiring", 600, json.dumps(results)
+            )
+            click.echo(
+                "✅ Template wiring audit emitted to Redis (key=audit:template_wiring)"
+            )
         except Exception as e:
             click.echo(f"⚠️ Failed to emit template wiring audit to Redis: {e}")
 

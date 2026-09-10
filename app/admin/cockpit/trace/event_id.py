@@ -18,7 +18,10 @@ def trace_detail(event_id):
     raw = redis_conn.get(key)
 
     if not raw:
-        return render_template("cockpit/trace_not_found.html", event_id=event_id), 404
+        return (
+            render_template("cockpit/trace_not_found.html", event_id=event_id),
+            404,
+        )
 
     event = json.loads(raw)
     return render_template("cockpit/trace_detail.html", event=event)

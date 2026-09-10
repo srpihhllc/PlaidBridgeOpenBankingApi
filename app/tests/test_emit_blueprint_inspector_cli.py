@@ -4,6 +4,7 @@
 # =============================================================================
 
 import pytest
+
 from app import create_app
 from app.cli_commands.emit_blueprint_inspector import emit_blueprint_inspector
 
@@ -11,7 +12,7 @@ from app.cli_commands.emit_blueprint_inspector import emit_blueprint_inspector
 @pytest.fixture
 def app():
     """Boot the test app with testing configuration."""
-    app = create_app('testing')
+    app = create_app("testing")
     return app
 
 
@@ -98,7 +99,9 @@ def test_cli_emit_blueprint_inspector(app, stub_dependencies):
     runner = app.test_cli_runner()
     result = runner.invoke(emit_blueprint_inspector)
 
-    assert result.exit_code == 0, f"Command failed: {result.output} | Exception: {result.exception}"
+    assert (
+        result.exit_code == 0
+    ), f"Command failed: {result.output} | Exception: {result.exception}"
     assert "✅" in result.output
     assert "Redis" in result.output
 

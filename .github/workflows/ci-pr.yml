@@ -1,0 +1,176 @@
+YAMLname: CI / Pull Request Validation
+
+on:
+  pull_request:
+    branches: [ main, PlaidBridgeOpenBankingApi ]
+
+jobs:
+  monorepo-integrity-and-schema:
+    name: Integrity, Schema & Route Drift Check
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi:${{ github.workspace }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify Monorepo Structure
+        run: |
+          set -euo pipefail
+          test -d app || (echo "Missing directory: app" && exit 1)
+          test -d docs || (echo "Missing directory: docs" && exit 1)
+          test -f README.md || (echo "Missing README.md" && exit 1)
+          test -f docs/10-openapi.yaml || (echo "Missing docs/10-openapi.yaml" && exit 1)
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Validation Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install openapi-spec-validator alembic
+          if [ -f PlaidBridgeOpenBankingApi/requirements.txt ]; then pip install -r PlaidBridgeOpenBankingApi/requirements.txt; fi
+
+      - name: Validate OpenAPI Spec
+        run: python -m openapi_spec_validator docs/10-openapi.yaml
+
+      - name: Validate Alembic Migration Filenames & Imports
+        run: |
+          python - <<'PY'
+          import importlib.util, glob, sys, os
+          errs = []
+          for path in sorted(glob.glob("migrations/versions/*.py") + glob.glob("PlaidBridgeOpenBankingApi/migrations/versions/*.py")):
+              spec = importlib.util.spec_from_file_location(path, path)
+              m = importlib.util.module_from_spec(spec)
+              try:
+                  spec.loader.exec_module(m)
+              except Exception as e:
+                  print("IMPORT ERROR", path, e)
+                  errs.append(path)
+                  continue
+              rev = getattr(m, "revision", None)
+              fname = os.path.basename(path)
+              if not rev or not fname.startswith(rev):
+                  print("FILENAME MISMATCH", path, "declares", rev)
+                  errs.append(path)
+          if errs:
+              print("Migration validation failed:", errs)
+              sys.exit(1)
+          print("Migration validation passed.")
+          PY
+
+      - name: Run Route Drift Check
+        env:
+          FLASK_APP: app:create_app
+          FLASK_ENV: test
+        run: |
+          if [ -f expected_endpoints.json ]; then
+            python -m flask route-drift --expected-file expected_endpoints.json --fail-on-missing
+          else
+            echo "expected_endpoints.json not present; skipping route drift assertion."
+          fi
+
+  backend-integration:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi
+      DATABASE_URL: postgresql://test:test@localhost:5432/test_db
+      REDIS_URL: redis://localhost:6379/0
+      FLASK_CONFIG: testing
+      ALEMBIC_RUNNING: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: 'pip'
+
+      - name: Install Dependencies
+        working-directory: PlaidBridgeOpenBankingApi
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+          pip install pytest coverage pip-audit bandit
+
+      - name: Run Alembic Migrations
+        working-directory: PlaidBridgeOpenBankingApi
+        run: python -m alembic -c alembic.ini upgrade head || true
+
+      - name: Run Pytest
+        working-directory: PlaidBridgeOpenBankingApi
+        run: python -m pytest -q -vv
+
+      - name: Run Security Audits (Non-fatal)
+        working-directory: PlaidBridgeOpenBankingApi
+        run: |
+          pip-audit --progress=off || true
+          bandit -r . -x .venv -f json -o bandit-results.json || true
+
+  mobile-integration:
+    name: Mobile App Integration Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for Mobile Changes
+        id: check_mobile
+        run: |
+          if [ -d mobile-app ] && [ -f mobile-app/package.json ]; then
+            echo "has_mobile=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_mobile=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node & pnpm
+        if: steps.check_mobile.outputs.has_mobile == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        if: steps.check_mobile.outputs.has_mobile == 'true'
+        run: npm install -g pnpm
+
+      - name: Run Mobile Validation
+        if: steps.check_mobile.outputs.has_mobile == 'true'
+        working-directory: mobile-app
+        run: |
+          pnpm install
+          pnpm run check || pnpm run typecheck || true
+          pnpm test --silent || true
+          pnpm run test:trpc-contract || true

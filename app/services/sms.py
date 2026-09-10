@@ -84,7 +84,9 @@ def _send_via_phone(phone_number: str, code: str) -> bool:
 
 
 # ---- Provider gateway (pluggable) ----
-def new_send_mfa_code(user: Any, code: str, purpose: str = "setup", persist: bool = True) -> bool:
+def new_send_mfa_code(
+    user: Any, code: str, purpose: str = "setup", persist: bool = True
+) -> bool:
     """
     Provider entrypoint. Default behaviour:
       - prefer user.primary_phone
@@ -99,10 +101,16 @@ def new_send_mfa_code(user: Any, code: str, purpose: str = "setup", persist: boo
         try:
             ok = _send_via_phone(phone, code)
         except SendMFATransientError:
-            _emit_telemetry("MFA_SEND_FAILURE_TRANSIENT", {"user_id": user_id, "mode": "sms"})
+            _emit_telemetry(
+                "MFA_SEND_FAILURE_TRANSIENT",
+                {"user_id": user_id, "mode": "sms"},
+            )
             raise
         except Exception as exc:
-            _emit_telemetry("MFA_SEND_FAILURE_PERMANENT", {"user_id": user_id, "mode": "sms"})
+            _emit_telemetry(
+                "MFA_SEND_FAILURE_PERMANENT",
+                {"user_id": user_id, "mode": "sms"},
+            )
             raise SendMFAPermanentError("sms provider failure") from exc
         _emit_telemetry("MFA_SEND_SMS_OK", {"user_id": user_id, "mode": "sms"})
         return ok
@@ -112,10 +120,14 @@ def new_send_mfa_code(user: Any, code: str, purpose: str = "setup", persist: boo
             "[MOCK EMAIL] MFA code delivered to email (masked): %s",
             email.split("@")[0] + "@***",
         )
-        _emit_telemetry("MFA_SEND_EMAIL_OK", {"user_id": user_id, "mode": "email"})
+        _emit_telemetry(
+            "MFA_SEND_EMAIL_OK", {"user_id": user_id, "mode": "email"}
+        )
         return True
     else:
-        logger.warning("No delivery address for user id=%s; cannot send MFA code", user_id)
+        logger.warning(
+            "No delivery address for user id=%s; cannot send MFA code", user_id
+        )
         _emit_telemetry("MFA_SEND_NO_ADDRESS", {"user_id": user_id})
         raise SendMFAPermanentError("no delivery address")
 
@@ -143,7 +155,9 @@ def send_mfa_code(
     if isinstance(user_or_phone, str):
         phone = user_or_phone
         if not code:
-            raise TypeError("Legacy send_mfa_code(phone_number, code) requires a code argument")
+            raise TypeError(
+                "Legacy send_mfa_code(phone_number, code) requires a code argument"
+            )
         try:
             ok = _send_via_phone(phone, code)
         except SendMFATransientError:
@@ -163,14 +177,22 @@ def send_mfa_code(
     attempt = 0
     while True:
         try:
-            ok = new_send_mfa_code(user, code=code, purpose=purpose, persist=persist)
+            ok = new_send_mfa_code(
+                user, code=code, purpose=purpose, persist=persist
+            )
             if not ok:
                 raise SendMFATransientError("provider returned False")
-            _emit_telemetry("MFA_SEND_OK", {"user_id": user_id, "purpose": purpose})
+            _emit_telemetry(
+                "MFA_SEND_OK", {"user_id": user_id, "purpose": purpose}
+            )
             return code
         except SendMFAPermanentError as e:
-            logger.warning("Permanent send failure for user=%s: %s", user_id, e)
-            _emit_telemetry("MFA_SEND_PERMANENT", {"user_id": user_id, "error": str(e)})
+            logger.warning(
+                "Permanent send failure for user=%s: %s", user_id, e
+            )
+            _emit_telemetry(
+                "MFA_SEND_PERMANENT", {"user_id": user_id, "error": str(e)}
+            )
             raise
         except SendMFATransientError as e:
             attempt += 1
@@ -178,7 +200,12 @@ def send_mfa_code(
                 "MFA_SEND_TRANSIENT",
                 {"user_id": user_id, "attempt": attempt, "error": str(e)},
             )
-            logger.warning("Transient send failure for user=%s attempt=%s: %s", user_id, attempt, e)
+            logger.warning(
+                "Transient send failure for user=%s attempt=%s: %s",
+                user_id,
+                attempt,
+                e,
+            )
             if attempt > retry:
                 raise
             # backoff then retry
@@ -186,6 +213,11 @@ def send_mfa_code(
                 time.sleep(backoff * attempt)
             continue
         except Exception as e:
-            logger.exception("Unexpected exception while sending MFA code for user=%s", user_id)
-            _emit_telemetry("MFA_SEND_UNEXPECTED", {"user_id": user_id, "error": str(e)})
+            logger.exception(
+                "Unexpected exception while sending MFA code for user=%s",
+                user_id,
+            )
+            _emit_telemetry(
+                "MFA_SEND_UNEXPECTED", {"user_id": user_id, "error": str(e)}
+            )
             raise SendMFATransientError(str(e)) from e

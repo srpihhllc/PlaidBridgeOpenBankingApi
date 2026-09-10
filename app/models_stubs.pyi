@@ -1,4 +1,4 @@
-#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/models_stubs.pyi
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models_stubs.pyi
 
 from typing import Any
 

@@ -36,7 +36,9 @@ def format_response(
         "message": message,
         "version": version,
         "timestamp": (
-            g.request_start_time.isoformat() if hasattr(g, "request_start_time") else None
+            g.request_start_time.isoformat()
+            if hasattr(g, "request_start_time")
+            else None
         ),
         # Request ID is injected by middleware in app/__init__.py
         "request_id": getattr(g, "request_id", "unknown"),
@@ -45,7 +47,9 @@ def format_response(
     if status == "success":
         response_payload["data"] = data if data is not None else {}
     elif status == "error":
-        response_payload["error_code"] = error_code if error_code else "E_UNKNOWN"
+        response_payload["error_code"] = (
+            error_code if error_code else "E_UNKNOWN"
+        )
 
     # Log the full error response for debugging
     if status == "error":

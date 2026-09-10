@@ -1,11 +1,13 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tiles/model_registry.py
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 from flask import current_app
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 
 class ModelRegistryTile:
@@ -24,7 +26,9 @@ class ModelRegistryTile:
             with open(self.manifest_path) as f:
                 return json.load(f)
         except Exception as e:
-            current_app.logger.error(f"[ModelRegistryTile] Failed to load manifest: {e}")
+            current_app.logger.error(
+                f"[ModelRegistryTile] Failed to load manifest: {e}"
+            )
             return []
 
     def is_stale(self, model_name):
@@ -38,7 +42,9 @@ class ModelRegistryTile:
         try:
             last_used = self.redis.get(key)
         except Exception as e:
-            current_app.logger.error(f"[ModelRegistryTile] Failed to get key={key}: {e}")
+            current_app.logger.error(
+                f"[ModelRegistryTile] Failed to get key={key}: {e}"
+            )
             return True
 
         if not last_used:
@@ -46,7 +52,7 @@ class ModelRegistryTile:
 
         try:
             last_dt = datetime.fromisoformat(last_used.decode())
-            return datetime.utcnow() - last_dt > self.stale_threshold
+            return datetime.now(timezone.utc) - last_dt > self.stale_threshold
         except Exception as e:
             current_app.logger.warning(
                 f"[ModelRegistryTile] Failed to parse timestamp for {model_name}: {e}"
@@ -63,7 +69,12 @@ class ModelRegistryTile:
         return self.models
 
     def get_status_summary(self):
-        summary = {"✅ Imported": 0, "⚠️ Failed": 0, "💤 Stale": 0, "🧠 Active": 0}
+        summary = {
+            "✅ Imported": 0,
+            "⚠️ Failed": 0,
+            "💤 Stale": 0,
+            "🧠 Active": 0,
+        }
         for model in self.models:
             status = model.get("status", "").split(":")[0]
             if status in summary:

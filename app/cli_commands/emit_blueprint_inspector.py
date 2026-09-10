@@ -3,6 +3,7 @@ from __future__ import annotations
 import click
 from flask.cli import with_appcontext
 
+
 def run_emit_blueprint_inspector() -> int:
     """
     Executes blueprint inspection and emits telemetry.
@@ -21,19 +22,13 @@ def run_emit_blueprint_inspector() -> int:
     # 2. TTL trace (Positional)
     emit_ttl_trace(
         "blueprint_inspector:summary",
-        {
-            "status": "emitted",
-            "result": result,
-            "ttl": 3600
-        }
+        {"status": "emitted", "result": result, "ttl": 3600},
     )
 
     # 3. Telemetry identity event
     # Signature: (user_id, event_type, ip=None, user_agent=None, details=None)
     log_identity_event(
-        0,
-        "BLUEPRINT_INSPECTOR_EMIT",
-        details={"status": "emitted"}
+        0, "BLUEPRINT_INSPECTOR_EMIT", details={"status": "emitted"}
     )
 
     click.echo("AUTH ROUTES LOADED")

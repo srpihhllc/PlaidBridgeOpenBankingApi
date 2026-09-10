@@ -18,25 +18,31 @@ from flask import Flask
 # REAL template drift audit (previously unregistered)
 # ---------------------------------------------------------------------------
 from app.cli_commands.cli_template_audit import template_audit
-from app.cli_commands.cli_template_block_audit import template_block_audit_command
-from app.cli_commands.cli_template_inheritance import template_inheritance_command
+from app.cli_commands.cli_template_block_audit import (
+    template_block_audit_command,
+)
+from app.cli_commands.cli_template_inheritance import (
+    template_inheritance_command,
+)
 
 # ⭐ NEW: Unified diagnostics
 from app.cli_commands.diagnostics_cli import diagnostics_full
-from app.cli_commands.sweep_endpoints import sweep_endpoints
-
-# Endpoint tracer (NOT the real template drift audit)
-from app.scripts.cli_template_tracer import trace_templates_command
-
-from .blueprint_emit import blueprint_emit
-from .cockpit_pdf_test import test_cockpit_pdf
 
 # ---------------------------------------------------------------------------
 # Core command imports
 # ---------------------------------------------------------------------------
 # ✅ CORRECTED: Routing to the new cli_commands module instead of legacy .commands
 from app.cli_commands.route_map_dump import route_map_command as route_map_dump
-from app.cli_commands.validate_relationships import validate_relationships_command
+from app.cli_commands.sweep_endpoints import sweep_endpoints
+from app.cli_commands.validate_relationships import (
+    validate_relationships_command,
+)
+
+# Endpoint tracer (NOT the real template drift audit)
+from app.scripts.cli_template_tracer import trace_templates_command
+
+from .blueprint_emit import blueprint_emit
+from .cockpit_pdf_test import test_cockpit_pdf
 from .doctor import doctor
 
 # ---------------------------------------------------------------------------

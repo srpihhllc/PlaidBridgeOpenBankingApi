@@ -4,7 +4,7 @@
 # =============================================================================
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
@@ -43,7 +43,9 @@ def generate_cfpb_pdf(template_name):
         current_app.logger.error(f"Template not found: {template_name}.md")
         return jsonify({"error": "Template not found"}), 404
     except Exception as e:
-        current_app.logger.error(f"An error occurred while generating PDF: {e}")
+        current_app.logger.error(
+            f"An error occurred while generating PDF: {e}"
+        )
         return jsonify({"error": "Failed to generate PDF"}), 500
 
 
@@ -72,7 +74,7 @@ def submit_complaint():
             "product": data.get("product", "Unspecified"),
             "issue": data.get("issue", "General"),
             "company": data.get("company", "PlaidBridge"),
-            "submitted_at": datetime.utcnow().isoformat(),
+            "submitted_at": datetime.now(timezone.utc).isoformat(),
         }
 
         # Log to Redis for real-time monitoring
@@ -90,7 +92,10 @@ def submit_complaint():
         )
         db.session.commit()
 
-        return jsonify({"message": "Complaint submitted successfully"}), 200
+        return (
+            jsonify({"message": "Complaint submitted successfully"}),
+            200,
+        )
 
     except Exception as e:
         db.session.rollback()

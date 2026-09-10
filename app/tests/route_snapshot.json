@@ -930,7 +930,7 @@
       "GET",
       "POST"
     ],
-    "endpoint": "auth.forgot_password_alias"
+    "endpoint": "auth.forgot_password"
   },
   {
     "rule": "/auth/identity-events",

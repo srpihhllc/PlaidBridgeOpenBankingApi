@@ -1,6 +1,6 @@
 # app/tiles/foreign_key_drift_tile.py
 
-from flask import Blueprint, render_template, current_app
+from flask import Blueprint, current_app, render_template
 from sqlalchemy import inspect
 
 from app.extensions import db
@@ -47,4 +47,6 @@ def foreign_key_drift():
                             }
                         )
 
-    return render_template("foreign_key_drift_tile.html", drift_report=drift_report)
+    return render_template(
+        "foreign_key_drift_tile.html", drift_report=drift_report
+    )

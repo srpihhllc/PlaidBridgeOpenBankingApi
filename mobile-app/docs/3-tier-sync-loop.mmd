@@ -1,0 +1,38 @@
+%% 3-tier sync loop (Mermaid)
+flowchart LR
+  subgraph Tier1 [Mobile / Client]
+    A[Mobile App<br/>(UI + Local Cache)]
+  end
+
+  subgraph Tier2 [API / Sync Orchestrator]
+    B[Sync API / Orchestrator]
+    B1[Job Queue]
+    B2[Worker Pool / Orchestrator]
+    B3[Notification Service<br/>(Push / Webhook)]
+  end
+
+  subgraph Tier3 [Data Layer & Connectors]
+    C[Connector Workers]
+    C1[Bank APIs & 3rd-party Providers<br/>(Plaid, TrueLayer, Basiq, Codat...)]
+    DB[(Primary Database / Audit Log)]
+  end
+
+  %% Primary flow
+  A -->|1. Trigger: manual or schedule| B
+  B -->|2. Create job / persist request| B1
+  B1 -->|3. Worker picks job| B2
+  B2 -->|4. Worker calls connectors| C
+  C -->|5. Fetch & normalize data| C1
+  C1 -->|6. Response / data| C
+  C -->|7. Write normalized data| DB
+  DB -->|8. Notify client update| B3
+  B3 -->|9. Push / Webhook / Poll response| A
+  A -->|10. Ack / resolve conflicts| B
+
+  %% Reliability & control loops
+  C -->|error / rate-limit| B2
+  B2 -->|retry/backoff / idempotency| B1
+  DB -->|idempotency keys / dedupe| B2
+
+  classDef tiers fill:#f8f9fb,stroke:#333,stroke-width:1px;
+  class Tier1,Tier2,Tier3 tiers;

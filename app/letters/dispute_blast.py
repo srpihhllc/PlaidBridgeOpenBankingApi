@@ -5,7 +5,7 @@ import hashlib
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, TypedDict, cast
 
 from app.extensions import db
@@ -16,7 +16,11 @@ from app.models.dispute_log import DisputeLog
 from app.models.schema_event import SchemaEvent
 from app.models.user import User
 from app.utils.email_utils import send_email_with_attachment
-from app.utils.redis_utils import increment_progress, init_progress, set_job_status
+from app.utils.redis_utils import (
+    increment_progress,
+    init_progress,
+    set_job_status,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +90,17 @@ async def _process_bureau_dispute(
     try:
         # render_letter expects a plain dict; make sure we pass a dict not a TypedDict
         letter_body = render_letter(
-            template_name, user=user_payload, bureau=dict(bureau), metadata=metadata
+            template_name,
+            user=user_payload,
+            bureau=dict(bureau),
+            metadata=metadata,
         )
         content_hash = hashlib.sha256(letter_body.encode("utf-8")).hexdigest()
 
         content_lines = letter_body.splitlines()
-        pdf_filename = narratable_filename(prefix=f"dispute_{user.id}_{bureau['name']}", ext="pdf")
+        pdf_filename = narratable_filename(
+            prefix=f"dispute_{user.id}_{bureau['name']}", ext="pdf"
+        )
         pdf_path = write_pdf(
             content_lines,
             filename=pdf_filename,
@@ -113,7 +122,9 @@ async def _process_bureau_dispute(
 
         await _retry_async(_send, context=f"send_email:{job_id}")
 
-        set_job_status(job_id, "sent", {"bureau": bureau["name"], "pdf": pdf_filename})
+        set_job_status(
+            job_id, "sent", {"bureau": bureau["name"], "pdf": pdf_filename}
+        )
         # Only increment progress when we have a concrete blast_id (not None)
         if blast_id:
             increment_progress(blast_id, "sent")
@@ -132,10 +143,16 @@ async def _process_bureau_dispute(
 
     except Exception as e:
         error_msg = str(e)
-        set_job_status(job_id, "failed", {"bureau": bureau["name"], "error": error_msg})
+        set_job_status(
+            job_id, "failed", {"bureau": bureau["name"], "error": error_msg}
+        )
         logger.exception(
             "Dispute job failed",
-            extra={"job_id": job_id, "bureau": bureau["name"], "user_id": user.id},
+            extra={
+                "job_id": job_id,
+                "bureau": bureau["name"],
+                "user_id": user.id,
+            },
         )
 
     db.session.add(
@@ -147,7 +164,7 @@ async def _process_bureau_dispute(
             email_status=email_status,
             sendgrid_id=None,
             content_hash=content_hash,
-            delivery_ts=datetime.utcnow(),
+            delivery_ts=datetime.now(timezone.utc),
             status=log_status,
         )
     )
@@ -208,13 +225,18 @@ async def send_dispute_blast_async(
             )
         )
 
-    results: list[DisputeJobResult] = await asyncio.gather(*tasks, return_exceptions=False)
+    results: list[DisputeJobResult] = await asyncio.gather(
+        *tasks, return_exceptions=False
+    )
 
     try:
         db.session.commit()
     except Exception:
         db.session.rollback()
-        logger.exception("Failed to commit dispute blast results", extra={"user_id": user.id})
+        logger.exception(
+            "Failed to commit dispute blast results",
+            extra={"user_id": user.id},
+        )
         raise
 
     return [

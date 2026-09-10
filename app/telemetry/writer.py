@@ -30,7 +30,9 @@ def safe_record_trace_event(session_factory, trace_event):
         except OperationalError as op_err:
             sess.rollback()
             sess.close()
-            logger.warning("Telemetry DB offline (OperationalError): %s", op_err)
+            logger.warning(
+                "Telemetry DB offline (OperationalError): %s", op_err
+            )
             time.sleep(RETRY_BACKOFF_SEC * attempt)
             continue
         except SQLAlchemyError as sa_err:
@@ -47,10 +49,15 @@ def safe_record_trace_event(session_factory, trace_event):
             "timestamp": getattr(trace_event, "timestamp", None),
             "detail": getattr(trace_event, "detail", None),
         }
-        r = current_app.extensions.get("redis_client") or getattr(current_app, "redis_client", None)
+        r = current_app.extensions.get("redis_client") or getattr(
+            current_app, "redis_client", None
+        )
         if r:
             r.rpush("telemetry_fallback_queue", json.dumps(payload))
-            logger.info("Queued telemetry event to redis fallback queue: %s", payload["id"])
+            logger.info(
+                "Queued telemetry event to redis fallback queue: %s",
+                payload["id"],
+            )
     except Exception as e:
         logger.error("Failed to enqueue telemetry fallback: %s", e)
     return False

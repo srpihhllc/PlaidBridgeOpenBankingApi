@@ -6,7 +6,7 @@
 #              behavior.
 # =============================================================================
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
@@ -39,7 +39,7 @@ def flag_anomaly(txn: VaultTransaction, acct: BankAccount) -> None:
             "txn_id": txn.id,
             "flags": flags,
             "amount": txn.amount,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         try:
             r.lpush(f"vault_anomalies:{acct.id}", json.dumps(anomaly))
@@ -57,9 +57,9 @@ def record_daily_flow(user_id: int, amount: float, direction: str) -> None:
         )
         return
 
-    key = f"flow_snapshot:{user_id}:{datetime.utcnow().date()}"
+    key = f"flow_snapshot:{user_id}:{datetime.now(timezone.utc).date()}"
     payload = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "amount": amount,
         "direction": direction,
     }
@@ -82,7 +82,9 @@ def process_vault_txn(txn: VaultTransaction) -> None:
     - Mark vault transaction as processed
     """
     # Ensure the ownership field matches BankAccount (user_id)
-    acct = BankAccount.query.filter_by(user_id=txn.borrower_id, account_type="vault").first()
+    acct = BankAccount.query.filter_by(
+        user_id=txn.borrower_id, account_type="vault"
+    ).first()
     if not acct:
         current_app.logger.warning(
             f"[process_vault_txn] Vault account not found for borrower_id={txn.borrower_id}"
@@ -98,7 +100,7 @@ def process_vault_txn(txn: VaultTransaction) -> None:
         amount=txn.amount,
         txn_type="deposit",
         method=txn.method,
-        timestamp=datetime.utcnow(),
+        timestamp=datetime.now(timezone.utc),
     )
     db.session.add(deposit)
 
@@ -114,7 +116,7 @@ def process_vault_txn(txn: VaultTransaction) -> None:
     r = get_redis_client()
     if r:
         trace = {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "txn_id": txn.id,
             "bank_txn_id": getattr(deposit, "id", None),
             "amount": txn.amount,
@@ -139,7 +141,7 @@ def process_vault_txn(txn: VaultTransaction) -> None:
 
     # Mark vault transaction as processed (idempotent changes)
     txn.reconciled = False
-    txn.processed_at = datetime.utcnow()
+    txn.processed_at = datetime.now(timezone.utc)
 
     # Commit changes with robust handling
     try:

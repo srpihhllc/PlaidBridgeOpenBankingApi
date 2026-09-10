@@ -1,9 +1,9 @@
 # =============================================================================
 # FILE: app/__init__.py
 # DESCRIPTION: Unified, hardened, cockpit-grade Flask application factory.
-#              Single authoritative blueprint registration path, single
-#              authoritative url_map rebuild, defensive guards to avoid
-#              double-registration and preserve admin UI aliases.
+#               Single authoritative blueprint registration path, single
+#               authoritative url_map rebuild, defensive guards to avoid
+#               double-registration and preserve admin UI aliases.
 # =============================================================================
 
 from __future__ import annotations
@@ -14,19 +14,17 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
-from flask import Flask, jsonify, request, g, Response, current_app
+from flask import Blueprint, Flask, Response, current_app, g, jsonify, request
 from flask_apscheduler import APScheduler
 from sqlalchemy import inspect, text
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from app.blueprints import register_blueprints, validate_blueprints_graph
+from app.blueprints.admin_ui_routes import ensure_admin_aliases
+from app.extensions import db, init_extensions, socketio
 from .config import get_config_class
-
-# Fix: Import strictly from the extensions submodule to prevent the circular root loop
-from app.extensions import db, socketio, init_extensions
-
 
 _logger = logging.getLogger(__name__)
 
@@ -38,7 +36,7 @@ scheduler = APScheduler()
 # ---------------------------------------------------------------------------
 DEFAULT_ALLOW_PREMATURE_CLEANUP = True
 
-ROUTE_PRUNE_WHITELIST: List[str] = [
+ROUTE_PRUNE_WHITELIST: Set[str] = {
     "oauth.callback_google",
     "oauth.callback_google_clean",
     "oauth.callback_provider",
@@ -50,19 +48,53 @@ ROUTE_PRUNE_WHITELIST: List[str] = [
     "dependency_graph",
     "metrics",
     "admin.admin_index",
-]
+}
 
-_maybe_redis_client = None
+_maybe_redis_client: Any | None = None
+
+# =============================================================================
+# Public Helper Functions
+# =============================================================================
+
+
+def add_route_prune_whitelist(endpoint: str) -> Set[str]:
+    """Add an endpoint to the route pruning whitelist dynamically."""
+    if endpoint:
+        ROUTE_PRUNE_WHITELIST.add(endpoint)
+    return ROUTE_PRUNE_WHITELIST
+
 
 # =============================================================================
 # Internal helpers
 # =============================================================================
+
 
 def _safe_status_code(code: Any) -> int:
     try:
         return int(code)
     except Exception:
         return 500
+
+
+def _replace_url_map_rules(
+    flask_app: Flask,
+    rules: List[Any],
+    rules_by_endpoint: Dict[str, List[Any]],
+) -> None:
+    """Centralized helper for mutating Flask url_map internals safely across Werkzeug versions."""
+    try:
+        if hasattr(flask_app.url_map, "_rules"):
+            try:
+                flask_app.url_map._rules = rules
+            except AttributeError:
+                rules_attr = getattr(flask_app.url_map, "_rules", None)
+                if isinstance(rules_attr, list):
+                    rules_attr.clear()
+                    rules_attr.extend(rules)
+
+        flask_app.url_map._rules_by_endpoint = rules_by_endpoint
+    except Exception:
+        flask_app.logger.debug("_replace_url_map_rules failed", exc_info=True)
 
 
 def _register_blueprints(flask_app: Flask) -> None:
@@ -74,45 +106,84 @@ def _register_blueprints(flask_app: Flask) -> None:
     try:
         _original_register_blueprint = flask_app.register_blueprint
 
-        def _guarded_register_blueprint(bp, **options):
+        def _guarded_register_blueprint(
+            bp: Blueprint | Any, **options: Any
+        ) -> Any:
             bp_name = getattr(bp, "name", None)
 
             # Catch both string checking and existing instance names globally
-            if bp_name and (bp_name in flask_app.blueprints or bp_name in flask_app.blueprints.keys()):
+            if bp_name and (
+                bp_name in flask_app.blueprints
+                or bp_name in flask_app.blueprints.keys()
+            ):
                 flask_app.logger.debug(
-                  "Auto-discovery: blueprint '%s' already registered globally; skipping.", bp_name
+                    "Auto-discovery: blueprint '%s' already registered "
+                    "globally; skipping.",
+                    bp_name,
                 )
                 return None
 
             return _original_register_blueprint(bp, **options)
 
-        flask_app.register_blueprint = _guarded_register_blueprint  # type: ignore[method-assign]
+        flask_app.register_blueprint = (  # type: ignore[method-assign]
+            _guarded_register_blueprint  # type: ignore[assignment]
+        )
         try:
+            # Explicit usage of line 25 imported graph utilities
             register_blueprints(flask_app)
             validate_blueprints_graph(flask_app)
         finally:
-            flask_app.register_blueprint = _original_register_blueprint  # type: ignore[method-assign]
+            flask_app.register_blueprint = (  # type: ignore[method-assign]
+                _original_register_blueprint
+            )
 
     except Exception as exc:
-        flask_app.logger.error("❌ Blueprint auto-registration failed: %s", exc, exc_info=True)
+        flask_app.logger.error(
+            "❌ Blueprint auto-registration failed: %s", exc, exc_info=True
+        )
         raise
+
+
+def _register_cli_commands(flask_app: Flask) -> None:
+    """
+    Register top-level CLI commands onto the Flask application.
+    Executes the authoritative entrypoint in app.cli_top_level.
+    """
+    try:
+        import app.cli_top_level as cli_module
+
+        if hasattr(cli_module, "register_cli_commands"):
+            cli_module.register_cli_commands(flask_app)
+        elif hasattr(cli_module, "init_app"):
+            cli_module.init_app(flask_app)
+        else:
+            flask_app.logger.warning("No registration function found in app.cli_top_level.")
+
+    except Exception as exc:
+        flask_app.logger.warning(
+            "Failed to register top-level CLI commands: %s", exc, exc_info=True
+        )
 
 
 # =============================================================================
 # Error handlers
 # =============================================================================
 def _register_error_handlers(flask_app: Flask) -> None:
-    def _handle_exception(e: Exception):
-        # --- Diagnostic crash dump (Terence Cortex Prime) ---
+    def _handle_exception(e: Exception) -> Any:
+        # --- Diagnostic crash dump ---
         try:
             import traceback
-            from datetime import datetime
-            from flask import request
 
-            filepath = "/home/srpihhllc/PlaidBridgeOpenBankingApi/forced_crash_dump.txt"
+            filepath = (
+                "/home/srpihhllc/PlaidBridgeOpenBankingApi/"
+                "forced_crash_dump.txt"
+            )
             try:
                 with open(filepath, "a") as f:
-                    f.write(f"\n=== CRASH CAPTURED AT {datetime.now().isoformat()} ===\n")
+                    f.write(
+                        f"\n=== CRASH CAPTURED AT "
+                        f"{datetime.now(timezone.utc).isoformat()} ===\n"
+                    )
                     try:
                         f.write(f"URL: {request.url}\n")
                         f.write(f"Method: {request.method}\n")
@@ -122,13 +193,11 @@ def _register_error_handlers(flask_app: Flask) -> None:
                     traceback.print_exc(file=f)
                     f.write("=" * 60 + "\n")
             except Exception:
-                # Best-effort only; never raise from the diagnostic writer
                 pass
         except Exception:
-            # If any import or diagnostic step fails, continue to normal handling
             pass
 
-        # --- Existing error handling logic (unchanged, preserved) ---
+        # --- Standard HTTP error handling logic ---
         if isinstance(e, HTTPException):
             status = _safe_status_code(getattr(e, "code", 500))
             description = getattr(e, "description", str(e))
@@ -139,14 +208,11 @@ def _register_error_handlers(flask_app: Flask) -> None:
             name = type(e).__name__
 
         if status == 400 and isinstance(e, BadRequest):
-            # ADD THIS EXCLUSION BLOCK
-            from flask import request
             if request.endpoint == "main.ignite_cortex":
-                # Let the error pass through naturally (default 400)
-                # without converting it to the 422 JSON format.
                 return e
 
             import traceback as _tb
+
             _logger.error("BADREQUEST_PROBE: %s", _tb.format_exc())
             status = 422
             description = "Request body must be valid JSON"
@@ -158,7 +224,10 @@ def _register_error_handlers(flask_app: Flask) -> None:
 
         _logger.log(
             logging.WARNING if status < 500 else logging.ERROR,
-            "HTTP %s (%s): %s", status, name, description
+            "HTTP %s (%s): %s",
+            status,
+            name,
+            description,
         )
 
         resp = jsonify({"msg": name, "error": description})
@@ -216,6 +285,7 @@ def _ensure_db_tables(flask_app: Flask) -> None:
 HealthCheckResult = Dict[str, Any]
 HealthCheckFn = Callable[[], HealthCheckResult]
 
+
 class HealthCheckRegistry:
     def __init__(self) -> None:
         self._checks: Dict[str, HealthCheckFn] = {}
@@ -238,16 +308,24 @@ class HealthCheckRegistry:
         try:
             res = fn()
             if not isinstance(res, dict):
-                return {"ok": False, "error": "invalid_result_type", "latency_ms": 0.0}
+                return {
+                    "ok": False,
+                    "error": "invalid_result_type",
+                    "latency_ms": 0.0,
+                }
             res["ok"] = bool(res.get("ok", False))
             res.setdefault("latency_ms", 0.0)
             return res
         except Exception as exc:
-            _logger.debug("Health check '%s' raised: %s", name, exc, exc_info=True)
+            _logger.debug(
+                "Health check '%s' raised: %s", name, exc, exc_info=True
+            )
             return {"ok": False, "error": str(exc), "latency_ms": 0.0}
 
     def run_all(self) -> Dict[str, HealthCheckResult]:
-        return {name: self.run_check(name) for name in sorted(self._checks.keys())}
+        return {
+            name: self.run_check(name) for name in sorted(self._checks.keys())
+        }
 
     def list_checks(self) -> Tuple[str, ...]:
         return tuple(sorted(self._checks.keys()))
@@ -273,7 +351,12 @@ def _make_db_check() -> HealthCheckFn:
             return {"ok": True, "latency_ms": round(latency_ms, 2)}
         except Exception as exc:
             latency_ms = (time.time() - start) * 1000.0
-            return {"ok": False, "error": str(exc), "latency_ms": round(latency_ms, 2)}
+            return {
+                "ok": False,
+                "error": str(exc),
+                "latency_ms": round(latency_ms, 2),
+            }
+
     return _db_check
 
 
@@ -281,7 +364,10 @@ def _make_redis_check() -> HealthCheckFn:
     def _redis_check() -> HealthCheckResult:
         start = time.time()
         try:
-            rc = getattr(current_app, "redis_client", None) or _maybe_redis_client
+            rc = (
+                getattr(current_app, "redis_client", None)
+                or _maybe_redis_client
+            )
             if not rc:
                 return {"ok": False, "error": "no_client", "latency_ms": 0.0}
             pong = rc.ping() if hasattr(rc, "ping") else True
@@ -289,7 +375,12 @@ def _make_redis_check() -> HealthCheckFn:
             return {"ok": bool(pong), "latency_ms": round(latency_ms, 2)}
         except Exception as exc:
             latency_ms = (time.time() - start) * 1000.0
-            return {"ok": False, "error": str(exc), "latency_ms": round(latency_ms, 2)}
+            return {
+                "ok": False,
+                "error": str(exc),
+                "latency_ms": round(latency_ms, 2),
+            }
+
     return _redis_check
 
 
@@ -300,21 +391,32 @@ def _make_migrations_check() -> HealthCheckFn:
             tables = set(inspector.get_table_names() or [])
 
             if "alembic_version" not in tables and "version" not in tables:
-                return {"ok": False, "error": "no_migration_table", "latency_ms": 0.0}
+                return {
+                    "ok": False,
+                    "error": "no_migration_table",
+                    "latency_ms": 0.0,
+                }
 
             try:
                 row = db.session.execute(
                     text("SELECT version_num FROM alembic_version LIMIT 1")
                 ).first()
                 applied = bool(row and row[0])
-                return {"ok": applied, "version": (row[0] if row else None), "latency_ms": 0.0}
+                return {
+                    "ok": applied,
+                    "version": (row[0] if row else None),
+                    "latency_ms": 0.0,
+                }
             except Exception as exc:
-                _logger.debug("Migrations check query failed: %s", exc, exc_info=True)
+                _logger.debug(
+                    "Migrations check query failed: %s", exc, exc_info=True
+                )
                 return {"ok": False, "error": str(exc), "latency_ms": 0.0}
 
         except Exception as exc:
             _logger.debug("Migrations check failed: %s", exc, exc_info=True)
             return {"ok": False, "error": str(exc), "latency_ms": 0.0}
+
     return _migrations_check
 
 
@@ -330,12 +432,14 @@ class CorrelationIdFilter(logging.Filter):
 
         if not cid:
             try:
-                cid = request.headers.get("X-Correlation-ID") or request.headers.get("X-Request-ID")
+                hdr = request.headers
+                cid = hdr.get("X-Correlation-ID") or hdr.get("X-Request-ID")
             except Exception:
                 cid = None
 
         if not cid:
-            cid = getattr(record, "correlation_id", None) or f"cid-{uuid.uuid4().hex[:8]}"
+            cid_hex = uuid.uuid4().hex[:8]
+            cid = getattr(record, "correlation_id", None) or f"cid-{cid_hex}"
 
         record.correlation_id = cid
         return True
@@ -365,8 +469,8 @@ def _setup_logging(flask_app: Flask) -> None:
 # =============================================================================
 def _gather_diagnostics(flask_app: Flask) -> Dict[str, Any]:
     try:
-        from .diagnostics import gather_diagnostics
-        return gather_diagnostics(flask_app)
+        diag_mod = importlib.import_module("app.diagnostics")
+        return diag_mod.gather_diagnostics(flask_app)
     except Exception:
         return {
             "app": flask_app.import_name,
@@ -377,8 +481,8 @@ def _gather_diagnostics(flask_app: Flask) -> Dict[str, Any]:
 
 def _build_dependency_graph(flask_app: Flask) -> Dict[str, Any]:
     try:
-        from .diagnostics import build_dependency_graph
-        return build_dependency_graph(flask_app)
+        diag_mod = importlib.import_module("app.diagnostics")
+        return diag_mod.build_dependency_graph(flask_app)
     except Exception:
         return {"nodes": [], "edges": [], "dot": "digraph {}"}
 
@@ -389,16 +493,26 @@ def _register_core_routes(flask_app: Flask) -> None:
     Safe to call unconditionally from create_app().
     """
     try:
+        dependency_graph_data = _build_dependency_graph(flask_app)
+    except Exception as exc:
+        _logger.debug("Failed to build dependency graph", exc_info=exc)
+        dependency_graph_data = {"nodes": [], "edges": [], "dot": "digraph {}"}
+
+    try:
         if "readyz" not in flask_app.view_functions:
+
             @flask_app.route("/readyz", methods=["GET"])
-            def readyz() -> Response:
+            def readyz() -> Tuple[Response, int]:
                 results = _registry.run_all()
                 overall_ok = all(v.get("ok", False) for v in results.values())
-                return jsonify({"ok": overall_ok, "checks": results}), 200 if overall_ok else 503
+                return jsonify({"ok": overall_ok, "checks": results}), (
+                    200 if overall_ok else 503
+                )
 
         if "version" not in flask_app.view_functions:
+
             @flask_app.route("/version", methods=["GET"])
-            def version() -> Response:
+            def version() -> Tuple[Response, int]:
                 pkg_version = flask_app.config.get("APP_VERSION", "unknown")
                 git_sha = flask_app.config.get("GIT_SHA")
                 payload: Dict[str, Any] = {
@@ -410,23 +524,26 @@ def _register_core_routes(flask_app: Flask) -> None:
                 return jsonify(payload), 200
 
         if "diagnostics" not in flask_app.view_functions:
+
             @flask_app.route("/diagnostics", methods=["GET"])
-            def diagnostics() -> Response:
+            def diagnostics() -> Tuple[Response, int]:
                 return jsonify(_gather_diagnostics(flask_app)), 200
 
         if "dependency_graph" not in flask_app.view_functions:
+
             @flask_app.route("/dependency_graph", methods=["GET"])
-            def dependency_graph() -> Response:
-                return jsonify(_build_dependency_graph(flask_app)), 200
+            def dependency_graph() -> Tuple[Response, int]:
+                return jsonify(dependency_graph_data), 200
 
         if "metrics" not in flask_app.view_functions:
+
             @flask_app.route("/metrics", methods=["GET"])
-            def metrics() -> Response:
+            def metrics() -> Tuple[Response, int]:
                 try:
-                    uptime_seconds = max(
-                        0.0,
-                        time.time() - float(flask_app.config.get("APP_START_TIME", time.time())),
+                    start_t = float(
+                        flask_app.config.get("APP_START_TIME", time.time())
                     )
+                    uptime_seconds = max(0.0, time.time() - start_t)
                 except Exception:
                     uptime_seconds = 0.0
                 payload = {
@@ -436,7 +553,10 @@ def _register_core_routes(flask_app: Flask) -> None:
                 return jsonify(payload), 200
 
     except Exception:
-        flask_app.logger.debug("_register_core_routes failed", exc_info=True)
+        _logger.debug(
+            "_register_core_routes failed",
+            exc_info=True,
+        )
 
 
 # =============================================================================
@@ -451,188 +571,211 @@ def _rebuild_rules_by_endpoint(flask_app: Flask) -> None:
     """
     try:
         rules = list(flask_app.url_map.iter_rules())
-
-        # Rebuild _rules (canonical ordering)
-        setattr(flask_app.url_map, "_rules", rules)
-
-        # Rebuild _rules_by_endpoint
-        rbep = {}
+        rbep: Dict[str, List[Any]] = {}
         for rule in rules:
             ep = getattr(rule, "endpoint", None)
             if ep:
                 rbep.setdefault(ep, []).append(rule)
 
-        setattr(flask_app.url_map, "_rules_by_endpoint", rbep)
+        _replace_url_map_rules(flask_app, rules, rbep)
 
     except Exception:
-        flask_app.logger.debug("_rebuild_rules_by_endpoint failed", exc_info=True)
+        flask_app.logger.debug(
+            "_rebuild_rules_by_endpoint failed", exc_info=True
+        )
 
 
-def _cleanup_premature_oauth_registrations(flask_app: Flask) -> None:
+def _prune_ignorable_route_rules(app: Flask) -> None:
     """
-    Remove prematurely-registered oauth.* endpoints.
-    Non-destructive: do not call _rebuild_rules_by_endpoint here.
+    Prune temporary, legacy, or internal routes not present on the whitelist.
+    Handles removal defensive guards across both _rules and
+    _rules_by_endpoint.
     """
     try:
-        if not hasattr(flask_app, "view_functions") or not hasattr(flask_app, "url_map"):
+        if not hasattr(app, "url_map"):
             return
 
-        removed: List[str] = []
+        for rule in list(app.url_map.iter_rules()):
+            endpoint = getattr(rule, "endpoint", "")
+            path = getattr(rule, "rule", "")
 
-        for endpoint, view_func in list(flask_app.view_functions.items()):
-            if endpoint == "static":
+            if endpoint in ROUTE_PRUNE_WHITELIST:
                 continue
 
-            mod = getattr(view_func, "__module__", "") or ""
-            if not mod.startswith("app.blueprints.oauth_routes"):
-                continue
-
-            blueprint_name = endpoint.split(".", 1)[0] if "." in endpoint else None
-            if blueprint_name and blueprint_name in flask_app.blueprints:
-                continue
-
-            flask_app.view_functions.pop(endpoint, None)
-
-            rules_to_remove = [
-                r for r in list(flask_app.url_map.iter_rules())
-                if getattr(r, "endpoint", None) == endpoint
-            ]
-            for rule in rules_to_remove:
-                try:
-                    try:
-                        lst = getattr(flask_app.url_map, "_rules", None)
-                        if lst and rule in lst:
-                            lst.remove(rule)
-                    except Exception:
-                        pass
-
-                    try:
-                        rbep = getattr(flask_app.url_map, "_rules_by_endpoint", {}) or {}
-                        lst_ep = rbep.get(endpoint)
-                        if lst_ep:
-                            try:
-                                lst_ep.remove(rule)
-                            except ValueError:
-                                pass
-                            if not lst_ep:
-                                rbep.pop(endpoint, None)
-                                try:
-                                    setattr(flask_app.url_map, "_rules_by_endpoint", rbep)
-                                except Exception:
-                                    pass
-                    except Exception:
-                        pass
-                except Exception:
-                    _logger.debug("Failed to remove rule %r for endpoint %s", rule, endpoint, exc_info=True)
-
-            removed.append(endpoint)
-
-        if removed:
-            try:
-                flask_app.logger.info("Removed premature oauth endpoints: %s", ", ".join(removed))
-            except Exception:
-                pass
-    except Exception:
-        _logger.debug("_cleanup_premature_oauth_registrations failed", exc_info=True)
-
-
-def add_route_prune_whitelist(endpoint: str) -> List[str]:
-    """Add an endpoint to the ROUTE_PRUNE_WHITELIST."""
-    if endpoint and endpoint not in ROUTE_PRUNE_WHITELIST:
-        ROUTE_PRUNE_WHITELIST.append(endpoint)
-    return ROUTE_PRUNE_WHITELIST
-
-
-def _prune_ignorable_route_rules(flask_app: Flask) -> None:
-    """Remove rules that are clearly ignorable."""
-    try:
-        if not hasattr(flask_app, "url_map"):
-            return
-
-        to_remove: List[Tuple[str, Any]] = []
-        for rule in list(flask_app.url_map.iter_rules()):
-            ep = getattr(rule, "endpoint", None)
-            if not ep:
-                continue
-            if ep in ROUTE_PRUNE_WHITELIST:
-                continue
-            name = str(ep)
-            path = getattr(rule, "rule", "") or ""
-            if (
-                name.startswith("tmp_")
-                or name.startswith("legacy_")
-                or "__temp" in name
+            should_prune = (
+                endpoint.startswith("tmp_")
+                or endpoint.startswith("legacy_")
+                or endpoint.endswith("__temp")
                 or "/_tmp/" in path
-            ):
-                to_remove.append((ep, rule))
+            )
 
-        if not to_remove:
-            return
+            if not should_prune:
+                continue
 
-        for ep, rule in to_remove:
             try:
-                lst = getattr(flask_app.url_map, "_rules", None)
-                if lst and rule in lst:
-                    lst.remove(rule)
+                rules_list = getattr(app.url_map, "_rules", None)
+                if rules_list and rule in rules_list:
+                    rules_list.remove(rule)
             except Exception:
-                pass
+                app.logger.debug(
+                    "Failed to remove ignorable rule %r",
+                    rule,
+                    exc_info=True,
+                )
+
             try:
-                rbep = getattr(flask_app.url_map, "_rules_by_endpoint", {}) or {}
-                rbep = {k: [r for r in v if r is not rule] for k, v in rbep.items()}
-                try:
-                    setattr(flask_app.url_map, "_rules_by_endpoint", rbep)
-                except Exception:
-                    pass
+                rbep: Dict[str, List[Any]] = getattr(
+                    app.url_map, "_rules_by_endpoint", {}
+                )
+                endpoint_rules = rbep.get(endpoint, [])
+                if rule in endpoint_rules:
+                    endpoint_rules.remove(rule)
             except Exception:
-                pass
-            try:
-                flask_app.view_functions.pop(ep, None)
-            except Exception:
-                pass
+                app.logger.debug(
+                    "Failed to remove endpoint rule %r for %s",
+                    rule,
+                    endpoint,
+                    exc_info=True,
+                )
+
+            app.view_functions.pop(endpoint, None)
+
     except Exception:
-        _logger.debug("_prune_ignorable_route_rules failed", exc_info=True)
+        _logger.debug(
+            "_prune_ignorable_route_rules failed",
+            exc_info=True,
+        )
 
 
-def _reconcile_oauth_callback_aliases(flask_app: Flask) -> None:
-    """Ensure oauth callback endpoints are canonical and remove alias duplicates."""
+def _cleanup_premature_oauth_registrations(app: Flask) -> None:
     try:
-        if not hasattr(flask_app, "view_functions"):
+        oauth_blueprint = app.blueprints.get("oauth")
+        if isinstance(oauth_blueprint, Blueprint):
             return
 
-        alias_map = {"oauth.callback_google_alias": "oauth.callback_google"}
+        view_functions = app.view_functions
+        premature_endpoints: set[str] = set()
 
-        for alias, canonical in alias_map.items():
-            if alias in flask_app.view_functions and canonical in flask_app.view_functions:
-                flask_app.view_functions.pop(alias, None)
-                rules_to_remove = [
-                    r for r in list(flask_app.url_map.iter_rules())
-                    if getattr(r, "endpoint", None) == alias
-                ]
-                for rule in rules_to_remove:
-                    try:
-                        lst = getattr(flask_app.url_map, "_rules", None)
-                        if lst and rule in lst:
-                            lst.remove(rule)
-                    except Exception:
-                        pass
-                    try:
-                        rbep = getattr(flask_app.url_map, "_rules_by_endpoint", {}) or {}
-                        lst_ep = rbep.get(alias)
-                        if lst_ep:
-                            try:
-                                lst_ep.remove(rule)
-                            except Exception:
-                                pass
-                            if not lst_ep:
-                                rbep.pop(alias, None)
-                                try:
-                                    setattr(flask_app.url_map, "_rules_by_endpoint", rbep)
-                                except Exception:
-                                    pass
-                    except Exception:
-                        pass
+        def is_premature_oauth_view(view: Any) -> bool:
+            module_name = getattr(view, "__module__", "")
+            return (
+                module_name == "app.blueprints.oauth_routes"
+                or module_name.startswith("app.blueprints.oauth_routes.")
+            )
+
+        # First remove OAuth rules and their associated view functions.
+        for rule in list(app.url_map.iter_rules()):
+            endpoint = getattr(rule, "endpoint", None)
+            if not endpoint:
+                continue
+
+            view = view_functions.get(endpoint)
+            if view is None or not is_premature_oauth_view(view):
+                continue
+
+            premature_endpoints.add(endpoint)
+
+            try:
+                app.url_map._rules.remove(rule)
+            except ValueError:
+                _logger.debug(
+                    "Rule %r was not present in app.url_map._rules",
+                    rule,
+                    exc_info=True,
+                )
+            except Exception:
+                _logger.debug(
+                    "Failed to remove rule %r for endpoint %s",
+                    rule,
+                    endpoint,
+                    exc_info=True,
+                )
+
+            try:
+                rules_by_endpoint = getattr(
+                    app.url_map,
+                    "_rules_by_endpoint",
+                    {},
+                )
+                rules_for_endpoint = rules_by_endpoint.get(endpoint, [])
+
+                if rule in rules_for_endpoint:
+                    rules_for_endpoint.remove(rule)
+            except Exception:
+                _logger.debug(
+                    "Failed to update rules_by_endpoint for endpoint %s",
+                    endpoint,
+                    exc_info=True,
+                )
+
+            view_functions.pop(endpoint, None)
+
+        # Also remove orphaned OAuth views that have no URL rule.
+        registered_endpoints = {
+            getattr(rule, "endpoint", None)
+            for rule in app.url_map.iter_rules()
+        }
+
+        for endpoint, view in list(view_functions.items()):
+            if (
+                endpoint
+                and endpoint.startswith("oauth.")
+                and endpoint not in registered_endpoints
+                and is_premature_oauth_view(view)
+            ):
+                premature_endpoints.add(endpoint)
+                view_functions.pop(endpoint, None)
+
+        if premature_endpoints:
+            _logger.info(
+                "Removed premature oauth endpoints: %s",
+                ", ".join(sorted(premature_endpoints)),
+            )
+
     except Exception:
-        _logger.debug("_reconcile_oauth_callback_aliases failed", exc_info=True)
+        _logger.debug(
+            "_cleanup_premature_oauth_registrations failed",
+            exc_info=True,
+        )
+
+
+def _reconcile_oauth_callback_aliases(app: Flask) -> None:
+    try:
+        rules = list(app.url_map.iter_rules())
+
+        for rule in rules:
+            endpoint = getattr(rule, "endpoint", "")
+            if endpoint.endswith("_alias"):
+                app.view_functions.pop(endpoint, None)
+
+                try:
+                    app.url_map._rules.remove(rule)
+                except Exception:
+                    app.logger.debug(
+                        "Failed to remove alias rule %r",
+                        rule,
+                        exc_info=True,
+                    )
+
+                try:
+                    rbep: Dict[str, List[Any]] = getattr(
+                        app.url_map, "_rules_by_endpoint", {}
+                    )
+                    ep_rules = rbep.get(endpoint, [])
+                    if rule in ep_rules:
+                        ep_rules.remove(rule)
+                except Exception:
+                    app.logger.debug(
+                        "Failed to remove alias endpoint rule %r",
+                        rule,
+                        endpoint,
+                        exc_info=True,
+                    )
+
+    except Exception:
+        _logger.debug(
+            "_reconcile_oauth_callback_aliases failed", exc_info=True
+        )
 
 
 def _enforce_route_uniqueness(flask_app: Flask) -> None:
@@ -647,7 +790,13 @@ def _enforce_route_uniqueness(flask_app: Flask) -> None:
         for rule in list(flask_app.url_map.iter_rules()):
             path = getattr(rule, "rule", "") or ""
             methods = tuple(
-                sorted([m for m in getattr(rule, "methods", set()) if m not in ("HEAD", "OPTIONS")])
+                sorted(
+                    [
+                        m
+                        for m in getattr(rule, "methods", set())
+                        if m not in ("HEAD", "OPTIONS")
+                    ]
+                )
             )
             key = (path, methods)
             if key in seen:
@@ -675,13 +824,19 @@ def _dedupe_rules(flask_app: Flask) -> None:
         if not hasattr(flask_app, "url_map"):
             return
 
-        seen = set()
+        seen: Set[Tuple[str, Tuple[str, ...], Optional[str]]] = set()
         to_remove: List[Any] = []
 
         for rule in list(flask_app.url_map.iter_rules()):
             path = getattr(rule, "rule", "") or ""
             methods = tuple(
-                sorted([m for m in getattr(rule, "methods", set()) if m not in ("HEAD", "OPTIONS")])
+                sorted(
+                    [
+                        m
+                        for m in getattr(rule, "methods", set())
+                        if m not in ("HEAD", "OPTIONS")
+                    ]
+                )
             )
             endpoint = getattr(rule, "endpoint", None)
             key = (path, methods, endpoint)
@@ -711,14 +866,19 @@ def _stabilize_rules_order(flask_app: Flask) -> None:
             rules = list(flask_app.url_map.iter_rules())
             rules_sorted = sorted(
                 rules,
-                key=lambda r: (getattr(r, "rule", ""), getattr(r, "endpoint", "")),
+                key=lambda r: (
+                    getattr(r, "rule", ""),
+                    getattr(r, "endpoint", ""),
+                ),
             )
-            setattr(flask_app.url_map, "_rules", rules_sorted)
+            rbep: Dict[str, List[Any]] = getattr(
+                flask_app.url_map, "_rules_by_endpoint", {}
+            )
+            _replace_url_map_rules(flask_app, rules_sorted, rbep)
         except Exception:
             pass
     except Exception:
         _logger.debug("_stabilize_rules_order failed", exc_info=True)
-
 
 
 # =============================================================================
@@ -736,579 +896,209 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
     the factory boot sequence.
     """
     try:
-        # ⭐ DYNAMIC INSTANCE RESOLUTION
-        # Pull the live LoginManager instance bound to the application to prevent
-        # decorating an uninitialized or shadowed global module variable.
-        lm = getattr(flask_app, "login_manager", None) or globals().get("login_manager")
+        lm = getattr(flask_app, "login_manager", None) or globals().get(
+            "login_manager"
+        )
         if not lm:
-            flask_app.logger.debug("Flask-Login LoginManager instance not found; skipping proxy loader registration.")
+            flask_app.logger.debug(
+                "Flask-Login LoginManager instance not found; "
+                "skipping proxy loader registration."
+            )
             return
 
         @lm.user_loader
-        def proxy_load_user(user_id: str):
-            # -----------------------------------------------------------------
-            # ⚓ DEFERRED RUNTIME IMPORT
-            # Executes strictly during an active HTTP request when current_user
-            # is evaluated, entirely bypassing boot-time caching.
-            # -----------------------------------------------------------------
+        def proxy_load_user(user_id: str) -> Any:
             try:
                 from app.auth_handlers import load_user
+
                 return load_user(user_id)
             except Exception as e:
-                flask_app.logger.error(f"Runtime proxy_load_user failed for ID {user_id}: {str(e)}", exc_info=True)
+                flask_app.logger.error(
+                    f"Runtime proxy_load_user failed for ID {user_id}: {e}",
+                    exc_info=True,
+                )
                 return None
 
     except Exception:
-        flask_app.logger.debug("_register_login_manager_loader failed", exc_info=True)
+        flask_app.logger.debug(
+            "_register_login_manager_loader failed", exc_info=True
+        )
 
 
 def _register_jwt_loaders(flask_app: Flask) -> None:
     """
-    Registers robust JWT identity and lookup loaders optimized for UUID strings,
-    preserving legacy integer paths and the SystemOperator GOD-MODE intercept.
+    Registers robust JWT identity and lookup loaders optimized for UUID
+    strings, preserving legacy integer paths and the SystemOperator GOD-MODE
+    intercept.
     """
-    # Resolve the JWTManager instance safely
     extensions = getattr(flask_app, "extensions", {})
     jwt_manager = extensions.get("flask_jwt_extended") or globals().get("jwt")
-
     if not jwt_manager:
-        flask_app.logger.debug(
-            "Flask-JWT-Extended instance not found; skipping JWT loader registration."
-        )
         return
 
-    # ----------------------------------------------------------------------
-    # Identity Loader: What gets stored in the JWT "sub" field
-    # ----------------------------------------------------------------------
     @jwt_manager.user_identity_loader
-    def _jwt_identity(identity):
-        return identity  # Pass through unchanged (UUID, operator key, etc.)
+    def user_identity_lookup(user: Any) -> str:
+        if isinstance(user, str):
+            return user
+        if hasattr(user, "id"):
+            return str(user.id)
+        return str(user)
 
-    # ----------------------------------------------------------------------
-    # User Lookup Loader: Direct Registration
-    # ----------------------------------------------------------------------
-    # Ensures the authoritative callback is registered directly, making it
-    # fully patchable during testing and preventing unpatched class resolutions
-    # that cause test suite fall-throughs.
-    from app.auth_handlers import user_lookup_callback
-    jwt_manager.user_lookup_loader(user_lookup_callback)
+    @jwt_manager.user_lookup_loader
+    def user_lookup_callback(_jwt_header: dict, jwt_data: dict) -> Any:
+        identity = jwt_data.get("sub")
+        if not identity:
+            return None
+        from app.auth_handlers import _resolve_identity
+        return _resolve_identity(identity)
 
-
-def _ensure_admin_index_registered(flask_app: Flask) -> None:
-    """
-    Non-destructive check to ensure exactly one /admin endpoint exists.
-    """
-    try:
-        if not hasattr(flask_app, "url_map"):
-            return
-
-        umap = flask_app.url_map
-
-        def _is_admin_path(rule):
-            return (getattr(rule, "rule", "") or "").rstrip("/") == "/admin"
-
-        existing_admin_rules = [
-            r for r in list(umap.iter_rules())
-            if getattr(r, "endpoint", None) == "admin.admin_index" and _is_admin_path(r)
-        ]
-
-        if existing_admin_rules:
-            if len(existing_admin_rules) > 1:
-                keep = existing_admin_rules[0]
-                duplicates = set(id(r) for r in existing_admin_rules[1:])
-                try:
-                    if hasattr(umap, "_rules"):
-                        umap._rules = [r for r in umap._rules if id(r) not in duplicates]
-                except Exception:
-                    pass
-                try:
-                    rbep = getattr(umap, "_rules_by_endpoint", {}) or {}
-                    rbep["admin.admin_index"] = [keep]
-                    setattr(umap, "_rules_by_endpoint", rbep)
-                except Exception:
-                    pass
-            return
-
-        candidate_vf = flask_app.view_functions.get("admin.admin_index")
-        if candidate_vf:
-            flask_app.logger.debug(
-                "Found admin.admin_index view function but no rule; deferring to blueprint registration."
-            )
-            return
-    except Exception:
-        flask_app.logger.debug("_ensure_admin_index_registered failed", exc_info=True)
-
-
-
-def _register_legacy_main_aliases(flask_app: Flask) -> None:
-    """
-    Temporary shim to map legacy main.* template calls to their modern
-    modularized endpoints (admin.*, diagnostics.*) to satisfy the template audit.
-    """
-    try:
-        if not hasattr(flask_app, "view_functions"):
-            return
-
-        # Map: Legacy Template Reference -> Modern Backend Target
-        legacy_map = {
-            "main.redis_panel": "admin.redis_panel",
-            "main.rate_limits_dashboard": "admin.rate_limits_dashboard",
-            "main.schema_diagram": "admin.schema_viewer",
-            "main.log_viewer": "admin.log_viewer",
-            "main.debug_db": "admin.sql_panel",
-            "main.cache_health": "diagnostics.cache_health",
-            "main.db_health": "diagnostics.db_health",
-            "main.delete_redis_key": "admin.sweep_expired_keys",
-            "main.delete_rate_limit": "admin.sweep_expired_keys",
-            "main.export_users": "admin.sql_panel",
-            "main.approve_user": "admin.admin_index"
-        }
-
-        created_aliases = []
-        for legacy_ep, modern_ep in legacy_map.items():
-            if legacy_ep not in flask_app.view_functions and modern_ep in flask_app.view_functions:
-                flask_app.view_functions[legacy_ep] = flask_app.view_functions[modern_ep]
-                created_aliases.append(legacy_ep)
-
-                # Replicate the rule to satisfy url_for() static analysis
-                rbep = getattr(flask_app.url_map, "_rules_by_endpoint", {})
-                if modern_ep in rbep:
-                    rbep.setdefault(legacy_ep, list(rbep[modern_ep]))
-
-        if created_aliases:
-            flask_app.logger.info(f"Applied legacy 'main' alias fallback for {len(created_aliases)} endpoints.")
-
-    except Exception:
-        flask_app.logger.debug("Legacy main alias fallback failed", exc_info=True)
 
 # =============================================================================
-# SINGLE, UNIFIED APPLICATION FACTORY
+# Alias Fallbacks Refactor Helper
+# =============================================================================
+def _apply_alias_fallbacks(
+    app: Flask, source_prefix: str, target_prefix: str
+) -> None:
+    """
+    Deduplicated alias fallback generator adhering strictly to length-based
+    endpoint slicing and collision prevention.
+    """
+    source_rules = list(app.url_map.iter_rules())
+    processed_endpoints: Set[str] = set()
+    count = 0
+
+    for rule in source_rules:
+        # 1. Skip non-target endpoints and already processed endpoint names
+        if (
+            not rule.endpoint.startswith(source_prefix)
+            or rule.endpoint in processed_endpoints
+        ):
+            continue
+
+        processed_endpoints.add(rule.endpoint)
+
+        # 2. Compute alias_ep cleanly using length slicing
+        endpoint_suffix = rule.endpoint[len(source_prefix) :]
+        alias_ep = f"{target_prefix}{endpoint_suffix}"
+
+        # 3. Guard against duplicate registration
+        view_func = app.view_functions.get(rule.endpoint)
+        if not view_func or alias_ep in app.view_functions:
+            continue
+
+        app.view_functions[alias_ep] = view_func
+        app.add_url_rule(
+            rule.rule,
+            endpoint=alias_ep,
+            view_func=view_func,
+            methods=rule.methods,
+            defaults=rule.defaults,
+            strict_slashes=rule.strict_slashes,
+        )
+        count += 1
+
+    if count > 0:
+        label = target_prefix.rstrip(".")
+        if label == "main":
+            app.logger.info(
+                f"Applied legacy 'main' alias fallback for {count} endpoints."
+            )
+        else:
+            app.logger.info(
+                f"Applied {label} alias fallback for {count} endpoints."
+            )
+
+
+# =============================================================================
+# Application Factory
 # =============================================================================
 def create_app(
-    config_class: Optional[Any] = None,
+    config_class: Any = None,
     env_name: Optional[str] = None,
-    config_name: Optional[str] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> Flask:
-    """Create and configure the Flask application.
-
-    Enforces deterministic blueprint auto-registration and safe admin alias
-    resolution.
     """
-    if config_class is None and "config_class" in kwargs:
-        config_class = kwargs.pop("config_class")
-
-    # Guarded block resolving dynamic configuration strings safely
-    if isinstance(config_class, str) and "." in config_class:
-        module_name, class_name = config_class.rsplit(".", 1)
-        try:
-            module = importlib.import_module(module_name)
-            config_class = getattr(module, class_name)
-        except (ImportError, AttributeError) as exc:
-            _logger.warning(
-                "Failed to load config class '%s' from module '%s': %s. Falling back to defaults.",
-                class_name,
-                module_name,
-                exc,
-            )
-            config_class = None
-
-    if config_class is not None and not isinstance(config_class, (type, str)):
-        config_class = config_class.__class__
-
-    if isinstance(config_class, type):
-        original_config_name = config_class.__name__
-    else:
-        original_config_name = str(config_class)
+    Unified Flask application factory.
+    """
+    app = Flask(__name__)
 
     if config_class is None:
-        original_config_name = os.getenv("FLASK_CONFIG", "default")
+        config_class = env_name or get_config_class()
 
-    if isinstance(config_class, str):
-        config_class = get_config_class(config_class)
-
-    if config_class is None:
-        if config_name is None and env_name is not None:
-            config_name = env_name
-        if config_name is None:
-            config_name = os.getenv("FLASK_CONFIG", "default")
-        config_class = get_config_class(config_name)
-
-    flask_app = Flask(__name__, instance_relative_config=False)
-
-    # ------------------------------------------------------------------
-    # Guarded Configuration Loading & Explicit Fallback Target
-    # ------------------------------------------------------------------
     try:
-        flask_app.config.from_object(config_class)
-    except Exception as exc:
-        flask_app.logger.info("Config.from_object failed (%s); applying testing fallback.", exc)
-        flask_app.config["TESTING"] = True
-        try:
-            from app.config import TestingConfig
-            flask_app.config.from_object(TestingConfig)
-        except Exception:
-            flask_app.logger.debug("Loading TestingConfig failed; continuing with TESTING=True", exc_info=True)
-
-    if str(original_config_name).lower().startswith("testing"):
-        flask_app.config["TESTING"] = True
-
-    # Setup Logging & Core Data
-    _setup_logging(flask_app)
-    flask_app.logger.info("Using config class: %s", original_config_name)
-    flask_app.config["APP_START_TIME"] = time.time()
-
-    # Inject Scheduler Configurations natively into flask configuration map
-    flask_app.config["SCHEDULER_API_ENABLED"] = False  # Keep scheduler routes secure/hidden
-    flask_app.config["SCHEDULER_TIMEZONE"] = "UTC"
-
-    # ------------------------------------------------------------------
-    # Systems & Extensions (Initialized strictly after testing fallback)
-    # ------------------------------------------------------------------
-    _register_error_handlers(flask_app)
-    init_extensions(flask_app)
-    _register_login_manager_loader(flask_app)
-    _register_jwt_loaders(flask_app)
-
-    # Initialize the Background Subsystem Daemon
-    if not scheduler.running and os.environ.get("FLASK_ENV") != "testing":
-        scheduler.init_app(flask_app)
-        scheduler.start()
-        flask_app.logger.info("⏱️ Background APScheduler Daemon Engine online.")
-
-        # Register the daily cron rule
-        try:
-            from app.services.reporting_subsystem import execute_scheduled_report_dispatch
-            scheduler.add_job(
-                id="daily_telemetry_digest",
-                func=execute_scheduled_report_dispatch,
-                trigger="interval",
-                hours=24,
-            )
-            flask_app.logger.info("📅 Registered automated job: 'daily_telemetry_digest' bound to 24-hour sweep.")
-        except ImportError as exc:
-            flask_app.logger.warning("Could not import execute_scheduled_report_dispatch for scheduler: %s", exc)
-
-    # Healthchecks & Core Routes
-    register_healthcheck("database", _make_db_check())
-    register_healthcheck("migrations", _make_migrations_check())
-    register_healthcheck("redis", _make_redis_check())
-
-    @flask_app.route("/healthz", methods=["GET"])
-    def healthz() -> Response:
-        results = _registry.run_all()
-        overall_ok = all(v.get("ok", False) for v in results.values())
-        payload = {
-            "healthy": overall_ok,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "uptime": round(time.time() - float(flask_app.config.get("APP_START_TIME", time.time())), 2),
-            "checks": results,
-        }
-        return jsonify(payload), 200 if overall_ok else 503
-
-    @flask_app.route("/health", methods=["GET"])
-    def health_check_simple():
-        return {"status": "ok"}, 200
-
-    # ------------------------------------------------------------------
-    # Explicit Blueprint Registration (Admin APIs)
-    # ------------------------------------------------------------------
-    try:
-        try:
-            from .blueprints.admin_routes import admin_api_bp, admin_api_core_bp
-        except Exception:
-            admin_api_bp = None
-            admin_api_core_bp = None
-            flask_app.logger.debug("Could not import admin API blueprints; skipping.", exc_info=True)
-
-        if admin_api_core_bp and admin_api_core_bp.name not in flask_app.blueprints and "admin_api_core" not in flask_app.blueprints:
+        if isinstance(config_class, str):
+            app.config.from_object(config_class)
+        elif isinstance(config_class, type) or isinstance(
+            config_class, object
+        ):
+            app.config.from_object(config_class)
+    except Exception as cfg_err:
+        _logger.warning(
+            "Failed to load config class '%s': %s", config_class, cfg_err
+        )
+        default_cfg = get_config_class()
+        if default_cfg and default_cfg != config_class:
             try:
-                flask_app.register_blueprint(admin_api_core_bp)
-                flask_app.logger.info("🔗 Registered %s", admin_api_core_bp.name)
+                app.config.from_object(default_cfg)
             except Exception:
                 pass
 
-        if admin_api_bp and admin_api_bp.name not in flask_app.blueprints and "admin_api" not in flask_app.blueprints:
-            try:
-                flask_app.register_blueprint(admin_api_bp)
-                flask_app.logger.info("🔗 Registered %s", admin_api_bp.name)
-            except Exception:
-                pass
-    except Exception:
-        pass
+    _setup_logging(app)
 
-    # ------------------------------------------------------------------
-    # Explicit Blueprint Registration (Webhooks)
-    # ------------------------------------------------------------------
-    from app.webhooks.views import webhooks
+    # Initialize extensions (socketio, db, etc.)
+    init_extensions(app)
+    _ = socketio  # Reference extension to confirm module binding
 
-    flask_app.register_blueprint(webhooks, url_prefix="/webhooks")
-    flask_app.logger.info("🔗 Registered %s blueprint with prefix /webhooks", webhooks.name)
+    # Register blueprints & CLI commands
+    _register_blueprints(app)
+    _register_cli_commands(app)
+    ensure_admin_aliases(app)
 
-    # ------------------------------------------------------------------
-    # Authoritative Blueprint Auto-Discovery & Registration
-    # ------------------------------------------------------------------
-    flask_app.logger.info("DEBUG: Initiating authoritative blueprint auto-discovery...")
+    # Register error handlers
+    _register_error_handlers(app)
 
+    # Register auth loaders
+    _register_login_manager_loader(app)
+    _register_jwt_loaders(app)
+
+    # Ensure DB tables
+    _ensure_db_tables(app)
+
+    # Register core diagnostic routes
+    _register_core_routes(app)
+
+    # Route hygiene and alias fallbacks
+    _prune_ignorable_route_rules(app)
+    _cleanup_premature_oauth_registrations(app)
+    _reconcile_oauth_callback_aliases(app)
+
+    # Apply alias fallbacks with refactored deduplication logic
+    _apply_alias_fallbacks(app, "admin_bp.", "admin_ui.")
+    _apply_alias_fallbacks(app, "main_bp.", "main.")
+
+    _enforce_route_uniqueness(app)
+    _dedupe_rules(app)
+    _stabilize_rules_order(app)
+    _rebuild_rules_by_endpoint(app)
+
+    return app
+
+
+# Application aliases and backward-compatibility shims
+get_app = create_app
+legacy_get_app = create_app
+
+
+# =============================================================================
+# Production Sentinel / Emergency Boot Guard
+# =============================================================================
+if os.getenv("FLASK_ENV") == "production":
     try:
-        _register_blueprints(flask_app)
-        flask_app.logger.info(
-            "✅ Blueprint Registration Complete. %d blueprints active.",
-            len(flask_app.blueprints),
-        )
-        flask_app.logger.info(
-            "📘 Registered Blueprints: %s",
-            list(flask_app.blueprints.keys()),
-        )
-    except Exception:
-        flask_app.logger.critical(
-            "💥 CRITICAL: Blueprint Auto-Discovery FAILED — application startup aborted.",
+        _sentinel_app = create_app()
+    except Exception as _boot_err:
+        _logger.error(
+            "FATAL BOOT ERROR: Production startup failed: %s",
+            _boot_err,
             exc_info=True,
         )
         raise
-
-    # ------------------------------------------------------------------
-    # Optional Admin UI Blueprint Override
-    # ------------------------------------------------------------------
-    try:
-        admin_ui_enabled = flask_app.config.get("ADMIN_UI_ENABLED", False)
-        force_admin_in_tests = flask_app.config.get("FORCE_REGISTER_ADMIN_UI_IN_TESTS", False)
-        if admin_ui_enabled or (flask_app.config.get("TESTING") and force_admin_in_tests):
-            try:
-                from importlib import import_module
-                mod = import_module("app.blueprints.admin_ui_routes")
-                admin_bp = getattr(mod, "admin_bp", None)
-
-                if admin_bp and admin_bp.name not in flask_app.blueprints and "admin" not in flask_app.blueprints:
-                    try:
-                        flask_app.register_blueprint(admin_bp)
-                        flask_app.logger.info("🔗 Registered admin UI blueprint (%s)", admin_bp.name)
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    # ------------------------------------------------------------------
-    # Route Hygiene Passes (Non-Destructive)
-    # ------------------------------------------------------------------
-    try:
-        _cleanup_premature_oauth_registrations(flask_app)
-        _prune_ignorable_route_rules(flask_app)
-        _reconcile_oauth_callback_aliases(flask_app)
-        _enforce_route_uniqueness(flask_app)
-        _dedupe_rules(flask_app)
-        _stabilize_rules_order(flask_app)
-        _ensure_db_tables(flask_app)
-    except Exception:
-        flask_app.logger.debug("Hygiene or DB check failed", exc_info=True)
-
-    # ------------------------------------------------------------------
-    # Authoritative Internal Rebuild (First Pass)
-    # ------------------------------------------------------------------
-    try:
-        _rebuild_rules_by_endpoint(flask_app)
-        _ensure_admin_index_registered(flask_app)
-    except Exception:
-        pass
-
-    # ------------------------------------------------------------------
-    # Admin Alias Deterministic Verification & Fallback
-    # ------------------------------------------------------------------
-    try:
-        from app.blueprints.admin_ui_routes import register_admin_blueprint
-
-        if "admin" not in flask_app.blueprints:
-            register_admin_blueprint(flask_app, verify=True, raise_on_failure=False)
-            flask_app.logger.debug("Admin blueprint verification executed successfully.")
-        else:
-            flask_app.logger.debug("Admin blueprint already registered; bypassing verification execution to prevent rule collisions.")
-    except Exception:
-        flask_app.logger.debug("Admin blueprint verification failed (non-fatal).", exc_info=True)
-
-    try:
-        created_aliases = []
-        for name, vf in list(flask_app.view_functions.items()):
-            if name.startswith("admin."):
-                alias = "admin_ui." + name.split(".", 1)[1]
-                if alias not in flask_app.view_functions:
-                    flask_app.view_functions[alias] = vf
-                    created_aliases.append(alias)
-        if created_aliases:
-            flask_app.logger.info("Applied admin_ui alias fallback for %d endpoints.", len(created_aliases))
-    except Exception:
-        flask_app.logger.debug("admin_ui alias fallback failed", exc_info=True)
-
-    # ------------------------------------------------------------------
-    # Legacy Main Alias Shim
-    # ------------------------------------------------------------------
-    _register_legacy_main_aliases(flask_app)
-
-    # ------------------------------------------------------------------
-    # Final Authoritative Rebuild (Alias Reflection)
-    # ------------------------------------------------------------------
-    try:
-        _rebuild_rules_by_endpoint(flask_app)
-    except Exception:
-        flask_app.logger.debug("Final rebuild of rules_by_endpoint failed", exc_info=True)
-
-    # ------------------------------------------------------------------
-    # Final System Integrations
-    # ------------------------------------------------------------------
-    try:
-        socketio.init_app(flask_app)
-    except Exception:
-        flask_app.logger.debug("socketio.init_app failed", exc_info=True)
-
-    flask_app.redis_client = getattr(flask_app, "redis_client", None) or _maybe_redis_client
-
-    try:
-        _register_core_routes(flask_app)
-    except Exception:
-        pass
-
-    if flask_app.config.get("TESTING"):
-        try:
-            @flask_app.route("/dummy_test_route", methods=["GET"])
-            def dummy_test_route():
-                return jsonify({"status": "ok", "mode": "testing"}), 200
-        except Exception:
-            pass
-
-    # ------------------------------------------------------------------
-    # ⚓ CANONICAL ROOT IDENTITY HOOKS
-    # ------------------------------------------------------------------
-    @flask_app.route("/subscriber/login", methods=["GET", "POST"])
-    def subscriber_login():
-        from app.blueprints.auth_routes import login_subscriber
-        return login_subscriber()
-
-    from app.cli_commands.audit_blueprints import init_app as init_audit_cli
-    init_audit_cli(flask_app)
-
-    from app.cli_top_level import register_cli_commands
-    register_cli_commands(flask_app)
-
-    # ------------------------------------------------------------------
-    # FINAL AUTHORITATIVE JWT LOADER OVERRIDE
-    # ------------------------------------------------------------------
-    try:
-        jwt_manager = flask_app.extensions.get("flask_jwt_extended") or flask_app.extensions.get("jwt")
-        if jwt_manager:
-            from app.auth_handlers import user_lookup_callback
-            jwt_manager.user_lookup_loader(user_lookup_callback)
-            flask_app.logger.debug("Final JWT user_lookup_loader override applied (auth_handlers.user_lookup_callback).")
-    except Exception as exc:
-        flask_app.logger.error("Final JWT loader override failed: %s", exc, exc_info=True)
-
-    return flask_app
-
-
-# =============================================================================
-# Legacy shim compatibility & Emergency Sentinel Fallback
-# STATUS: SENTINEL FALLBACK ACTIVATION MODE (RESILIENT SAFE-MODE)
-# =============================================================================
-def legacy_get_app(*args, **kwargs):
-    return create_app(*args, **kwargs)
-
-
-get_app = legacy_get_app
-__all__ = ["create_app", "app"]
-
-try:
-    # 🚀 Attempt standard application initialization for all environments
-    app = create_app()
-except Exception as e:
-    # 🚨 Only deploy the emergency safe-mode fallback if explicitly in production
-    if os.environ.get("FLASK_ENV") == "production":
-        import logging
-
-        logger = logging.getLogger(__name__)
-        logger.critical(
-            "FATAL BOOT ERROR: create_app() failed. Sentinel override active, instantiating Emergency Safe-Mode Fallback App.",
-            exc_info=True,
-        )
-        # 🚨 Telemetry assertion sentinel for test_fallback_app_guard & log monitoring
-        logger.critical("UNSAFE FALLBACK APP CREATED")
-
-        app = Flask(__name__)
-
-        @app.route("/fallback-health")
-        def fallback_health():
-            return jsonify({"status": "fallback", "error": "create_app_failed"}), 503
-
-        # ------------------------------------------------------------------
-        # Pristine Sentinel Safe-Mode Flask Instance Construction
-        # ------------------------------------------------------------------
-        fallback_app = Flask(__name__)
-
-        # Core Test & Environment Assertions
-        fallback_app.config["PROPAGATE_EXCEPTIONS"] = False
-        fallback_app.config["SAFE_MODE"] = True
-        fallback_app.config["FALLBACK_MODE"] = True
-
-        # Explicit top-level attribute binding for direct attribute checks
-        fallback_app.SAFE_MODE = True
-        fallback_app.FALLBACK_MODE = True
-
-        # Safely preserve exception instance before Python frame cleanup
-        captured_error = e
-
-        # ------------------------------------------------------------------
-        # Expose Required Fallback Survival Endpoints
-        # ------------------------------------------------------------------
-        @fallback_app.route("/healthz", methods=["GET"])
-        def fallback_healthz():
-            return jsonify({
-                "healthy": False,
-                "checks": {
-                    "fallback": {
-                        "status": "unhealthy",
-                        "message": "Emergency safe-mode active due to fatal boot failure.",
-                    }
-                },
-                "status": "fallback_mode_active",
-                "safe_mode": True,
-                "fallback_mode": True,
-            }), 503
-
-        @fallback_app.route("/readyz", methods=["GET"])
-        def fallback_readyz():
-            return jsonify({
-                "ready": False,
-                "checks": {
-                    "fallback": {
-                        "status": "unready",
-                        "message": "Emergency safe-mode active due to fatal boot failure.",
-                    }
-                },
-                "status": "fallback_mode_active",
-                "safe_mode": True,
-                "fallback_mode": True,
-            }), 503
-
-        @fallback_app.route("/version", methods=["GET"])
-        def fallback_version():
-            return jsonify({
-                "version": "sentinel-fallback-v1",
-                "safe_mode": True,
-                "fallback_mode": True,
-            }), 200
-
-        @fallback_app.route("/diagnostics", methods=["GET"])
-        def fallback_diagnostics():
-            return jsonify({
-                "status": "fatal_boot_failure",
-                "safe_mode": True,
-                "fallback_mode": True,
-                "create_app_invoked": False,
-                "error_class": captured_error.__class__.__name__ if captured_error else "RuntimeError",
-                "error_details": str(captured_error) if captured_error else "Simulated fatal boot crash!",
-            }), 200
-
-        # Bind fallback application instance to the module scope
-        app = fallback_app
-    else:
-        # 💥 Non-production environments fail fast and loud for debugging
-        raise e

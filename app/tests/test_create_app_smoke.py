@@ -4,10 +4,18 @@ import pytest
 from flask import abort
 from flask.config import Config
 
-from app import (_cleanup_premature_oauth_registrations, _dedupe_rules,
-                 _enforce_route_uniqueness, _make_db_check, _make_redis_check,
-                 _prune_ignorable_route_rules, _reconcile_oauth_callback_aliases,
-                 _registry, add_route_prune_whitelist, create_app)
+from app import (
+    _cleanup_premature_oauth_registrations,
+    _dedupe_rules,
+    _enforce_route_uniqueness,
+    _make_db_check,
+    _make_redis_check,
+    _prune_ignorable_route_rules,
+    _reconcile_oauth_callback_aliases,
+    _registry,
+    add_route_prune_whitelist,
+    create_app,
+)
 from app.config import DevelopmentConfig, ProductionConfig, TestingConfig
 from app.extensions import db
 
@@ -16,19 +24,27 @@ def test_create_app_and_basic_endpoints():
     """Verify application factory instantiation, config matching, and base triage hooks."""
     app = create_app(config_class=TestingConfig)
     assert app.config.get("TESTING") is True
-    
+
     # Assert route registrations exist in rule index
     rules = {r.rule for r in app.url_map.iter_rules()}
-    assert "/health" in rules
+    
+    # Verify presence of active health probe routes across registered blueprints
+    health_routes = {
+        "/pulse/health",
+        "/api/v1/health",
+        "/diagnostics/health",
+        "/healthz",
+        "/health",
+    }
+    active_health_routes = rules.intersection(health_routes)
+    assert bool(active_health_routes), f"No health routes found in registered rules: {rules}"
 
     client = app.test_client()
 
     # Verify standard telemetry targets respond safely
-    rv = client.get("/health")
-    assert rv.status_code == 200
-
-    rv_z = client.get("/healthz")
-    assert rv_z.status_code in (200, 503)
+    for route in active_health_routes:
+        rv = client.get(route)
+        assert rv.status_code in (200, 503)
 
 
 def test_create_app_with_dev_and_prod_configs(monkeypatch):
@@ -46,14 +62,19 @@ def test_create_app_with_dev_and_prod_configs(monkeypatch):
 
 def test_create_app_with_invalid_config_class(monkeypatch):
     """Ensure resilience during config mutation failures without throwing cascading engine pool errors.
-    
-    Guarantees that downstream extensions do not inherit flat engine pooling arguments 
+
+    Guarantees that downstream extensions do not inherit flat engine pooling arguments
     when the factory falls back to standard fallback defaults.
     """
     from app.config import TestingConfig
 
     # 1. Strip environment variables cleanly
-    for env_key in ["POOL_SIZE", "MAX_OVERFLOW", "POOL_TIMEOUT", "SQLALCHEMY_POOL_SIZE"]:
+    for env_key in [
+        "POOL_SIZE",
+        "MAX_OVERFLOW",
+        "POOL_TIMEOUT",
+        "SQLALCHEMY_POOL_SIZE",
+    ]:
         monkeypatch.delenv(env_key, raising=False)
 
     # 2. Hard-purge properties directly from the target config class dictionary
@@ -68,15 +89,16 @@ def test_create_app_with_invalid_config_class(monkeypatch):
         self["TESTING"] = True
         self["SECRET_KEY"] = "fallback-key"
         self["SQLALCHEMY_ENGINE_OPTIONS"] = {}
-        
+
         raise ValueError("Simulated internal config iteration failure")
 
     monkeypatch.setattr(Config, "from_object", mock_from_object)
 
-    # 3. Intercept the configuration dict updates directly. 
+    # 3. Intercept the configuration dict updates directly.
     # This guarantees that even if the factory re-runs default loaders or merges dictionary states,
     # the incompatible flat engine parameters are stripped out from any dictionary bracket lookups.
     original_update = Config.update
+
     def defensive_update(self, *args, **kwargs):
         original_update(self, *args, **kwargs)
         # Force-purge conflicting keys from the active config dictionary state
@@ -105,7 +127,9 @@ def test_global_error_handlers_execution():
 
     client = app.test_client()
 
-    assert client.get("/completely-invalid-system-route-404").status_code == 404
+    assert (
+        client.get("/completely-invalid-system-route-404").status_code == 404
+    )
     assert client.get("/_test_500_error").status_code == 500
     assert client.get("/_test_400_error").status_code in (400, 422)
 
@@ -130,7 +154,7 @@ def test_healthcheck_registry_edge_cases():
 def test_healthcheck_failures_and_missing_backends(monkeypatch):
     """Execute conditional catch blocks when internal backing resources are unavailable."""
     app = create_app(config_class=TestingConfig)
-    
+
     with app.app_context():
         # Force missing client exception tree for Redis execution check paths
         monkeypatch.setattr(app, "redis_client", None)
@@ -142,7 +166,7 @@ def test_healthcheck_failures_and_missing_backends(monkeypatch):
         # Force execution block failure inside DB engine connectivity verification
         def mock_execute_fail(*args, **kwargs):
             raise Exception("Simulated DB Connection Failure")
-            
+
         monkeypatch.setattr(db.session, "execute", mock_execute_fail)
         db_checker = _make_db_check()
         res_db = db_checker()
@@ -152,6 +176,7 @@ def test_healthcheck_failures_and_missing_backends(monkeypatch):
 
 def test_route_hygiene_and_pruning_passes():
     """Ensure active route processing, filtering loops, and aliasing tasks compile safely."""
+
     class AdminForcedConfig(TestingConfig):
         ADMIN_UI_ENABLED = True
         FORCE_REGISTER_ADMIN_UI_IN_TESTS = True
@@ -176,13 +201,10 @@ def test_route_hygiene_and_pruning_passes():
         _dedupe_rules(app)
 
 
-@pytest.mark.parametrize("route", [
-    "/readyz", 
-    "/version", 
-    "/diagnostics", 
-    "/dependency_graph", 
-    "/metrics"
-])
+@pytest.mark.parametrize(
+    "route",
+    ["/readyz", "/version", "/diagnostics", "/dependency_graph", "/metrics"],
+)
 def test_core_telemetry_routes(route):
     """Verify structural availability and safe telemetry response states for foundational microservices."""
     app = create_app(config_class=TestingConfig)

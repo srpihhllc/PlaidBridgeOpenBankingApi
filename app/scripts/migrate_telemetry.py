@@ -18,22 +18,30 @@ SRC_DIRS = [
 IMPORT_REWRITES = [
     # log_route_usage -> inc_metric
     (
-        re.compile(r"from\s+app\.utils\.telemetry\s+import\s+log_route_usage\b"),
+        re.compile(
+            r"from\s+app\.utils\.telemetry\s+import\s+log_route_usage\b"
+        ),
         "from app.utils.telemetry import inc_metric",
     ),
     # time_route_latency -> time_metric
     (
-        re.compile(r"from\s+app\.utils\.telemetry\s+import\s+time_route_latency\b"),
+        re.compile(
+            r"from\s+app\.utils\.telemetry\s+import\s+time_route_latency\b"
+        ),
         "from app.utils.telemetry import time_metric",
     ),
     # increment_counter -> inc_metric (if used)
     (
-        re.compile(r"from\s+app\.utils\.telemetry\s+import\s+increment_counter\b"),
+        re.compile(
+            r"from\s+app\.utils\.telemetry\s+import\s+increment_counter\b"
+        ),
         "from app.utils.telemetry import inc_metric",
     ),
     # increment_timing -> time_metric (decorator)
     (
-        re.compile(r"from\s+app\.utils\.telemetry\s+import\s+increment_timing\b"),
+        re.compile(
+            r"from\s+app\.utils\.telemetry\s+import\s+increment_timing\b"
+        ),
         "from app.utils.telemetry import time_metric",
     ),
     # log_identity_event import stays, but ensure present if needed
@@ -123,10 +131,14 @@ def process_file(path: Path) -> bool:
 
     # Calls/decorators
     for pattern, replacement in CALL_REWRITES:
-        text = pattern.sub(replacement if isinstance(replacement, str) else replacement, text)
+        text = pattern.sub(
+            replacement if isinstance(replacement, str) else replacement, text
+        )
 
     if DB_LOG_REWRITE:
-        text = DB_LOG_REWRITE.sub(..., text)  # customize if you need DB migration
+        text = DB_LOG_REWRITE.sub(
+            ..., text
+        )  # customize if you need DB migration
 
     if text != original:
         backup = path.with_suffix(path.suffix + ".bak")
@@ -148,7 +160,9 @@ def main():
                 if process_file(path):
                     changed.append(str(path.relative_to(ROOT)))
             except Exception as e:
-                print(f"[ERROR] Failed processing {path}: {e}", file=sys.stderr)
+                print(
+                    f"[ERROR] Failed processing {path}: {e}", file=sys.stderr
+                )
 
     print(f"Scanned {scanned} files.")
     if changed:
@@ -160,7 +174,9 @@ def main():
             "Next: run tests, then remove shims from app/utils/telemetry.py once imports are clean."
         )
     else:
-        print("No changes needed. Blueprint code already using new telemetry API.")
+        print(
+            "No changes needed. Blueprint code already using new telemetry API."
+        )
 
 
 if __name__ == "__main__":

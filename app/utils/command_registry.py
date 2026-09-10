@@ -17,6 +17,7 @@ except ImportError:
     def register_command(name, callable_obj):
         pass
 
+
 # Guarded discovery loop for core diagnostic tiles
 try:
     from tiles.boot_probe_blueprint_reg import probe_blueprint_reg

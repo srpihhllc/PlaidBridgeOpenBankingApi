@@ -133,7 +133,9 @@ def fmt_iso_utc(value: DateLike) -> str:
     return dt.isoformat().replace("+00:00", "Z") if dt else ""
 
 
-def fmt_datetime(value: DateLike, tz_name: str = "UTC", fmt: str = "%Y-%m-%d %H:%M:%S") -> str:
+def fmt_datetime(
+    value: DateLike, tz_name: str = "UTC", fmt: str = "%Y-%m-%d %H:%M:%S"
+) -> str:
     """
     Format a date-like value into the given timezone and strftime format.
     - tz_name: IANA timezone (e.g., 'America/Chicago'). If ZoneInfo unavailable, falls back to UTC.
@@ -155,14 +157,18 @@ def fmt_datetime(value: DateLike, tz_name: str = "UTC", fmt: str = "%Y-%m-%d %H:
         return ""
 
 
-def fmt_date(value: DateLike, tz_name: str = "UTC", fmt: str = "%Y-%m-%d") -> str:
+def fmt_date(
+    value: DateLike, tz_name: str = "UTC", fmt: str = "%Y-%m-%d"
+) -> str:
     """
     Format only the date portion in the given timezone.
     """
     return fmt_datetime(value, tz_name, fmt)
 
 
-def fmt_time(value: DateLike, tz_name: str = "UTC", fmt: str = "%H:%M:%S") -> str:
+def fmt_time(
+    value: DateLike, tz_name: str = "UTC", fmt: str = "%H:%M:%S"
+) -> str:
     """
     Format only the time portion in the given timezone.
     """

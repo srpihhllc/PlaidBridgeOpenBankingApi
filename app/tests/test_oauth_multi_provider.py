@@ -9,7 +9,10 @@ from flask import url_for
 from app.oauth.provider import ProviderName
 
 
-@pytest.mark.parametrize("provider", [ProviderName.GOOGLE, ProviderName.MICROSOFT, ProviderName.APPLE])
+@pytest.mark.parametrize(
+    "provider",
+    [ProviderName.GOOGLE, ProviderName.MICROSOFT, ProviderName.APPLE],
+)
 def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
     """
     End-to-end unit test for the unified /oauth/callback/<provider> route.
@@ -20,8 +23,15 @@ def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
     app.config["TESTING"] = True
 
     # Deterministic token response and profile per provider
-    token_response = {"access_token": f"fake-{provider.value}-access", "id_token": f"fake-{provider.value}-id"}
-    profile_response = {"email": f"test+{provider.value}@example.com", "sub": "123", "name": "Tester"}
+    token_response = {
+        "access_token": f"fake-{provider.value}-access",
+        "id_token": f"fake-{provider.value}-id",
+    }
+    profile_response = {
+        "email": f"test+{provider.value}@example.com",
+        "sub": "123",
+        "name": "Tester",
+    }
 
     # Monkeypatch the OAuthProvider methods used by the route
     from app.oauth import provider as provider_module
@@ -35,8 +45,12 @@ def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
         assert isinstance(token_data, dict)
         return profile_response
 
-    monkeypatch.setattr(provider_module.OAuthProvider, "exchange_code", mock_exchange)
-    monkeypatch.setattr(provider_module.OAuthProvider, "fetch_profile", mock_fetch_profile)
+    monkeypatch.setattr(
+        provider_module.OAuthProvider, "exchange_code", mock_exchange
+    )
+    monkeypatch.setattr(
+        provider_module.OAuthProvider, "fetch_profile", mock_fetch_profile
+    )
 
     # Seed the expected CSRF state in the session for this specific provider
     test_state = f"test-{provider.value}-state"
@@ -45,7 +59,12 @@ def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
 
     # Build the URL for the unified route including the state parameter
     resp = client.get(
-        url_for("oauth.callback_provider", provider=provider.value, code="abc123", state=test_state)
+        url_for(
+            "oauth.callback_provider",
+            provider=provider.value,
+            code="abc123",
+            state=test_state,
+        )
     )
 
     # Expect redirect to dashboard
@@ -54,7 +73,7 @@ def test_oauth_callback_multi_provider(monkeypatch, client, app, provider):
 
     # Verify user created and events inserted
     with app.app_context():
-        from app.models import User, TraceEvent
+        from app.models import TraceEvent, User
 
         u = User.query.filter_by(email=profile_response["email"]).first()
         assert u is not None

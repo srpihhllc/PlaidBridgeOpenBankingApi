@@ -10,8 +10,8 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
-from typing import Optional, Dict, Any
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 from app.extensions import db
 
@@ -32,7 +32,9 @@ class TraceEvent(db.Model):
     # External event UUID used for correlation
     event_id: str = db.Column(db.String(128), unique=True, nullable=False)
     event_type: str = db.Column(db.String(64), nullable=False)
-    timestamp: datetime = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp: datetime = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # Nullable FK — some events occur before login or without a user context
     # Matches User.id (String(36)); keep ondelete cascade for cleanup where supported
@@ -45,12 +47,16 @@ class TraceEvent(db.Model):
 
     email: Optional[str] = db.Column(db.String(120))
     ip: Optional[str] = db.Column(db.String(45))
-    meta: Optional[str] = db.Column(db.Text)  # JSON string for metadata inspection
+    meta: Optional[str] = db.Column(
+        db.Text
+    )  # JSON string for metadata inspection
     detail: Optional[str] = db.Column(db.Text)  # Human-readable summary
 
     # Define relationship to User using a string target to avoid import-time cycles.
     # This matches User.trace_events back_populates and allows mappers to configure.
-    user = db.relationship("User", back_populates="trace_events", foreign_keys=[user_id])  # type: ignore
+    user = db.relationship(
+        "User", back_populates="trace_events", foreign_keys=[user_id]
+    )  # type: ignore
 
     def __repr__(self) -> str:
         return f"<TraceEvent {self.event_type} event_id={self.event_id} user_id={self.user_id}>"

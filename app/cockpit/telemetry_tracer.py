@@ -1,6 +1,7 @@
 # app/cockpit/telemetry_tracer.py
 
 import datetime
+from datetime import timezone
 import traceback
 
 from flask import Blueprint, g, render_template
@@ -41,5 +42,5 @@ def telemetry_tracer():
     return render_template(
         "admin/template_tracer.html",
         results=results,
-        timestamp=datetime.datetime.utcnow(),
+        timestamp=datetime.datetime.now(timezone.utc),
     )

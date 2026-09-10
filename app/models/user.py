@@ -4,13 +4,13 @@
 #              MFA, audit fields, computed metrics, Todo, and Transaction integration.
 # =============================================================================
 
-import uuid
 import json
+import uuid
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
 from sqlalchemy.orm import DeclarativeBase
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..extensions import db
 
@@ -20,6 +20,7 @@ Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
 # ---------------------------------------------------------------------------
 # Utility Generators
 # ---------------------------------------------------------------------------
+
 
 def _generate_uuid_string() -> str:
     return str(uuid.uuid4())
@@ -37,6 +38,7 @@ def _get_naive_utc_now() -> datetime:
 # User Model
 # ---------------------------------------------------------------------------
 
+
 class User(UserMixin, Model):
     __tablename__ = "users"
     __table_args__ = {"extend_existing": True}
@@ -44,12 +46,21 @@ class User(UserMixin, Model):
     # -----------------------------------------------------------------------
     # Core Identity
     # -----------------------------------------------------------------------
-    id = db.Column(db.String(36), primary_key=True, default=_generate_uuid_string)
-    uuid = db.Column(db.String(36), unique=True, nullable=False, default=_generate_uuid_string)
+    id = db.Column(
+        db.String(36), primary_key=True, default=_generate_uuid_string
+    )
+    uuid = db.Column(
+        db.String(36),
+        unique=True,
+        nullable=False,
+        default=_generate_uuid_string,
+    )
 
     username = db.Column(db.String(64), index=True, unique=True)
     email = db.Column(db.String(120), index=True, unique=True, nullable=False)
-    password_hash = db.Column(db.String(256), nullable=False, default=_generate_secure_fallback_hash)
+    password_hash = db.Column(
+        db.String(256), nullable=False, default=_generate_secure_fallback_hash
+    )
 
     role = db.Column(db.String(64))
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
@@ -62,8 +73,12 @@ class User(UserMixin, Model):
     is_mfa_enabled = db.Column(db.Boolean, default=False, nullable=False)
     mfa_secret = db.Column(db.String(64))
     has_mfa = db.Column(db.Boolean, default=False, nullable=False)
-    mfa_enabled = db.Column(db.Boolean, default=False, nullable=False, index=True)
-    mfa_pending_setup = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    mfa_enabled = db.Column(
+        db.Boolean, default=False, nullable=False, index=True
+    )
+    mfa_pending_setup = db.Column(
+        db.Boolean, default=False, nullable=False, index=True
+    )
     totp_secret = db.Column(db.String(64), index=True)
 
     mfa_failures = db.Column(db.Integer, default=0, nullable=False)
@@ -74,14 +89,14 @@ class User(UserMixin, Model):
     created_at = db.Column(
         db.DateTime,
         default=_get_naive_utc_now,
-        server_default=db.text('CURRENT_TIMESTAMP'),
+        server_default=db.text("CURRENT_TIMESTAMP"),
         nullable=False,
         index=True,
     )
     updated_at = db.Column(
         db.DateTime,
         default=_get_naive_utc_now,
-        server_default=db.text('CURRENT_TIMESTAMP'),
+        server_default=db.text("CURRENT_TIMESTAMP"),
         onupdate=_get_naive_utc_now,
         nullable=False,
         index=True,
@@ -130,10 +145,30 @@ class User(UserMixin, Model):
         passive_deletes=True,
     )
 
-    bank_accounts = db.relationship("BankAccount", back_populates="user", lazy="dynamic", passive_deletes=True)
-    bank_statements = db.relationship("BankStatement", back_populates="user", lazy="dynamic", passive_deletes=True)
-    bank_institutions = db.relationship("BankInstitution", back_populates="user", lazy="dynamic", passive_deletes=True)
-    tradelines = db.relationship("Tradeline", back_populates="user", lazy="dynamic", passive_deletes=True)
+    bank_accounts = db.relationship(
+        "BankAccount",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    bank_statements = db.relationship(
+        "BankStatement",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    bank_institutions = db.relationship(
+        "BankInstitution",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    tradelines = db.relationship(
+        "Tradeline",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
 
     vault_transactions = db.relationship(
         "VaultTransaction",
@@ -143,9 +178,21 @@ class User(UserMixin, Model):
         passive_deletes=True,
     )
 
-    borrower_cards = db.relationship("BorrowerCard", back_populates="user", lazy="dynamic", passive_deletes=True)
-    lender_profiles = db.relationship("Lender", back_populates="user", lazy="dynamic", passive_deletes=True)
-    underwriter_profiles = db.relationship("UnderwriterAgent", back_populates="user", lazy="dynamic", passive_deletes=True)
+    borrower_cards = db.relationship(
+        "BorrowerCard",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
+    lender_profiles = db.relationship(
+        "Lender", back_populates="user", lazy="dynamic", passive_deletes=True
+    )
+    underwriter_profiles = db.relationship(
+        "UnderwriterAgent",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
+    )
 
     # -----------------------------------------------------------------------
     # Core Financial Transactions
@@ -210,7 +257,11 @@ class User(UserMixin, Model):
         Gracefully defaults to 0.0 if an anomaly occurs during summation.
         """
         try:
-            return sum(account.balance for account in self.bank_accounts if account.balance is not None)
+            return sum(
+                account.balance
+                for account in self.bank_accounts
+                if account.balance is not None
+            )
         except Exception:
             return 0.0
 
@@ -239,8 +290,8 @@ class User(UserMixin, Model):
         Emits two TraceEvents: OAUTH_LOGIN_SUCCESS and SESSION_ESTABLISHED.
         """
         from app.extensions import db
-        from app.oauth.provider import OAuthProvider
         from app.models.trace_events import TraceEvent
+        from app.oauth.provider import OAuthProvider
 
         oauth_client = OAuthProvider(provider)
         profile = oauth_client.fetch_profile(token_response)

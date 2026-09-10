@@ -1,7 +1,9 @@
 # app/models/borrower_card.py
 
-from datetime import datetime
+from datetime import datetime, timezone
+
 from sqlalchemy.orm import synonym
+
 from ..extensions import db
 
 
@@ -24,7 +26,9 @@ class BorrowerCard(db.Model):
     cvv = db.Column(db.String(3), nullable=False)
     score = db.Column(db.Integer, nullable=False)
     color = db.Column(db.String(10), nullable=False)
-    issued_at = db.Column(db.DateTime, default=datetime.utcnow)
+    issued_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     last_used_at = db.Column(db.DateTime)
     revoked = db.Column(db.Boolean, default=False)
 

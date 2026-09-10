@@ -1,11 +1,13 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils/flow_snapshot.py
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
 
 def record_daily_flow(user_id, amount, direction):
@@ -20,9 +22,9 @@ def record_daily_flow(user_id, amount, direction):
         )
         return
 
-    key = f"flow_snapshot:{user_id}:{datetime.utcnow().date()}"
+    key = f"flow_snapshot:{user_id}:{datetime.now(timezone.utc).date()}"
     payload = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "amount": amount,
         "direction": direction,  # "inbound" or "outbound"
     }

@@ -6,6 +6,7 @@
 # =============================================================================
 
 import time
+
 import pyotp
 import pytest
 
@@ -32,7 +33,9 @@ def test_mfa_flow(app):
         try:
             # --- One-time consumption (DB-backed MFACode) ---
             code = generate_mfa_code(user, ttl_seconds=2, persist=True)
-            assert verify_mfa_code(user, code) is True, "First verification should succeed"
+            assert (
+                verify_mfa_code(user, code) is True
+            ), "First verification should succeed"
             assert (
                 verify_mfa_code(user, code) is False
             ), "Second verification should fail (one-time use)"
@@ -40,18 +43,22 @@ def test_mfa_flow(app):
             # --- TTL expiry ---
             code2 = generate_mfa_code(user, ttl_seconds=1, persist=True)
             time.sleep(2)  # wait beyond TTL
-            assert verify_mfa_code(user, code2) is False, "Expired code should fail"
+            assert (
+                verify_mfa_code(user, code2) is False
+            ), "Expired code should fail"
 
             # --- Fail-count tracking & lockout ---
             bad_code = "000000"
             max_failures = 3
             for i in range(max_failures):
                 assert (
-                    verify_mfa_code(user, bad_code, max_failures=max_failures) is False
+                    verify_mfa_code(user, bad_code, max_failures=max_failures)
+                    is False
                 ), f"Attempt {i+1} should fail"
-            
+
             assert (
-                verify_mfa_code(user, bad_code, max_failures=max_failures) is False
+                verify_mfa_code(user, bad_code, max_failures=max_failures)
+                is False
             ), "User should remain locked out after max failures"
 
             # --- Audit trail (DB) ---
@@ -93,7 +100,9 @@ def test_totp_flow(app):
 
             # --- Time drift tolerance (window typically ±30s) ---
             past_code = pyotp.TOTP(user.totp_secret).at(int(time.time()) - 30)
-            future_code = pyotp.TOTP(user.totp_secret).at(int(time.time()) + 30)
+            future_code = pyotp.TOTP(user.totp_secret).at(
+                int(time.time()) + 30
+            )
             assert (
                 verify_totp_code(user.totp_secret, past_code) is True
             ), "Past code within window should succeed"

@@ -3,7 +3,8 @@
 # DESCRIPTION: Plaid item model aligned with ALL test suite expectations.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
+
 from ..extensions import db
 
 
@@ -25,7 +26,9 @@ class PlaidItem(db.Model):
     # Canonical column name expected by Plaid OAuth tests
     plaid_access_token = db.Column(db.String(256), nullable=False)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
 
     user = db.relationship("User", back_populates="plaid_items")
 

@@ -4,7 +4,7 @@
 #              cascade delete semantics, and explicit two-way relationships.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -37,11 +37,13 @@ class PaymentLog(db.Model):
         nullable=False,
     )  # e.g., 'ach', 'card', 'crypto'
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
     # -------------------------------------------------------------------------
@@ -53,7 +55,9 @@ class PaymentLog(db.Model):
     # avoiding compile-time KeyError/InvalidRequestError checks.
     user = db.relationship(
         "User",
-        backref=db.backref("payment_logs", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "payment_logs", lazy="dynamic", passive_deletes=True
+        ),
     )
 
     def __repr__(self):

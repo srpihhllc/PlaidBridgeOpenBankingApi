@@ -2,9 +2,10 @@
 
 import json
 from pathlib import Path
+
 import pytest
-from jsonschema import validate, ValidationError
-from openapi_spec_validator import validate_spec
+from jsonschema import ValidationError, validate as validate_jsonschema
+from openapi_spec_validator import validate as validate_openapi_spec
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 SWAGGER_FILE = FIXTURES_DIR / "swagger.json"
@@ -20,7 +21,9 @@ def swagger_spec(app):
             if response.status_code == 200:
                 SWAGGER_FILE.write_bytes(response.data)
             else:
-                pytest.fail(f"Could not generate swagger spec via /apispec_1.json (Status {response.status_code})")
+                pytest.fail(
+                    f"Could not generate swagger spec via /apispec_1.json (Status {response.status_code})"
+                )
 
     with open(SWAGGER_FILE, "r") as f:
         return json.load(f)
@@ -29,10 +32,12 @@ def swagger_spec(app):
 def test_swagger_schema_integrity(swagger_spec):
     """Ensures the swagger.json file itself strictly complies with Swagger 2.0 rules."""
     # Will raise an exception if swagger.json structure is invalid
-    validate_spec(swagger_spec)
+    validate_openapi_spec(swagger_spec)
 
 
-def validate_response_contract(swagger_spec, path: str, method: str, status_code: int, response_data: dict):
+def validate_response_contract(
+    swagger_spec, path: str, method: str, status_code: int, response_data: dict
+):
     """Helper to extract a schema from the spec and validate response data against it."""
     endpoint_spec = swagger_spec["paths"][path][method.lower()]
     response_spec = endpoint_spec["responses"][str(status_code)]
@@ -43,12 +48,15 @@ def validate_response_contract(swagger_spec, path: str, method: str, status_code
 
     schema = response_spec["schema"]
     try:
-        validate(instance=response_data, schema=schema)
+        validate_jsonschema(instance=response_data, schema=schema)
     except ValidationError as e:
-        pytest.fail(f"Contract violation on {method.upper()} {path} ({status_code}): {e.message}")
+        pytest.fail(
+            f"Contract violation on {method.upper()} {path} ({status_code}): {e.message}"
+        )
 
 
 # --- Endpoint Contract Tests ---
+
 
 def test_api_ping_contract(client, swagger_spec):
     """Validate /api/ping response against the schema contract."""
@@ -60,7 +68,7 @@ def test_api_ping_contract(client, swagger_spec):
         path="/api/ping",
         method="get",
         status_code=200,
-        response_data=response.get_json()
+        response_data=response.get_json(),
     )
 
 
@@ -70,7 +78,7 @@ def test_tradeline_review_contract(client, auth_headers, swagger_spec):
     response = client.post(
         "/api/tradelines/review/1",
         json={"action": "invalid_action"},
-        headers=auth_headers
+        headers=auth_headers,
     )
     assert response.status_code == 400
 
@@ -79,5 +87,5 @@ def test_tradeline_review_contract(client, auth_headers, swagger_spec):
         path="/api/tradelines/review/{tradeline_id}",
         method="post",
         status_code=400,
-        response_data=response.get_json()
+        response_data=response.get_json(),
     )

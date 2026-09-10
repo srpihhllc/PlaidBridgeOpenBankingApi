@@ -19,7 +19,9 @@ def fix_models():
                     content = f.read()
 
                 # Replace "users.id") with "users.id", ondelete='CASCADE')
-                new_content = FK_PATTERN.sub(r"db.ForeignKey(\1, ondelete='CASCADE'", content)
+                new_content = FK_PATTERN.sub(
+                    r"db.ForeignKey(\1, ondelete='CASCADE'", content
+                )
 
                 if new_content != content:
                     with open(path, "w") as f:

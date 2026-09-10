@@ -1,43 +1,30 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_factory_maximizer_extreme.py
 
-import os
-import sys
 import logging
-import pytest
-import uuid
-import importlib
+import os
 from unittest.mock import MagicMock, patch
-from flask import Flask, g, jsonify, request
-from werkzeug.exceptions import BadRequest, HTTPException
+
+from flask import Flask
 
 from app import (
-    create_app,
-    _safe_status_code,
-    _register_blueprints,
-    HealthCheckRegistry,
     CorrelationIdFilter,
-    register_healthcheck,
-    unregister_healthcheck,
-    _make_db_check,
-    _make_redis_check,
-    _make_migrations_check,
-    _setup_logging,
-    _gather_diagnostics,
-    _build_dependency_graph,
-    _register_core_routes,
-    _rebuild_rules_by_endpoint,
-    _cleanup_premature_oauth_registrations,
-    add_route_prune_whitelist,
-    _prune_ignorable_route_rules,
-    _reconcile_oauth_callback_aliases,
-    _enforce_route_uniqueness,
+    HealthCheckRegistry,
     _dedupe_rules,
-    _stabilize_rules_order
+    _enforce_route_uniqueness,
+    _prune_ignorable_route_rules,
+    _rebuild_rules_by_endpoint,
+    _reconcile_oauth_callback_aliases,
+    _register_blueprints,
+    _safe_status_code,
+    _stabilize_rules_order,
+    add_route_prune_whitelist,
+    create_app,
 )
 
 # =============================================================================
 # 1. TEST CONFIG, FALLBACK STATUS CODES & BLUEPRINT EXCEPTIONS
 # =============================================================================
+
 
 def test_extreme_safe_status_code_fallback():
     """Forces _safe_status_code to run into the except block."""
@@ -52,16 +39,20 @@ def test_blueprint_auto_registration_failure_path():
     mock_app.blueprints = {}
     mock_app.logger = MagicMock()
 
-    with patch("app.blueprints.register_blueprints", side_effect=RuntimeError("Simulated registration crash")):
+    with patch(
+        "app.blueprints.register_blueprints",
+        side_effect=RuntimeError("Simulated registration crash"),
+    ):
         # Removed pytest.raises because app/__init__.py catches the error internally
         _register_blueprints(mock_app)
-        
+
     assert mock_app.logger.error.called or True
 
 
 # =============================================================================
 # 2. ERROR HANDLERS & SENTINEL DIAGNOSTIC CRASH CODES
 # =============================================================================
+
 
 def test_error_handlers_production_masking():
     """
@@ -74,6 +65,7 @@ def test_error_handlers_production_masking():
     mock_app.config["PROPAGATE_EXCEPTIONS"] = False
 
     from app import _register_error_handlers
+
     _register_error_handlers(mock_app)
 
     # Trigger the handler through Flask's native exception pipeline
@@ -89,12 +81,15 @@ def test_error_handlers_production_masking():
 
 def test_factory_extreme_environment_overrides():
     """Forces extreme environment overrides to hit fallback branches."""
-    with patch.dict(os.environ, {
-        "FLASK_ENV": "production",
-        "SECRET_KEY": "prod_secret_key",
-        "APP_START_TIME": "0",
-        "GIT_SHA": "deadbeef"
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "FLASK_ENV": "production",
+            "SECRET_KEY": "prod_secret_key",
+            "APP_START_TIME": "0",
+            "GIT_SHA": "deadbeef",
+        },
+    ):
         try:
             app = create_app()
             assert app.config["ENV"] == "production"
@@ -105,6 +100,7 @@ def test_factory_extreme_environment_overrides():
 # =============================================================================
 # 3. GRAPH ENGINE & ADJACENT HEALTHCHECK / METRICS ZONE REACHABILITY
 # =============================================================================
+
 
 def test_factory_extreme_blueprint_graph_paths():
     """Ensures dependency graph and diagnostics routes execute under extreme conditions."""
@@ -133,9 +129,10 @@ def test_ensure_db_tables_inspection_failure():
     """Triggers the inspector exception block inside _ensure_db_tables."""
     mock_app = Flask("test_db_inspect_fail")
     mock_app.config["TESTING"] = False
-    
+
     with patch("app.inspect", side_effect=Exception("DB connection broken")):
         from app import _ensure_db_tables
+
         _ensure_db_tables(mock_app)
 
 
@@ -143,11 +140,14 @@ def test_ensure_db_tables_alembic_running():
     """Triggers the ALEMBIC_RUNNING dynamic shortcut branch."""
     mock_app = Flask("test_alembic_branch")
     mock_app.config["TESTING"] = False
-    
+
     with patch.dict(os.environ, {"ALEMBIC_RUNNING": "1"}):
         with patch("app.inspect") as mock_inspect:
-            mock_inspect.return_value.get_table_names.return_value = ["some_table"]
+            mock_inspect.return_value.get_table_names.return_value = [
+                "some_table"
+            ]
             from app import _ensure_db_tables
+
             _ensure_db_tables(mock_app)
 
 
@@ -155,7 +155,7 @@ def test_healthcheck_registry_runtime_anomalies():
     """Triggers incorrect type returns and raw check exceptions inside registry."""
     registry = HealthCheckRegistry()
     assert registry.run_check("missing_check")["error"] == "not_registered"
-    
+
     registry.register("wrong_type", lambda: ["not", "a", "dict"])
     assert registry.run_check("wrong_type")["error"] == "invalid_result_type"
 
@@ -163,7 +163,9 @@ def test_healthcheck_registry_runtime_anomalies():
 def test_correlation_id_filter_without_contexts():
     """Executes the log filter entirely outside of Flask application or request context."""
     filt = CorrelationIdFilter()
-    record = logging.LogRecord("test", logging.INFO, "src.py", 10, "Log line", (), None)
+    record = logging.LogRecord(
+        "test", logging.INFO, "src.py", 10, "Log line", (), None
+    )
     assert filt.filter(record) is True
     assert hasattr(record, "correlation_id")
 
@@ -171,9 +173,10 @@ def test_correlation_id_filter_without_contexts():
 def test_route_hygiene_and_pruning_manipulation():
     """Forces duplication, temporary naming schemas, and alias cleanups down url_map."""
     mock_app = Flask("test_hygiene")
-    
+
     @mock_app.route("/fine")
-    def fine(): return "fine"
+    def fine():
+        return "fine"
 
     add_route_prune_whitelist("fine")
     _prune_ignorable_route_rules(mock_app)

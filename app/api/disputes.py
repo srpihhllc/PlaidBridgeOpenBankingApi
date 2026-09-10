@@ -13,7 +13,9 @@ from app.utils.cockpit_tracker import (  # type: ignore[import-untyped]
     mark_job_sent,
     start_batch,
 )
-from app.utils.redis_utils import get_redis_client as get_redis  # ✅ updated import
+from app.utils.redis_utils import (
+    get_redis_client as get_redis,
+)  # ✅ updated import
 
 router = APIRouter()
 
@@ -44,7 +46,10 @@ def start_dispute_batch(req: StartBatchRequest):
 @router.post("/submit")
 def submit_dispute(req: SubmitDisputeRequest):
     origin = "dispute_form"
-    mark_job_queued(req.job_id, {"account": req.accountNumber, "transaction": req.transactionId})
+    mark_job_queued(
+        req.job_id,
+        {"account": req.accountNumber, "transaction": req.transactionId},
+    )
 
     try:
         # Your actual dispute processing logic
@@ -68,7 +73,9 @@ def submit_dispute(req: SubmitDisputeRequest):
             origin,
             str(e),
         )
-        raise HTTPException(status_code=500, detail="Dispute submission failed") from e
+        raise HTTPException(
+            status_code=500, detail="Dispute submission failed"
+        ) from e
 
 
 @router.get("/job-status/{job_id}")

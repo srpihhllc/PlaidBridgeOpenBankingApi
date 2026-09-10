@@ -27,7 +27,9 @@ def template_wiring_tile():
             if raw:
                 results = json.loads(raw.decode("utf-8"))
         except Exception as e:
-            current_app.logger.error(f"Failed to read template wiring audit: {e}")
+            current_app.logger.error(
+                f"Failed to read template wiring audit: {e}"
+            )
 
     # Build response payload
     payload = []

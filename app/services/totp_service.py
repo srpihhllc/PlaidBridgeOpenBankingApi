@@ -18,7 +18,9 @@ def get_totp_uri(user, secret) -> str:
     Issuer name is configurable via Flask config: TOTP_ISSUER_NAME.
     """
     issuer = current_app.config.get("TOTP_ISSUER_NAME", "PlaidBridgeCockpit")
-    return pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name=issuer)
+    return pyotp.TOTP(secret).provisioning_uri(
+        name=user.email, issuer_name=issuer
+    )
 
 
 def generate_qr_code(uri: str) -> str:

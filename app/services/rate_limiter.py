@@ -26,7 +26,9 @@ def _make_key(identifier: str, action: str) -> str:
 # -----------------------------------------------------------------------------
 # Rate Limit Check
 # -----------------------------------------------------------------------------
-def is_rate_limited(identifier: str, action: str, limit: int, period: int) -> bool:
+def is_rate_limited(
+    identifier: str, action: str, limit: int, period: int
+) -> bool:
     """
     Check if the given identifier (IP, user_id, etc.) has exceeded the rate limit.
 
@@ -41,7 +43,9 @@ def is_rate_limited(identifier: str, action: str, limit: int, period: int) -> bo
     """
     client = get_redis_client()
     if not client:
-        logger.warning("Redis unavailable — skipping rate limit check (fail-open).")
+        logger.warning(
+            "Redis unavailable — skipping rate limit check (fail-open)."
+        )
         return False
 
     key = _make_key(identifier, action)
@@ -52,7 +56,9 @@ def is_rate_limited(identifier: str, action: str, limit: int, period: int) -> bo
         try:
             return int(count) >= limit
         except ValueError:
-            logger.error(f"Non-integer value found in rate limit key {key}: {count}")
+            logger.error(
+                f"Non-integer value found in rate limit key {key}: {count}"
+            )
             client.delete(key)
             return False
     except Exception as e:
@@ -82,7 +88,9 @@ def apply_rate_limit(
     """
     client = get_redis_client()
     if not client:
-        logger.warning("Redis unavailable — skipping rate limit increment (fail-open).")
+        logger.warning(
+            "Redis unavailable — skipping rate limit increment (fail-open)."
+        )
         return
 
     key = _make_key(identifier, action)
@@ -95,7 +103,8 @@ def apply_rate_limit(
 
         if is_failure:
             logger.info(
-                f"Rate limit incremented for {key} (failure). " f"Limit={limit}, Period={period}s"
+                f"Rate limit incremented for {key} (failure). "
+                f"Limit={limit}, Period={period}s"
             )
         else:
             logger.info(
@@ -103,4 +112,6 @@ def apply_rate_limit(
                 f"Limit={limit}, Period={period}s"
             )
     except Exception as e:
-        logger.error(f"Failed to apply rate limit for {key}: {e}", exc_info=True)
+        logger.error(
+            f"Failed to apply rate limit for {key}: {e}", exc_info=True
+        )

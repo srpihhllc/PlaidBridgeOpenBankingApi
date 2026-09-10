@@ -18,49 +18,44 @@ from ..extensions import db
 # Base / independent models (safe to import first)
 # ---------------------------------------------------------------------------
 from .access_token import AccessToken
-from .user import User
-from .ledger import LedgerEntry
 
 # ---------------------------------------------------------------------------
 # Audit / timeline models
 # ---------------------------------------------------------------------------
 from .audit_log import AuditLog, FinancialAuditLog
-from .timeline_event import TimelineEvent
+from .bank_account import BankAccount
 
 # ---------------------------------------------------------------------------
 # Dependent models (order chosen to reduce circular import risk)
 # ---------------------------------------------------------------------------
 from .bank_institution import BankInstitution
-from .plaid_item import PlaidItem
-from .bank_account import BankAccount
 from .bank_statement import BankStatement
 from .bank_transaction import BankTransaction
-from .vault_transaction import VaultTransaction
-
 from .borrower_card import BorrowerCard
-from .loan_agreement import LoanAgreement
+from .complaint_log import ComplaintLog
+from .credit_ledger import CreditLedger
+from .dispute_log import DisputeLog
+from .fraud_report import FraudReport
+from .ledger import LedgerEntry
 from .lender import Lender
 from .lender_risk import LenderRisk
-from .underwriter import UnderwriterAgent
-
-from .tradeline import Tradeline
-from .credit_ledger import CreditLedger
+from .loan_agreement import LoanAgreement
+from .mfa_code import MFACode
 from .payment_log import PaymentLog
-
-from .dispute_log import DisputeLog
-from .complaint_log import ComplaintLog
-from .fraud_report import FraudReport
-
+from .plaid_item import PlaidItem
 from .registry import Registry
 from .schema_event import SchemaEvent
-from .trace_events import TraceEvent
-from .system import SystemVersion
-
 from .subscriber_profile import SubscriberProfile
-from .user_dashboard import UserDashboard
+from .system import SystemVersion
+from .timeline_event import TimelineEvent
 from .todo import Todo
+from .trace_events import TraceEvent
+from .tradeline import Tradeline
 from .transactions import Transaction
-from .mfa_code import MFACode
+from .underwriter import UnderwriterAgent
+from .user import User
+from .user_dashboard import UserDashboard
+from .vault_transaction import VaultTransaction
 
 # ---------------------------------------------------------------------------
 # Explicit export surface for introspection and tooling
@@ -71,12 +66,10 @@ __all__ = [
     "User",
     "AccessToken",
     "LedgerEntry",
-
     # Auth / profile
     "MFACode",
     "SubscriberProfile",
     "UserDashboard",
-
     # Banking / Plaid
     "BankInstitution",
     "PlaidItem",
@@ -84,21 +77,19 @@ __all__ = [
     "BankTransaction",
     "BankStatement",
     "VaultTransaction",
-
     # Credit / lending
     "LoanAgreement",
     "Lender",
+    "LenderRisk",
     "UnderwriterAgent",
     "BorrowerCard",
     "Tradeline",
     "CreditLedger",
     "PaymentLog",
-
     # Disputes / complaints / fraud
     "DisputeLog",
     "ComplaintLog",
     "FraudReport",
-
     # Registry / schema / system
     "Registry",
     "SchemaEvent",
@@ -107,7 +98,6 @@ __all__ = [
     "TimelineEvent",
     "AuditLog",
     "FinancialAuditLog",
-
     # Misc / UI
     "Todo",
     "Transaction",

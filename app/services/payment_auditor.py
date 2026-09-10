@@ -2,7 +2,7 @@
 
 import json
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
@@ -17,7 +17,7 @@ def audit_processor_logs(processor_name, transactions):
     # Initialize the audit results structure
     audit_results = {
         "processor_name": processor_name,
-        "audit_date": datetime.utcnow().isoformat(),
+        "audit_date": datetime.now(timezone.utc).isoformat(),
         "stats": {
             "total_transactions": len(transactions),
             "flagged_anomalies": 0,
@@ -73,22 +73,29 @@ def audit_processor_logs(processor_name, transactions):
 
     # Calculate overall risk score (average of flagged transactions)
     if audit_results["stats"]["flagged_anomalies"] > 0:
-        total_flagged_score = sum(t["risk_score"] for t in audit_results["flagged_transactions"])
+        total_flagged_score = sum(
+            t["risk_score"] for t in audit_results["flagged_transactions"]
+        )
         audit_results["stats"]["risk_score"] = round(
-            total_flagged_score / audit_results["stats"]["flagged_anomalies"], 3
+            total_flagged_score / audit_results["stats"]["flagged_anomalies"],
+            3,
         )
 
     audit_results["stats"]["total_value_audited"] = round(total_value, 2)
 
     # Log the audit event to Redis for a dashboard or monitoring
-    log_key = f"audit_log:{processor_name}:{datetime.utcnow().timestamp()}"
+    log_key = (
+        f"audit_log:{processor_name}:{datetime.now(timezone.utc).timestamp()}"
+    )
     client = getattr(current_app, "redis_client", None) or get_redis_client()
 
     if client:
         try:
             client.setex(log_key, 86400 * 7, json.dumps(audit_results))
         except Exception as e:
-            current_app.logger.error(f"[payment_auditor] Redis setex failed for {log_key} — {e}")
+            current_app.logger.error(
+                f"[payment_auditor] Redis setex failed for {log_key} — {e}"
+            )
     else:
         current_app.logger.error(
             f"[payment_auditor] Redis unavailable — skipping setex for {log_key}"

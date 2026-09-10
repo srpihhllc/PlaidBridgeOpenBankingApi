@@ -1,117 +1,149 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/decorators/access.py
 
+# app/decorators/access.py
 from functools import wraps
-
-from flask import abort, flash, jsonify, redirect, url_for
-from flask_jwt_extended import get_jwt, get_jwt_identity, verify_jwt_in_request
+from flask import current_app, jsonify, redirect, url_for
+from flask_jwt_extended import get_jwt, verify_jwt_in_request
+from flask_jwt_extended.exceptions import JWTExtendedException
 from flask_login import current_user
-
-from app.utils.telemetry import log_identity_event  # ← FIXED IMPORT
-from app.utils.user_helpers import user_is_admin
+from werkzeug.exceptions import Forbidden
 
 
-# =============================================================================
-# 1. ROLE-BASED ACCESS (JWT-aware + Flask-Login fallback)
-# =============================================================================
+def user_is_admin():
+    """Helper to check if current session user is an admin."""
+    if hasattr(current_user, "is_admin"):
+        return current_user.is_admin
+    if hasattr(current_user, "role"):
+        return current_user.role in ("admin", "super_admin")
+    return False
+
+
 def roles_required(*required_roles):
     """
-    Role-based access decorator that supports BOTH JWT and Flask-Login.
-    Ensures compatibility between API tests (JWT) and UI usage (Session).
+    Decorator that requires the user to have one of the specified roles.
+    Supports both JWT tokens (checking claims) and Flask-Login session fallback.
+
+    Behavior:
+    - If a valid JWT is present and contains a matching role -> allow.
+    - If a valid JWT is present but does NOT contain a matching role -> allow session fallback.
+    - If no JWT header is present (Missing/No Authorization) -> fallback to session.
+    - If JWT verification raises a structural error (expired, wrong token type, invalid token),
+      re-raise it so it bubbles up.
     """
 
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
-            # -------------------------------------------------------------
-            # 1.1 JWT PATH (Priority for API calls)
-            # -------------------------------------------------------------
+            jwt_verified = False
+            jwt_claims = {}
+            jwt_attempted = False
+            jwt_matched = False
+
+            # 1. Attempt JWT verification
             try:
-                verify_jwt_in_request(optional=True)
-                claims = get_jwt()
-
-                if claims:
-                    jwt_roles = claims.get("roles", [])
-                    is_admin_claim = claims.get("is_admin", False)
-
-                    # Match explicit roles OR allow is_admin=True to satisfy admin routes
-                    if any(role in jwt_roles for role in required_roles) or (
-                        is_admin_claim and "admin" in required_roles
-                    ):
-                        return fn(*args, **kwargs)
-
-            except Exception:
-                # No valid JWT — fall back to session
-                pass
-
-            # -------------------------------------------------------------
-            # 1.2 FLASK-LOGIN FALLBACK (UI sessions)
-            # -------------------------------------------------------------
-            if getattr(current_user, "is_authenticated", False):
-                user_role = getattr(current_user, "role", None)
-                user_is_admin_attr = getattr(current_user, "is_admin", False)
-
-                if user_role in required_roles or (
-                    user_is_admin_attr and "admin" in required_roles
+                verify_jwt_in_request()
+                jwt_verified = True
+                jwt_claims = get_jwt() or {}
+                jwt_attempted = True
+            except JWTExtendedException as e:
+                # If no token/header was provided, allow fallback to session.
+                # If a structural JWT error occurred (expired, bad token type), re-raise immediately.
+                if type(e).__name__ in (
+                    "NoAuthorizationError",
+                    "MissingAuthorizationError",
                 ):
+                    jwt_verified = False
+                else:
+                    raise
+            except Exception:
+                # Any other unexpected exception: treat as no JWT
+                jwt_verified = False
+
+            # 2. Evaluate JWT claims if verification succeeded
+            if jwt_verified:
+                user_roles = jwt_claims.get("roles", [])
+                if isinstance(user_roles, str):
+                    user_roles = [user_roles]
+                single_role = jwt_claims.get("role")
+                if single_role and single_role not in user_roles:
+                    user_roles.append(single_role)
+
+                if any(r in user_roles for r in required_roles):
+                    jwt_matched = True
                     return fn(*args, **kwargs)
+                else:
+                    jwt_matched = False
 
-            # -------------------------------------------------------------
-            # 1.3 ACCESS DENIED
-            # -------------------------------------------------------------
-            log_identity_event(
-                event_type="ROLE_ACCESS_DENIED",
-                user_id=get_jwt_identity() or getattr(current_user, "id", 0),
-                details={
-                    "required_roles": list(required_roles),
-                    "reason": "missing_required_role_or_claim",
-                },
-            )
+            # 3. Fallback to Flask-Login session if no valid JWT header was present or JWT didn't match
+            if current_user and getattr(
+                current_user, "is_authenticated", False
+            ):
+                session_roles = []
+                if hasattr(current_user, "roles") and current_user.roles:
+                    session_roles.extend(current_user.roles)
+                if hasattr(current_user, "role") and current_user.role:
+                    session_roles.append(current_user.role)
+                if getattr(current_user, "is_admin", False):
+                    session_roles.append("admin")
 
-            return (
-                jsonify(
-                    {
-                        "msg": "Forbidden",
-                        "error": "You don't have permission to access this resource.",
-                    }
-                ),
-                403,
-            )
+                if any(r in session_roles for r in required_roles):
+                    return fn(*args, **kwargs)
+                else:
+                    return jsonify(
+                        {"msg": "Forbidden: Insufficient privileges"}
+                    ), 403
+
+            # 4. Neither JWT nor session satisfied the required roles
+            if jwt_attempted and not jwt_matched:
+                return jsonify(
+                    {"msg": "Forbidden: Insufficient privileges"}
+                ), 403
+
+            # Neither JWT nor session present -> Missing Authorization
+            return jsonify({"msg": "Missing Authorization Header"}), 401
 
         return wrapper
 
     return decorator
 
 
-# =============================================================================
-# 2. SHORTCUT DECORATORS
-# =============================================================================
+def subscriber_required(fn):
+    """Shortcut decorator for subscriber-only endpoints."""
+    return roles_required("subscriber")(fn)
+
+
 def admin_required(fn):
-    """Shortcut for routes requiring 'admin' privileges."""
+    """Shortcut decorator for admin-only endpoints."""
     return roles_required("admin")(fn)
 
 
 def super_admin_required(fn):
-    """Shortcut for routes requiring 'super_admin' privileges."""
+    """Shortcut decorator for super_admin-only endpoints."""
     return roles_required("super_admin")(fn)
 
 
-# =============================================================================
-# 3. UI-SPECIFIC LEGACY CHECK (Session-only admin gate)
-# =============================================================================
-def require_admin(view_func):
-    """Legacy session-only redirect for UI routes."""
+def require_admin(fn):
+    """
+    Legacy session-only decorator for HTML UI routes.
+    Redirects to login if not authenticated, or aborts with 403 if not admin.
+    """
 
-    @wraps(view_func)
-    def wrapped_view(*args, **kwargs):
-        # 3.1 Must be logged in
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
-            flash("Please log in to access this page.", "info")
-            return redirect(url_for("auth.login"))
+            login_endpoint = (
+                "auth.login"
+                if "auth.login" in current_app.view_functions
+                else "login"
+            )
+            try:
+                return redirect(url_for(login_endpoint))
+            except Exception:
+                return redirect("/mock-login")
 
-        # 3.2 Must be super admin
-        if not user_is_admin(current_user):
-            abort(403)
+        if not user_is_admin():
+            raise Forbidden()
 
-        return view_func(*args, **kwargs)
+        return fn(*args, **kwargs)
 
-    return wrapped_view
+    return wrapper

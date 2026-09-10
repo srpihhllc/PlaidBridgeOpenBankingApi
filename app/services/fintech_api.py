@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 
 # NOTE: In a production environment, base URLs and API keys would be loaded
 # from app.config or environment variables and passed securely.
-TRUELAYER_BASE_URL = os.getenv("TRUELAYER_API_URL", "https://api.truelayer.com")
+TRUELAYER_BASE_URL = os.getenv(
+    "TRUELAYER_API_URL", "https://api.truelayer.com"
+)
 TINK_BASE_URL = os.getenv("TINK_API_URL", "https://api.tink.com")
 
 # ---------------------------
@@ -20,7 +22,9 @@ TINK_BASE_URL = os.getenv("TINK_API_URL", "https://api.tink.com")
 # ---------------------------
 
 
-def _make_fintech_verification_request(vendor_name: str, url: str, account_data: dict) -> dict:
+def _make_fintech_verification_request(
+    vendor_name: str, url: str, account_data: dict
+) -> dict:
     """Generic helper to handle external verification API calls."""
     logger.info(f"Attempting verification via {vendor_name} to URL: {url}")
 
@@ -46,7 +50,9 @@ def _make_fintech_verification_request(vendor_name: str, url: str, account_data:
         # Log the response body if available for debugging
         try:
             if response is not None:
-                logger.debug(f"{vendor_name} Error Response Body: {response.text}")
+                logger.debug(
+                    f"{vendor_name} Error Response Body: {response.text}"
+                )
         except NameError:
             pass  # response object not yet defined
 
@@ -66,4 +72,6 @@ def verify_via_truelayer(account_data: dict) -> dict:
 
 def verify_via_tink(account_data: dict) -> dict:
     """Verifies lender account credentials via Tink API."""
-    return _make_fintech_verification_request("Tink", f"{TINK_BASE_URL}/verify", account_data)
+    return _make_fintech_verification_request(
+        "Tink", f"{TINK_BASE_URL}/verify", account_data
+    )

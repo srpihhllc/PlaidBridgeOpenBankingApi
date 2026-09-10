@@ -6,7 +6,7 @@
 
 import hashlib
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -32,7 +32,9 @@ class DisputeLog(db.Model):
     sendgrid_id = db.Column(db.String(128), nullable=True)
 
     content_hash = db.Column(db.String(128), nullable=False)
-    delivery_ts = db.Column(db.DateTime, default=datetime.utcnow)
+    delivery_ts = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     acknowledged_ts = db.Column(db.DateTime, nullable=True)
     response_notes = db.Column(db.Text, nullable=True)
 
@@ -47,7 +49,9 @@ class DisputeLog(db.Model):
     # clearing the compile-time KeyError validation check.
     user = db.relationship(
         "User",
-        backref=db.backref("dispute_logs", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "dispute_logs", lazy="dynamic", passive_deletes=True
+        ),
     )
 
     # ---------- Artifact Trace Properties ----------
@@ -130,7 +134,11 @@ class DisputeLog(db.Model):
             "email_status": self.email_status,
             "sendgrid_id": self.sendgrid_id,
             "delivery_ts": self.delivery_ts.isoformat(),
-            "acknowledged_ts": (self.acknowledged_ts.isoformat() if self.acknowledged_ts else None),
+            "acknowledged_ts": (
+                self.acknowledged_ts.isoformat()
+                if self.acknowledged_ts
+                else None
+            ),
             "badges": self.get_badges(),
             "dispatch_state": self.dispatch_state,
             "urls": {

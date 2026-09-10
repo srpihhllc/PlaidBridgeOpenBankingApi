@@ -1,0 +1,50 @@
+YAMLname: Deploy Documentation
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+
+jobs:
+  build-and-deploy-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install MkDocs Dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          if [ -f docs/requirements.txt ]; then
+            python -m pip install --no-cache-dir -r docs/requirements.txt
+          else
+            python -m pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings mkdocstrings-python
+          fi
+
+      - name: Build MkDocs Site
+        run: mkdocs build
+
+      - name: Upload to GitHub Pages Artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Publish to GitHub Pages
+        uses: actions/deploy-pages@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

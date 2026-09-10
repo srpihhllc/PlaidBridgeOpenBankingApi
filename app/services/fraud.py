@@ -2,7 +2,7 @@
 
 import json
 import random
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import current_app
 
@@ -38,11 +38,11 @@ def analyze_transaction(tx):
     result = {
         "fraud_score": round(min(score, 1.0), 3),
         "flags": flags,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     # 🔐 Log to Redis for dashboarding
-    key = f"fraud_log:{tx.get('id', 'tx')}-{datetime.utcnow().timestamp()}"
+    key = f"fraud_log:{tx.get('id', 'tx')}-{datetime.now(timezone.utc).timestamp()}"
     client = getattr(current_app, "redis_client", None) or get_redis_client()
     if client:
         try:
@@ -90,7 +90,9 @@ def analyze_transactions_batch(transactions):
             buckets["low"] += 1
 
     # 🏆 Top 5
-    top_risky = sorted(results, key=lambda r: r["fraud_score"], reverse=True)[:5]
+    top_risky = sorted(results, key=lambda r: r["fraud_score"], reverse=True)[
+        :5
+    ]
 
     return {
         "results": results,
@@ -131,7 +133,7 @@ def execute_smart_contract(loan_agreement_id):
         "agreement_id": loan_agreement_id,
         "status": "executed",
         "violations": random.randint(0, 3),
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     if result["violations"] >= 3:
@@ -141,7 +143,7 @@ def execute_smart_contract(loan_agreement_id):
         result["status"] = "warned"
         result["detail"] = "Contract passed with warning"
 
-    key = f"contract_log:{loan_agreement_id}:{datetime.utcnow().timestamp()}"
+    key = f"contract_log:{loan_agreement_id}:{datetime.now(timezone.utc).timestamp()}"
     client = getattr(current_app, "redis_client", None) or get_redis_client()
     if client:
         try:

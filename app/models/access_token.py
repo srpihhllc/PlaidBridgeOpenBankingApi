@@ -1,7 +1,7 @@
 # app/models/access_token.py
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -14,7 +14,9 @@ class AccessToken(db.Model):
     __tablename__ = "access_tokens"
     __table_args__ = {"extend_existing": True}
 
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(
+        db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
 
     # FIX: user_id must match User.id (String UUID), not Integer
     user_id = db.Column(
@@ -24,7 +26,9 @@ class AccessToken(db.Model):
     )
 
     token = db.Column(db.String(255), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
     expires_at = db.Column(db.DateTime, nullable=True)
 
     # Relationship back to User

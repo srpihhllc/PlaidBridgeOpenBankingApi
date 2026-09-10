@@ -1,6 +1,6 @@
 # app/routes/lenders.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, abort, jsonify, request
 from flask_jwt_extended import jwt_required
@@ -29,7 +29,11 @@ def verify_lender_identity():
         return jsonify({"error": "Missing required credentials"}), 400
 
     result = verify_credentials(data)
-    status = "verified" if result["score"] > 80 and result["is_valid"] else "rejected"
+    status = (
+        "verified"
+        if result["score"] > 80 and result["is_valid"]
+        else "rejected"
+    )
 
     # Update lender status directly (mock flow)
     lender = Lender.query.filter_by(
@@ -58,11 +62,13 @@ def link_bank_account():
 
     lender = Lender.query.get_or_404(lender_id)
     if lender.verification_status != "verified":
-        abort(403, description="Lender not verified — cannot link bank account")
+        abort(
+            403, description="Lender not verified — cannot link bank account"
+        )
 
     lender.bank_linked = True
     lender.institution_name = institution
-    lender.linked_at = datetime.utcnow()
+    lender.linked_at = datetime.now(timezone.utc)
     db.session.commit()
 
     return (

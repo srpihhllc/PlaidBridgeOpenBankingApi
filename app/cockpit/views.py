@@ -1,7 +1,7 @@
 # app/cockpit/views.py
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import (
     Blueprint,
@@ -59,7 +59,9 @@ def cockpit_instrument(ttl_key, ttl=300):
             except Exception as e:
                 # Use canonical ttl_emit signature: client= and ttl=
                 ttl_emit(key=ttl_key, status="error", client=client, ttl=ttl)
-                current_app.logger.warning(f"[Cockpit] {request.endpoint} failed: {e}")
+                current_app.logger.warning(
+                    f"[Cockpit] {request.endpoint} failed: {e}"
+                )
                 return render_template("error.html", error=str(e)), 500
 
         wrapper.__name__ = func.__name__
@@ -82,7 +84,6 @@ def refresh_operator_ttl():
     if session.get(OPERATOR_MODE_KEY):
         redis = get_redis_client()
         redis.expire(f"operator_session:{current_user.email}", 900)
-
 
 
 # -------------------------------------------------------------------
@@ -144,7 +145,9 @@ def ignite_dashboard():
         try:
             ttl = client.ttl(key)
         except Exception as e:
-            current_app.logger.error(f"[cockpit.ignite_dashboard] Redis ttl failed for {key} — {e}")
+            current_app.logger.error(
+                f"[cockpit.ignite_dashboard] Redis ttl failed for {key} — {e}"
+            )
     else:
         current_app.logger.error(
             f"[cockpit.ignite_dashboard] Redis unavailable — skipping ttl for {key}"
@@ -175,7 +178,9 @@ def ignite_dashboard():
                         "event_type": "LOW_TTL_ALERT",
                         "by": current_user.email,
                         "ttl_remaining": ttl,
-                        "timestamp": int(datetime.utcnow().timestamp()),
+                        "timestamp": int(
+                            datetime.now(timezone.utc).timestamp()
+                        ),
                         "severity": "critical",
                     }
                     client.set(
@@ -235,7 +240,9 @@ def ignite_dashboard():
 
     session_bootstrap_ctx = {
         "method": (
-            "Operator Cockpit" if session.get(OPERATOR_MODE_KEY) else "Standard Session"
+            "Operator Cockpit"
+            if session.get(OPERATOR_MODE_KEY)
+            else "Standard Session"
         ),  # <--- REPLACED "operator_mode" (CHECK 2/2)
         "freshness": ttl or 0,
         "seeded": seeded,
@@ -277,7 +284,7 @@ def borrower_card_grid():
     return render_template(
         "cockpit/borrower_card_grid.html",
         cards=cards,
-        current_time=datetime.utcnow(),
+        current_time=datetime.now(timezone.utc),
     )
 
 
@@ -290,7 +297,7 @@ def borrower_card_grid():
 def vault_metrics(client=None):
     """Renders a view of the card vault's key metrics."""
     cards = BorrowerCard.query.all()
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     active = expiring = revoked = dormant = 0
     for card in cards:
         if card.revoked:
@@ -328,16 +335,19 @@ def revoke_card(card_id):
     """Handles the revocation of a borrower's card."""
     redis = get_redis_client()
     card = BorrowerCard.query.get_or_404(card_id)
-    card.revoked, card.last_used_at = True, datetime.utcnow()
+    card.revoked, card.last_used_at = True, datetime.now(timezone.utc)
     db.session.commit()
     event = {
         "event_type": "CARD_REVOKED",
         "by": current_user.email,
         "card_id": card.id,
-        "timestamp": int(datetime.utcnow().timestamp()),
+        "timestamp": int(datetime.now(timezone.utc).timestamp()),
         "reason": "Delinquent borrowing pattern",
     }
-    redis.set(f"identity_event:card:{card.id}:{event['timestamp']}", json.dumps(event))
+    redis.set(
+        f"identity_event:card:{card.id}:{event['timestamp']}",
+        json.dumps(event),
+    )
     return redirect("/card-vault")
 
 
@@ -347,16 +357,19 @@ def link_wallet(card_id):
     """Handles the manual linking of a card to a wallet."""
     redis = get_redis_client()
     card = BorrowerCard.query.get_or_404(card_id)
-    card.last_used_at = datetime.utcnow()
+    card.last_used_at = datetime.now(timezone.utc)
     db.session.commit()
     event = {
         "event_type": "CARD_LINKED_WALLET",
         "by": current_user.email,
         "card_id": card.id,
-        "timestamp": int(datetime.utcnow().timestamp()),
+        "timestamp": int(datetime.now(timezone.utc).timestamp()),
         "method": "Operator Manual Link",
     }
-    redis.set(f"identity_event:card:{card.id}:{event['timestamp']}", json.dumps(event))
+    redis.set(
+        f"identity_event:card:{card.id}:{event['timestamp']}",
+        json.dumps(event),
+    )
     return redirect("/card-vault")
 
 
@@ -373,7 +386,9 @@ def card_audit(card_id):
         if raw:
             audit_logs.append(json.loads(raw))
     audit_logs.sort(key=lambda log: log["timestamp"], reverse=True)
-    return render_template("cockpit/card_audit.html", logs=audit_logs, card_id=card_id)
+    return render_template(
+        "cockpit/card_audit.html", logs=audit_logs, card_id=card_id
+    )
 
 
 @cockpit_bp.route("/card-vault-export")
@@ -393,13 +408,17 @@ def card_vault_export():
         return Response(
             serialize_logs_as_json(logs),
             mimetype="application/json",
-            headers={"Content-Disposition": "attachment;filename=vault_export.json"},
+            headers={
+                "Content-Disposition": "attachment;filename=vault_export.json"
+            },
         )
     elif export_format == "csv":
         return Response(
             serialize_logs_as_csv(logs),
             mimetype="text/csv",
-            headers={"Content-Disposition": "attachment;filename=vault_export.csv"},
+            headers={
+                "Content-Disposition": "attachment;filename=vault_export.csv"
+            },
         )
     return render_template("cockpit/card_vault_export.html", logs=logs)
 
@@ -408,15 +427,21 @@ def card_vault_export():
 @login_required
 def underwriter_intake():
     """Renders a view of all underwriter agents."""
-    underwriters = UnderwriterAgent.query.order_by(UnderwriterAgent.verified_at.desc()).all()
-    return render_template("cockpit/underwriter_intake.html", underwriters=underwriters)
+    underwriters = UnderwriterAgent.query.order_by(
+        UnderwriterAgent.verified_at.desc()
+    ).all()
+    return render_template(
+        "cockpit/underwriter_intake.html", underwriters=underwriters
+    )
 
 
 @cockpit_bp.route("/vault-intake")
 @login_required
 def vault_intake():
     """Renders a view of all vault transactions."""
-    txns = VaultTransaction.query.order_by(VaultTransaction.received_at.desc()).all()
+    txns = VaultTransaction.query.order_by(
+        VaultTransaction.received_at.desc()
+    ).all()
     return render_template("cockpit/vault_intake.html", txns=txns)
 
 
@@ -426,5 +451,8 @@ def debug_blueprints():
     """Returns a JSON payload of all registered Flask blueprints."""
     registered = {}
     for name, bp in current_app.blueprints.items():
-        registered[name] = {"url_prefix": bp.url_prefix, "import_name": bp.import_name}
+        registered[name] = {
+            "url_prefix": bp.url_prefix,
+            "import_name": bp.import_name,
+        }
     return jsonify(registered)

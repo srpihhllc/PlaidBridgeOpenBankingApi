@@ -589,7 +589,7 @@
 
                           <div class="mt-auto">
                             <!-- Dynamic route compiler execution -->
-                            <a href="{{ url_for(svc.endpoint) if svc.endpoint else '#' }}"
+                            <a href="{{ url_for(svc.endpoint, grant_type='default') if svc.endpoint else '#' }}"
                                class="btn btn-sm btn-primary w-100 d-flex align-items-center justify-content-center py-1 font-weight-bold shadow-xs transition-all">
                               <span>Open Workspace</span>
                               <i class="fas fa-external-link-alt ms-2 extra-small-icon"></i>

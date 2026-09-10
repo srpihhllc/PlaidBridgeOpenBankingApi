@@ -5,6 +5,7 @@
 
 import os
 import sys
+
 import click
 from flask.cli import with_appcontext
 from werkzeug.security import generate_password_hash
@@ -36,7 +37,9 @@ def seed_lender(email, password, username, interactive):
 
     # Enforce mandatory credentials
     if not email or not password:
-        click.echo("❌ ERROR: LENDER_EMAIL and LENDER_PASSWORD must be set in the environment or provided via arguments.")
+        click.echo(
+            "❌ ERROR: LENDER_EMAIL and LENDER_PASSWORD must be set in the environment or provided via arguments."
+        )
         sys.exit(1)
 
     user = User.query.filter_by(email=email).first()

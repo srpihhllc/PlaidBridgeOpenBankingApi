@@ -7,6 +7,7 @@
 
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+
 import pytest
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -23,19 +24,22 @@ def test_user(app):
         user.set_password("password123")
         db.session.add(user)
         db.session.commit()
-        
+
         yield user
 
         # Cleanup routine: purge child MFA records before deleting parent user
         # to prevent NOT NULL foreign key constraint errors during teardown
-        MFACode.query.filter_by(user_id=user.id).delete()
+        # Modern SQLAlchemy 2.x bulk delete
+        from sqlalchemy import delete
+
+        stmt = delete(MFACode).where(MFACode.user_id == user.id)
+        db.session.execute(stmt)
         db.session.delete(user)
         db.session.commit()
 
 
 @pytest.mark.usefixtures("app")
 class TestMFACodeModel:
-
     # =========================================================================
     # 1. LIFECYCLE CREATION & ATOMIC REPLACEMENT HOOKS
     # =========================================================================
@@ -43,26 +47,44 @@ class TestMFACodeModel:
         """Should overwrite any pre-existing MFA codes within the same transaction block."""
         with app.app_context():
             # Establish original token entry with an active commit
-            mfa1 = MFACode.create_or_replace(user_id=test_user.id, code="111111", ttl_seconds=300, commit=True)
+            mfa1 = MFACode.create_or_replace(
+                user_id=test_user.id,
+                code="111111",
+                ttl_seconds=300,
+                commit=True,
+            )
             assert mfa1.id is not None
             assert mfa1.code == "111111"
 
             # Replace existing entry with flush-only option
-            mfa2 = MFACode.create_or_replace(user_id=test_user.id, code="222222", ttl_seconds=600, commit=False)
+            mfa2 = MFACode.create_or_replace(
+                user_id=test_user.id,
+                code="222222",
+                ttl_seconds=600,
+                commit=False,
+            )
+            assert mfa2.code == "222222"
             db.session.commit()
 
             # Assert target replacement and state tracking
             active = MFACode.get_active_for_user(test_user.id)
             assert active is not None
+            assert active.id == mfa2.id
             assert active.code == "222222"
             assert active.time_remaining() > 0
 
     def test_create_or_replace_sqlalchemy_error(self, app, test_user):
         """Should roll back transactions and bubble up errors upon core database failure."""
         with app.app_context():
-            with patch.object(db.session, "commit", side_effect=SQLAlchemyError("Write Failure Interrupt")):
+            with patch.object(
+                db.session,
+                "commit",
+                side_effect=SQLAlchemyError("Write Failure Interrupt"),
+            ):
                 with pytest.raises(SQLAlchemyError):
-                    MFACode.create_or_replace(user_id=test_user.id, code="333333", commit=True)
+                    MFACode.create_or_replace(
+                        user_id=test_user.id, code="333333", commit=True
+                    )
 
     def test_get_active_for_user_none_or_expired(self, app, test_user):
         """Should return None cleanly if a code is absent or has crossed its expiration window."""
@@ -71,8 +93,10 @@ class TestMFACodeModel:
             assert MFACode.get_active_for_user(test_user.id) is None
 
             # Condition B: Stale token present in database
-            past_time = datetime.utcnow() - timedelta(seconds=10)
-            mfa = MFACode(user_id=test_user.id, code="123456", expires_at=past_time)
+            past_time = datetime.now(timezone.utc) - timedelta(seconds=10)
+            mfa = MFACode(
+                user_id=test_user.id, code="123456", expires_at=past_time
+            )
             db.session.add(mfa)
             db.session.commit()
 
@@ -85,19 +109,25 @@ class TestMFACodeModel:
         """Should process naive and timezone-aware expirations identically without breaking."""
         with app.app_context():
             # Defensive branch: Null expiry mapping
-            mfa_none = MFACode(user_id=test_user.id, code="123456", expires_at=None)
+            mfa_none = MFACode(
+                user_id=test_user.id, code="123456", expires_at=None
+            )
             assert mfa_none.is_valid() is False
             assert mfa_none.time_remaining() == 0
 
             # Structural branch: Naive UTC tracking
-            future_naive = datetime.utcnow() + timedelta(seconds=100)
-            mfa_naive = MFACode(user_id=test_user.id, code="123456", expires_at=future_naive)
+            future_naive = datetime.now(timezone.utc) + timedelta(seconds=100)
+            mfa_naive = MFACode(
+                user_id=test_user.id, code="123456", expires_at=future_naive
+            )
             assert mfa_naive.is_valid() is True
             assert mfa_naive.time_remaining() > 0
 
             # Structural branch: Aware UTC tracking (covers expires.tzinfo branch evaluation)
             future_aware = datetime.now(timezone.utc) + timedelta(seconds=200)
-            mfa_aware = MFACode(user_id=test_user.id, code="123456", expires_at=future_aware)
+            mfa_aware = MFACode(
+                user_id=test_user.id, code="123456", expires_at=future_aware
+            )
             assert mfa_aware.is_valid() is True
             assert mfa_aware.time_remaining() > 0
 
@@ -107,7 +137,9 @@ class TestMFACodeModel:
     def test_increment_fail_variations(self, app, test_user):
         """Verify fail counters update safely under explicit commits or flushes."""
         with app.app_context():
-            mfa = MFACode.create_or_replace(user_id=test_user.id, code="123456", commit=True)
+            mfa = MFACode.create_or_replace(
+                user_id=test_user.id, code="123456", commit=True
+            )
 
             # Execution using commit=False
             mfa.increment_fail(commit=False)
@@ -118,16 +150,26 @@ class TestMFACodeModel:
             assert mfa.fail_count == 2
 
             # Error handling path
-            with patch.object(db.session, "commit", side_effect=SQLAlchemyError("Atomic Error Injected")):
+            with patch.object(
+                db.session,
+                "commit",
+                side_effect=SQLAlchemyError("Atomic Error Injected"),
+            ):
                 with pytest.raises(SQLAlchemyError):
                     mfa.increment_fail(commit=True)
 
     def test_consume_exception_handling(self, app, test_user):
         """Should trigger standard exception logging and rollback when consumption crashes."""
         with app.app_context():
-            mfa = MFACode.create_or_replace(user_id=test_user.id, code="123456", commit=True)
+            mfa = MFACode.create_or_replace(
+                user_id=test_user.id, code="123456", commit=True
+            )
 
-            with patch.object(db.session, "commit", side_effect=SQLAlchemyError("Session Drop")):
+            with patch.object(
+                db.session,
+                "commit",
+                side_effect=SQLAlchemyError("Session Drop"),
+            ):
                 with pytest.raises(SQLAlchemyError):
                     mfa.consume(commit=True)
 
@@ -135,38 +177,68 @@ class TestMFACodeModel:
         """Validate structural behavior across match, mismatch, expiry, and automated lockouts."""
         with app.app_context():
             # 1. Immediate exit on invalid/expired record
-            past_time = datetime.utcnow() - timedelta(seconds=10)
-            mfa_expired = MFACode(user_id=test_user.id, code="123456", expires_at=past_time)
+            past_time = datetime.now(timezone.utc) - timedelta(seconds=10)
+            mfa_expired = MFACode(
+                user_id=test_user.id, code="123456", expires_at=past_time
+            )
             db.session.add(mfa_expired)
             db.session.commit()
             assert mfa_expired.validate_and_consume("123456") is False
 
             # 2. Resiliency on invalid records with failing database session
-            mfa_expired_err = MFACode(user_id=test_user.id, code="123456", expires_at=past_time)
+            mfa_expired_err = MFACode(
+                user_id=test_user.id, code="123456", expires_at=past_time
+            )
             db.session.add(mfa_expired_err)
             db.session.commit()
-            with patch.object(db.session, "commit", side_effect=SQLAlchemyError("Prune Crash")):
+            with patch.object(
+                db.session,
+                "commit",
+                side_effect=SQLAlchemyError("Prune Crash"),
+            ):
                 assert mfa_expired_err.validate_and_consume("123456") is False
 
             # 3. Successful identification and immediate consumption
-            mfa_valid = MFACode.create_or_replace(user_id=test_user.id, code="654321")
+            mfa_valid = MFACode.create_or_replace(
+                user_id=test_user.id, code="654321"
+            )
             assert mfa_valid.validate_and_consume("654321") is True
 
             # 4. Standard verification mismatch penalty
-            mfa_mismatch = MFACode.create_or_replace(user_id=test_user.id, code="abcdef")
-            assert mfa_mismatch.validate_and_consume("wrong_code", max_failures=2) is False
+            mfa_mismatch = MFACode.create_or_replace(
+                user_id=test_user.id, code="abcdef"
+            )
+            assert (
+                mfa_mismatch.validate_and_consume("wrong_code", max_failures=2)
+                is False
+            )
             assert mfa_mismatch.fail_count == 1
 
             # 5. Lockout threshold reached (automated row purge)
-            assert mfa_mismatch.validate_and_consume("wrong_code", max_failures=2) is False
-            assert MFACode.query.get(mfa_mismatch.id) is None
+            assert (
+                mfa_mismatch.validate_and_consume("wrong_code", max_failures=2)
+                is False
+            )
+            # Modern SQLAlchemy 2.x lookup
+            assert db.session.get(MFACode, mfa_mismatch.id) is None
 
             # 6. Lockout purge routine under failing database transaction
-            mfa_lockout_err = MFACode.create_or_replace(user_id=test_user.id, code="999999")
+            mfa_lockout_err = MFACode.create_or_replace(
+                user_id=test_user.id, code="999999"
+            )
             mfa_lockout_err.fail_count = 1
             db.session.commit()
-            with patch.object(db.session, "commit", side_effect=SQLAlchemyError("Purge Exception Intercept")):
-                assert mfa_lockout_err.validate_and_consume("wrong_code", max_failures=2) is False
+            with patch.object(
+                db.session,
+                "commit",
+                side_effect=SQLAlchemyError("Purge Exception Intercept"),
+            ):
+                assert (
+                    mfa_lockout_err.validate_and_consume(
+                        "wrong_code", max_failures=2
+                    )
+                    is False
+                )
 
     # =========================================================================
     # 4. MAINTENANCE ROUTINES & REPRESENTATION
@@ -175,13 +247,28 @@ class TestMFACodeModel:
         """Verify systemic record cleanups adhere to strict delta windows."""
         with app.app_context():
             # Clear layout records for explicit validation
-            db.session.query(MFACode).delete()
+            from sqlalchemy import delete
+
+            stmt = delete(MFACode)
+            db.session.execute(stmt)
             db.session.commit()
 
-            now = datetime.utcnow()
-            mfa_stale = MFACode(user_id=test_user.id, code="111", expires_at=now - timedelta(seconds=600))
-            mfa_recent = MFACode(user_id=test_user.id, code="222", expires_at=now - timedelta(seconds=10))
-            mfa_active = MFACode(user_id=test_user.id, code="333", expires_at=now + timedelta(seconds=600))
+            now = datetime.now(timezone.utc)
+            mfa_stale = MFACode(
+                user_id=test_user.id,
+                code="111",
+                expires_at=now - timedelta(seconds=600),
+            )
+            mfa_recent = MFACode(
+                user_id=test_user.id,
+                code="222",
+                expires_at=now - timedelta(seconds=10),
+            )
+            mfa_active = MFACode(
+                user_id=test_user.id,
+                code="333",
+                expires_at=now + timedelta(seconds=600),
+            )
             db.session.add_all([mfa_stale, mfa_recent, mfa_active])
             db.session.commit()
 
@@ -192,17 +279,30 @@ class TestMFACodeModel:
             assert MFACode.purge_expired() == 1
 
             # Active tracking code remains preserved
-            assert MFACode.query.filter_by(user_id=test_user.id).count() == 1
+            from sqlalchemy import func, select
+
+            stmt = (
+                select(func.count())
+                .select_from(MFACode)
+                .filter_by(user_id=test_user.id)
+            )
+            assert db.session.scalar(stmt) == 1
 
             # Core engine exception coverage
-            with patch.object(db.session, "execute", side_effect=SQLAlchemyError("Query Timeout")):
+            with patch.object(
+                db.session,
+                "execute",
+                side_effect=SQLAlchemyError("Query Timeout"),
+            ):
                 with pytest.raises(SQLAlchemyError):
                     MFACode.purge_expired()
 
     def test_serialization_and_string_representation(self, app, test_user):
         """Assert dictionary formatting and string summaries produce expected schemas."""
         with app.app_context():
-            mfa = MFACode.create_or_replace(user_id=test_user.id, code="987654")
+            mfa = MFACode.create_or_replace(
+                user_id=test_user.id, code="987654"
+            )
 
             summary = MFACode.list_for_user(test_user.id)
             assert len(summary) == 1

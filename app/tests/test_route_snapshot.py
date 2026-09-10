@@ -14,7 +14,9 @@ def test_route_snapshot(app):
         (
             {
                 "rule": rule.rule,
-                "methods": sorted(m for m in rule.methods if m not in {"HEAD", "OPTIONS"}),
+                "methods": sorted(
+                    m for m in rule.methods if m not in {"HEAD", "OPTIONS"}
+                ),
                 "endpoint": rule.endpoint,
             }
             for rule in app.url_map.iter_rules()

@@ -5,17 +5,26 @@ import time
 
 from flask import Blueprint, current_app, render_template
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
-bp_trace_viewer = Blueprint("trace_viewer_tile", __name__, url_prefix="/cockpit/trace-viewer")
+bp_trace_viewer = Blueprint(
+    "trace_viewer_tile", __name__, url_prefix="/cockpit/trace-viewer"
+)
 
 
 @bp_trace_viewer.route("/")
 def render_trace_viewer():
     r = get_redis_client()
     if not r:
-        current_app.logger.error("[trace_viewer_tile] Redis unavailable — cannot load traces")
-        return render_template("fallback_tile.html", error="Redis unavailable — cannot load traces")
+        current_app.logger.error(
+            "[trace_viewer_tile] Redis unavailable — cannot load traces"
+        )
+        return render_template(
+            "fallback_tile.html",
+            error="Redis unavailable — cannot load traces",
+        )
 
     try:
         keys = r.keys("trace:*")
@@ -29,10 +38,14 @@ def render_trace_viewer():
                     payload = json.loads(raw)
                     traces.append(
                         {
-                            "key": key.decode() if isinstance(key, bytes) else key,
+                            "key": key.decode()
+                            if isinstance(key, bytes)
+                            else key,
                             "event_type": payload.get("event_type"),
                             "detail": payload.get("detail"),
-                            "timestamp": _format_timestamp(payload.get("timestamp")),
+                            "timestamp": _format_timestamp(
+                                payload.get("timestamp")
+                            ),
                             "ttl": ttl,
                             "freshness": classify_freshness(ttl),
                         }
@@ -40,7 +53,9 @@ def render_trace_viewer():
                 except Exception as e:
                     traces.append(
                         {
-                            "key": key.decode() if isinstance(key, bytes) else key,
+                            "key": key.decode()
+                            if isinstance(key, bytes)
+                            else key,
                             "event_type": "decode_error",
                             "detail": str(e),
                             "timestamp": "N/A",
@@ -52,8 +67,12 @@ def render_trace_viewer():
         return render_template("trace_viewer_tile.html", traces=traces)
 
     except Exception as e:
-        current_app.logger.error(f"[trace_viewer_tile] Error rendering traces: {e}")
-        return render_template("fallback_tile.html", error=f"Trace viewer error: {str(e)}")
+        current_app.logger.error(
+            f"[trace_viewer_tile] Error rendering traces: {e}"
+        )
+        return render_template(
+            "fallback_tile.html", error=f"Trace viewer error: {str(e)}"
+        )
 
 
 def classify_freshness(ttl):

@@ -24,7 +24,13 @@ def check_model(name: str) -> dict:
 
 def model_import_health():
     """Return health check for key models used in cockpit diagnostics."""
-    targets = ["SchemaEvent", "CreditLedger", "PaymentLog", "DisputeLog", "User"]
+    targets = [
+        "SchemaEvent",
+        "CreditLedger",
+        "PaymentLog",
+        "DisputeLog",
+        "User",
+    ]
     results = []
     for name in targets:
         results.append(check_model(name))

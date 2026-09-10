@@ -77,7 +77,9 @@ class DummyRedis:
 
         pattern_re = pattern.replace(".", r"\.").replace("*", ".*")
         return [
-            k for k in list(self.store.keys()) + list(self.lists.keys()) if re.match(pattern_re, k)
+            k
+            for k in list(self.store.keys()) + list(self.lists.keys())
+            if re.match(pattern_re, k)
         ]
 
     # -----------------------------
@@ -167,7 +169,8 @@ class DummyRedis:
 
 def assert_called_with(dummy, method_name, *args, **kwargs):
     assert any(
-        call[0] == method_name and call[1] == args and call[2] == kwargs for call in dummy.calls
+        call[0] == method_name and call[1] == args and call[2] == kwargs
+        for call in dummy.calls
     ), (
         f"Expected call to '{method_name}' with args {args} and kwargs {kwargs}, "
         f"but found calls: {dummy.calls}"
@@ -188,9 +191,7 @@ def assert_called_once_with(dummy, method_name, *args, **kwargs):
 
 def assert_not_called(dummy, method_name):
     matches = [call for call in dummy.calls if call[0] == method_name]
-    assert (
-        not matches
-    ), f"Expected no calls to '{method_name}', but found {len(matches)} calls: {matches}"
+    assert not matches, f"Expected no calls to '{method_name}', but found {len(matches)} calls: {matches}"
 
 
 def assert_call_count(dummy, method_name, expected_count):

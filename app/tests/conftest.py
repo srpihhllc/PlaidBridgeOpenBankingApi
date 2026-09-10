@@ -33,14 +33,15 @@ from flask import jsonify as _jsonify
 from werkzeug.security import generate_password_hash
 
 from app import create_app
-from app.extensions import db as _db, init_extensions
+from app.extensions import db as _db
+from app.extensions import init_extensions
 from app.models.trace_events import TraceEvent
 from app.models.user import User
-
 
 # =============================================================================
 # GLOBAL AUTO-USE FIXTURES
 # =============================================================================
+
 
 @pytest.fixture(autouse=True)
 def set_plaid_encryption_key(monkeypatch):
@@ -52,7 +53,9 @@ def set_plaid_encryption_key(monkeypatch):
 @pytest.fixture(autouse=True)
 def mock_global_ttl_emit():
     """Stub out telemetry calls to avoid signature mismatched errors during tests."""
-    with patch("app.blueprints.plaid_routes.ttl_emit") as mock_emit:
+    with patch(
+        "app.blueprints.plaid_routes.ttl_emit", create=True
+    ) as mock_emit:
         mock_emit.return_value = None
         yield mock_emit
 
@@ -60,6 +63,7 @@ def mock_global_ttl_emit():
 # =============================================================================
 # CORE APPLICATION & DATABASE FIXTURES
 # =============================================================================
+
 
 @pytest.fixture(scope="session")
 def app():
@@ -84,17 +88,21 @@ def app():
     # ------------------------------------------------------------------
     if hasattr(application, "login_manager"):
         try:
+
             @application.login_manager.user_loader
             def robust_load_user(user_id):
                 if not user_id:
                     return None
-                user = User.query.get(user_id)
+                # Modern SQLAlchemy 2.x lookup
+                user = _db.session.get(User, user_id)
                 if not user:
                     try:
-                        user = User.query.get(uuid.UUID(str(user_id)))
+                        # UUID fallback using modern API
+                        user = _db.session.get(User, uuid.UUID(str(user_id)))
                     except (ValueError, AttributeError):
                         pass
                 return user
+
         except Exception:
             pass
 
@@ -112,8 +120,14 @@ def app():
             return
 
         try:
-            if hasattr(application, "extensions") and "flask-jwt-extended" in application.extensions:
-                from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
+            if (
+                hasattr(application, "extensions")
+                and "flask-jwt-extended" in application.extensions
+            ):
+                from flask_jwt_extended import (
+                    get_jwt_identity,
+                    verify_jwt_in_request,
+                )
 
                 # Check for token without raising unhandled exceptions out of context
                 verify_jwt_in_request(optional=True)
@@ -121,12 +135,14 @@ def app():
 
                 if identity:
                     # Attempt standard string resolution lookup first
-                    user = User.query.get(identity)
+                    user = _db.session.get(User, identity)
 
                     # Fallback to explicit UUID object coercion if primary key type mismatch occurs
                     if not user:
                         try:
-                            user = User.query.get(uuid.UUID(str(identity)))
+                            user = _db.session.get(
+                                User, uuid.UUID(str(identity))
+                            )
                         except (ValueError, AttributeError):
                             pass
 
@@ -150,7 +166,9 @@ def app():
         "properties": {"foo": {"type": "string"}},
         "required": ["foo"],
     }
-    _existing_endpoints = {rule.endpoint for rule in application.url_map.iter_rules()}
+    _existing_endpoints = {
+        rule.endpoint for rule in application.url_map.iter_rules()
+    }
 
     # Idempotent declaration matrix for validation smoke targets
     _dummy_routes = [
@@ -162,6 +180,7 @@ def app():
 
     for endpoint, route_path in _dummy_routes:
         if endpoint not in _existing_endpoints:
+
             @application.route(route_path, methods=["POST"], endpoint=endpoint)
             @_vjson(_validation_schema)
             def _handler_factory():
@@ -171,13 +190,23 @@ def app():
         # Authoritatively evaluate and register all application models prior to compilation
         import app.models
 
+        # Explicitly touch the imported module and models to satisfy unused import linters (F401)
+        _ = (app.models, TraceEvent)
+
         # Build pristine schema structures for the session lifecycle
         _db.create_all()
 
         # Seed global admin user under the unified test credentials
-        admin_email = os.environ.get("ADMIN_EMAIL", "srpollardsihhllc@gmail.com")
+        admin_email = os.environ.get(
+            "ADMIN_EMAIL", "srpollardsihhllc@gmail.com"
+        )
         admin_username = os.environ.get("ADMIN_USERNAME", "srpihhllc")
-        admin = User.query.filter_by(email=admin_email).first()
+        # Modern SQLAlchemy 2.x: select + scalar_one_or_none
+        from sqlalchemy import select
+
+        stmt = select(User).filter_by(email=admin_email)
+        admin = _db.session.execute(stmt).scalar_one_or_none()
+
         if not admin:
             admin = User(
                 id="00000000-0000-0000-0000-000000000001",
@@ -236,7 +265,12 @@ def _reseed_admin(application):
     """Re-seed baseline admin state contextually when row flushes occur."""
     admin_email = os.environ.get("ADMIN_EMAIL", "srpollardsihhllc@gmail.com")
     admin_username = os.environ.get("ADMIN_USERNAME", "srpihhllc")
-    admin = User.query.filter_by(email=admin_email).first()
+    # Modern SQLAlchemy 2.x
+    from sqlalchemy import select
+
+    stmt = select(User).filter_by(email=admin_email)
+    admin = _db.session.execute(stmt).scalar_one_or_none()
+
     if not admin:
         admin = User(
             id="00000000-0000-0000-0000-000000000001",
@@ -288,6 +322,7 @@ def user_factory(db_session):
     Unified testing factory generating flexible account states.
     Automates multi-tier status and subscription profile links dynamically.
     """
+
     def _create(**kwargs):
         password = kwargs.pop("password", None)
         role = kwargs.pop("role", None)
@@ -297,7 +332,9 @@ def user_factory(db_session):
         data = {
             "id": kwargs.pop("id", str(uuid.uuid4())),
             "username": kwargs.pop("username", "testuser"),
-            "email": kwargs.pop("email", f"testuser+{uuid.uuid4().hex[:6]}@example.com"),
+            "email": kwargs.pop(
+                "email", f"testuser+{uuid.uuid4().hex[:6]}@example.com"
+            ),
             "is_admin": kwargs.pop("is_admin", False),
         }
         data.update(kwargs)
@@ -330,7 +367,9 @@ def user_factory(db_session):
                 user.role = role
             except Exception:
                 pass
-            user.is_admin = True if str(role).lower() == "admin" else user.is_admin
+            user.is_admin = (
+                True if str(role).lower() == "admin" else user.is_admin
+            )
 
         db_session.add(user)
         db_session.commit()
@@ -338,7 +377,9 @@ def user_factory(db_session):
         # Handle specialized user downstream context bindings
         if role is not None and str(role).lower() == "subscriber":
             try:
-                from app.models.subscriptions_and_profiles import SubscriberProfile
+                from app.models.subscriptions_and_profiles import (
+                    SubscriberProfile,
+                )
             except Exception:
                 SubscriberProfile = None
 
@@ -369,14 +410,21 @@ def clear_trace_events_between_tests(app):
     """
     with app.app_context():
         try:
-            TraceEvent.query.delete()
+            # Modern SQLAlchemy 2.x bulk delete
+            from sqlalchemy import delete
+
+            stmt = delete(TraceEvent)
+            _db.session.execute(stmt)
             _db.session.commit()
         except Exception:
             _db.session.rollback()
     yield
     with app.app_context():
         try:
-            TraceEvent.query.delete()
+            from sqlalchemy import delete
+
+            stmt = delete(TraceEvent)
+            _db.session.execute(stmt)
             _db.session.commit()
         except Exception:
             _db.session.rollback()
@@ -385,6 +433,7 @@ def clear_trace_events_between_tests(app):
 # =============================================================================
 # INJECTED SECURITY CONTEXT FIXTURES
 # =============================================================================
+
 
 @pytest.fixture
 def auth_headers(client, app, user_factory):
@@ -395,8 +444,7 @@ def auth_headers(client, app, user_factory):
     """
     # 1. Generate a true subscriber to satisfy subscriber-guarded backend routes
     test_subscriber = user_factory(
-        username="dashboard_tester",
-        role="subscriber"
+        username="dashboard_tester", role="subscriber"
     )
 
     # 2. Build a real Flask-Login session inside a request context to match production identifiers
@@ -404,6 +452,7 @@ def auth_headers(client, app, user_factory):
     if hasattr(app, "login_manager"):
         with app.test_request_context(headers={"User-Agent": "pytest"}):
             from flask_login import login_user
+
             login_user(test_subscriber, remember=False, fresh=True)
             try:
                 sess_id = app.login_manager._session_identifier_generator()
@@ -419,16 +468,14 @@ def auth_headers(client, app, user_factory):
             session_dict["_id"] = sess_id
         cookie_val = s.dumps(session_dict)
 
-        # Use server name host if configured, fallback to localhost
-        host = app.config.get("SERVER_NAME", "localhost").split(":")[0]
+        # Safely fall back to "localhost" if SERVER_NAME key exists as None
+        server_name = app.config.get("SERVER_NAME") or "localhost"
+        host = server_name.split(":")[0]
         cookie_name = app.config.get("SESSION_COOKIE_NAME", "session")
 
         # Safe cross-version syntax via explicit keyword assignment
         client.set_cookie(
-            key=cookie_name,
-            value=cookie_val,
-            domain=host,
-            path="/"
+            key=cookie_name, value=cookie_val, domain=host, path="/"
         )
     else:
         with client.session_transaction() as sess:
@@ -441,15 +488,21 @@ def auth_headers(client, app, user_factory):
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
-        "User-Agent": "pytest"
+        "User-Agent": "pytest",
     }
 
     # 5. Inject Token-Based Header Auth (Fully synchronized with session state)
     with app.app_context():
-        if hasattr(app, "extensions") and "flask-jwt-extended" in app.extensions:
+        if (
+            hasattr(app, "extensions")
+            and "flask-jwt-extended" in app.extensions
+        ):
             from flask_jwt_extended import create_access_token
+
             # Set fresh=True to satisfy endpoints requiring fresh tokens or strict checks
-            token = create_access_token(identity=str(test_subscriber.id), fresh=True)
+            token = create_access_token(
+                identity=str(test_subscriber.id), fresh=True
+            )
             headers["Authorization"] = f"Bearer {token}"
 
         elif hasattr(test_subscriber, "generate_auth_token"):
@@ -459,23 +512,28 @@ def auth_headers(client, app, user_factory):
         else:
             try:
                 import jwt as pyjwt
+
                 # Fail fast if SECRET_KEY is not configured for the test app
                 secret = app.config.get("SECRET_KEY")
-                assert secret, "Test app must set SECRET_KEY for pyjwt fallback"
+                assert (
+                    secret
+                ), "Test app must set SECRET_KEY for pyjwt fallback"
                 token = pyjwt.encode(
                     {
                         "sub": str(test_subscriber.id),
                         "iat": datetime.datetime.now(datetime.timezone.utc),
-                        "fresh": True
+                        "fresh": True,
                     },
                     secret,
-                    algorithm=app.config.get("JWT_ALGORITHM", "HS256")
+                    algorithm=app.config.get("JWT_ALGORITHM", "HS256"),
                 )
                 # Normalize bytes -> str for header safety
                 if isinstance(token, bytes):
                     token = token.decode("utf-8")
                 headers["Authorization"] = f"Bearer {token}"
             except Exception:
-                headers["Authorization"] = "Bearer mock-subscriber-token-xyz123"
+                headers["Authorization"] = (
+                    "Bearer mock-subscriber-token-xyz123"
+                )
 
     return headers

@@ -40,7 +40,9 @@ def require_api_key(f):
     def decorated_function(*args, **kwargs):
         api_key = os.getenv("API_KEY")
         if not api_key:
-            current_app.logger.error("API_KEY environment variable is not set.")
+            current_app.logger.error(
+                "API_KEY environment variable is not set."
+            )
             return jsonify({"error": "Internal server error"}), 500
 
         provided_key = request.headers.get("X-API-KEY")
@@ -64,8 +66,9 @@ def require_subscriber():
 
     # 💡 OPERATOR BYPASS (Local imports prevent circular dependency loops)
     from flask import session
-    from app.constants import OPERATOR_MODE_KEY
+
     from app.blueprints.main_routes import is_creator
+    from app.constants import OPERATOR_MODE_KEY
 
     # If session flag is set OR user matches creator profile, open the gates
     if session.get(OPERATOR_MODE_KEY) is True or is_creator(current_user):

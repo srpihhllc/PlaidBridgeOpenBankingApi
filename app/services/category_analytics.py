@@ -23,7 +23,9 @@ def _to_decimal(val: Any) -> Decimal:
     try:
         return Decimal(str(val))
     except (InvalidOperation, TypeError, ValueError):
-        logger.warning(f"⚠️ [ANALYTICS] Invalid transaction amount '{val}', defaulting to 0.00")
+        logger.warning(
+            f"⚠️ [ANALYTICS] Invalid transaction amount '{val}', defaulting to 0.00"
+        )
         return Decimal("0.00")
 
 
@@ -53,7 +55,9 @@ def compute_category_summary(
         amt = _to_decimal(raw_amt)
 
         # Aggregate category total
-        categories_map[category] = categories_map.get(category, Decimal("0.00")) + amt
+        categories_map[category] = (
+            categories_map.get(category, Decimal("0.00")) + amt
+        )
 
         # Aggregate income vs expenses
         if amt >= Decimal("0.00"):

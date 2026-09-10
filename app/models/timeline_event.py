@@ -6,6 +6,7 @@
 # =============================================================================
 
 from datetime import datetime, timezone
+
 from ..extensions import db
 
 
@@ -35,13 +36,15 @@ class TimelineEvent(db.Model):
 
     # -------------------------------------------------------------------------
     # Core Relationships
-    # FIXED: Added passive_deletes=True to prevent SQLAlchemy from setting 
+    # FIXED: Added passive_deletes=True to prevent SQLAlchemy from setting
     # user_id to NULL before the database-level cascade triggers.
     # -------------------------------------------------------------------------
     user = db.relationship(
-        "User", 
-        backref=db.backref("timeline_events", lazy="dynamic", passive_deletes=True),
-        lazy=True
+        "User",
+        backref=db.backref(
+            "timeline_events", lazy="dynamic", passive_deletes=True
+        ),
+        lazy=True,
     )
 
     def __repr__(self):

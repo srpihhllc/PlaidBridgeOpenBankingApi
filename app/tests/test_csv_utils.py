@@ -11,7 +11,11 @@ from app.utils.csv_utils import export_csv, import_csv
 
 SAMPLE_DATA = [
     {"date": "2024-01-01", "description": "Coffee Shop", "amount": "-5.50"},
-    {"date": "2024-01-02", "description": "Salary Deposit", "amount": "1500.00"},
+    {
+        "date": "2024-01-02",
+        "description": "Salary Deposit",
+        "amount": "1500.00",
+    },
     {"date": "2024-01-03", "description": "Rent", "amount": "-800.00"},
 ]
 

@@ -1,6 +1,6 @@
 # app/routes/debug.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, current_app, jsonify
 from sqlalchemy import text
@@ -16,13 +16,15 @@ def db_debug_view():
     client = getattr(current_app, "redis_client", None) or get_redis_client()
     try:
         db.session.execute(text("SELECT 1"))
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         if client:
             client.setex("boot:db_ping_success", 1800, "true")
             client.setex("boot:db_ping_success_timestamp", 1800, now)
         else:
-            current_app.logger.error("Redis unavailable — skipping DB ping success setex calls")
+            current_app.logger.error(
+                "Redis unavailable — skipping DB ping success setex calls"
+            )
 
         return jsonify({"status": "OK", "ping_timestamp": now}), 200
 

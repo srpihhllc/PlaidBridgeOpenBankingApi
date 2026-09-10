@@ -73,7 +73,9 @@ def pulse_access_token_query():
     if not user_id:
         # fall back to current user if available
         try:
-            if current_user and getattr(current_user, "is_authenticated", False):
+            if current_user and getattr(
+                current_user, "is_authenticated", False
+            ):
                 user_id = current_user.get_id()
         except Exception:
             user_id = None

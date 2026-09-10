@@ -2,8 +2,10 @@ import os
 import re
 import subprocess
 from pathlib import Path
+
 import click
 from flask.cli import with_appcontext
+
 
 @click.command("find-template")
 @click.argument("name")
@@ -14,17 +16,27 @@ def find_template(name):
 
 
 @click.command("omega-templates")
-@click.option("--generate-missing", is_flag=True, help="Auto-create missing templates with placeholders")
-@click.option("--clean-refs", is_flag=True, help="Safely comment out references to missing templates")
+@click.option(
+    "--generate-missing",
+    is_flag=True,
+    help="Auto-create missing templates with placeholders",
+)
+@click.option(
+    "--clean-refs",
+    is_flag=True,
+    help="Safely comment out references to missing templates",
+)
 @with_appcontext
 def omega_templates(generate_missing, clean_refs):
     """🗺️ Map, Verify, Generate, and Clean all templates across the app."""
     app_dir = Path("app")
     templates_dir = app_dir / "templates"
-    
+
     py_pattern = re.compile(r'render_template\(\s*["\']([^"\']+)["\']')
-    jinja_pattern = re.compile(r'{%\s*(?:include|extends)\s*["\']([^"\']+)["\']\s*%}')
-    
+    jinja_pattern = re.compile(
+        r'{%\s*(?:include|extends)\s*["\']([^"\']+)["\']\s*%}'
+    )
+
     physical_templates = set()
     if templates_dir.exists():
         for root, dirs, files in os.walk(templates_dir):
@@ -35,17 +47,17 @@ def omega_templates(generate_missing, clean_refs):
                     physical_templates.add(rel_path)
 
     template_map = {}
-    
+
     for root, dirs, files in os.walk(app_dir):
-        if '__pycache__' in root or 'venv' in root:
+        if "__pycache__" in root or "venv" in root:
             continue
-            
+
         for file in files:
             if not (file.endswith(".py") or file.endswith(".html")):
                 continue
-                
+
             filepath = Path(root) / file
-            
+
             component_type = "Generic"
             if "blueprints" in filepath.parts:
                 component_type = "Blueprint"
@@ -56,79 +68,121 @@ def omega_templates(generate_missing, clean_refs):
             elif filepath.name.endswith(".html"):
                 component_type = "Parent Template"
 
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 lines = f.readlines()
-                
+
             for line_num, line in enumerate(lines, 1):
-                py_matches = py_pattern.findall(line) if file.endswith(".py") else []
-                jinja_matches = jinja_pattern.findall(line) if file.endswith(".html") else []
-                
+                py_matches = (
+                    py_pattern.findall(line) if file.endswith(".py") else []
+                )
+                jinja_matches = (
+                    jinja_pattern.findall(line)
+                    if file.endswith(".html")
+                    else []
+                )
+
                 for match in py_matches + jinja_matches:
                     if match not in template_map:
-                        template_map[match] = {'exists': match in physical_templates, 'refs': []}
-                    
-                    template_map[match]['refs'].append({
-                        'file': filepath,
-                        'line_num': line_num,
-                        'raw_line': line,
-                        'type': component_type
-                    })
+                        template_map[match] = {
+                            "exists": match in physical_templates,
+                            "refs": [],
+                        }
+
+                    template_map[match]["refs"].append(
+                        {
+                            "file": filepath,
+                            "line_num": line_num,
+                            "raw_line": line,
+                            "type": component_type,
+                        }
+                    )
 
     click.secho("\n🚀 INITIATING OMEGA TEMPLATE MAP...", fg="cyan", bold=True)
-    click.secho(f"Found {len(physical_templates)} physical templates and {len(template_map)} unique template calls.\n", fg="cyan")
+    click.secho(
+        f"Found {len(physical_templates)} physical templates and {len(template_map)} unique template calls.\n",
+        fg="cyan",
+    )
 
-    missing_templates = [k for k, v in template_map.items() if not v['exists']]
-    
+    missing_templates = [k for k, v in template_map.items() if not v["exists"]]
+
     for template_name, data in sorted(template_map.items()):
-        status = click.style("✅ EXISTS", fg="green") if data['exists'] else click.style("❌ MISSING", fg="red", bold=True)
-        click.echo(f"📄 {click.style(template_name, bold=True, fg='yellow')} [{status}]")
-        
-        for ref in data['refs']:
-            ref_file = str(ref['file'].relative_to(app_dir))
-            click.echo(f"   └── 🧩 {click.style(ref['type'], fg='magenta')}: {ref_file}:{ref['line_num']}")
-    
+        status = (
+            click.style("✅ EXISTS", fg="green")
+            if data["exists"]
+            else click.style("❌ MISSING", fg="red", bold=True)
+        )
+        click.echo(
+            f"📄 {click.style(template_name, bold=True, fg='yellow')} [{status}]"
+        )
+
+        for ref in data["refs"]:
+            ref_file = str(ref["file"].relative_to(app_dir))
+            click.echo(
+                f"   └── 🧩 {click.style(ref['type'], fg='magenta')}: {ref_file}:{ref['line_num']}"
+            )
+
     if generate_missing and missing_templates:
-        click.secho("\n🛠️ GENERATING MISSING TEMPLATE PLACEHOLDERS...", fg="cyan", bold=True)
+        click.secho(
+            "\n🛠️ GENERATING MISSING TEMPLATE PLACEHOLDERS...",
+            fg="cyan",
+            bold=True,
+        )
         for missing in missing_templates:
             target_path = templates_dir / missing
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(target_path, 'w', encoding='utf-8') as f:
-                f.write(f"<!-- OMEGA AUTO-GENERATED PLACEHOLDER -->\n")
+
+            with open(target_path, "w", encoding="utf-8") as f:
+                f.write("<!-- OMEGA AUTO-GENERATED PLACEHOLDER -->\n")
                 f.write(f"<!-- Intended Path: app/templates/{missing} -->\n")
-                f.write(f"<div class='diagnostics-warning'>\n")
+                f.write("<div class='diagnostics-warning'>\n")
                 f.write(f"  <h3>⚠️ Placeholder: {missing}</h3>\n")
-                f.write(f"  <p>This template was auto-generated by the Omega command.</p>\n")
-                f.write(f"</div>\n")
-            
+                f.write(
+                    "  <p>This template was auto-generated by the Omega command.</p>\n"
+                )
+                f.write("</div>\n")
+
             click.secho(f"   [CREATED] {target_path}", fg="green")
 
     if clean_refs and missing_templates:
-        click.secho("\n🧹 CLEANING UP ORPHANED REFERENCES...", fg="cyan", bold=True)
+        click.secho(
+            "\n🧹 CLEANING UP ORPHANED REFERENCES...", fg="cyan", bold=True
+        )
         files_to_update = {}
-        
+
         for missing in missing_templates:
-            for ref in template_map[missing]['refs']:
-                filepath = ref['file']
-                line_idx = ref['line_num'] - 1
-                
+            for ref in template_map[missing]["refs"]:
+                filepath = ref["file"]
+                line_idx = ref["line_num"] - 1
+
                 if filepath not in files_to_update:
-                    with open(filepath, 'r', encoding='utf-8') as f:
+                    with open(filepath, "r", encoding="utf-8") as f:
                         files_to_update[filepath] = f.readlines()
-                
+
                 original_line = files_to_update[filepath][line_idx]
-                if not original_line.strip().startswith("#") and not original_line.strip().startswith("<!--"):
-                    if filepath.suffix == '.py':
-                        files_to_update[filepath][line_idx] = f"# OMEGA DISABLED: {original_line.lstrip()}"
-                    elif filepath.suffix == '.html':
-                        files_to_update[filepath][line_idx] = f"<!-- OMEGA DISABLED: {original_line.strip()} -->\n"
-                        
-                    click.secho(f"   [SILENCED] {filepath.name}:{ref['line_num']}", fg="yellow")
+                if not original_line.strip().startswith(
+                    "#"
+                ) and not original_line.strip().startswith("<!--"):
+                    if filepath.suffix == ".py":
+                        files_to_update[filepath][line_idx] = (
+                            f"# OMEGA DISABLED: {original_line.lstrip()}"
+                        )
+                    elif filepath.suffix == ".html":
+                        files_to_update[filepath][line_idx] = (
+                            f"<!-- OMEGA DISABLED: {original_line.strip()} -->\n"
+                        )
+
+                    click.secho(
+                        f"   [SILENCED] {filepath.name}:{ref['line_num']}",
+                        fg="yellow",
+                    )
 
         for filepath, lines in files_to_update.items():
-            with open(filepath, 'w', encoding='utf-8') as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 f.writelines(lines)
-                
+
     if not (generate_missing or clean_refs):
-        click.secho("\n💡 Run with --generate-missing to create placeholders, or --clean-refs to comment out dead calls.", fg="blue")
+        click.secho(
+            "\n💡 Run with --generate-missing to create placeholders, or --clean-refs to comment out dead calls.",
+            fg="blue",
+        )
     click.secho("\n✅ Omega Template Sweep Complete.\n", fg="green", bold=True)

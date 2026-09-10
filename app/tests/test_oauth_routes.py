@@ -27,7 +27,9 @@ class FakeRedis:
 def _get_string_keys(app) -> list[str]:
     """Helper to extract and decode Redis keys regardless of byte/str format."""
     raw_keys = list(app.redis_client.store.keys())
-    return [k.decode("utf-8") if isinstance(k, bytes) else str(k) for k in raw_keys]
+    return [
+        k.decode("utf-8") if isinstance(k, bytes) else str(k) for k in raw_keys
+    ]
 
 
 # -- Fixtures ---------------------------------------------------------------
@@ -89,6 +91,7 @@ def test_token_exchange_success_without_access_token(monkeypatch, client, app):
     class DummyProfileResponse:
         def raise_for_status(self):
             from requests.exceptions import HTTPError
+
             raise HTTPError("401 Client Error: Unauthorized", response=self)
 
         def json(self):
@@ -139,4 +142,7 @@ def test_full_success_flow(monkeypatch, client, app):
     assert resp.headers["Location"].endswith("/dashboard")
 
     keys = _get_string_keys(app)
-    assert any("login:success" in k or "oauth:google:success" in k or "user" in k for k in keys)
+    assert any(
+        "login:success" in k or "oauth:google:success" in k or "user" in k
+        for k in keys
+    )

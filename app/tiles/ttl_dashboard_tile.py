@@ -5,11 +5,10 @@
 # =============================================================================
 
 import logging
-from datetime import datetime
-
-from app.utils.redis import redis_scan_json, redis_set_json
+from datetime import datetime, timezone
 
 from app.cockpit.telemetry.emitters.ttl import ttl_summary
+from app.utils.redis import redis_scan_json, redis_set_json
 
 TTL_DASHBOARD_KEY = "cockpit:ttl_dashboard"
 TTL_DASHBOARD_TTL_SECONDS = 60  # prevent stale tiles
@@ -68,7 +67,7 @@ def build_tile() -> dict:
 
     tile = {
         "version": 1,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "ttl": ttl_data,
         "mfa": collect_mfa_metrics(),
     }
@@ -88,7 +87,9 @@ def emit_to_redis() -> None:
         redis_set_json(TTL_DASHBOARD_KEY, tile, ttl=TTL_DASHBOARD_TTL_SECONDS)
         _logger.info("[📡] TTL dashboard emitted → %s", TTL_DASHBOARD_KEY)
     except Exception as e:
-        _logger.error("❌ Failed to emit TTL dashboard telemetry: %s", e, exc_info=True)
+        _logger.error(
+            "❌ Failed to emit TTL dashboard telemetry: %s", e, exc_info=True
+        )
 
 
 # -----------------------------------------------------------------------------

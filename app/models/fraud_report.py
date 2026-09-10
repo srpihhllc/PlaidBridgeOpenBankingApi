@@ -5,7 +5,7 @@
 #              serialization helpers. Adjusted for dynamic User backrefs.
 # =============================================================================
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -14,7 +14,9 @@ class FraudReport(db.Model):
     __tablename__ = "fraud_reports"
     __table_args__ = {"extend_existing": True}
 
-    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    id = db.Column(
+        db.String(36), primary_key=True, default=lambda: str(uuid.uuid4())
+    )
 
     # -------------------------------------------------------------------------
     # Foreign keys
@@ -47,22 +49,32 @@ class FraudReport(db.Model):
     # -------------------------------------------------------------------------
     # Timestamps
     # -------------------------------------------------------------------------
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
     resolved_at = db.Column(db.DateTime, nullable=True)
 
     # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------
-    
+
     # ⭐ User Fix: Kept as backref because User model lacks 'fraud_reports'.
     user = db.relationship(
         "User",
-        backref=db.backref("fraud_reports", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "fraud_reports", lazy="dynamic", passive_deletes=True
+        ),
     )
-    
+
     # Kept as back_populates assuming Transaction model has 'fraud_reports' defined.
-    transaction = db.relationship("Transaction", back_populates="fraud_reports")
+    transaction = db.relationship(
+        "Transaction", back_populates="fraud_reports"
+    )
 
     # -------------------------------------------------------------------------
     # Serialization helpers
@@ -77,9 +89,15 @@ class FraudReport(db.Model):
             "status": self.status,
             "description": self.description,
             "evidence": self.evidence,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
+            "created_at": self.created_at.isoformat()
+            if self.created_at
+            else None,
+            "updated_at": self.updated_at.isoformat()
+            if self.updated_at
+            else None,
+            "resolved_at": self.resolved_at.isoformat()
+            if self.resolved_at
+            else None,
         }
 
     def __repr__(self):

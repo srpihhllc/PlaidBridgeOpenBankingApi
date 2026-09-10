@@ -5,7 +5,7 @@
 #              Updated to use dynamic 1:1 backref to fix User mapper KeyError.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -29,23 +29,27 @@ class UserDashboard(db.Model):
     settings = db.Column(db.JSON, nullable=True)
 
     # Timestamping for cockpit audits
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+    )
     updated_at = db.Column(
         db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
         nullable=False,
     )
 
     # -------------------------------------------------------------------------
     # Relationships
     # -------------------------------------------------------------------------
-    
+
     # ⭐ User Fix: Swapped back_populates to a dynamic backref.
     # Included uselist=False to ensure a strict 1:1 scalar mapping on the User model.
     user = db.relationship(
         "User",
-        backref=db.backref("user_dashboard", uselist=False, passive_deletes=True),
+        backref=db.backref(
+            "user_dashboard", uselist=False, passive_deletes=True
+        ),
     )
 
     # -------------------------------------------------------------------------
@@ -114,4 +118,7 @@ class UserDashboard(db.Model):
     # Representation
     # -------------------------------------------------------------------------
     def __repr__(self):
-        return f"<UserDashboard user_id={self.user_id} " f"layout={self.get_setting('layout')}>"
+        return (
+            f"<UserDashboard user_id={self.user_id} "
+            f"layout={self.get_setting('layout')}>"
+        )

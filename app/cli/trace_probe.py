@@ -1,5 +1,6 @@
 # app/cli/trace_probe.py
 
+
 # Stub for render_session_bootstrap; replace with actual import if the module exists
 def render_session_bootstrap():
     """Render session bootstrap tile. Stub implementation."""

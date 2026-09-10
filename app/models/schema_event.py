@@ -5,7 +5,7 @@
 #              Updated to use dynamic backref to prevent KeyError on User mapper.
 # =============================================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -29,10 +29,16 @@ class SchemaEvent(db.Model):
         nullable=False,
     )
 
-    event_type = db.Column(db.String(64), nullable=False)  # e.g. 'REVISION_APPLIED'
+    event_type = db.Column(
+        db.String(64), nullable=False
+    )  # e.g. 'REVISION_APPLIED'
     detail = db.Column(db.Text, nullable=True)  # JSON string, freeform notes
-    origin = db.Column(db.String(64), nullable=True)  # e.g. 'auto', 'manual', 'cli'
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    origin = db.Column(
+        db.String(64), nullable=True
+    )  # e.g. 'auto', 'manual', 'cli'
+    timestamp = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # -------------------------------------------------------------------------
     # Relationships
@@ -41,7 +47,9 @@ class SchemaEvent(db.Model):
     # ⭐ User Fix: Swapped back_populates to dynamic backref since User lacks 'schema_events'
     user = db.relationship(
         "User",
-        backref=db.backref("schema_events", lazy="dynamic", passive_deletes=True),
+        backref=db.backref(
+            "schema_events", lazy="dynamic", passive_deletes=True
+        ),
     )
 
     def __repr__(self):

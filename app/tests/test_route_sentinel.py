@@ -19,12 +19,13 @@ def _assert_owned_by_oauth(rules):
     assert eps, "No endpoints found for rule(s)"
     # Ensure every endpoint is owned by oauth blueprint
     assert all(e.startswith("oauth.") for e in eps), (
-        "Found non-oauth endpoint(s) for the rule: "
-        + ", ".join(sorted(eps))
+        "Found non-oauth endpoint(s) for the rule: " + ", ".join(sorted(eps))
     )
     # Ensure blueprint name set is exactly {'oauth'}
     bps = {e.split(".", 1)[0] for e in eps}
-    assert bps == {"oauth"}, f"Expected only 'oauth' blueprint ownership; found: {bps}"
+    assert bps == {
+        "oauth"
+    }, f"Expected only 'oauth' blueprint ownership; found: {bps}"
 
 
 def test_oauth_callback_google_sentinel(app, client):
@@ -40,18 +41,22 @@ def test_oauth_callback_google_sentinel(app, client):
 
     endpoints = _endpoints_of(rules)
     # Match against the exact runtime endpoint registered by the app
-    assert "oauth.callback_google" in endpoints, (
-        f"Expected 'oauth.callback_google' to be registered for /callback/google; found: {sorted(endpoints)}"
-    )
+    assert (
+        "oauth.callback_google" in endpoints
+    ), f"Expected 'oauth.callback_google' to be registered for /callback/google; found: {sorted(endpoints)}"
 
     # Ensure no other blueprint is shadowing this rule
     _assert_owned_by_oauth(rules)
 
     # Behavior: missing code → 400 and contains the missing-code message
     resp = client.get("/callback/google")
-    assert resp.status_code == 400, f"Expected 400 for missing code, got {resp.status_code}"
+    assert (
+        resp.status_code == 400
+    ), f"Expected 400 for missing code, got {resp.status_code}"
     body = resp.get_data(as_text=True) or ""
-    assert "missing code" in body.lower(), "Response did not include expected missing-code message"
+    assert (
+        "missing code" in body.lower()
+    ), "Response did not include expected missing-code message"
 
 
 def test_oauth_callback_microsoft_sentinel(app, client):
@@ -67,16 +72,20 @@ def test_oauth_callback_microsoft_sentinel(app, client):
 
     endpoints = _endpoints_of(rules)
     # Match against the exact runtime endpoint registered by the app
-    assert "oauth.callback_microsoft" in endpoints, (
-        f"Expected 'oauth.callback_microsoft' to be registered for /callback/microsoft; found: {sorted(endpoints)}"
-    )
+    assert (
+        "oauth.callback_microsoft" in endpoints
+    ), f"Expected 'oauth.callback_microsoft' to be registered for /callback/microsoft; found: {sorted(endpoints)}"
 
     _assert_owned_by_oauth(rules)
 
     resp = client.get("/callback/microsoft")
-    assert resp.status_code == 400, f"Expected 400 for missing code, got {resp.status_code}"
+    assert (
+        resp.status_code == 400
+    ), f"Expected 400 for missing code, got {resp.status_code}"
     body = resp.get_data(as_text=True) or ""
-    assert "missing code" in body.lower(), "Response did not include expected missing-code message"
+    assert (
+        "missing code" in body.lower()
+    ), "Response did not include expected missing-code message"
 
 
 def test_oauth_callback_provider_and_oauth_prefix_sentinel(app):
@@ -91,9 +100,9 @@ def test_oauth_callback_provider_and_oauth_prefix_sentinel(app):
     assert rules, "No rule registered for endpoint 'oauth.callback_provider'"
 
     endpoints = _endpoints_of(rules)
-    assert "oauth.callback_provider" in endpoints, (
-        f"Expected 'oauth.callback_provider' in endpoints; found: {sorted(endpoints)}"
-    )
+    assert (
+        "oauth.callback_provider" in endpoints
+    ), f"Expected 'oauth.callback_provider' in endpoints; found: {sorted(endpoints)}"
 
     # Ensure ownership is exclusive to oauth and not shadowed by other blueprints
     _assert_owned_by_oauth(rules)
@@ -106,7 +115,11 @@ def test_no_shadowed_or_duplicate_callback_routes(app):
     - all endpoints for that rule are owned by oauth
     - there are not endpoints from multiple different blueprints for the same rule
     """
-    targets = ["/callback/google", "/callback/microsoft", "oauth.callback_provider"]
+    targets = [
+        "/callback/google",
+        "/callback/microsoft",
+        "oauth.callback_provider",
+    ]
     for path in targets:
         rules = _rules_for(app, path)
         assert rules, f"No rule registered for target: {path}"
@@ -114,9 +127,11 @@ def test_no_shadowed_or_duplicate_callback_routes(app):
         endpoints = _endpoints_of(rules)
         # Sanity: no duplicate blueprints owning the same rule
         blueprints = {e.split(".", 1)[0] for e in endpoints}
-        assert len(blueprints) == 1 and "oauth" in blueprints, (
-            f"Expected only 'oauth' to own rule {path}; found blueprints: {sorted(blueprints)} with endpoints: {sorted(endpoints)}"
-        )
+        assert (
+            len(blueprints) == 1 and "oauth" in blueprints
+        ), f"Expected only 'oauth' to own rule {path}; found blueprints: {sorted(blueprints)} with endpoints: {sorted(endpoints)}"
 
         # Also assert endpoints are unique (no duplicate identical endpoints)
-        assert len(endpoints) == len(set(endpoints)), f"Duplicate endpoints detected for target {path}: {sorted(endpoints)}"
+        assert (
+            len(endpoints) == len(set(endpoints))
+        ), f"Duplicate endpoints detected for target {path}: {sorted(endpoints)}"

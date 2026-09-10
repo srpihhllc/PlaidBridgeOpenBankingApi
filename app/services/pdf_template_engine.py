@@ -28,7 +28,9 @@ class CSVtoPDFEngine:
     # ---------------------------------------------------------------------
     # Public API
     # ---------------------------------------------------------------------
-    def render_pdf(self, csv_path: str, pdf_path: str, template: str = "table") -> None:
+    def render_pdf(
+        self, csv_path: str, pdf_path: str, template: str = "table"
+    ) -> None:
         """
         Render a CSV file into a PDF using the selected template.
         Supported templates:
@@ -113,7 +115,12 @@ class CSVtoPDFEngine:
         pdf.set_font(self.font, size=9)
 
         for idx, row in enumerate(rows):
-            pdf.cell(0, 6, f"[{idx:04d}] " + " | ".join(str(c) for c in row), ln=True)
+            pdf.cell(
+                0,
+                6,
+                f"[{idx:04d}] " + " | ".join(str(c) for c in row),
+                ln=True,
+            )
 
         return bytes(pdf.output(dest="S"))
 
@@ -130,7 +137,9 @@ class CSVtoPDFEngine:
 
         for row in rows:
             for i, cell in enumerate(row):
-                widths[i] = max(widths[i], pdf.get_string_width(str(cell)) + 6.0)
+                widths[i] = max(
+                    widths[i], pdf.get_string_width(str(cell)) + 6.0
+                )
 
         total_width = sum(widths)
         max_width = pdf.w - 20  # pdf.w is float

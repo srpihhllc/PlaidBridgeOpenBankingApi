@@ -6,7 +6,11 @@
 from .account_forms import AccountUpdateForm
 from .auth_forms import LoginForm, RegistrationForm
 from .mfa_forms import MFAEnableForm, MFAForm
-from .password_forms import ChangePasswordForm, PasswordResetForm, PasswordResetRequestForm
+from .password_forms import (
+    ChangePasswordForm,
+    PasswordResetForm,
+    PasswordResetRequestForm,
+)
 from .pii_forms import PIIRequestForm
 
 __all__ = [

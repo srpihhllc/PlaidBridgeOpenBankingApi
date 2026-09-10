@@ -38,7 +38,8 @@ def cli_audit():
 
             # Pass 2: Check if this module successfully satisfies the manage.py discovery loop
             has_pure_command = any(
-                isinstance(obj, click.Command) and not isinstance(obj, click.Group)
+                isinstance(obj, click.Command)
+                and not isinstance(obj, click.Group)
                 for _, obj in inspect.getmembers(mod)
             )
 
@@ -48,20 +49,30 @@ def cli_audit():
 
             # Pass 3: If no command exists, flag locally defined public functions as un-decorated
             for name, obj in inspect.getmembers(mod):
-                if name.startswith("_") or name in ("init_app", "run_cli", "COMMANDS"):
+                if name.startswith("_") or name in (
+                    "init_app",
+                    "run_cli",
+                    "COMMANDS",
+                ):
                     continue
 
                 if inspect.isfunction(obj) and obj.__module__ == mod.__name__:
-                    violations.append(f"{mod_path}:{name} — function is not a click.Command")
+                    violations.append(
+                        f"{mod_path}:{name} — function is not a click.Command"
+                    )
         except Exception as scan_err:
-            violations.append(f"❌ Metaprogramming reflection failure in {mod_path}: {scan_err}")
+            violations.append(
+                f"❌ Metaprogramming reflection failure in {mod_path}: {scan_err}"
+            )
 
     for target_dir in TARGET_DIRS:
         for py_file in target_dir.rglob("*.py"):
             if py_file.name == "__init__.py":
                 continue
             module_path = ".".join(
-                py_file.relative_to(Path(__file__).resolve().parent.parent).with_suffix("").parts
+                py_file.relative_to(Path(__file__).resolve().parent.parent)
+                .with_suffix("")
+                .parts
             )
             try:
                 mod = importlib.import_module(f"app.{module_path}")
@@ -81,7 +92,10 @@ def cli_audit():
                 meta={"violations": violations},
             )
         except Exception as redis_err:
-            click.echo(f"⚠️ Telemetry fallback: Trace log failed: {redis_err}", err=True)
+            click.echo(
+                f"⚠️ Telemetry fallback: Trace log failed: {redis_err}",
+                err=True,
+            )
 
         click.echo("🚨 CLI Audit Failed:")
         for v in violations:
@@ -98,7 +112,9 @@ def cli_audit():
             ttl=300,
             meta={"violations": 0},
         )
-    except Exception as redis_err:
+    except Exception:
         pass
 
-    click.echo("✅ CLI Audit Passed — all commands are @click.command and no Groups found.")
+    click.echo(
+        "✅ CLI Audit Passed — all commands are @click.command and no Groups found."
+    )

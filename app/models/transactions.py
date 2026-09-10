@@ -6,7 +6,7 @@
 # =============================================================================
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -47,7 +47,9 @@ class Transaction(db.Model):
     category = db.Column(db.String(255))
     description = db.Column(db.String(255), nullable=True)
     is_pending = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     # -------------------------------------------------------------------------
     # Plaid‑style enrichment fields

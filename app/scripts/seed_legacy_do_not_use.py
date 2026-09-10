@@ -10,6 +10,7 @@ Usage:
 """
 
 import datetime
+from datetime import timezone
 
 from sqlalchemy.orm import Session
 
@@ -32,7 +33,9 @@ def seed():
 
         # Create sample lender
         lender = models.Lender(
-            name="Demo Lender Inc.", account_number="LEND123456", health_score=95
+            name="Demo Lender Inc.",
+            account_number="LEND123456",
+            health_score=95,
         )
 
         # Create sample borrower
@@ -50,7 +53,7 @@ def seed():
             principal_amount=5000,
             interest_rate=0.05,
             status="active",
-            created_at=datetime.datetime.utcnow(),
+            created_at=datetime.datetime.now(timezone.utc),
         )
         session.add(loan)
         session.flush()
@@ -60,19 +63,21 @@ def seed():
             loan_id=loan.id,
             amount=-200,
             description="Monthly repayment",
-            timestamp=datetime.datetime.utcnow(),
+            timestamp=datetime.datetime.now(timezone.utc),
         )
         tx2 = models.Transaction(
             loan_id=loan.id,
             amount=+5000,
             description="Loan disbursement",
-            timestamp=datetime.datetime.utcnow(),
+            timestamp=datetime.datetime.now(timezone.utc),
         )
 
         session.add_all([tx1, tx2])
         session.commit()
 
-        print("✅ Database seeded with demo borrower, lender, loan, and transactions.")
+        print(
+            "✅ Database seeded with demo borrower, lender, loan, and transactions."
+        )
 
     except Exception as e:
         session.rollback()

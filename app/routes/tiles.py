@@ -29,7 +29,9 @@ def pulse_status():
             failures.append(
                 {
                     "key": key.decode() if isinstance(key, bytes) else key,
-                    "value": data.decode() if isinstance(data, bytes) else data,
+                    "value": data.decode()
+                    if isinstance(data, bytes)
+                    else data,
                 }
             )
 
@@ -38,7 +40,9 @@ def pulse_status():
 
     except Exception as e:
         trace_log("pulse/error", str(e))
-        return jsonify({"status": "error", "message": str(e), "failures": []}), 500
+        return jsonify(
+            {"status": "error", "message": str(e), "failures": []}
+        ), 500
 
 
 @tiles_bp.route("/blueprint_drift_overlay/pulse", methods=["GET"])

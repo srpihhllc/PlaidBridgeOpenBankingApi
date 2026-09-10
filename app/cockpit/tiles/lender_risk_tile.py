@@ -5,7 +5,7 @@
 # =============================================================================
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Blueprint, render_template
 from sqlalchemy import desc
@@ -27,7 +27,9 @@ def load_ai_risk_logs(limit=20):
     if not r:
         return []
 
-    keys = sorted([k.decode() for k in r.keys("grants_composed:*")], reverse=True)[:limit]
+    keys = sorted(
+        [k.decode() for k in r.keys("grants_composed:*")], reverse=True
+    )[:limit]
 
     logs = []
     for key in keys:
@@ -45,7 +47,11 @@ def load_ai_risk_logs(limit=20):
 # Helper: Load recent fraud trend summaries
 # -----------------------------------------------------------------------------
 def load_recent_fraud_cases(limit=20):
-    cases = FraudReport.query.order_by(desc(FraudReport.timestamp)).limit(limit).all()
+    cases = (
+        FraudReport.query.order_by(desc(FraudReport.timestamp))
+        .limit(limit)
+        .all()
+    )
 
     return [
         {
@@ -63,16 +69,21 @@ def load_recent_fraud_cases(limit=20):
 # -----------------------------------------------------------------------------
 def load_lender_events(limit=20):
     events = (
-        SchemaEvent.query.filter(
-            SchemaEvent.event_type.in_(
-                [
-                    "LENDER_SELF_LINKED",
-                    "LENDER_SELF_LINK_BLOCKED",
-                    "LENDER_RISK_ALERT",
-                ]
+        (
+            SchemaEvent.query.filter(
+                SchemaEvent.event_type.in_(
+                    [
+                        "LENDER_SELF_LINKED",
+                        "LENDER_SELF_LINK_BLOCKED",
+                        "LENDER_RISK_ALERT",
+                    ]
+                )
             )
         )
-    ) .order_by(desc(SchemaEvent.timestamp)).limit(limit).all()
+        .order_by(desc(SchemaEvent.timestamp))
+        .limit(limit)
+        .all()
+    )
 
     return [
         {
@@ -122,7 +133,7 @@ def lender_risk_tile():
         "fraud_cases": load_recent_fraud_cases(),
         "lender_events": load_lender_events(),
         "counters": counters,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     return render_template("cockpit/lender_risk_tile.html", context)
@@ -143,7 +154,9 @@ def lender_risk_heatmap():
     # Fetch relevant events
     events = (
         SchemaEvent.query.filter(
-            SchemaEvent.event_type.in_(["LENDER_RISK_ALERT", "LENDER_SELF_LINKED"])
+            SchemaEvent.event_type.in_(
+                ["LENDER_RISK_ALERT", "LENDER_SELF_LINKED"]
+            )
         )
         .order_by(SchemaEvent.timestamp.asc())
         .all()
@@ -184,7 +197,9 @@ def lender_risk_day_detail(date_str):
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
     except ValueError:
-        return render_template("cockpit/lender_risk_day_invalid.html", date_str=date_str)
+        return render_template(
+            "cockpit/lender_risk_day_invalid.html", date_str=date_str
+        )
 
     # Start/end of day
     start_dt = datetime.combine(target_date, datetime.min.time())
@@ -246,7 +261,9 @@ def lender_risk_overview():
     # Build a small heatmap preview (last 14 days)
     events = (
         SchemaEvent.query.filter(
-            SchemaEvent.event_type.in_(["LENDER_RISK_ALERT", "LENDER_SELF_LINKED"])
+            SchemaEvent.event_type.in_(
+                ["LENDER_RISK_ALERT", "LENDER_SELF_LINKED"]
+            )
         )
         .order_by(SchemaEvent.timestamp.asc())
         .all()

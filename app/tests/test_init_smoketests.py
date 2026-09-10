@@ -1,6 +1,7 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_init_smoketests.py
 
 import importlib
+
 import pytest
 from flask import Flask
 
@@ -26,7 +27,9 @@ def test_fintech_routes_are_versioned(client):
     assert any(r.startswith("/api/v1/fintech") for r in rules)
 
     # 🚫 Must not exist at root
-    assert not any(r.startswith("/fintech") and not r.startswith("/api/v1") for r in rules)
+    assert not any(
+        r.startswith("/fintech") and not r.startswith("/api/v1") for r in rules
+    )
 
 
 @pytest.mark.smoketest
@@ -53,10 +56,17 @@ def test_blueprint_registration_logged(caplog):
         create_app(config_class=TestConfig)
 
     # Check for the explicit registration logs OR the final success summary
-    has_registrations = any("Registered" in rec.message for rec in caplog.records)
-    has_success_signal = any("blueprints registered successfully" in rec.message for rec in caplog.records)
+    has_registrations = any(
+        "Registered" in rec.message for rec in caplog.records
+    )
+    has_success_signal = any(
+        "blueprints registered successfully" in rec.message
+        for rec in caplog.records
+    )
 
-    assert has_registrations or has_success_signal, "Failed to find valid blueprint registration logs."
+    assert (
+        has_registrations or has_success_signal
+    ), "Failed to find valid blueprint registration logs."
 
 
 @pytest.mark.smoketest
@@ -80,7 +90,10 @@ def test_fallback_app_guard(monkeypatch, caplog):
         importlib.reload(app_module)
 
         # --- Assertions ---
-        assert any("UNSAFE FALLBACK APP CREATED" in rec.message for rec in caplog.records)
+        assert any(
+            "UNSAFE FALLBACK APP CREATED" in rec.message
+            for rec in caplog.records
+        )
         assert getattr(app_module, "app", None) is not None
         assert isinstance(app_module.app, Flask)
         assert app_module.app.config.get("SAFE_MODE") is True
@@ -100,7 +113,9 @@ def test_jwt_and_login_loaders_registered(client):
     app = client.application
 
     # Flask-Login user_loader should be set
-    assert app.login_manager._user_callback is not None, "Flask-Login user_loader not registered"
+    assert (
+        app.login_manager._user_callback is not None
+    ), "Flask-Login user_loader not registered"
 
     # Fetch jwt_manager authoritatively from extensions map or fallback to the global manager
     jwt_manager = app.extensions.get("flask-jwt-extended") or jwt
@@ -108,11 +123,15 @@ def test_jwt_and_login_loaders_registered(client):
 
     # Verify JWT blocklist loader callback registration
     blocklist_cb = getattr(jwt_manager, "_token_in_blocklist_callback", None)
-    assert blocklist_cb is not None and callable(blocklist_cb), "JWT blocklist loader callback not registered"
+    assert blocklist_cb is not None and callable(
+        blocklist_cb
+    ), "JWT blocklist loader callback not registered"
 
     # Verify JWT identity loader callback registration
     identity_cb = getattr(jwt_manager, "_user_identity_callback", None)
-    assert identity_cb is not None and callable(identity_cb), "JWT identity loader callback not registered"
+    assert identity_cb is not None and callable(
+        identity_cb
+    ), "JWT identity loader callback not registered"
 
 
 @pytest.mark.smoketest
@@ -122,5 +141,8 @@ def test_config_class_name_logged(caplog):
         create_app(config_class=TestConfig)
     # Look for the class name string in the logs
     assert any(
-        "TestConfig" in rec.message or "TestingConfig" in rec.message or "DevelopmentConfig" in rec.message for rec in caplog.records
+        "TestConfig" in rec.message
+        or "TestingConfig" in rec.message
+        or "DevelopmentConfig" in rec.message
+        for rec in caplog.records
     ), "Config class name not logged correctly"

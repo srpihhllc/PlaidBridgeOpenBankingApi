@@ -4,10 +4,19 @@
 from app.dto.fraud_summary_dto import FraudSummaryDTO
 from app.dto.transaction_dto import TransactionDTO
 
-SUSPICIOUS_KEYWORDS = ["crypto", "gambling", "casino", "bet", "wire", "overseas"]
+SUSPICIOUS_KEYWORDS = [
+    "crypto",
+    "gambling",
+    "casino",
+    "bet",
+    "wire",
+    "overseas",
+]
 
 
-def compute_fraud_summary(transactions: list[TransactionDTO]) -> FraudSummaryDTO:
+def compute_fraud_summary(
+    transactions: list[TransactionDTO],
+) -> FraudSummaryDTO:
     flagged = []
     risk_score = 0
 

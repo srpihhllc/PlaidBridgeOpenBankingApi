@@ -1,6 +1,6 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/banking/bank_statement.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..extensions import db
 
@@ -25,7 +25,11 @@ class BankStatement(db.Model):
     name = db.Column(db.String(100), nullable=False)
     txn_count = db.Column(db.Integer, default=0)
     source_api = db.Column(db.String(64))
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    timestamp = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    created_at = db.Column(
+        db.DateTime, default=lambda: datetime.now(timezone.utc)
+    )
 
     user = db.relationship("User", back_populates="bank_statements")

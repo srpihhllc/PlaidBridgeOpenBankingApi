@@ -5,6 +5,7 @@ Debug helper to check which config is used and to POST to login endpoints.
 Put this at app/debug/debug_login.py and run from the repo root:
   python app/debug/debug_login.py | tee /tmp/debug_login.out
 """
+
 import os
 import sys
 
@@ -13,7 +14,11 @@ os.environ.setdefault("FLASK_ENV", "testing")
 
 # Make repo root and common subpackage paths importable
 repo_root = os.getcwd()
-candidates = [repo_root, os.path.join(repo_root, "PlaidBridgeOpenBankingApi"), os.path.join(repo_root)]
+candidates = [
+    repo_root,
+    os.path.join(repo_root, "PlaidBridgeOpenBankingApi"),
+    os.path.join(repo_root),
+]
 # Prepend candidates to sys.path if not already present
 for p in candidates:
     if p and p not in sys.path:

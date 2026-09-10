@@ -5,6 +5,7 @@
 
 from app.services.symphony_ai import SymphonyAI
 
+
 def run_compliance_stress_test():
     cortex = SymphonyAI()
 

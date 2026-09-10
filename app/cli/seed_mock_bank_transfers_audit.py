@@ -6,7 +6,9 @@ from flask.cli import with_appcontext
 
 from app.extensions import db
 from app.models import Transaction, User
-from app.models.audit_log import AuditLog  # adjust import if your model lives elsewhere
+from app.models.audit_log import (
+    AuditLog,
+)  # adjust import if your model lives elsewhere
 
 
 @click.command("seed-mock-bank-transfers-audit")
@@ -34,13 +36,21 @@ def seed_mock_bank_transfers_audit():
     # -------------------------------------------------------------------------
     # 2. Load all mock bank transfers for this user
     # -------------------------------------------------------------------------
-    transfers = Transaction.query.filter_by(user_id=user.id).order_by(Transaction.date.desc()).all()
+    transfers = (
+        Transaction.query.filter_by(user_id=user.id)
+        .order_by(Transaction.date.desc())
+        .all()
+    )
 
     if not transfers:
-        logger.warning("⚠️ No transactions found for subscriber — nothing to audit.")
+        logger.warning(
+            "⚠️ No transactions found for subscriber — nothing to audit."
+        )
         return
 
-    logger.info(f"📦 Loaded {len(transfers)} transactions for audit processing.")
+    logger.info(
+        f"📦 Loaded {len(transfers)} transactions for audit processing."
+    )
 
     # -------------------------------------------------------------------------
     # 3. Emit audit events
@@ -51,7 +61,9 @@ def seed_mock_bank_transfers_audit():
         event_type = "mock_bank_transfer_audit"
 
         # Deduplication: skip if event already exists
-        existing = AuditLog.query.filter_by(transaction_id=tx.id, event_type=event_type).first()
+        existing = AuditLog.query.filter_by(
+            transaction_id=tx.id, event_type=event_type
+        ).first()
 
         if existing:
             continue

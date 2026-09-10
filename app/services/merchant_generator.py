@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Any, Final
 
 # -----------------------------------------------------------------------------
@@ -67,7 +67,11 @@ MERCHANTS: Final[list[dict[str, Any]]] = [
         "amount_range": (-8.00, -45.00),
         "spending_bias": {"morning": 0.15, "afternoon": 0.35, "evening": 0.50},
         "fraud_risk": 0.08,
-        "location": {"city": "San Francisco", "lat": 37.7749, "lon": -122.4194},
+        "location": {
+            "city": "San Francisco",
+            "lat": 37.7749,
+            "lon": -122.4194,
+        },
     },
 ]
 
@@ -99,7 +103,9 @@ def generate_plaid_style_transaction() -> dict[str, Any]:
     # Amount
     low, high = merchant["amount_range"]
     # Ensure valid uniform arguments by dynamically finding min/max
-    amount = round(random.uniform(min(low, high), max(low, high)) * (1 + (bias * 0.1)), 2)
+    amount = round(
+        random.uniform(min(low, high), max(low, high)) * (1 + (bias * 0.1)), 2
+    )
 
     # Fraud likelihood scoring
     fraud_score = round(merchant["fraud_risk"] * random.uniform(0.8, 1.4), 3)
@@ -108,7 +114,9 @@ def generate_plaid_style_transaction() -> dict[str, Any]:
     payment_meta = {
         "reference_number": f"RF{random.randint(100000, 999999)}",
         "ppd_id": f"PPD{random.randint(1000, 9999)}",
-        "payment_method": random.choice(["card_present", "card_not_present", "online"]),
+        "payment_method": random.choice(
+            ["card_present", "card_not_present", "online"]
+        ),
     }
 
     # Location object
@@ -122,7 +130,8 @@ def generate_plaid_style_transaction() -> dict[str, Any]:
         "cluster": merchant["cluster"],
         "description": name,
         "amount": amount,
-        "date": datetime.utcnow() - timedelta(days=random.randint(1, 60)),
+        "date": datetime.now(timezone.utc)
+        - timedelta(days=random.randint(1, 60)),
         "is_pending": False,
         "fraud_score": fraud_score,
         "location": location,

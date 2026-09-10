@@ -86,7 +86,9 @@ def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
 
     # Parse and sanitize query params, possibly promoting tls
     q = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    ssl_q = q.pop("ssl", "").strip().lower()  # remove ssl from query if present
+    ssl_q = (
+        q.pop("ssl", "").strip().lower()
+    )  # remove ssl from query if present
 
     promote_tls = False
     if ssl_q in {"1", "true", "yes"} and scheme == "redis":
@@ -176,7 +178,9 @@ def get_redis_client() -> Redis[Any] | None:
         return None
 
     if not raw_url:
-        logger.debug("REDIS_STORAGE_URI not set; get_redis_client returning None.")
+        logger.debug(
+            "REDIS_STORAGE_URI not set; get_redis_client returning None."
+        )
         return None
 
     url, tls_enabled = _normalize_redis_uri(raw_url)
@@ -203,7 +207,9 @@ def get_redis_client() -> Redis[Any] | None:
             client.ping()
         except Exception as ping_exc:
             REDIS_CONNECT_FAILURES_COUNTER.inc()
-            logger.warning("Redis ping failed for %s: %s", _masked_endpoint(url), ping_exc)
+            logger.warning(
+                "Redis ping failed for %s: %s", _masked_endpoint(url), ping_exc
+            )
             try:
                 ttl_emit(
                     key=REDIS_PING_KEY,
@@ -240,9 +246,17 @@ def get_redis_client() -> Redis[Any] | None:
                 ttl=REDIS_QUEUE_FLUSH_TTL,
                 client=client,
             )
-            ttl_emit(key=REDIS_PING_KEY, status="success", ttl=REDIS_PING_TTL, client=client)
+            ttl_emit(
+                key=REDIS_PING_KEY,
+                status="success",
+                ttl=REDIS_PING_TTL,
+                client=client,
+            )
         except Exception:
-            logger.debug("Best-effort telemetry/flush failed (continuing).", exc_info=True)
+            logger.debug(
+                "Best-effort telemetry/flush failed (continuing).",
+                exc_info=True,
+            )
 
         if has_app_context():
             current_app.redis_client = client
@@ -257,7 +271,11 @@ def get_redis_client() -> Redis[Any] | None:
             exc_info=True,
         )
         try:
-            ttl_emit(key=REDIS_PING_KEY, status=f"type_error:{te}", ttl=REDIS_FAIL_TTL)
+            ttl_emit(
+                key=REDIS_PING_KEY,
+                status=f"type_error:{te}",
+                ttl=REDIS_FAIL_TTL,
+            )
         except Exception:
             pass
         return None
@@ -271,7 +289,9 @@ def get_redis_client() -> Redis[Any] | None:
             exc_info=True,
         )
         try:
-            ttl_emit(key=REDIS_PING_KEY, status=f"error:{e}", ttl=REDIS_FAIL_TTL)
+            ttl_emit(
+                key=REDIS_PING_KEY, status=f"error:{e}", ttl=REDIS_FAIL_TTL
+            )
         except Exception:
             pass
         return None
@@ -309,7 +329,8 @@ def get_cluster_debug_flags() -> dict[str, Any]:
                     flags[key_str] = val_str
         except Exception as exc:
             logger.warning(
-                "Redis flag lookup failed, relying on local config fallback: %s", exc
+                "Redis flag lookup failed, relying on local config fallback: %s",
+                exc,
             )
 
     return flags
@@ -336,7 +357,9 @@ def set_cluster_debug_flags(updates: dict[str, Any]) -> dict[str, Any]:
                 client.hset(REDIS_DEBUG_FLAGS_HASH, key, serialized)
             except Exception as exc:
                 logger.warning(
-                    "Failed to synchronize debug flag '%s' across Redis: %s", key, exc
+                    "Failed to synchronize debug flag '%s' across Redis: %s",
+                    key,
+                    exc,
                 )
 
     return applied
@@ -345,14 +368,20 @@ def set_cluster_debug_flags(updates: dict[str, Any]) -> dict[str, Any]:
 # -------------------------------------------------------------------------
 # Utility helpers
 # -------------------------------------------------------------------------
-def set_job_status(job_id: str, status: str, data: dict | None = None, ttl: int = 3600) -> None:
+def set_job_status(
+    job_id: str, status: str, data: dict | None = None, ttl: int = 3600
+) -> None:
     client = get_redis_client()
     if not client:
         return
     try:
-        client.setex(job_id, ttl, json.dumps({"status": status, "data": data or {}}))
+        client.setex(
+            job_id, ttl, json.dumps({"status": status, "data": data or {}})
+        )
     except Exception as e:
-        logger.error("Failed to set job status for %s: %s", job_id, e, exc_info=True)
+        logger.error(
+            "Failed to set job status for %s: %s", job_id, e, exc_info=True
+        )
 
 
 def get_job_status(job_id: str) -> dict[str, Any] | None:
@@ -363,7 +392,9 @@ def get_job_status(job_id: str) -> dict[str, Any] | None:
         raw = client.get(job_id)
         return cast(dict[str, Any], json.loads(raw)) if raw else None
     except Exception as e:
-        logger.error("Failed to get job status for %s: %s", job_id, e, exc_info=True)
+        logger.error(
+            "Failed to get job status for %s: %s", job_id, e, exc_info=True
+        )
         return None
 
 
@@ -374,7 +405,12 @@ def increment_progress(blast_id: str, field: str) -> None:
     try:
         client.hincrby(f"dispute:progress:{blast_id}", field, 1)
     except Exception as e:
-        logger.error("Failed to increment progress for %s: %s", blast_id, e, exc_info=True)
+        logger.error(
+            "Failed to increment progress for %s: %s",
+            blast_id,
+            e,
+            exc_info=True,
+        )
 
 
 def init_progress(blast_id: str, total: int) -> None:
@@ -382,9 +418,16 @@ def init_progress(blast_id: str, total: int) -> None:
     if not client:
         return
     try:
-        client.hset(f"dispute:progress:{blast_id}", mapping={"total": total, "sent": 0})
+        client.hset(
+            f"dispute:progress:{blast_id}", mapping={"total": total, "sent": 0}
+        )
     except Exception as e:
-        logger.error("Failed to initialize progress for %s: %s", blast_id, e, exc_info=True)
+        logger.error(
+            "Failed to initialize progress for %s: %s",
+            blast_id,
+            e,
+            exc_info=True,
+        )
 
 
 def call_reflector_ai(payload: dict) -> dict[str, Any]:
@@ -433,9 +476,15 @@ def get_recent_logs(key: str, lines: int = 200) -> list[str]:
     try:
         raw = client.lrange(key, -lines, -1)
         return [
-            (item.decode("utf-8", errors="ignore") if isinstance(item, bytes) else str(item))
+            (
+                item.decode("utf-8", errors="ignore")
+                if isinstance(item, bytes)
+                else str(item)
+            )
             for item in raw
         ]
     except Exception as e:
-        logger.error("Failed to retrieve logs for key %s: %s", key, e, exc_info=True)
+        logger.error(
+            "Failed to retrieve logs for key %s: %s", key, e, exc_info=True
+        )
         return []

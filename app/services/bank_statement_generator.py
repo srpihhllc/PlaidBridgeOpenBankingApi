@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import csv
 import logging
-import sys
 from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
@@ -20,7 +19,9 @@ from flask import current_app, has_app_context
 from fpdf import FPDF
 
 # Path to FDIC branch attributes CSV (operator-visible, no import-time IO)
-BRANCH_CSV_PATH = Path(__file__).parent.parent / "data" / "CSV_ATTRIBUTES_BRANCHES.csv"
+BRANCH_CSV_PATH = (
+    Path(__file__).parent.parent / "data" / "CSV_ATTRIBUTES_BRANCHES.csv"
+)
 
 
 # -------------------------------------------------------------------------
@@ -32,11 +33,13 @@ def _log_debug(msg: str) -> None:
     else:
         logging.debug(msg)
 
+
 def _log_warning(msg: str) -> None:
     if has_app_context():
         current_app.logger.warning(msg)
     else:
         logging.warning(msg)
+
 
 def _log_error(msg: str) -> None:
     if has_app_context():
@@ -56,30 +59,41 @@ def _load_branch_bank_names() -> set[str]:
     """
     try:
         if not BRANCH_CSV_PATH.exists():
-            _log_warning(f"[LOGO_RESOLVE] Branch CSV not found: {BRANCH_CSV_PATH}")
+            _log_warning(
+                f"[LOGO_RESOLVE] Branch CSV not found: {BRANCH_CSV_PATH}"
+            )
             return set()
         df = pd.read_csv(BRANCH_CSV_PATH, usecols=["NM_LGL"])
         names = set(df["NM_LGL"].dropna().astype(str).str.strip().unique())
-        _log_debug(f"[LOGO_RESOLVE] Loaded {len(names)} bank names from branch CSV")
+        _log_debug(
+            f"[LOGO_RESOLVE] Loaded {len(names)} bank names from branch CSV"
+        )
         return names
     except Exception as e:
         _log_warning(f"[LOGO_RESOLVE] Could not load branch CSV: {e}")
         return set()
 
+
 def _normalize_filename(name: str) -> str:
     """Normalize a bank name to match logo filenames in static/logos."""
     return "".join(c for c in name.lower() if c.isalnum())
 
+
 def _resolve_static_base(static_folder: str | None) -> Path:
     base_static = Path(
-        static_folder or (has_app_context() and current_app.static_folder) or "static"
+        static_folder
+        or (has_app_context() and current_app.static_folder)
+        or "static"
     )
     return base_static / "logos"
+
 
 def _logo_path(bank_name: str, static_folder: str | None = None) -> str:
     """Resolve the logo path for a given bank name from static/logos."""
     base = _resolve_static_base(static_folder)
-    _log_debug(f"[LOGO_RESOLVE] Resolving logo for bank: '{bank_name}' (base={base})")
+    _log_debug(
+        f"[LOGO_RESOLVE] Resolving logo for bank: '{bank_name}' (base={base})"
+    )
 
     candidates = {
         "Piermont Bank": base / "PiermontBankLogo.png",
@@ -102,10 +116,14 @@ def _logo_path(bank_name: str, static_folder: str | None = None) -> str:
 
     fallback_logo = base / "NoLogo.png"
     if fallback_logo.exists():
-        _log_warning(f"[LOGO_RESOLVE] No match found for '{bank_name}', using fallback: {fallback_logo}")
+        _log_warning(
+            f"[LOGO_RESOLVE] No match found for '{bank_name}', using fallback: {fallback_logo}"
+        )
         return str(fallback_logo)
 
-    _log_error(f"[LOGO_RESOLVE] No logo found for '{bank_name}' and fallback missing in {base}!")
+    _log_error(
+        f"[LOGO_RESOLVE] No logo found for '{bank_name}' and fallback missing in {base}!"
+    )
     return ""
 
 
@@ -118,10 +136,13 @@ def _safe_amount(val: Any) -> str:
     except Exception:
         return "0.00"
 
+
 def _safe_text(val: Any, default: str = "") -> str:
     try:
         s = str(val).strip()
-        return s.encode("latin-1", "replace").decode("latin-1") if s else default
+        return (
+            s.encode("latin-1", "replace").decode("latin-1") if s else default
+        )
     except Exception:
         return default
 
@@ -143,14 +164,23 @@ def render_branded_bank_statement_pdf(
             pdf.image(logo, x=10, y=8, w=33)
         except Exception as e:
             _log_warning(f"[PDF] Failed to place logo '{logo}': {e}")
-            
+
     pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, _safe_text(bank_name, "Bank Statement"), ln=True, align="C")
+    pdf.cell(
+        0, 10, _safe_text(bank_name, "Bank Statement"), ln=True, align="C"
+    )
 
     # Account info
     pdf.set_font("Arial", size=12)
-    pdf.cell(0, 10, f"Account Number: {_safe_text(account_number, 'N/A')}", ln=True)
-    pdf.cell(0, 10, f"Statement Date: {datetime.now().strftime('%Y-%m-%d')}", ln=True)
+    pdf.cell(
+        0, 10, f"Account Number: {_safe_text(account_number, 'N/A')}", ln=True
+    )
+    pdf.cell(
+        0,
+        10,
+        f"Statement Date: {datetime.now().strftime('%Y-%m-%d')}",
+        ln=True,
+    )
 
     # Transactions table
     pdf.ln(10)

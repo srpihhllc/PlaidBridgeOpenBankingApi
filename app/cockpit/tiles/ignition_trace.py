@@ -2,9 +2,13 @@
 
 from flask import Blueprint, render_template
 
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 
-bp_ignition = Blueprint("ignition_trace", __name__, url_prefix="/cockpit/ignition")
+bp_ignition = Blueprint(
+    "ignition_trace", __name__, url_prefix="/cockpit/ignition"
+)
 
 
 @bp_ignition.route("/")

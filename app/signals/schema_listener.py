@@ -31,7 +31,9 @@ def schema_listener(app):
             try:
                 pubsub = r.pubsub(ignore_subscribe_messages=True)
                 pubsub.subscribe("schema:update")
-                app.logger.info("[schema_listener] Subscribed to schema:update channel.")
+                app.logger.info(
+                    "[schema_listener] Subscribed to schema:update channel."
+                )
             except Exception as e:
                 app.logger.error(f"[schema_listener] Failed to subscribe: {e}")
                 return
@@ -48,18 +50,26 @@ def schema_listener(app):
                         else str(raw_data)
                     )
                 except Exception as e:
-                    app.logger.warning(f"[schema_listener] Failed to decode revision: {e}")
+                    app.logger.warning(
+                        f"[schema_listener] Failed to decode revision: {e}"
+                    )
                     continue
 
-                app.logger.info(f"[🧠 schema_listener] Detected schema update: {revision}")
+                app.logger.info(
+                    f"[🧠 schema_listener] Detected schema update: {revision}"
+                )
                 try:
                     from app.signals.triggers import handle_schema_update
 
                     handle_schema_update(revision)
                 except Exception as e:
-                    app.logger.error(f"[schema_listener] Error handling schema update: {e}")
+                    app.logger.error(
+                        f"[schema_listener] Error handling schema update: {e}"
+                    )
 
     # Start the listener in a daemon thread so it won’t block shutdown
-    t = threading.Thread(target=_listen, daemon=True, name="SchemaListenerThread")
+    t = threading.Thread(
+        target=_listen, daemon=True, name="SchemaListenerThread"
+    )
     t.start()
     app.logger.debug("[schema_listener] Background thread started.")

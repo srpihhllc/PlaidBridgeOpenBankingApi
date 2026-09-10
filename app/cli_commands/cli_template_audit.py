@@ -5,13 +5,15 @@
 # =============================================================================
 
 import sys
+
 import click
-import re
 from flask import current_app
 from flask.cli import with_appcontext
 
 from app.telemetry.ttl_emit import emit_schema_trace
-from app.utils.redis_utils import get_redis_client  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import (
+    get_redis_client,
+)  # ✅ centralised, SSL‑safe client
 from app.utils.template_audit import audit_template_wiring
 
 
@@ -30,15 +32,23 @@ def template_audit():
     try:
         r = get_redis_client()
     except Exception as redis_init_err:
-        click.echo(f"❌ Critical exception initializing Redis client: {redis_init_err}", err=True)
+        click.echo(
+            f"❌ Critical exception initializing Redis client: {redis_init_err}",
+            err=True,
+        )
         r = None
 
     if not r:
         # Defensively logging via standard stream if current_app proxy behaves unexpectedly
         try:
-            current_app.logger.error("[template_audit] Redis unavailable — cannot emit TTL traces")
+            current_app.logger.error(
+                "[template_audit] Redis unavailable — cannot emit TTL traces"
+            )
         except Exception:
-            print("[CRITICAL INTERCEPT] [template_audit] Redis unavailable — application proxy unresolvable.", file=sys.stderr)
+            print(
+                "[CRITICAL INTERCEPT] [template_audit] Redis unavailable — application proxy unresolvable.",
+                file=sys.stderr,
+            )
 
         click.echo("❌ Redis unavailable — template audit aborted.", err=True)
 
@@ -54,7 +64,10 @@ def template_audit():
                 meta={"source": "cli", "reason": "redis_unavailable"},
             )
         except Exception as trace_err:
-            click.echo(f"⚠️ Telemetry Intercept: Failed to emit error schema trace: {trace_err}", err=True)
+            click.echo(
+                f"⚠️ Telemetry Intercept: Failed to emit error schema trace: {trace_err}",
+                err=True,
+            )
         return
 
     # 2. Isolate the Core Audit Traversal Engine
@@ -64,7 +77,10 @@ def template_audit():
         try:
             current_app.logger.error(f"[template_audit] Audit failed: {e}")
         except Exception:
-            print(f"[CRITICAL INTERCEPT] [template_audit] Audit pipeline failure: {e}", file=sys.stderr)
+            print(
+                f"[CRITICAL INTERCEPT] [template_audit] Audit pipeline failure: {e}",
+                file=sys.stderr,
+            )
 
         click.echo(f"❌ Template audit failed: {e}", err=True)
 
@@ -94,7 +110,10 @@ def template_audit():
             meta=summary,
         )
     except Exception as trace_err:
-        click.echo(f"⚠️ Telemetry Intercept: Failed to emit completion metrics: {trace_err}", err=True)
+        click.echo(
+            f"⚠️ Telemetry Intercept: Failed to emit completion metrics: {trace_err}",
+            err=True,
+        )
 
     # 4. Structured Operator Reporting
     click.echo("✅ Template audit complete.")

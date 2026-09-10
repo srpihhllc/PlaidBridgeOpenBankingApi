@@ -25,12 +25,15 @@ from __future__ import annotations
 
 import pytest
 
-from app.cockpit.template_tracer import PARAMETERIZED_ENDPOINTS, trace_templates
-
+from app.cockpit.template_tracer import (
+    PARAMETERIZED_ENDPOINTS,
+    trace_templates,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="module")
 def tracer_app():
@@ -54,6 +57,7 @@ def tracer_app():
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _results_by_endpoint(app) -> dict[str, dict]:
     """Run trace_templates and index results by endpoint name."""
     results = trace_templates(app)
@@ -63,6 +67,7 @@ def _results_by_endpoint(app) -> dict[str, dict]:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 def test_trace_templates_returns_list(tracer_app):
     """trace_templates must always return a list of dicts with an 'endpoint' key."""
@@ -78,19 +83,28 @@ def test_trace_templates_returns_list(tracer_app):
     for r in results:
         assert "endpoint" in r, f"Result missing 'endpoint' key: {r}"
         assert "status" in r, f"Result missing 'status' key: {r}"
-        assert r["status"] in (
-            "ok",
-            "error",
-            "missing_template",
+        assert (
+            r["status"]
+            in (
+                "ok",
+                "error",
+                "missing_template",
+            )
         ), f"Unexpected status value: {r['status']!r} for endpoint {r['endpoint']!r}"
 
 
 def test_parameterized_endpoints_map_types():
     """Every entry in PARAMETERIZED_ENDPOINTS must be str → str."""
-    assert isinstance(PARAMETERIZED_ENDPOINTS, dict), "PARAMETERIZED_ENDPOINTS must be a dict"
+    assert isinstance(
+        PARAMETERIZED_ENDPOINTS, dict
+    ), "PARAMETERIZED_ENDPOINTS must be a dict"
     for ep, dummy in PARAMETERIZED_ENDPOINTS.items():
-        assert isinstance(ep, str), f"Key must be str, got {type(ep)} for {ep!r}"
-        assert isinstance(dummy, str), f"Value must be str, got {type(dummy)} for key {ep!r}"
+        assert isinstance(
+            ep, str
+        ), f"Key must be str, got {type(ep)} for {ep!r}"
+        assert isinstance(
+            dummy, str
+        ), f"Value must be str, got {type(dummy)} for key {ep!r}"
 
 
 def test_drilldown_blueprint_is_registered(tracer_app):
@@ -165,7 +179,9 @@ def test_parameterized_endpoints_are_reachable(tracer_app):
     This catches the case where PARAMETERIZED_ENDPOINTS references an
     endpoint name that was renamed or removed.
     """
-    registered_endpoints = {r.endpoint for r in tracer_app.url_map.iter_rules()}
+    registered_endpoints = {
+        r.endpoint for r in tracer_app.url_map.iter_rules()
+    }
     indexed = _results_by_endpoint(tracer_app)
 
     missing_from_trace = []
@@ -185,6 +201,7 @@ def test_parameterized_endpoints_are_reachable(tracer_app):
     # PARAMETERIZED_ENDPOINTS may intentionally list future endpoints.
     if not_registered:
         import warnings
+
         warnings.warn(
             f"PARAMETERIZED_ENDPOINTS references endpoints not yet registered: "
             f"{not_registered}",

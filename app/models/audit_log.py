@@ -5,6 +5,7 @@
 # =============================================================================
 
 from datetime import datetime, timezone
+
 from ..extensions import db
 
 
@@ -39,10 +40,14 @@ class FinancialAuditLog(db.Model):
     )
 
     # Core Relationships
-    actor = db.relationship("User", backref=db.backref("financial_audit_logs", lazy="dynamic"))
+    actor = db.relationship(
+        "User", backref=db.backref("financial_audit_logs", lazy="dynamic")
+    )
 
     def __repr__(self):
-        return f"<FinancialAuditLog id={self.id} action_type={self.action_type}>"
+        return (
+            f"<FinancialAuditLog id={self.id} action_type={self.action_type}>"
+        )
 
 
 # -------------------------------------------------------------------------
@@ -76,7 +81,9 @@ class AuditLog(db.Model):
     )
 
     # Core Relationships
-    user = db.relationship("User", backref=db.backref("audit_logs", lazy="dynamic"))
+    user = db.relationship(
+        "User", backref=db.backref("audit_logs", lazy="dynamic")
+    )
 
     # -----------------------------------------------------------------------
     # Transaction Bridge (Fixes the InvalidRequestError: KeyError: 'transaction')

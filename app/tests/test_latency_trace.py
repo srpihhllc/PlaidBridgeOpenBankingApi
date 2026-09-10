@@ -82,7 +82,9 @@ def capture_ttl_emit(monkeypatch) -> Any:
             with calls_lock:
                 return len(self._calls)
 
-        def __getitem__(self, idx: int) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+        def __getitem__(
+            self, idx: int
+        ) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
             with calls_lock:
                 return self._calls[idx]
 
@@ -220,7 +222,9 @@ def test_legacy_signature_positional(capture_ttl_emit):
 
     _, kwargs = capture_ttl_emit[0]
     key = _extract_key(kwargs)
-    assert "latency:user_login" in key or "latency:user_login" in str(kwargs.values())
+    assert "latency:user_login" in key or "latency:user_login" in str(
+        kwargs.values()
+    )
     assert kwargs.get("ttl") == 300
 
     assert isinstance(kwargs.get("value"), str)
@@ -231,13 +235,17 @@ def test_legacy_signature_positional(capture_ttl_emit):
 def test_new_signature_keyword(capture_ttl_emit):
     """New-style keyword: emit_latency_trace(stage=..., request_uuid=..., start_ts=..., r=...)."""
     start_time = time.time() - 0.2
-    emit_latency_trace(stage="token", request_uuid="abc", start_ts=start_time, r="fake")
+    emit_latency_trace(
+        stage="token", request_uuid="abc", start_ts=start_time, r="fake"
+    )
     assert len(capture_ttl_emit) == 1
 
     _, kwargs = capture_ttl_emit[0]
     assert "ttl:flow:oauth:google:token:latency:abc" in _extract_key(kwargs)
     assert kwargs.get("ttl") == 300
-    assert isinstance(kwargs.get("value"), str) and kwargs["value"].startswith("latency_ms:")
+    assert isinstance(kwargs.get("value"), str) and kwargs["value"].startswith(
+        "latency_ms:"
+    )
 
 
 @pytest.mark.ci
@@ -259,7 +267,9 @@ def test_legacy_signature_keyword(capture_ttl_emit):
 # -----------------------------------------------------------------------------
 @pytest.mark.ci
 def test_custom_ttl_override(capture_ttl_emit):
-    emit_latency_trace("auth", "req-123", time.time(), r="fake", ttl_seconds=120)
+    emit_latency_trace(
+        "auth", "req-123", time.time(), r="fake", ttl_seconds=120
+    )
     assert len(capture_ttl_emit) == 1
     _, kwargs = capture_ttl_emit[0]
     assert kwargs.get("ttl") == 120
@@ -314,7 +324,9 @@ def test_ttl_emit_signature_mismatch(monkeypatch, caplog):
         emit_latency_trace("legacy", 123.0, r="fake")
 
     # Validate log presence — exact message is implementation dependent.
-    assert "ttl_emit signature" in caplog.text or "bad signature" in caplog.text
+    assert (
+        "ttl_emit signature" in caplog.text or "bad signature" in caplog.text
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -328,7 +340,9 @@ def test_emit_boot_trace_delegates_to_ttl_emit(monkeypatch):
         calls.append((args, kwargs))
 
     monkeypatch.setattr("app.telemetry.ttl_emit.ttl_emit", fake_ttl_emit)
-    emit_boot_trace(key="ttl:boot:blueprint:auth:complete", status="ok", r="fake")
+    emit_boot_trace(
+        key="ttl:boot:blueprint:auth:complete", status="ok", r="fake"
+    )
 
     assert len(calls) == 1
     _, kwargs = calls[0]
@@ -377,16 +391,28 @@ def test_ttl_summary_expiry_and_freshness():
         (10000, 30.0),
     ],
 )
-def test_stress_emits_performance(capture_ttl_emit, num_emits, perf_limit_seconds):
-    logging.info("Starting stress test with %d emits (limit %.2fs).", num_emits, perf_limit_seconds)
+def test_stress_emits_performance(
+    capture_ttl_emit, num_emits, perf_limit_seconds
+):
+    logging.info(
+        "Starting stress test with %d emits (limit %.2fs).",
+        num_emits,
+        perf_limit_seconds,
+    )
 
     loop_start_time = time.time()
     for i in range(num_emits):
-        emit_latency_trace("stress", f"req-{i}", loop_start_time - (i * 0.01), r="fake")
+        emit_latency_trace(
+            "stress", f"req-{i}", loop_start_time - (i * 0.01), r="fake"
+        )
     loop_duration = time.time() - loop_start_time
 
-    assert len(capture_ttl_emit) == num_emits, "Mismatch between expected and captured emits."
-    assert loop_duration < perf_limit_seconds, f"Stress test took too long: {loop_duration:.2f}s"
+    assert (
+        len(capture_ttl_emit) == num_emits
+    ), "Mismatch between expected and captured emits."
+    assert (
+        loop_duration < perf_limit_seconds
+    ), f"Stress test took too long: {loop_duration:.2f}s"
 
     keys = {kwargs.get("key") for _, kwargs in capture_ttl_emit.items()}
     ttls = {kwargs.get("ttl") for _, kwargs in capture_ttl_emit.items()}
@@ -397,8 +423,12 @@ def test_stress_emits_performance(capture_ttl_emit, num_emits, perf_limit_second
 
 @pytest.mark.ci
 def test_boundary_ttl(capture_ttl_emit):
-    emit_latency_trace("auth", "req-zero", time.time(), r="fake", ttl_seconds=0)
-    emit_latency_trace("auth", "req-neg", time.time(), r="fake", ttl_seconds=-10)
+    emit_latency_trace(
+        "auth", "req-zero", time.time(), r="fake", ttl_seconds=0
+    )
+    emit_latency_trace(
+        "auth", "req-neg", time.time(), r="fake", ttl_seconds=-10
+    )
 
     assert len(capture_ttl_emit) == 2
     _, kwargs_zero = capture_ttl_emit[0]
@@ -438,7 +468,9 @@ def _concurrent_emit_task(thread_id: int, num_calls: int) -> None:
     for i in range(num_calls):
         req_id = f"T{thread_id}-R{i}-{uuid.uuid4().hex[:8]}"
         start_ts = time.time() - 0.05
-        emit_latency_trace(f"concurrent_stage_{thread_id}", req_id, start_ts, r="fake")
+        emit_latency_trace(
+            f"concurrent_stage_{thread_id}", req_id, start_ts, r="fake"
+        )
 
 
 @pytest.mark.ci
@@ -449,27 +481,37 @@ def test_concurrent_emits(capture_ttl_emit):
 
     threads: List[threading.Thread] = []
     for i in range(num_threads):
-        t = threading.Thread(target=_concurrent_emit_task, args=(i, calls_per_thread))
+        t = threading.Thread(
+            target=_concurrent_emit_task, args=(i, calls_per_thread)
+        )
         threads.append(t)
         t.start()
 
     for t in threads:
         t.join(timeout=10)
 
-    assert len(capture_ttl_emit) == total_expected_calls, (
-        f"Expected {total_expected_calls} emits, got {len(capture_ttl_emit)}"
-    )
+    assert (
+        len(capture_ttl_emit) == total_expected_calls
+    ), f"Expected {total_expected_calls} emits, got {len(capture_ttl_emit)}"
 
     keys = {kwargs.get("key") for _, kwargs in capture_ttl_emit.items()}
-    assert len(keys) == total_expected_calls, "Concurrent emits produced non-unique keys."
+    assert (
+        len(keys) == total_expected_calls
+    ), "Concurrent emits produced non-unique keys."
 
 
 # -----------------------------------------------------------------------------
 # Property-Based Tests
 # -----------------------------------------------------------------------------
 # Use alphanumeric-only characters to avoid exotic unicode causing unexpected key formatting.
-safe_text = st.text(alphabet=st.characters(whitelist_categories=("L", "N")), min_size=1, max_size=20)
-timestamps = st.floats(min_value=time.time() - 3600, max_value=time.time() + 3600)
+safe_text = st.text(
+    alphabet=st.characters(whitelist_categories=("L", "N")),
+    min_size=1,
+    max_size=20,
+)
+timestamps = st.floats(
+    min_value=time.time() - 3600, max_value=time.time() + 3600
+)
 latencies = st.floats(min_value=0.0, max_value=10000.0)
 ttls = st.integers(min_value=-100, max_value=3600)
 
@@ -478,7 +520,11 @@ ttls = st.integers(min_value=-100, max_value=3600)
 @settings(max_examples=100, deadline=None)
 @given(
     stage=safe_text,
-    request_id=st.text(alphabet=st.characters(whitelist_categories=("L", "N")), min_size=1, max_size=20),
+    request_id=st.text(
+        alphabet=st.characters(whitelist_categories=("L", "N")),
+        min_size=1,
+        max_size=20,
+    ),
     start_ts=timestamps,
     ttl=ttls,
 )
@@ -486,18 +532,24 @@ def test_property_based_new_signature(stage, request_id, start_ts, ttl):
     # Use context manager to ensure a fresh capture list per Hypothesis example.
     with capture_ttl_emit_context() as capture_ttl_emit:
         time_before_call = time.time()
-        emit_latency_trace(stage, request_id, start_ts, r="fake", ttl_seconds=ttl)
+        emit_latency_trace(
+            stage, request_id, start_ts, r="fake", ttl_seconds=ttl
+        )
         time_after_call = time.time()
 
         assert len(capture_ttl_emit) == 1
         _, kwargs = capture_ttl_emit[0]
 
-        expected_key_part = f"ttl:flow:oauth:google:{stage}:latency:{request_id}"
+        expected_key_part = (
+            f"ttl:flow:oauth:google:{stage}:latency:{request_id}"
+        )
         assert kwargs.get("key") == expected_key_part
         assert kwargs.get("ttl") == ttl
 
         value_payload = kwargs.get("value", "")
-        assert isinstance(value_payload, str) and value_payload.startswith("latency_ms:")
+        assert isinstance(value_payload, str) and value_payload.startswith(
+            "latency_ms:"
+        )
         latency_ms_str = value_payload.split(":", 1)[1]
         assert latency_ms_str.isdigit()
         latency_ms = int(latency_ms_str)
@@ -536,7 +588,9 @@ def test_property_based_legacy_signature(endpoint, latency, ttl):
             assert abs(float_val - latency) < 0.01
             assert isinstance(kwargs.get("value"), str)
         except (ValueError, TypeError):
-            pytest.fail(f"Legacy value payload was not a valid float string: {kwargs.get('value')}")
+            pytest.fail(
+                f"Legacy value payload was not a valid float string: {kwargs.get('value')}"
+            )
 
 
 # Concurrent property fuzzing (nightly)
@@ -547,9 +601,13 @@ concurrent_req_id_strategy = st.builds(
 )
 
 
-def _concurrent_property_worker(stage: str, request_id: str, start_ts: float, ttl: int) -> None:
+def _concurrent_property_worker(
+    stage: str, request_id: str, start_ts: float, ttl: int
+) -> None:
     try:
-        emit_latency_trace(stage, request_id, start_ts, r="concurrent-fuzz", ttl_seconds=ttl)
+        emit_latency_trace(
+            stage, request_id, start_ts, r="concurrent-fuzz", ttl_seconds=ttl
+        )
     except Exception as e:
         logging.error("Concurrent fuzzing worker error: %s", e)
 
@@ -575,7 +633,8 @@ def test_property_based_concurrent_new_signature(stage, inputs):
         for fuzzed in inputs:
             fuzzed_req_id, fuzzed_ts, fuzzed_ttl = fuzzed
             t = threading.Thread(
-                target=_concurrent_property_worker, args=(stage, fuzzed_req_id, fuzzed_ts, fuzzed_ttl)
+                target=_concurrent_property_worker,
+                args=(stage, fuzzed_req_id, fuzzed_ts, fuzzed_ttl),
             )
             threads.append(t)
             t.start()
@@ -583,12 +642,16 @@ def test_property_based_concurrent_new_signature(stage, inputs):
         for t in threads:
             t.join(timeout=10)
 
-        assert len(capture_ttl_emit) == len(inputs), (
-            f"Incorrect number of traces captured under concurrency: expected {len(inputs)}, got {len(capture_ttl_emit)}"
-        )
+        assert (
+            len(capture_ttl_emit) == len(inputs)
+        ), f"Incorrect number of traces captured under concurrency: expected {len(inputs)}, got {len(capture_ttl_emit)}"
 
-        captured_keys = {kwargs["key"] for _, kwargs in capture_ttl_emit.items()}
-        assert len(captured_keys) == len(inputs), "Non-unique keys detected during concurrent property test."
+        captured_keys = {
+            kwargs["key"] for _, kwargs in capture_ttl_emit.items()
+        }
+        assert len(captured_keys) == len(
+            inputs
+        ), "Non-unique keys detected during concurrent property test."
 
 
 # -----------------------------------------------------------------------------
@@ -597,13 +660,20 @@ def test_property_based_concurrent_new_signature(stage, inputs):
 @pytest.mark.nightly
 def test_soak_test_memory_leak():
     if not os.getenv("RUN_SOAK_TEST"):
-        pytest.skip("Skipping soak test. Set RUN_SOAK_TEST=1 to run this test.")
+        pytest.skip(
+            "Skipping soak test. Set RUN_SOAK_TEST=1 to run this test."
+        )
 
     num_emits = 50000
     start_time = time.time()
     for i in range(num_emits):
         request_id = f"soak-req-{i}-{uuid.uuid4().hex[:4]}"
-        emit_latency_trace("soak_test_leak_check", request_id, time.time() - 0.05, r="soak_session")
+        emit_latency_trace(
+            "soak_test_leak_check",
+            request_id,
+            time.time() - 0.05,
+            r="soak_session",
+        )
     duration = time.time() - start_time
     logging.info("Soak test completed %d emits in %.2fs.", num_emits, duration)
     # Keep the assertion minimal because this test only runs when explicitly enabled.

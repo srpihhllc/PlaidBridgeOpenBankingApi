@@ -7,7 +7,9 @@ import click
 from flask.cli import with_appcontext
 
 from app.models import User
-from app.services.bank_transaction_generator import seed_mock_bank_transfers_for_user
+from app.services.bank_transaction_generator import (
+    seed_mock_bank_transfers_for_user,
+)
 
 
 @click.command("seed-mock-bank-transfers-flags")

@@ -63,7 +63,9 @@ def scan_trace_keys(pattern: str = "trace:*") -> list[str]:
     return [key.decode() if isinstance(key, bytes) else key for key in keys]
 
 
-def get_ranked_trace_keys(pattern: str = "trace:*", rank: bool = True) -> list[str]:
+def get_ranked_trace_keys(
+    pattern: str = "trace:*", rank: bool = True
+) -> list[str]:
     if client is None:
         return []
 

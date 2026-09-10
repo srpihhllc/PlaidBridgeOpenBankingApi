@@ -6,7 +6,7 @@
 # =============================================================================
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from app.models import BankStatement
@@ -31,16 +31,24 @@ def get_last_statement_data(user_id: int) -> dict[str, Any] | None:
             .first()
         )
         if not stmt:
-            logger.warning(f"[get_last_statement_data] No statements found for user_id={user_id}")
+            logger.warning(
+                f"[get_last_statement_data] No statements found for user_id={user_id}"
+            )
             return None
 
         return {
             "id": stmt.id,
             "user_id": stmt.user_id,
-            "period_start": (stmt.period_start.isoformat() if stmt.period_start else None),
-            "period_end": stmt.period_end.isoformat() if stmt.period_end else None,
+            "period_start": (
+                stmt.period_start.isoformat() if stmt.period_start else None
+            ),
+            "period_end": stmt.period_end.isoformat()
+            if stmt.period_end
+            else None,
             "balance": stmt.balance,
-            "generated_at": (stmt.generated_at.isoformat() if stmt.generated_at else None),
+            "generated_at": (
+                stmt.generated_at.isoformat() if stmt.generated_at else None
+            ),
         }
     except Exception as e:
         logger.error(
@@ -63,13 +71,18 @@ def generate_statement_pdf(user_id: int) -> bytes:
     """
     try:
         # TODO: Replace with real PDF generation (e.g., ReportLab, WeasyPrint)
-        logger.info(f"[generate_statement_pdf] Generating stub PDF for user_id={user_id}")
+        logger.info(
+            f"[generate_statement_pdf] Generating stub PDF for user_id={user_id}"
+        )
         pdf_content = (
             f"Bank Statement for user {user_id}\n"
-            f"Generated at {datetime.utcnow().isoformat()}\n"
+            f"Generated at {datetime.now(timezone.utc).isoformat()}\n"
             f"(Stub content — replace with real statement data)"
         )
         return pdf_content.encode("utf-8")
     except Exception as e:
-        logger.error(f"[generate_statement_pdf] Failed for user_id={user_id}: {e}", exc_info=True)
+        logger.error(
+            f"[generate_statement_pdf] Failed for user_id={user_id}: {e}",
+            exc_info=True,
+        )
         return b""

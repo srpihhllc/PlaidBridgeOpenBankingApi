@@ -3,15 +3,16 @@
 # DESCRIPTION: Deep structural branch execution maximizing coverage on app/__init__.py
 # =============================================================================
 
-import os
 import sys
-import pytest
 from unittest.mock import MagicMock, patch
-from flask import Flask, jsonify
+
+import pytest
+from flask import Flask
 from werkzeug.routing import Rule
 
 import app as app_root
 from app.extensions import db
+
 
 @pytest.fixture
 def base_test_app():
@@ -25,13 +26,20 @@ def test_force_all_environment_factory_branches():
     """Forces the application factory through production, development, and custom states."""
     if not hasattr(app_root, "create_app"):
         pytest.skip("create_app factory not found at root level")
-        
+
     factory = getattr(app_root, "create_app")
-    
+
     # Mock all heavy database/extension attachments to prevent side-effect crashes
-    with patch("app.extensions") if sys.modules.get("app.extensions") else patch("flask_sqlalchemy.SQLAlchemy"):
+    with (
+        patch("app.extensions")
+        if sys.modules.get("app.extensions")
+        else patch("flask_sqlalchemy.SQLAlchemy")
+    ):
         # 1. Test Production Mode Branch Execution
-        with patch.dict("os.environ", {"FLASK_ENV": "production", "DATABASE_URL": "sqlite:///:memory:"}):
+        with patch.dict(
+            "os.environ",
+            {"FLASK_ENV": "production", "DATABASE_URL": "sqlite:///:memory:"},
+        ):
             try:
                 factory()
             except Exception:
@@ -65,7 +73,10 @@ def test_perfection_db_setup_branches(base_test_app):
 
     # 2. Fix Typo: Force RuntimeError Exception Path on DB Creation failure
     with patch.dict("os.environ", {"ALEMBIC_RUNNING": "0"}):
-        with patch("importlib.import_module", side_effect=RuntimeError("Simulated import crash")):
+        with patch(
+            "importlib.import_module",
+            side_effect=RuntimeError("Simulated import crash"),
+        ):
             for attr_name in dir(app_root):
                 if "db" in attr_name.lower() or "init" in attr_name.lower():
                     try:
@@ -79,7 +90,10 @@ def test_perfection_migration_health_check_blocks(base_test_app):
     diagnostic_callables = []
     for attr_name in dir(app_root):
         attr = getattr(app_root, attr_name)
-        if callable(attr) and any(x in attr_name.lower() for x in ["health", "check", "status", "migration"]):
+        if callable(attr) and any(
+            x in attr_name.lower()
+            for x in ["health", "check", "status", "migration"]
+        ):
             diagnostic_callables.append(attr)
 
     with base_test_app.app_context():
@@ -99,7 +113,13 @@ def test_perfection_migration_health_check_blocks(base_test_app):
             mock_inspector = MagicMock()
             mock_inspector.get_table_names.return_value = ["alembic_version"]
             mock_inspect.return_value = mock_inspector
-            with patch.object(db.session, "execute", side_effect=Exception("Database connection timeout simulation")):
+            with patch.object(
+                db.session,
+                "execute",
+                side_effect=Exception(
+                    "Database connection timeout simulation"
+                ),
+            ):
                 for func in diagnostic_callables:
                     try:
                         func()
@@ -112,13 +132,13 @@ def test_perfection_route_removal_and_oauth_cleanup_loops(base_test_app):
     # Create internal match variables
     dummy_endpoint = "dummy_test_target_endpoint"
     dummy_alias = "dummy_oauth_callback_alias"
-    
+
     base_test_app.view_functions[dummy_endpoint] = lambda: "ok"
     base_test_app.view_functions[dummy_alias] = lambda: "ok"
-    
+
     rule_1 = Rule("/dummy-endpoint-path", endpoint=dummy_endpoint)
     rule_2 = Rule("/dummy-alias-path", endpoint=dummy_alias)
-    
+
     base_test_app.url_map.add(rule_1)
     base_test_app.url_map.add(rule_2)
 
@@ -160,7 +180,10 @@ def test_surgical_error_handler_execution(base_test_app):
 
         for attr_name in dir(app_root):
             attr = getattr(app_root, attr_name)
-            if callable(attr) and any(x in attr_name.lower() for x in ["error", "handle", "exception", "unauthorized"]):
+            if callable(attr) and any(
+                x in attr_name.lower()
+                for x in ["error", "handle", "exception", "unauthorized"]
+            ):
                 try:
                     attr(Exception("Targeted execution sweep"))
                     attr(404)

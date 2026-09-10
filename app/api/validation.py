@@ -10,9 +10,9 @@ from werkzeug.exceptions import BadRequest
 
 
 def validate_json_schema(schema):
-    """
-    Decorator to enforce that requests contain valid JSON and match a given schema.
-    Returns 422 on invalid/missing JSON or schema violations.
+    """Decorator to enforce that requests contain valid JSON and match a
+
+    given schema. Returns 422 on invalid/missing JSON or schema violations.
     """
 
     def decorator(fn):
@@ -75,7 +75,9 @@ def validate_json_schema(schema):
                             "status": "error",
                             "error": {
                                 "code": "E_VALIDATION",
-                                "message": f"Schema validation failed: {ve.message}",
+                                "message": (
+                                    f"Schema validation failed: {ve.message}"
+                                ),
                             },
                         }
                     ),
@@ -88,7 +90,9 @@ def validate_json_schema(schema):
                             "status": "error",
                             "error": {
                                 "code": "E_SCHEMA",
-                                "message": f"Invalid schema definition: {se.message}",
+                                "message": (
+                                    f"Invalid schema definition: {se.message}"
+                                ),
                             },
                         }
                     ),

@@ -3,6 +3,7 @@
 import pytest
 from flask import Flask
 
+
 @pytest.mark.smoketest
 def test_fallback_sentinels(monkeypatch, caplog):
     """
@@ -17,6 +18,7 @@ def test_fallback_sentinels(monkeypatch, caplog):
     caplog.set_level("CRITICAL")
 
     import importlib
+
     import app as app_module
     import app.extensions
 
@@ -32,7 +34,9 @@ def test_fallback_sentinels(monkeypatch, caplog):
         importlib.reload(app_module)
 
         # --- Core sentinel checks ---
-        assert getattr(app_module, "app", None) is not None, "Fallback app was not exported"
+        assert (
+            getattr(app_module, "app", None) is not None
+        ), "Fallback app was not exported"
         assert isinstance(app_module.app, Flask)
         assert app_module.app.config.get("SAFE_MODE") is True
         assert app_module.app.config.get("FALLBACK_MODE") is True
@@ -41,8 +45,13 @@ def test_fallback_sentinels(monkeypatch, caplog):
         # --- Log expectations ---
         # Updated to match the actual CRITICAL log output from the app boot sequence
         assert any("FATAL BOOT ERROR" in rec.message for rec in caplog.records)
-        assert any("Sentinel override active" in rec.message for rec in caplog.records)
-        assert any("Emergency Safe-Mode Fallback App" in rec.message for rec in caplog.records)
+        assert any(
+            "Sentinel override active" in rec.message for rec in caplog.records
+        )
+        assert any(
+            "Emergency Safe-Mode Fallback App" in rec.message
+            for rec in caplog.records
+        )
 
         client = app_module.app.test_client()
 

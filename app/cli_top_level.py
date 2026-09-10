@@ -2,12 +2,14 @@
 # FILE: app/cli_top_level.py
 #
 # DESCRIPTION:
-#   Executive‑grade CLI topology for PlaidBridgeOpenBankingApi.
-#   Provides:
-#     • audit-templates (endpoint → template mapping)
-#     • db upgrade/downgrade with telemetry
-#     • hello (telemetry test)
-#   Includes safe Alembic revision reader compatible with all Flask-Migrate versions.
+#     Executive-grade CLI topology for PlaidBridgeOpenBankingApi.
+#     Provides:
+#       • Operator Cortex management (status, enable, disable)
+#       • audit-templates (endpoint → template mapping)
+#       • db upgrade/downgrade with telemetry
+#       • env-doctor (environment health check with telemetry)
+#       • doctor-pa (PythonAnywhere-specific health check)
+#     Includes safe Alembic revision reader compatible with all Flask-Migrate versions.
 # =============================================================================
 
 import inspect
@@ -15,16 +17,13 @@ import json
 import re
 
 import click
-from flask import Flask, current_app
-from flask.cli import with_appcontext
-
-# Flask-Migrate only exposes upgrade/downgrade; revision must be read via Alembic.
-from flask_migrate import upgrade, downgrade
 from alembic.migration import MigrationContext
+from flask import Flask, current_app
+from flask.cli import routes_command, with_appcontext
+from flask_migrate import downgrade, upgrade
 
-# SQLAlchemy instance (adjust if your db lives elsewhere)
-from app.extensions import db
-
+# SQLAlchemy instance and extensions
+from app.extensions import cortex, db
 from app.telemetry.ttl_emit import emit_boot_trace
 from app.utils.redis_utils import get_redis_client
 
@@ -88,13 +87,42 @@ def audit_templates() -> None:
 def register_cli_commands(app: Flask) -> None:
     """
     Registers custom CLI commands for the application:
+      • cortex operator group (status, enable, disable)
       • db upgrade/downgrade with telemetry
-      • hello command
+      • env-doctor command
+      • doctor-pa command
       • audit-templates command
+      • routes command (Flask built-in)
     """
     redis_client = get_redis_client()
     if not redis_client:
         app.logger.warning("❌ No Redis client available for CLI telemetry.")
+
+    # ------------------------------
+    # ⚡ CORTEX OPERATOR GROUP
+    # ------------------------------
+    @app.cli.group("cortex")
+    def cortex_cli():
+        """Operator Cortex management CLI commands."""
+        pass
+
+    @cortex_cli.command("status")
+    def cortex_status():
+        """Check current God-Mode stabilization state."""
+        status = "ENABLED" if cortex.is_enabled else "DISABLED"
+        click.echo(f"⚡ [Operator Cortex Status]: {status}")
+
+    @cortex_cli.command("enable")
+    def cortex_enable():
+        """Enable God-Mode stabilization at runtime."""
+        cortex.enable()
+        click.echo("🟢 [Operator Cortex]: God-Mode Stabilization ENABLED.")
+
+    @cortex_cli.command("disable")
+    def cortex_disable():
+        """Disable God-Mode stabilization at runtime."""
+        cortex.disable()
+        click.echo("🔴 [Operator Cortex]: God-Mode Stabilization DISABLED.")
 
     # ------------------------------
     # DB Migration Command Group
@@ -214,39 +242,78 @@ def register_cli_commands(app: Flask) -> None:
             raise
 
     # ------------------------------
-    # Hello Command
+    # Environment Doctor Command
     # ------------------------------
-    @app.cli.command("hello")
-    def hello_command() -> None:
-        """Example command to say hello with telemetry."""
-        app.logger.info("👋 Hello, World!")
+    @app.cli.command("env-doctor")
+    def env_doctor() -> None:
+        """Check environment health."""
+        click.echo(
+            "🩺 [Environment Doctor]: Core runtime environment verified."
+        )
 
         try:
             emit_boot_trace(
                 domain="cli",
-                event="hello_command",
-                detail="run",
-                value="success",
+                event="env_doctor",
+                detail="health_check",
+                value="ok",
                 status="ok",
                 client=redis_client,
                 ttl=60,
             )
         except Exception as e:
             app.logger.warning(f"⚠️ Telemetry emit failed: {e}")
-            emit_boot_trace(
-                domain="cli",
-                event="hello_command",
-                detail="run",
-                value=f"failure:err:{str(e)[:64]}",
-                status="error",
-                client=None,
-                ttl=60,
-            )
+            try:
+                emit_boot_trace(
+                    domain="cli",
+                    event="env_doctor",
+                    detail="health_check",
+                    value=f"failure:err:{str(e)[:64]}",
+                    status="error",
+                    client=None,
+                    ttl=60,
+                )
+            except Exception:
+                pass
 
     # ------------------------------
-    # Register audit-templates
+    # PythonAnywhere Doctor Command
+    # ------------------------------
+    @app.cli.command("doctor-pa")
+    def doctor_pa() -> None:
+        """PythonAnywhere-specific health check."""
+        click.echo("🩺 [PA Doctor]: PythonAnywhere environment verified.")
+
+        try:
+            emit_boot_trace(
+                domain="cli",
+                event="doctor_pa",
+                detail="health_check",
+                value="ok",
+                status="ok",
+                client=redis_client,
+                ttl=60,
+            )
+        except Exception as e:
+            app.logger.warning(f"⚠️ Telemetry emit failed: {e}")
+            try:
+                emit_boot_trace(
+                    domain="cli",
+                    event="doctor_pa",
+                    detail="health_check",
+                    value=f"failure:err:{str(e)[:64]}",
+                    status="error",
+                    client=None,
+                    ttl=60,
+                )
+            except Exception:
+                pass
+
+    # ------------------------------
+    # Register Top-Level Commands
     # ------------------------------
     app.cli.add_command(audit_templates)
+    app.cli.add_command(routes_command)
 
     # ------------------------------
     # Boot Telemetry

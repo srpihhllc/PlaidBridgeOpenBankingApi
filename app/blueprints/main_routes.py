@@ -23,20 +23,17 @@ from jinja2 import TemplateNotFound
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash
 
+from app.auth_handlers import SystemOperator
 from app.constants import OPERATOR_MODE_KEY
+from app.extensions import csrf
 from app.models.user import User
 from app.utils.redis_utils import get_redis_client
-from app.auth_handlers import SystemOperator
 
-
-
-# Blueprint for main routes
-# NOTE: template_folder="../templates" points Flask (and our manual checks) at app/templates
 main_bp = Blueprint("main", __name__, template_folder="../templates")
 
 
 # -------------------------------------------------------------------------
-# Creator identity helper
+# Helpers
 # -------------------------------------------------------------------------
 def is_creator(user) -> bool:
     creator_email = os.getenv("CREATOR_EMAIL")
@@ -51,29 +48,56 @@ def is_creator(user) -> bool:
     )
 
 
-# -------------------------------------------------------------------------
-# Telemetry helper
-# -------------------------------------------------------------------------
-def emit_narrative_trace(key_prefix: str, detail: str, status: str, value: str = ""):
-    redis_client = getattr(current_app, "redis_client", None) or get_redis_client()
+def safe_get_redis_ttl(key: str) -> int:
+    redis_client = (
+        getattr(current_app, "redis_client", None) or get_redis_client()
+    )
     if not redis_client:
-        current_app.logger.debug("Redis unavailable — skipping telemetry for '%s'", key_prefix)
+        return 0
+    try:
+        ttl_val = redis_client.ttl(key)
+        if isinstance(ttl_val, bytes):
+            ttl_val = ttl_val.decode()
+        val = int(ttl_val)
+        return val if val > 0 else 0
+    except Exception:
+        current_app.logger.debug(
+            "Redis TTL read failed for key '%s'", key, exc_info=True
+        )
+        return 0
+
+
+def emit_narrative_trace(
+    key_prefix: str, detail: str, status: str, value: str = ""
+):
+    redis_client = (
+        getattr(current_app, "redis_client", None) or get_redis_client()
+    )
+    if not redis_client:
+        current_app.logger.debug(
+            "Redis unavailable — skipping telemetry for '%s'", key_prefix
+        )
         return
     try:
         key = f"{key_prefix}:{detail}"
         redis_client.setex(key, 300, f"{status} | {value}")
     except Exception as exc:
         current_app.logger.debug(
-            "Redis telemetry emit failed for %s: %s", key_prefix, exc, exc_info=True
+            "Redis telemetry emit failed for %s: %s",
+            key_prefix,
+            exc,
+            exc_info=True,
         )
 
 
 # -------------------------------------------------------------------------
-# Favicon
+# Static / Favicon
 # -------------------------------------------------------------------------
 @main_bp.route("/favicon.ico")
 def favicon():
-    static_folder = current_app.static_folder or os.path.join(current_app.root_path, "static")
+    static_folder = current_app.static_folder or os.path.join(
+        current_app.root_path, "static"
+    )
     favicon_path = os.path.join(static_folder, "favicon.ico")
     if os.path.exists(favicon_path):
         return send_from_directory(static_folder, "favicon.ico")
@@ -85,69 +109,25 @@ def favicon():
 # -------------------------------------------------------------------------
 @main_bp.route("/", endpoint="home")
 def home():
-    redis_ttl: int = 0
+    redis_ttl = safe_get_redis_ttl("boot:render:home_view")
 
+    auth_ok = False
     try:
-        redis_client = getattr(current_app, "redis_client", None) or get_redis_client()
-        if redis_client:
-            try:
-                ttl_val = redis_client.ttl("boot:render:home_view")
-                if isinstance(ttl_val, bytes):
-                    try:
-                        ttl_val = int(ttl_val.decode())
-                    except Exception:
-                        ttl_val = 0
-                redis_ttl = int(ttl_val) if isinstance(ttl_val, int) and ttl_val > 0 else 0
-            except Exception:
-                current_app.logger.debug("Redis TTL read failed", exc_info=True)
-                redis_ttl = 0
-
-        # Resolve the template folder in a way that matches Flask's loader for this blueprint.
-        tpl_folder = None
-        try:
-            bp = current_app.blueprints.get("main")
-            if bp and getattr(bp, "template_folder", None):
-                # blueprint.template_folder is relative to this module; compute absolute path
-                tpl_folder = os.path.normpath(os.path.join(os.path.dirname(__file__), bp.template_folder))
-            else:
-                tpl_folder = getattr(current_app, "template_folder", None) or current_app.root_path
-        except Exception:
-            tpl_folder = getattr(current_app, "template_folder", None) or current_app.root_path
-
-        template_path = os.path.join(tpl_folder, "index.html")
-
-        current_app.logger.info(
-            "Home view template check: template_folder=%s root_path=%s index_exists=%s",
-            tpl_folder,
-            current_app.root_path,
-            os.path.exists(template_path),
+        auth_ok = bool(getattr(current_user, "is_authenticated", False))
+        if auth_ok:
+            current_app.logger.info(
+                "Authenticated visitor: %s",
+                getattr(current_user, "id", "unknown"),
+            )
+    except Exception:
+        current_app.logger.debug(
+            "current_user probe failed; serving anonymously", exc_info=True
         )
 
-        if not os.path.exists(template_path):
-            current_app.logger.error("index.html template file not found at %s", template_path)
-            emit_narrative_trace("boot:render", "home_view", "fallback", "missing_index")
-            return (
-                render_template_string(
-                    "<html><body><h1>Welcome (fallback, path check failed)</h1></body></html>"
-                ),
-                200,
-            )
-
-        auth_ok = False
-        try:
-            auth_ok = bool(getattr(current_user, "is_authenticated", False))
-            if auth_ok:
-                current_app.logger.info(
-                    "Authenticated visitor: %s", getattr(current_user, "id", "unknown")
-                )
-        except Exception:
-            current_app.logger.debug(
-                "current_user probe failed; serving anonymously", exc_info=True
-            )
-            auth_ok = False
-
-        emit_narrative_trace("boot:render", "home_view", "ok", "rendered:index.html")
-
+    try:
+        emit_narrative_trace(
+            "boot:render", "home_view", "ok", "rendered:index.html"
+        )
         return render_template(
             "index.html",
             app=current_app,
@@ -156,8 +136,12 @@ def home():
         )
 
     except TemplateNotFound:
-        current_app.logger.error("TemplateNotFound when rendering index.html", exc_info=True)
-        emit_narrative_trace("boot:render", "home_view", "template_not_found", "")
+        current_app.logger.error(
+            "Template index.html not found", exc_info=True
+        )
+        emit_narrative_trace(
+            "boot:render", "home_view", "template_not_found", ""
+        )
         return (
             render_template_string(
                 "<html><body><h1>Welcome (fallback, TemplateNotFound)</h1></body></html>"
@@ -166,8 +150,12 @@ def home():
         )
 
     except OperationalError as e:
-        current_app.logger.exception("DB operational error while rendering home: %s", e)
-        emit_narrative_trace("boot:render", "home_view", "db_error_fallback", str(e))
+        current_app.logger.exception(
+            "DB operational error while rendering home: %s", e
+        )
+        emit_narrative_trace(
+            "boot:render", "home_view", "db_error_fallback", str(e)
+        )
         return (
             render_template_string(
                 "<html><body><h1>Welcome (Database Error Fallback)</h1></body></html>"
@@ -177,7 +165,9 @@ def home():
 
     except Exception as e:
         current_app.logger.exception("Generic error rendering home: %s", e)
-        emit_narrative_trace("boot:render", "home_view", "generic_error_fallback", str(e))
+        emit_narrative_trace(
+            "boot:render", "home_view", "generic_error_fallback", str(e)
+        )
         return (
             render_template_string(
                 "<html><body><h1>Welcome (Internal Error Fallback)</h1></body></html>"
@@ -188,37 +178,27 @@ def home():
 
 @main_bp.route("/dispute-form", methods=["GET"])
 def dispute_form():
-    emit_narrative_trace("boot:render", "dispute_form", "ok", "rendered:letters/dispute_form.html")
+    emit_narrative_trace(
+        "boot:render",
+        "dispute_form",
+        "ok",
+        "rendered:letters/dispute_form.html",
+    )
     return render_template("letters/dispute_form.html")
 
 
-# -------------------------------------------------------------------------
-# ⭐ REQUIRED BY TEST SUITE — /upload-pdf
-# -------------------------------------------------------------------------
 @main_bp.route("/upload-pdf", methods=["POST"])
 def upload_pdf():
-    """
-    Required by test suite:
-      - 400 if no file part
-      - 400 if filename is empty
-      - 400 if file is not a .pdf
-      - 200 otherwise
-    """
-    # No file part at all
     if "file" not in request.files:
         return b"No file part", 400
 
     file = request.files["file"]
-
-    # Empty filename
     if file.filename == "":
         return b"No file part", 400
 
-    # Must end with .pdf
     if not file.filename.lower().endswith(".pdf"):
         return b"Invalid file format", 400
 
-    # Tests do NOT require actual PDF parsing
     return b"OK", 200
 
 
@@ -232,12 +212,16 @@ def handle_login_post(source: str):
         user = User.query.filter_by(email=email).first()
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
-            emit_narrative_trace("login", f"user_id:{user.id}", "ok", f"via:{source}")
+            emit_narrative_trace(
+                "login", f"user_id:{user.id}", "ok", f"via:{source}"
+            )
             flash(f"Welcome back, {user.email}!", "success")
             return redirect(url_for("sub_ui.dashboard"))
         else:
             flash("Invalid credentials.", "danger")
-            emit_narrative_trace("login", f"email:{email}", "error", "invalid_credentials")
+            emit_narrative_trace(
+                "login", f"email:{email}", "error", "invalid_credentials"
+            )
     except Exception:
         current_app.logger.exception("Login error for email=%s", email)
         flash("Login error. Please try again.", "danger")
@@ -251,7 +235,9 @@ def login():
     return render_template("auth/login.html", app=current_app)
 
 
-@main_bp.route("/get_started", methods=["GET", "POST"], endpoint="subscriber_entry")
+@main_bp.route(
+    "/get_started", methods=["GET", "POST"], endpoint="subscriber_entry"
+)
 def get_started():
     if request.method == "POST":
         return handle_login_post("get_started")
@@ -275,24 +261,10 @@ def logout_alias():
 @main_bp.route("/welcome_back")
 @login_required
 def welcome_back():
-    redis_client = getattr(current_app, "redis_client", None) or get_redis_client()
-    ttl = 0
-    try:
-        if redis_client:
-            ttl_val = redis_client.ttl(
-                f"subscriber_registered:{getattr(current_user, 'email', '')}"
-            )
-            if isinstance(ttl_val, bytes):
-                try:
-                    ttl_val = int(ttl_val.decode())
-                except Exception:
-                    ttl_val = 0
-            ttl = int(ttl_val) if isinstance(ttl_val, int) and ttl_val > 0 else 0
-    except Exception:
-        current_app.logger.debug("Redis TTL read failed for welcome_back", exc_info=True)
-        ttl = 0
+    user_email = getattr(current_user, "email", "")
+    ttl = safe_get_redis_ttl(f"subscriber_registered:{user_email}")
+    ttl_badge = "active" if ttl > 0 else "expired"
 
-    ttl_badge = "active" if ttl and ttl > 0 else "expired"
     return render_template(
         "welcome_back.html",
         bank_name=getattr(current_user, "bank_name", "Default Bank"),
@@ -323,35 +295,13 @@ def terence_entry():
     return render_template("terence_entry.html", app=current_app)
 
 
-from app.extensions import csrf
-
-@main_bp.route("/ignite-cortex", methods=["GET", "POST"])  # 👈 Added GET method support
+@main_bp.route("/ignite-cortex", methods=["GET", "POST"])
 @csrf.exempt
 def ignite_cortex():
-    # -------------------------------------------------------------------------
-    # 1. Handle Browser GET Request (Instant Backdoor Activation)
-    # -------------------------------------------------------------------------
     if request.method == "GET":
-        creator_email = os.getenv("CREATOR_EMAIL") or "terence@cortex.prime"
+        # Serves entry page or requires explicit authentication
+        return redirect(url_for("main.terence_entry"))
 
-        # Authenticate natively in memory as SystemOperator to avoid DB lookup locks
-        login_user(SystemOperator("TERENCE_CORTEX_PRIME"))
-
-        # Set exact secure session contexts expected by your templates and sub-guards
-        session[OPERATOR_MODE_KEY] = True
-        session["user_id"] = "TERENCE_CORTEX_PRIME"
-        session["user_email"] = creator_email
-        session["username"] = os.getenv("CREATOR_USERNAME") or "OPERATOR_ADMIN"
-        session["is_creator"] = True
-        session["role"] = "subscriber"  # Satisfies sub_ui landing requirements flawlessly
-
-        current_app.logger.info("🔑 Web browser GET request successfully triggered God-Mode.")
-        flash("Cortex engine activated via browser.", "success")
-        return redirect(url_for("sub_ui.sub_index"))
-
-    # -------------------------------------------------------------------------
-    # 2. Handle Form/Terminal POST Request (Passcode Verification)
-    # -------------------------------------------------------------------------
     if current_user.is_authenticated and is_creator(current_user):
         session[OPERATOR_MODE_KEY] = True
         flash("Creator ignition successful.", "success")
@@ -364,8 +314,7 @@ def ignite_cortex():
         flash("Invalid ignition code.", "danger")
         return redirect(url_for("main.terence_entry"))
 
-    # Sanity check: ensure creator exists in DB for explicit passcode posts
-    creator_email = os.getenv("CREATOR_EMAIL")
+    creator_email = os.getenv("CREATOR_EMAIL") or "terence@cortex.prime"
     user = User.query.filter_by(email=creator_email).first()
 
     if not user:
@@ -373,15 +322,18 @@ def ignite_cortex():
             "Ignition aborted: Creator user record for %s missing from database.",
             creator_email,
         )
-        return "Critical Error: Creator user profile not found in database.", 500
+        return (
+            "Critical Error: Creator user profile not found in database.",
+            500,
+        )
 
     login_user(SystemOperator("TERENCE_CORTEX_PRIME"))
 
     session[OPERATOR_MODE_KEY] = True
     session["user_email"] = creator_email
-    session["username"] = os.getenv("CREATOR_USERNAME")
+    session["username"] = os.getenv("CREATOR_USERNAME") or "OPERATOR_ADMIN"
     session["is_creator"] = True
-    session["role"] = "subscriber"  # Swapped to 'subscriber' alignment to clear sub_index guards
+    session["role"] = "subscriber"
 
     flash("Cortex ignition successful.", "success")
     return redirect(url_for("sub_ui.sub_index"))

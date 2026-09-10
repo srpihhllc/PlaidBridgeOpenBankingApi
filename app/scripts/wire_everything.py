@@ -60,4 +60,6 @@ for tpl in missing_templates:
 #    (This prevented ghost blueprints from being registered.)
 # =============================================================================
 
-print("=== Wire-up complete. No UI blueprints created. No injections performed. ===")
+print(
+    "=== Wire-up complete. No UI blueprints created. No injections performed. ==="
+)
