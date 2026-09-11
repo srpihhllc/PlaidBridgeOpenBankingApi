@@ -1,0 +1,63 @@
+For a MySQL service:
+
+backend-integration:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: test_db
+          MYSQL_USER: test
+          MYSQL_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}/PlaidBridgeOpenBankingApi
+      DATABASE_URL: mysql+pymysql://test:test@127.0.0.1:3306/test_db
+      REDIS_URL: redis://127.0.0.1:6379/0
+      FLASK_CONFIG: testing
+      ALEMBIC_RUNNING: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Dependencies
+        working-directory: PlaidBridgeOpenBankingApi
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest coverage pip-audit bandit pymysql
+
+      - name: Run Alembic Migrations
+        working-directory: PlaidBridgeOpenBankingApi
+        run: python -m alembic -c alembic.ini upgrade head
+
+      - name: Run Pytest
+        working-directory: PlaidBridgeOpenBankingApi
+        run: python -m pytest -q -vv
