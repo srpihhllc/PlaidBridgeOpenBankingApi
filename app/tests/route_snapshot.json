@@ -18,14 +18,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.admin_index"
-  },
-  {
-    "rule": "/admin/",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "admin.admin_index"
+    "endpoint": "admin_ui.admin_index"
   },
   {
     "rule": "/admin/advanced_telemetry",
@@ -33,6 +26,13 @@
       "GET"
     ],
     "endpoint": "admin.advanced_telemetry"
+  },
+  {
+    "rule": "/admin/advanced_telemetry",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.advanced_telemetry"
   },
   {
     "rule": "/admin/api/v1/audit",
@@ -91,11 +91,25 @@
     "endpoint": "admin.approval_queue"
   },
   {
+    "rule": "/admin/approval_queue",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.approval_queue"
+  },
+  {
     "rule": "/admin/audit/nav",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.nav_audit"
+  },
+  {
+    "rule": "/admin/audit/nav",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.nav_audit"
   },
   {
     "rule": "/admin/audit_viewer",
@@ -105,11 +119,25 @@
     "endpoint": "admin.audit_viewer"
   },
   {
+    "rule": "/admin/audit_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.audit_viewer"
+  },
+  {
     "rule": "/admin/cache_health",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.cache_health"
+  },
+  {
+    "rule": "/admin/cache_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.cache_health"
   },
   {
     "rule": "/admin/cockpit",
@@ -119,11 +147,25 @@
     "endpoint": "admin.admin_cockpit"
   },
   {
+    "rule": "/admin/cockpit",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.admin_cockpit"
+  },
+  {
     "rule": "/admin/cockpit/lender_risk_day_detail",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.lender_risk_day_detail"
+  },
+  {
+    "rule": "/admin/cockpit/lender_risk_day_detail",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.lender_risk_day_detail"
   },
   {
     "rule": "/admin/cockpit/lender_risk_day_invalid",
@@ -133,11 +175,25 @@
     "endpoint": "admin.lender_risk_day_invalid"
   },
   {
+    "rule": "/admin/cockpit/lender_risk_day_invalid",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.lender_risk_day_invalid"
+  },
+  {
     "rule": "/admin/cockpit/lender_risk_overview",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.lender_risk_overview"
+  },
+  {
+    "rule": "/admin/cockpit/lender_risk_overview",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.lender_risk_overview"
   },
   {
     "rule": "/admin/cockpit/trace_detail",
@@ -147,11 +203,25 @@
     "endpoint": "admin.cockpit_trace_detail"
   },
   {
+    "rule": "/admin/cockpit/trace_detail",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.cockpit_trace_detail"
+  },
+  {
     "rule": "/admin/cockpit/trace_not_found",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.cockpit_trace_not_found"
+  },
+  {
+    "rule": "/admin/cockpit/trace_not_found",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.cockpit_trace_not_found"
   },
   {
     "rule": "/admin/cortex",
@@ -161,11 +231,25 @@
     "endpoint": "admin.admin_cortex"
   },
   {
+    "rule": "/admin/cortex",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.admin_cortex"
+  },
+  {
     "rule": "/admin/dispute_logs/<int:user_id>",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.view_dispute_logs"
+  },
+  {
+    "rule": "/admin/dispute_logs/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.view_dispute_logs"
   },
   {
     "rule": "/admin/export_trace/<string:trace_id>",
@@ -175,6 +259,13 @@
     "endpoint": "admin.export_trace"
   },
   {
+    "rule": "/admin/export_trace/<string:trace_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.export_trace"
+  },
+  {
     "rule": "/admin/fraud_scanner",
     "methods": [
       "GET"
@@ -182,6 +273,13 @@
     "endpoint": "admin.fraud_scanner"
   },
   {
+    "rule": "/admin/fraud_scanner",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.fraud_scanner"
+  },
+  {
     "rule": "/admin/home",
     "methods": [
       "GET"
@@ -193,7 +291,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.admin_home"
+    "endpoint": "admin_ui.admin_home"
   },
   {
     "rule": "/admin/lenders",
@@ -203,6 +301,13 @@
     "endpoint": "admin.show_lenders"
   },
   {
+    "rule": "/admin/lenders",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.show_lenders"
+  },
+  {
     "rule": "/admin/lenders/<int:lender_id>/verify",
     "methods": [
       "POST"
@@ -210,6 +315,13 @@
     "endpoint": "admin.verify_lender"
   },
   {
+    "rule": "/admin/lenders/<int:lender_id>/verify",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_ui.verify_lender"
+  },
+  {
     "rule": "/admin/log_viewer",
     "methods": [
       "GET"
@@ -221,7 +333,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.log_viewer"
+    "endpoint": "admin_ui.log_viewer"
   },
   {
     "rule": "/admin/neural_console",
@@ -231,11 +343,25 @@
     "endpoint": "admin.neural_console"
   },
   {
+    "rule": "/admin/neural_console",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.neural_console"
+  },
+  {
     "rule": "/admin/operator-login",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.operator_login"
+  },
+  {
+    "rule": "/admin/operator-login",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.operator_login"
   },
   {
     "rule": "/admin/payment_processor",
@@ -245,6 +371,13 @@
     "endpoint": "admin.process_payment"
   },
   {
+    "rule": "/admin/payment_processor",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_ui.process_payment"
+  },
+  {
     "rule": "/admin/preview_letter/<int:log_id>",
     "methods": [
       "GET"
@@ -252,6 +385,13 @@
     "endpoint": "admin.preview_letter"
   },
   {
+    "rule": "/admin/preview_letter/<int:log_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.preview_letter"
+  },
+  {
     "rule": "/admin/rate_limits",
     "methods": [
       "GET"
@@ -263,7 +403,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.rate_limits_dashboard"
+    "endpoint": "admin_ui.rate_limits_dashboard"
   },
   {
     "rule": "/admin/redis_panel",
@@ -277,7 +417,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.redis_panel"
+    "endpoint": "admin_ui.redis_panel"
   },
   {
     "rule": "/admin/schema_diagram",
@@ -287,11 +427,11 @@
     "endpoint": "admin.schema_diagram"
   },
   {
-    "rule": "/admin/sql_panel",
+    "rule": "/admin/schema_diagram",
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.sql_panel"
+    "endpoint": "admin_ui.schema_diagram"
   },
   {
     "rule": "/admin/sql_panel",
@@ -305,7 +445,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.sql_panel"
+    "endpoint": "admin_ui.sql_panel"
   },
   {
     "rule": "/admin/sweep_expired_keys",
@@ -319,14 +459,7 @@
     "methods": [
       "POST"
     ],
-    "endpoint": "admin.sweep_expired_keys"
-  },
-  {
-    "rule": "/admin/sweep_expired_keys",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "admin.sweep_expired_keys"
+    "endpoint": "admin_ui.sweep_expired_keys"
   },
   {
     "rule": "/admin/system_health",
@@ -336,11 +469,25 @@
     "endpoint": "admin.system_health"
   },
   {
+    "rule": "/admin/system_health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.system_health"
+  },
+  {
     "rule": "/admin/system_heartbeat",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.system_heartbeat"
+  },
+  {
+    "rule": "/admin/system_heartbeat",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.system_heartbeat"
   },
   {
     "rule": "/admin/system_map",
@@ -350,6 +497,13 @@
     "endpoint": "admin.system_map"
   },
   {
+    "rule": "/admin/system_map",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.system_map"
+  },
+  {
     "rule": "/admin/t/<path:tpl>",
     "methods": [
       "GET"
@@ -361,7 +515,7 @@
     "methods": [
       "GET"
     ],
-    "endpoint": "admin.render_admin_template"
+    "endpoint": "admin_ui.render_admin_template"
   },
   {
     "rule": "/admin/tile/agent_activity",
@@ -371,11 +525,25 @@
     "endpoint": "admin.tile_agent_activity"
   },
   {
+    "rule": "/admin/tile/agent_activity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_agent_activity"
+  },
+  {
     "rule": "/admin/tile/credit_ledger/<int:user_id>",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_credit_ledger"
+  },
+  {
+    "rule": "/admin/tile/credit_ledger/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_credit_ledger"
   },
   {
     "rule": "/admin/tile/exposure/<int:user_id>",
@@ -385,11 +553,25 @@
     "endpoint": "admin.tile_exposure"
   },
   {
+    "rule": "/admin/tile/exposure/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_exposure"
+  },
+  {
     "rule": "/admin/tile/fraud_chart",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_fraud_chart"
+  },
+  {
+    "rule": "/admin/tile/fraud_chart",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_fraud_chart"
   },
   {
     "rule": "/admin/tile/log_viewer",
@@ -399,11 +581,25 @@
     "endpoint": "admin.tile_log_viewer"
   },
   {
+    "rule": "/admin/tile/log_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_log_viewer"
+  },
+  {
     "rule": "/admin/tile/rate_limits",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_rate_limits"
+  },
+  {
+    "rule": "/admin/tile/rate_limits",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_rate_limits"
   },
   {
     "rule": "/admin/tile/redis_keys",
@@ -413,11 +609,25 @@
     "endpoint": "admin.tile_redis_keys"
   },
   {
+    "rule": "/admin/tile/redis_keys",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_redis_keys"
+  },
+  {
     "rule": "/admin/tile/schema_events",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_schema_events"
+  },
+  {
+    "rule": "/admin/tile/schema_events",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_schema_events"
   },
   {
     "rule": "/admin/tile/schema_versions",
@@ -427,11 +637,25 @@
     "endpoint": "admin.tile_schema_versions"
   },
   {
+    "rule": "/admin/tile/schema_versions",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_schema_versions"
+  },
+  {
     "rule": "/admin/tile/sql_panel",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_sql_panel"
+  },
+  {
+    "rule": "/admin/tile/sql_panel",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_sql_panel"
   },
   {
     "rule": "/admin/tile/statements_heatmap",
@@ -441,11 +665,25 @@
     "endpoint": "admin.tile_statements_heatmap"
   },
   {
+    "rule": "/admin/tile/statements_heatmap",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_statements_heatmap"
+  },
+  {
     "rule": "/admin/tile/statements_timeline",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_statements_timeline"
+  },
+  {
+    "rule": "/admin/tile/statements_timeline",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_statements_timeline"
   },
   {
     "rule": "/admin/tile/trace_viewer",
@@ -455,11 +693,25 @@
     "endpoint": "admin.tile_trace_viewer"
   },
   {
+    "rule": "/admin/tile/trace_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_trace_viewer"
+  },
+  {
     "rule": "/admin/tiles/blueprint_drift_overlay/pulse",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_blueprint_drift_pulse"
+  },
+  {
+    "rule": "/admin/tiles/blueprint_drift_overlay/pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tile_blueprint_drift_pulse"
   },
   {
     "rule": "/admin/trace_viewer",
@@ -469,6 +721,13 @@
     "endpoint": "admin.trace_viewer"
   },
   {
+    "rule": "/admin/trace_viewer",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.trace_viewer"
+  },
+  {
     "rule": "/admin/tradelines_panel",
     "methods": [
       "GET"
@@ -476,11 +735,25 @@
     "endpoint": "admin.tradelines_panel"
   },
   {
+    "rule": "/admin/tradelines_panel",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.tradelines_panel"
+  },
+  {
     "rule": "/admin/view_credit_ledger/<int:user_id>",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.view_credit_ledger"
+  },
+  {
+    "rule": "/admin/view_credit_ledger/<int:user_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "admin_ui.view_credit_ledger"
   },
   {
     "rule": "/api/",
@@ -537,13 +810,6 @@
       "POST"
     ],
     "endpoint": "compat.api_login"
-  },
-  {
-    "rule": "/api/operator/access_token_pulse",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "api.operator_access_token_pulse"
   },
   {
     "rule": "/api/operator/debug_flags",
@@ -628,28 +894,6 @@
     "endpoint": "compat.api_register"
   },
   {
-    "rule": "/api/reports/fraud",
-    "methods": [
-      "GET",
-      "POST"
-    ],
-    "endpoint": "api.generate_fraud_report"
-  },
-  {
-    "rule": "/api/reports/fraud/pdf",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "api.generate_fraud_report_pdf"
-  },
-  {
-    "rule": "/api/reports/statement",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "api.generate_statement"
-  },
-  {
     "rule": "/api/settings/theme",
     "methods": [
       "POST"
@@ -664,18 +908,11 @@
     "endpoint": "api.api_health"
   },
   {
-    "rule": "/api/tradeline/review/<int:tradeline_id>",
-    "methods": [
-      "POST"
-    ],
-    "endpoint": "api.tradeline_review"
-  },
-  {
     "rule": "/api/tradelines/review/<int:tradeline_id>",
     "methods": [
       "POST"
     ],
-    "endpoint": "api.tradeline_review"
+    "endpoint": "tradelines_review.review_tradeline"
   },
   {
     "rule": "/api/v1/auth/login",
@@ -858,6 +1095,27 @@
       "PUT"
     ],
     "endpoint": "api_v1.update_tradeline"
+  },
+  {
+    "rule": "/api/v1/tradelines/review/<int:tradeline_id>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api_v1.review_tradeline_v1"
+  },
+  {
+    "rule": "/api/v1/treasury/cards/<card_id>/suspend",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "treasury_bp.suspend_card_route"
+  },
+  {
+    "rule": "/api/v1/treasury/cards/<card_id>/unfreeze",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "treasury_bp.unfreeze_card_route"
   },
   {
     "rule": "/apidocs/",
@@ -1088,7 +1346,7 @@
     "methods": [
       "POST"
     ],
-    "endpoint": "plaid.create_link_token"
+    "endpoint": "plaid.create_link_token_route"
   },
   {
     "rule": "/dashboard",
@@ -1154,13 +1412,6 @@
     "endpoint": "diagnostics.cache_health"
   },
   {
-    "rule": "/diagnostics/cache_health",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "diagnostics.cache_health"
-  },
-  {
     "rule": "/diagnostics/console",
     "methods": [
       "GET"
@@ -1175,18 +1426,18 @@
     "endpoint": "diagnostics.db_health"
   },
   {
-    "rule": "/diagnostics/db_health",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "diagnostics.db_health"
-  },
-  {
     "rule": "/diagnostics/full",
     "methods": [
       "GET"
     ],
     "endpoint": "diagnostics.get_full_diagnostics"
+  },
+  {
+    "rule": "/diagnostics/mfa-status",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "diagnostics.mfa_status"
   },
   {
     "rule": "/diagnostics/routes",
@@ -1217,13 +1468,6 @@
     "endpoint": "dummy_malformed"
   },
   {
-    "rule": "/dummy_test_route",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "dummy_test_route"
-  },
-  {
     "rule": "/dummy_valid",
     "methods": [
       "POST"
@@ -1242,7 +1486,7 @@
     "methods": [
       "POST"
     ],
-    "endpoint": "plaid.exchange_public_token"
+    "endpoint": "plaid.exchange_public_token_route"
   },
   {
     "rule": "/favicon.ico",
@@ -1286,13 +1530,6 @@
       "POST"
     ],
     "endpoint": "main.subscriber_entry"
-  },
-  {
-    "rule": "/health",
-    "methods": [
-      "GET"
-    ],
-    "endpoint": "health_check_simple"
   },
   {
     "rule": "/healthz",
@@ -1373,6 +1610,13 @@
       "GET"
     ],
     "endpoint": "pulse.access_token_pulse"
+  },
+  {
+    "rule": "/pulse/healthz",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "pulse.healthz"
   },
   {
     "rule": "/pulse/vault/<int:vault_id>",
@@ -1551,14 +1795,6 @@
     "endpoint": "main.subscriber_dashboard"
   },
   {
-    "rule": "/subscriber/login",
-    "methods": [
-      "GET",
-      "POST"
-    ],
-    "endpoint": "subscriber_login"
-  },
-  {
     "rule": "/subscriber/update_profile",
     "methods": [
       "POST"
@@ -1578,6 +1814,13 @@
       "GET"
     ],
     "endpoint": "tracer.template_tracer"
+  },
+  {
+    "rule": "/transactions",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "plaid.get_transactions_route"
   },
   {
     "rule": "/upload-pdf",
