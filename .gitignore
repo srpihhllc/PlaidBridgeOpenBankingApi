@@ -75,3 +75,10 @@ pytest_output*.log
 .venv/
 site/
 site_backup/
+
+# Local inspection output
+console_output.pdf
+app-inspection.txt
+.env
+.env.*
+!.env.example
