@@ -41,7 +41,8 @@ def cortex_overlay():
         key.decode().split(":")[1]: int(redis.get(key) or 0)
         for key in redis.keys("route_hits:*")
     }
-    return render_template("admin/cortex_overlay.svg", hits=usage_data)
+    rendered_svg = render_template("admin/cortex_overlay.svg", hits=usage_data)
+    return current_app.response_class(rendered_svg, mimetype="image/svg+xml")
 
 
 @introspection_bp.route("/diagnose_brain", methods=["GET", "POST"])

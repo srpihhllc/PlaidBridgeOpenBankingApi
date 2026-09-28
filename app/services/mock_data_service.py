@@ -125,6 +125,14 @@ class MockDataService:
             "lender_user_id": lender_user_id,
             "status": "active",
             "verification_status": "automatically_verified",
+            "institution": {
+                "name": bank_name,
+                "phishing_risk_level": "LOW",
+            },
+            "compliance_audit": {
+                "unethical_lending_flag": False,
+                "predatory_score": 0.02,
+            },
             "owners": [
                 {
                     "name": f"Lender Sandbox User {lender_user_id}",
@@ -205,8 +213,6 @@ class MockDataService:
                 merchant = random.choice(cls.MERCHANTS)
                 is_income = merchant["primary"] == "INCOME"
 
-                # Standardize amounts: Positive for income, Negative for expense (or vice versa based on your DB schema)
-                # Assuming your legacy code used negative for expense:
                 if is_income:
                     amount = round(random.uniform(300.0, 2000.0), 2)
                 else:
@@ -217,14 +223,12 @@ class MockDataService:
 
                 txns.append(
                     {
-                        # Legacy keys for PDF generator compatibility
                         "date": day.strftime("%Y-%m-%d"),
                         "description": merchant["name"],
                         "amount": amount,
                         "category": merchant["primary"].lower(),
-                        # Enriched Open Banking attributes
                         "id": f"tx_{uuid.uuid4().hex}",
-                        "account_id": f"acc_{uuid.uuid4().hex[:16]}",  # Usually mapped to the actual account
+                        "account_id": f"acc_{uuid.uuid4().hex[:16]}",
                         "pending": is_pending,
                         "authorized_date": authorized_day.strftime("%Y-%m-%d"),
                         "payment_channel": merchant["channel"],
@@ -253,7 +257,6 @@ class MockDataService:
                     }
                 )
 
-        # Sort by date ascending
         txns.sort(key=lambda t: t["date"])
         return txns
 
@@ -272,7 +275,6 @@ class MockDataService:
 
         for tx in transactions:
             amount = float(tx.get("amount", 0) or 0)
-            # Use the new enriched category if available, fallback to legacy
             cat = tx.get("personal_finance_category", {}).get(
                 "primary", tx.get("category", "UNCATEGORIZED")
             )
@@ -300,7 +302,7 @@ class MockDataService:
                 "days_with_negative_balance": 0,
                 "insufficient_funds_count": random.choice(
                     [0, 0, 0, 1]
-                ),  # Occasional mock NSF
+                ),
                 "high_velocity_transactions": transaction_count > 50,
             },
             "metadata": {

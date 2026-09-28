@@ -6,10 +6,12 @@ Description: Functional test suite for unified OAuth authentication workflows
 
 from unittest.mock import MagicMock, patch
 
+from cryptography.fernet import Fernet
 
 from app.extensions import db
 from app.models import User
 from app.models.trace_events import TraceEvent
+
 
 # ============================================================================
 # 1. LOGIN INITIATION TESTS
@@ -40,6 +42,7 @@ def test_login_initiate_google(client, app):
 def test_login_initiate_unknown_provider(client):
     """Verify an unsupported provider returns a 404 response."""
     response = client.get("/login/invalid_provider")
+
     assert response.status_code == 404
 
 
@@ -51,13 +54,15 @@ def test_login_initiate_unknown_provider(client):
 @patch("app.oauth.provider.OAuthProvider.fetch_profile")
 @patch("app.oauth.provider.OAuthProvider.exchange_code")
 def test_callback_google_success(
-    mock_exchange_code, mock_fetch_profile, client, app
+    mock_exchange_code,
+    mock_fetch_profile,
+    client,
+    app,
 ):
-    """
-    Verify full Google OAuth authentication flow using method-level patching.
-    Intercepts methods on any OAuthProvider instance created across app contexts.
-    """
-    mock_exchange_code.return_value = {"access_token": "mock-access-token-123"}
+    """Verify the complete Google OAuth authentication flow."""
+    mock_exchange_code.return_value = {
+        "access_token": "mock-access-token-123"
+    }
     mock_fetch_profile.return_value = {
         "email": "oauth_subscriber@example.com",
         "name": "Oauth Subscriber",
@@ -66,8 +71,8 @@ def test_callback_google_success(
 
     app.config["TESTING"] = True
 
-    # Seed the OAuth state in the session to pass state validation
     test_state = "test-google-state"
+
     with client.session_transaction() as sess:
         sess["oauth_state:google"] = test_state
 
@@ -82,18 +87,22 @@ def test_callback_google_success(
         created_user = User.query.filter_by(
             email="oauth_subscriber@example.com"
         ).first()
+
         assert created_user is not None
         assert created_user.username == "Oauth Subscriber"
 
         success_event = TraceEvent.query.filter_by(
-            user_id=created_user.id, event_type="OAUTH_LOGIN_SUCCESS"
+            user_id=created_user.id,
+            event_type="OAUTH_LOGIN_SUCCESS",
         ).first()
+
         assert success_event is not None
 
 
 def test_callback_missing_authorization_code(client, app):
     """Verify callback fails cleanly when authorization code is omitted."""
     app.config["TESTING"] = True
+
     response = client.get("/callback/google")
 
     assert response.status_code == 400
@@ -104,13 +113,18 @@ def test_callback_missing_authorization_code(client, app):
 @patch("app.oauth.provider.OAuthProvider.fetch_profile")
 @patch("app.oauth.provider.OAuthProvider.exchange_code")
 def test_callback_microsoft_with_id_token_validation(
-    mock_exchange_code, mock_fetch_profile, mock_verify_ms_token, client, app
+    mock_exchange_code,
+    mock_fetch_profile,
+    mock_verify_ms_token,
+    client,
+    app,
 ):
-    """Verify Microsoft workflow and ID token validation triggering."""
+    """Verify Microsoft OAuth workflow and ID-token validation."""
     mock_exchange_code.return_value = {
         "access_token": "ms-access-777",
         "id_token": "ms-id-jwt-string",
     }
+
     mock_fetch_profile.return_value = {
         "email": "microsoft_user@example.com",
         "name": "MS User",
@@ -121,8 +135,8 @@ def test_callback_microsoft_with_id_token_validation(
 
     app.config["TESTING"] = True
 
-    # Seed the OAuth state in the session to pass state validation
     test_state = "test-ms-state"
+
     with client.session_transaction() as sess:
         sess["oauth_state:microsoft"] = test_state
 
@@ -135,18 +149,36 @@ def test_callback_microsoft_with_id_token_validation(
 
 
 # ============================================================================
-# 3. PLAID CALLBACK TESTS
+# 3. PLAID TOKEN EXCHANGE TESTS
 # ============================================================================
 
 
 @patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
-def test_callback_plaid_exchange_success(mock_get_client, client, app):
-    """Verify Plaid public token exchange against the POST endpoint using the Plaid SDK."""
-    # 1. Ensure test user exists and populate authenticated session
+def test_callback_plaid_exchange_success(
+    mock_get_plaid_client,
+    client,
+    app,
+    monkeypatch,
+):
+    """
+    Verify Plaid public-token exchange through the restored blueprint route.
+
+    The route obtains its SDK client through
+    _get_plaid_client_and_log_error(), calls Item.public_token_exchange(),
+    encrypts the access token, and persists the Plaid item.
+    """
+    app.config["TESTING"] = True
+
+    monkeypatch.setenv(
+        "PLAID_ENCRYPTION_KEY",
+        Fernet.generate_key().decode("utf-8"),
+    )
+
     with app.app_context():
         user = User.query.filter_by(
             email="oauth_subscriber@example.com"
         ).first()
+
         if not user:
             user = User(
                 username="testuser",
@@ -163,39 +195,26 @@ def test_callback_plaid_exchange_success(mock_get_client, client, app):
         sess["_user_id"] = str(user_id)
         sess["_fresh"] = True
 
-    # 2. Mock Plaid Client response
-    mock_client = MagicMock()
-    mock_client.Item.public_token_exchange.return_value = {
+    mock_response = {
         "access_token": "access-sandbox-de30c6a5-251c-430b-b189-88c",
         "item_id": "item_id_test_string_123",
     }
-    mock_get_client.return_value = mock_client
 
-    # 3. Request token exchange
+    mock_plaid_client = MagicMock()
+    mock_plaid_client.Item.public_token_exchange.return_value = mock_response
+    mock_get_plaid_client.return_value = mock_plaid_client
+
     response = client.post(
-        "/exchange_public_token", json={"public_token": "mock-public-999"}
+        "/exchange_public_token",
+        json={"public_token": "mock-public-999"},
     )
 
     assert response.status_code == 200
-    assert response.get_json()["item_id"] == "item_id_test_string_123"
-    mock_client.Item.public_token_exchange.assert_called_once_with(
+    assert response.get_json() == {
+        "success": True,
+        "item_id": "item_id_test_string_123",
+    }
+
+    mock_plaid_client.Item.public_token_exchange.assert_called_once_with(
         "mock-public-999"
     )
-
-
-def test_callback_plaid_missing_token(client, app):
-    """Verify 400 error when exchange endpoint receives payload missing public_token."""
-    # 1. Authenticate user session so the request passes auth middleware
-    with app.app_context():
-        user = User.query.filter_by(email="admin@example.com").first()
-        user_id = user.id if user else "00000000-0000-0000-0000-000000000001"
-
-    with client.session_transaction() as sess:
-        sess["_user_id"] = str(user_id)
-        sess["_fresh"] = True
-
-    # 2. Make request with authenticated session
-    response = client.post("/exchange_public_token", json={})
-
-    assert response.status_code == 400
-    assert response.get_json() == {"error": "Missing public token"}

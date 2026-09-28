@@ -777,6 +777,20 @@
     "endpoint": "api.set_dark_mode"
   },
   {
+    "rule": "/api/fraud/report",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.generate_fraud_report"
+  },
+  {
+    "rule": "/api/fraud/report/pdf",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.generate_fraud_report_pdf"
+  },
+  {
     "rule": "/api/generate_link_token",
     "methods": [
       "GET"
@@ -822,7 +836,6 @@
   {
     "rule": "/api/operator/disable",
     "methods": [
-      "GET",
       "POST"
     ],
     "endpoint": "api.operator_disable"
@@ -837,7 +850,6 @@
   {
     "rule": "/api/operator/enable",
     "methods": [
-      "GET",
       "POST"
     ],
     "endpoint": "api.operator_enable"
@@ -852,7 +864,6 @@
   {
     "rule": "/api/operator/force_template_audit",
     "methods": [
-      "GET",
       "POST"
     ],
     "endpoint": "api.operator_force_template_audit"
@@ -874,7 +885,6 @@
   {
     "rule": "/api/operator/toggle-mode",
     "methods": [
-      "GET",
       "POST"
     ],
     "endpoint": "api.operator_toggle_mode"
@@ -901,6 +911,13 @@
     "endpoint": "api.set_dark_mode"
   },
   {
+    "rule": "/api/statement/generate",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "api.generate_statement"
+  },
+  {
     "rule": "/api/status",
     "methods": [
       "GET"
@@ -912,7 +929,7 @@
     "methods": [
       "POST"
     ],
-    "endpoint": "tradelines_review.review_tradeline"
+    "endpoint": "api.tradeline_review"
   },
   {
     "rule": "/api/v1/auth/login",
@@ -1828,6 +1845,13 @@
       "POST"
     ],
     "endpoint": "main.upload_pdf"
+  },
+  {
+    "rule": "/v1/webhooks/polsia",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "polsia.handle_polsia_webhook"
   },
   {
     "rule": "/version",

@@ -41,14 +41,14 @@ from app.cli_commands.validate_relationships import (
 # Endpoint tracer (NOT the real template drift audit)
 from app.scripts.cli_template_tracer import trace_templates_command
 
-from .blueprint_emit import blueprint_emit
+from app.cli_commands.blueprint_emit import blueprint_emit
 from .cockpit_pdf_test import test_cockpit_pdf
 from .doctor import doctor
 
 # ---------------------------------------------------------------------------
 # Diagnostics & Blueprint Inspection
 # ---------------------------------------------------------------------------
-from .emit_blueprint_inspector import emit_blueprint_inspector
+from app.cli_commands.emit_blueprint_inspector import emit_blueprint_inspector
 from .grant_pulse import grant_pulse
 from .reset_and_reseed import reset_and_reseed
 

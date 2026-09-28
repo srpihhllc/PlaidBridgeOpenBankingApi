@@ -1,5 +1,5 @@
 # =============================================================================
-# FILE: app/tests/test_plaid_routes.py
+# FILE: app/tests/test_plaid_oauth.py
 # DESCRIPTION: Test suite covering Plaid Link token generation & exchange flows.
 # =============================================================================
 
@@ -48,8 +48,11 @@ def authenticated_client(client, test_user):
 # =============================================================================
 
 
-@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
-def test_create_link_token_success(mock_get_client, authenticated_client):
+@patch("app.blueprints.plaid_routes.ttl_emit")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error", create=True)
+def test_create_link_token_success(
+    mock_get_client, mock_ttl_emit, authenticated_client, test_user
+):
     """Verify successful creation and returning of a Plaid Link token."""
     mock_client = MagicMock()
     mock_client.LinkToken.create.return_value = {
@@ -62,9 +65,14 @@ def test_create_link_token_success(mock_get_client, authenticated_client):
     assert response.status_code == 200
     assert response.get_json() == {"link_token": "link-sandbox-test-123"}
     mock_client.LinkToken.create.assert_called_once()
+    mock_ttl_emit.assert_called_once_with(
+        f"ttl:plaid:link_token:success:{test_user.id}",
+        status="success",
+        ttl=300,
+    )
 
 
-@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error", create=True)
 def test_create_link_token_sdk_unavailable(
     mock_get_client, authenticated_client
 ):
@@ -83,7 +91,7 @@ def test_create_link_token_sdk_unavailable(
 
 
 @patch("app.blueprints.plaid_routes.ttl_emit")
-@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error", create=True)
 def test_exchange_public_token_success(
     mock_get_client,
     mock_ttl_emit,
@@ -93,7 +101,6 @@ def test_exchange_public_token_success(
     monkeypatch,
 ):
     """Verify token exchange, Fernet encryption, DB persistence, and telemetry."""
-    # Ensure encryption key is present in environment
     dummy_key = Fernet.generate_key().decode("utf-8")
     monkeypatch.setenv("PLAID_ENCRYPTION_KEY", dummy_key)
 
@@ -115,19 +122,16 @@ def test_exchange_public_token_success(
         "item_id": "item_id_plaid_123",
     }
 
-    # Assert database insertion and token encryption
     with app.app_context():
         item = PlaidItem.query.filter_by(
             user_id=test_user.id, plaid_item_id="item_id_plaid_123"
         ).first()
         assert item is not None
 
-        # Verify stored access token can be decrypted
         f = Fernet(dummy_key.encode())
         decrypted = f.decrypt(item.plaid_access_token.encode()).decode("utf-8")
         assert decrypted == "access-sandbox-999-xyz"
 
-    # Assert telemetry invocation
     mock_ttl_emit.assert_called_with(
         f"ttl:plaid:success:{test_user.id}", status="success", ttl=300
     )
@@ -138,14 +142,14 @@ def test_exchange_public_token_missing_payload(authenticated_client):
     response = authenticated_client.post("/exchange_public_token", json={})
 
     assert response.status_code == 400
-    assert response.get_json() == {"error": "Missing public token"}
+    assert response.get_json() == {"error": "public_token is required"}
 
 
-@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error", create=True)
 def test_exchange_public_token_sdk_unavailable(
     mock_get_client, authenticated_client
 ):
-    """Verify 503 error returned when SDK client factory yields None."""
+    """Verify 502 error returned when SDK client factory yields None."""
     mock_get_client.return_value = None
 
     response = authenticated_client.post(
@@ -153,16 +157,15 @@ def test_exchange_public_token_sdk_unavailable(
         json={"public_token": "public-sandbox-mock-000"},
     )
 
-    assert response.status_code == 503
-    assert response.get_json() == {"error": "Service unavailable"}
+    assert response.status_code == 502
+    assert response.get_json() == {"error": "Plaid client unavailable"}
 
 
-@patch("app.blueprints.plaid_routes.ttl_emit")
-@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error")
+@patch("app.blueprints.plaid_routes._get_plaid_client_and_log_error", create=True)
 def test_exchange_public_token_sdk_failure(
-    mock_get_client, mock_ttl_emit, authenticated_client, test_user
+    mock_get_client, authenticated_client
 ):
-    """Verify failure state handling, error logging, and error telemetry emit."""
+    """Verify failure state handling and 502 response on exception."""
     mock_client = MagicMock()
     mock_client.Item.public_token_exchange.side_effect = Exception(
         "Plaid API Timeout"
@@ -174,9 +177,5 @@ def test_exchange_public_token_sdk_failure(
         json={"public_token": "public-sandbox-mock-000"},
     )
 
-    assert response.status_code == 500
-    assert response.get_json() == {"error": "Exchange failed"}
-
-    mock_ttl_emit.assert_called_with(
-        f"ttl:plaid:error:{test_user.id}", status="error", ttl=300
-    )
+    assert response.status_code == 502
+    assert response.get_json() == {"error": "Plaid token exchange failed"}

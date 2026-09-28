@@ -62,6 +62,17 @@ _TIMEZONE = os.getenv("TIMEZONE", "UTC")
 _SECRET_KEY = os.getenv("SECRET_KEY", "DEV_SECRET_KEY")
 _JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "DEV_JWT_SECRET")
 
+# System Operator / God-Mode Settings
+_SYSTEM_OPERATOR_ID = os.getenv("SYSTEM_OPERATOR_ID", "TERENCE_CORTEX_PRIME")
+_SYSTEM_OPERATOR_ENABLED = as_bool(
+    os.getenv("SYSTEM_OPERATOR_ENABLED", "True"), default=True
+)
+
+# Polsia Integration Credentials
+_POLSIA_API_KEY = _clean_env_string("POLSIA_API_KEY", "")
+_POLSIA_BASE_URL = _clean_env_string("POLSIA_BASE_URL", "https://api.polsia.com/v1")
+_POLSIA_WEBHOOK_SECRET = _clean_env_string("POLSIA_WEBHOOK_SECRET", "default_secret_key")
+
 # Relational Database Context Sanitation
 _DB_USER = _clean_env_string("DB_USER")
 _DB_PASSWORD = _clean_env_string("DB_PASSWORD")
@@ -108,6 +119,15 @@ class BaseConfig:
     SECRET_KEY = _SECRET_KEY
     JWT_SECRET_KEY = _JWT_SECRET_KEY
 
+    # System Operator / God-Mode Configuration
+    SYSTEM_OPERATOR_ID = _SYSTEM_OPERATOR_ID
+    SYSTEM_OPERATOR_ENABLED = _SYSTEM_OPERATOR_ENABLED
+
+    # Polsia API Configuration
+    POLSIA_API_KEY = _POLSIA_API_KEY
+    POLSIA_BASE_URL = _POLSIA_BASE_URL
+    POLSIA_WEBHOOK_SECRET = _POLSIA_WEBHOOK_SECRET
+
     # SMTP Mail Handlers
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
@@ -146,6 +166,7 @@ class BaseConfig:
             "db_host": _DB_HOST,
             "db_name": _DB_NAME,
             "debug_ui": cls.DEBUG_UI,
+            "system_operator_enabled": cls.SYSTEM_OPERATOR_ENABLED,
         }
 
 
@@ -166,6 +187,11 @@ class TestingConfig(BaseConfig):
     JWT_SECRET_KEY = "test-jwt-sentinel-key"
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
+
+    # Operator Intercept Overrides
+    SYSTEM_OPERATOR_ID = "TERENCE_CORTEX_PRIME"
+    SYSTEM_OPERATOR_ENABLED = True
+
     REDIS_URL = _ensure_redis_url(
         _RAW_REDIS_TARGET or "redis://localhost:6379/0"
     )

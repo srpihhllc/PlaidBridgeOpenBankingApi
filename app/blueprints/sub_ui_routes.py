@@ -9,7 +9,6 @@ import threading
 from collections.abc import Iterator
 from datetime import datetime, timezone
 
-from flask import session  # Hoisted to top-level for full blueprint access
 from flask import (
     Blueprint,
     abort,
@@ -19,21 +18,20 @@ from flask import (
     render_template,
     render_template_string,
     request,
+    session,
     url_for,
 )
 from flask_login import current_user, login_required
 
-from app.auth_handlers import SystemOperator  # Resolved missing reference
 from app.constants import (
     BLUEPRINT_AUDIT_KEY,
-    DEFAULT_TTL,  # Hoisted
+    DEFAULT_TTL,
     OPERATOR_MODE_KEY,
 )
+from app.decorators.access import has_permission
 from app.dto.transaction_dto import TransactionDTO
 from app.extensions import db
-from app.models.registry import (
-    Registry,
-)  # 🟢 ADDED: Live database model for services
+from app.models.registry import Registry
 from app.models.todo import Todo
 from app.models.transactions import Transaction
 from app.models.user_dashboard import UserDashboard
@@ -54,18 +52,15 @@ sub_bp = Blueprint("sub_ui", __name__, url_prefix="/sub")
 # Role Guard
 # =============================================================================
 
-
 def require_subscriber():
     """
-    Hard guard: only authenticated subscribers may access /sub routes.
-    Operators bypass the role check.
+    Hard guard: only authenticated subscribers or operators may access /sub routes.
     """
     if not getattr(current_user, "is_authenticated", False):
         abort(401)
 
-    # 💡 OPERATOR BYPASS
-    if session.get(OPERATOR_MODE_KEY) is True:
-        return current_user  # Let the operator through!
+    if session.get(OPERATOR_MODE_KEY) is True or has_permission(current_user, "read_operational_data"):
+        return current_user
 
     if getattr(current_user, "role", None) != "subscriber":
         abort(403)
@@ -85,7 +80,7 @@ _EXPECTED_TEMPLATES_MANIFEST: set[str] = {
     "sub/profile.html",
     "sub/fraud_drilldown.html",
     "sub/settings.html",
-    "sub/vault_dashboard.html",  # 🟢 Added to prevent false-positive template drift
+    "sub/vault_dashboard.html",
 }
 
 TTL_SECONDS = DEFAULT_TTL
@@ -138,7 +133,6 @@ def _emit_blueprint_audit_trace() -> dict:
 
     status = "DRIFT_DETECTED" if missing or extras else "COCKPIT_ACTIVE"
 
-    # Normalized keys to perfectly fit the UI data binding contract
     audit_data = {
         "last_audit_date": datetime.now(timezone.utc).isoformat(),
         "status": status,
@@ -251,85 +245,9 @@ def sub_index():
 @sub_bp.route("/dashboard", endpoint="dashboard")
 @login_required
 def dashboard():
-    # Unwrap Werkzeug's LocalProxy to get the deterministic underlying object type
     user = current_user._get_current_object()
+    is_operator = bool(session.get(OPERATOR_MODE_KEY, False))
 
-    # ⭐ GOD-MODE BYPASS: Structured fallback contract for transient operator sessions
-    if (
-        isinstance(user, SystemOperator)
-        or getattr(user, "id", None) == "TERENCE_CORTEX_PRIME"
-    ):
-        # 🛡️ Safely attach template context properties to prevent dynamic evaluation panics
-        try:
-            setattr(
-                user, "total_balance", getattr(user, "total_balance", 0.00)
-            )
-            setattr(user, "first_name", getattr(user, "first_name", "Terence"))
-            setattr(
-                user, "last_name", getattr(user, "last_name", "Pollard Sr")
-            )
-        except AttributeError:
-            pass  # Protective catch if the model doesn't permit active mutation
-
-        # authoritative mock profile context dict to match standard template contract
-        profile_ctx = {
-            "username": getattr(user, "username", "TERENCE_CORTEX_PRIME"),
-            "full_name": "Terence Pollard Sr",
-        }
-
-        # 🟢 THE FIX: Force a global database dump of all provisioned services
-        all_services = Registry.query.all()
-        operator_registry = []
-        for svc in all_services:
-            try:
-                # Extract the config to expose the endpoint route to the UI
-                config_dict = (
-                    json.loads(svc.config_blob)
-                    if isinstance(svc.config_blob, str)
-                    else svc.config_blob
-                )
-                operator_registry.append(
-                    {
-                        "id": svc.id,
-                        "name": svc.name,
-                        "endpoint": config_dict.get(
-                            "endpoint", "#"
-                        ),  # Crucial for the HTML form action
-                        "config": config_dict,
-                    }
-                )
-            except Exception:
-                continue
-
-        return render_template(
-            "sub/subscriber_dashboard.html",
-            audit_info={
-                "last_audit_date": datetime.now(timezone.utc).isoformat(),
-                "audit_status": "COCKPIT_ACTIVE",
-                "audit_issues": 0,
-                "environment": "CORTEX_PRIME",
-            },
-            profile=profile_ctx,
-            bank_accounts=[],
-            transactions=[],
-            category_summary={},
-            fraud_summary={"flagged_count": 0, "total_risk_score": 0.0},
-            timeline=[],
-            transaction_summary={"income": 0, "expenses": 0, "net": 0},
-            page=1,
-            total_pages=1,
-            dashboard_settings={"theme": "dark", "compact_mode": False},
-            pending_todos=[],
-            completed_todos=[],
-            service_registry=operator_registry,  # 🟢 ALIGNED: Uses the God-Mode registry list
-            is_operator=True,  # 🟢 ALIGNED: Hardcoded to True for God-Mode
-        )
-
-    # -------------------------------------------------------------------------
-    # Standard Persistent Database Resolution Path (For Real Subscribers Only)
-    # -------------------------------------------------------------------------
-
-    # Telemetry
     log_identity_event(
         user_id=user.id,
         event_type="SUBSCRIBER_DASHBOARD_ACCESS",
@@ -337,7 +255,6 @@ def dashboard():
         ip=request.remote_addr,
     )
 
-    # Audit drift resolution with protective map default
     try:
         audit_info = get_audit_info()
         if not audit_info or not isinstance(audit_info, dict):
@@ -352,13 +269,11 @@ def dashboard():
             "audit_issues": 0,
         }
 
-    # Profile DTO
     profile = {
         "username": getattr(user, "username", None),
         "full_name": getattr(user, "full_name", None),
     }
 
-    # Ensure UserDashboard configuration exists
     dashboard_model = getattr(user, "user_dashboard", None)
     if dashboard_model is None:
         dashboard_model = UserDashboard.create_for_user(user.id)
@@ -369,7 +284,6 @@ def dashboard():
         dashboard_model.settings or UserDashboard.default_settings()
     )
 
-    # Transaction feed processing
     raw_txns = (
         Transaction.query.filter_by(user_id=user.id)
         .order_by(Transaction.date.desc())
@@ -377,12 +291,10 @@ def dashboard():
     )
     transactions = [TransactionDTO.from_model(t) for t in raw_txns]
 
-    # Compute Analytics Metrics
     category_summary = compute_category_summary(transactions)
     fraud_summary = compute_fraud_summary(transactions)
     timeline = compute_timeline(transactions)
 
-    # Optional Downstream Analysis Engine Lookups
     try:
         from app.services.transaction_analysis import (
             compute_transaction_summary,
@@ -392,20 +304,21 @@ def dashboard():
     except Exception:
         transaction_summary = None
 
-    # View Pagination Segmentation
     page = request.args.get("page", 1, type=int)
     per_page = 20
     total_items = len(transactions)
     total_pages = (total_items + per_page - 1) // per_page
     paged_transactions = transactions[(page - 1) * per_page : page * per_page]
 
-    # Operational Task Queues
     todo_q = Todo.query.filter_by(user_id=user.id)
     pending_todos = todo_q.filter_by(completed=False).all()
     completed_todos = todo_q.filter_by(completed=True).all()
 
-    # Discovery Services Infrastructure (Now Live From Database)
-    seeded_services = Registry.query.filter_by(user_id=user.id).all()
+    if is_operator:
+        seeded_services = Registry.query.all()
+    else:
+        seeded_services = Registry.query.filter_by(user_id=user.id).all()
+
     processed_services = []
     for svc in seeded_services:
         try:
@@ -420,9 +333,6 @@ def dashboard():
         except Exception:
             continue
 
-    is_operator = bool(session.get(OPERATOR_MODE_KEY, False))
-
-    # Telemetry Execution Trace
     template_name = "sub/subscriber_dashboard.html"
     _emit_subscriber_ui_rendered(
         user,
@@ -435,7 +345,6 @@ def dashboard():
         },
     )
 
-    # Render cockpit dashboard contextually
     return render_template(
         template_name,
         audit_info=audit_info,
@@ -450,7 +359,7 @@ def dashboard():
         dashboard_settings=dashboard_settings,
         pending_todos=pending_todos,
         completed_todos=completed_todos,
-        service_registry=processed_services,  # 🟢 FIX: Aligned template variable to 'service_registry'
+        service_registry=processed_services,
         is_operator=is_operator,
     )
 
@@ -459,13 +368,6 @@ def dashboard():
 @login_required
 def settings():
     user = require_subscriber()
-
-    # ⭐ GOD-MODE BYPASS
-    if getattr(user, "id", None) == "TERENCE_CORTEX_PRIME":
-        return render_template(
-            "sub/settings.html",
-            dashboard_settings={"theme": "dark", "layout": "default"},
-        )
 
     log_identity_event(
         user_id=user.id,
@@ -501,15 +403,6 @@ def settings():
 @login_required
 def fraud_drilldown():
     user = require_subscriber()
-
-    # ⭐ GOD-MODE BYPASS
-    if getattr(user, "id", None) == "TERENCE_CORTEX_PRIME":
-        return render_template(
-            "sub/fraud_drilldown.html",
-            fraud_summary={"risk_score": 0, "flagged_count": 0},
-            flagged_transactions=[],
-            timeline=[],
-        )
 
     raw_txns = (
         Transaction.query.filter_by(user_id=user.id)
@@ -587,17 +480,6 @@ def navbar_probe():
 @login_required
 def vault_dashboard():
     user = require_subscriber()
-
-    # ⭐ GOD-MODE BYPASS
-    if getattr(user, "id", None) == "TERENCE_CORTEX_PRIME":
-        return render_template(
-            "sub/vault_dashboard.html",
-            vault_txns=[],
-            summary={},
-            flow_labels=[],
-            flow_values=[],
-            fraud_signals=[],
-        )
 
     from app.dto.vault_dto import VaultTransactionDTO
     from app.models.vault_transaction import VaultTransaction
@@ -677,11 +559,6 @@ def tile_diagnostics():
 
 @sub_bp.route("/t/<path:tpl>", endpoint="render_sub_template")
 def render_sub_template(tpl):
-    """
-    Dynamic preview router for subscriber templates.
-    Ensures that requested parameters match files within the allowed manifest
-    and supplies dummy context fields to bypass Jinja evaluation blocks.
-    """
     if not tpl.endswith(".html"):
         tpl = f"{tpl}.html"
 
@@ -734,7 +611,7 @@ def render_sub_template(tpl):
         "total_pages": 1,
         "pending_todos": [],
         "completed_todos": [],
-        "service_registry": [],  # 🟢 FIXED: Changed back to service_registry to match template contract
+        "service_registry": [],
         "is_operator": False,
         "vault_txns": [],
         "summary": {},

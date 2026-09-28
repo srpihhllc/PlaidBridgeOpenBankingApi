@@ -232,7 +232,7 @@ def _configure_limiter(
         )
     except Exception:
         app.logger.exception(
-            "[LIMITER] Initialization failed; disabling limiter " "[PID: %s]",
+            "[LIMITER] Initialization failed; disabling limiter [PID: %s]",
             os.getpid(),
         )
 
@@ -456,6 +456,7 @@ def init_extensions(app: Any) -> None:
 
     if not app.extensions.get("app_jwt_initialized"):
         jwt.init_app(app)
+        app.extensions["jwt"] = jwt  # Alias for legacy routes and test fixtures
         app.extensions["app_jwt_initialized"] = True
 
         app.logger.info(
@@ -465,7 +466,6 @@ def init_extensions(app: Any) -> None:
 
         try:
             from .models.revoked_token import RevokedToken
-            from .models.user import User
 
             @jwt.token_in_blocklist_loader
             def check_if_token_revoked(jwt_header, jwt_payload):

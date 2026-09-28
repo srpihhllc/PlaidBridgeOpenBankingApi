@@ -15,7 +15,7 @@ def test_fallback_sentinels(monkeypatch, caplog):
       - returns structured fallback payloads
     """
     monkeypatch.setenv("FLASK_ENV", "production")
-    caplog.set_level("CRITICAL")
+    caplog.set_level("ERROR")
 
     import importlib
 
@@ -43,7 +43,6 @@ def test_fallback_sentinels(monkeypatch, caplog):
         assert app_module.app.config.get("PROPAGATE_EXCEPTIONS") is False
 
         # --- Log expectations ---
-        # Updated to match the actual CRITICAL log output from the app boot sequence
         assert any("FATAL BOOT ERROR" in rec.message for rec in caplog.records)
         assert any(
             "Sentinel override active" in rec.message for rec in caplog.records

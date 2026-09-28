@@ -18,8 +18,7 @@ def seed_fraud_cases():
 
     txns = Transaction.query.order_by(Transaction.id.desc()).limit(20).all()
     if not txns:
-        click.echo("❌ No transactions found. Seed transactions first.")
-        return
+        raise click.ClickException("❌ No transactions found. Seed transactions first.")
 
     fraud_samples = random.sample(txns, min(5, len(txns)))
 

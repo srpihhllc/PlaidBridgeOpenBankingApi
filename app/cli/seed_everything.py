@@ -1,6 +1,6 @@
 # FILE: app/cli/seed_everything.py
 
-from subprocess import call
+from subprocess import CalledProcessError, check_call
 
 import click
 from flask.cli import with_appcontext
@@ -13,13 +13,23 @@ def seed_everything():
 
     click.echo("🚀 Seeding FULL cockpit data suite...")
 
-    call(["flask", "seed-admin"])
-    call(["flask", "seed-subscriber"])
-    call(["flask", "seed-lender"])
-    call(["flask", "seed-mock-transactions"])
-    call(["flask", "seed-fraud-cases"])
-    call(["flask", "seed-timeline"])
-    call(["flask", "seed-todos"])
+    commands = [
+        ["flask", "seed-admin"],
+        ["flask", "seed-subscriber"],
+        ["flask", "seed-lender"],
+        ["flask", "seed-mock-transactions"],
+        ["flask", "seed-fraud-cases"],
+        ["flask", "seed-timeline"],
+        ["flask", "seed-todos"],
+    ]
+
+    for cmd in commands:
+        try:
+            check_call(cmd)
+        except CalledProcessError as exc:
+            raise click.ClickException(
+                f"❌ Seeding pipeline halted on command '{' '.join(cmd)}' (Exit code: {exc.returncode})."
+            )
 
     click.echo("\n📊 Cockpit-Grade Full Suite Seeding Summary")
     click.echo("--------------------------------")

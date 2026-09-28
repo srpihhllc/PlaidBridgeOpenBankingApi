@@ -1,3 +1,4 @@
+#home/srpihhllc/PlaidBridgeOpenBankingApi/app/test_deployment.py
 """
 Deployment Readiness Test
 Simulates staging-deploy.yml workflow checks locally
@@ -31,19 +32,19 @@ def test_backend():
     print("=" * 60)
     print("BACKEND DEPLOYMENT TEST")
     print("=" * 60)
-    
+
     try:
         from app import create_app
         app = create_app()
-        
+
         route_count = len(list(app.url_map.iter_rules()))
         blueprint_count = len(app.blueprints)
-        
+
         print("[OK] Backend app creation: SUCCESS")
         print(f"   - Total routes: {route_count}")
         print(f"   - Total blueprints: {blueprint_count}")
         print(f"   - Flask version: {app.__class__.__module__}")
-        
+
         # Check critical blueprints
         critical_bps = ['api_v1', 'fintech', 'plaid', 'auth']
         missing = [bp for bp in critical_bps if bp not in app.blueprints]
@@ -51,7 +52,7 @@ def test_backend():
             print(f"[WARN] Missing blueprints: {missing}")
         else:
             print("[OK] All critical blueprints registered")
-        
+
         return True
     except Exception as e:
         print("[FAIL] Backend app creation: FAILED")
@@ -65,13 +66,13 @@ def test_mobile():
     print("\n" + "=" * 60)
     print("MOBILE APP DEPLOYMENT TEST")
     print("=" * 60)
-    
+
     mobile_path = Path(__file__).parent / "mobile-app"
-    
+
     if not (mobile_path / "package.json").exists():
         print("[FAIL] Mobile app not found")
         return False
-    
+
     try:
         # Check if pnpm is available
         pnpm_check = subprocess.run(
@@ -80,21 +81,21 @@ def test_mobile():
             text=True,
             timeout=5
         )
-        
+
         if pnpm_check.returncode != 0:
             print("[WARN] pnpm not installed, skipping mobile tests")
             return None
-        
+
         print(f"[OK] pnpm version: {pnpm_check.stdout.strip()}")
-        
+
         # Check package.json
         import json
         with open(mobile_path / "package.json") as f:
             package = json.load(f)
-        
+
         print(f"[OK] Mobile app: {package.get('name', 'unknown')}")
         print(f"   - Version: {package.get('version', 'unknown')}")
-        
+
         # Check for critical dependencies
         deps = package.get('dependencies', {})
         critical_deps = ['expo', '@trpc/react-query', 'react-native']
@@ -103,13 +104,13 @@ def test_mobile():
                 print(f"   - {dep}: {deps[dep]}")
             else:
                 print(f"   [WARN] Missing {dep}")
-        
+
         # Check if node_modules exists
         if (mobile_path / "node_modules").exists():
             print("[OK] Dependencies installed")
         else:
             print("[WARN] Dependencies not installed (run: cd mobile-app && pnpm install)")
-        
+
         return True
     except Exception as e:
         print("[FAIL] Mobile app test: FAILED")
@@ -121,23 +122,23 @@ def test_environment():
     print("\n" + "=" * 60)
     print("ENVIRONMENT CONFIGURATION TEST")
     print("=" * 60)
-    
+
     root = Path(__file__).parent
-    
+
     # Check .env files
     backend_env = root / "PlaidBridgeOpenBankingApi" / ".env"
     mobile_env = root / "mobile-app" / ".env"
-    
+
     print(f"Backend .env: {'[OK] EXISTS' if backend_env.exists() else '[FAIL] MISSING'}")
     print(f"Mobile .env:  {'[OK] EXISTS' if mobile_env.exists() else '[FAIL] MISSING'}")
-    
+
     # Check .gitignore
     gitignore = root / ".gitignore"
     if gitignore.exists():
         content = gitignore.read_text()
         env_ignored = '.env' in content or '*.env' in content
         print(f".gitignore:   {'[OK] .env files ignored' if env_ignored else '[WARN] .env not ignored'}")
-    
+
     # Read keys from backend .env so local checks match repository-secret usage.
     backend_env_keys = _read_env_keys(backend_env)
 
@@ -159,10 +160,10 @@ def test_environment():
     # Optional component-mode DB vars (fallback if DATABASE_URL not used; supported by app/config.py).
     # Only show these if DATABASE_URL is not set (fallback mode).
     database_url_set = (os.getenv("DATABASE_URL") is not None) or ("DATABASE_URL" in backend_env_keys)
-    
+
     component_db_vars = ["DB_USER", "DB_PASSWORD", "DB_HOST", "DB_NAME"]
     comp_count = sum(1 for var in component_db_vars if var in backend_env_keys or os.getenv(var) is not None)
-    
+
     if comp_count and not database_url_set:
         print(f"\nOptional DB component variables (fallback): {comp_count}/4 present")
         for var in component_db_vars:
@@ -181,7 +182,7 @@ def test_environment():
                 print(f"   - {key}")
             return False
         print("\n[OK] Mobile .env contains only EXPO_PUBLIC_* keys")
-    
+
     return True
 
 def test_git_status():
@@ -189,7 +190,7 @@ def test_git_status():
     print("\n" + "=" * 60)
     print("GIT REPOSITORY STATUS")
     print("=" * 60)
-    
+
     try:
         # Check current branch
         branch = subprocess.run(
@@ -199,7 +200,7 @@ def test_git_status():
             timeout=5
         )
         print(f"Current branch: {branch.stdout.strip()}")
-        
+
         # Check if there are uncommitted changes
         status = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -207,14 +208,14 @@ def test_git_status():
             text=True,
             timeout=15
         )
-        
+
         if status.stdout.strip():
             print("[WARN] Uncommitted changes detected:")
             for line in status.stdout.strip().split('\n')[:10]:
                 print(f"   {line}")
         else:
             print("[OK] Working tree clean")
-        
+
         # Check if ahead/behind remote
         tracking = subprocess.run(
             ["git", "rev-list", "--left-right", "--count", "origin/main...main"],
@@ -222,7 +223,7 @@ def test_git_status():
             text=True,
             timeout=5
         )
-        
+
         if tracking.returncode == 0:
             ahead, behind = tracking.stdout.strip().split()
             if ahead == "0" and behind == "0":
@@ -241,18 +242,18 @@ def main():
     print("DEPLOYMENT READINESS TEST")
     print("Simulating: .github/workflows/staging-deploy.yml")
     print("=" * 60 + "\n")
-    
+
     results = {
         'backend': test_backend(),
         'mobile': test_mobile(),
         'environment': test_environment(),
         'git': test_git_status()
     }
-    
+
     print("\n" + "=" * 60)
     print("DEPLOYMENT READINESS SUMMARY")
     print("=" * 60)
-    
+
     for component, status in results.items():
         if status is True:
             print(f"[OK] {component.upper()}: READY")
@@ -260,9 +261,9 @@ def main():
             print(f"[FAIL] {component.upper()}: NOT READY")
         else:
             print(f"[WARN] {component.upper()}: SKIPPED")
-    
+
     all_ready = all(v in (True, None) for v in results.values())
-    
+
     print("\n" + "=" * 60)
     if all_ready:
         print("[OK] DEPLOYMENT: READY FOR STAGING")

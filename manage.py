@@ -45,6 +45,7 @@ _command_modules = [
     "app.cli_commands.blueprint_drift_tracer",
     "app.cli_commands.blueprint_emit",
     "app.cli_commands.emit_blueprint_inspector",
+    "app.cli_commands.route_audit",
     "app.cli_commands.route_drift",
     "app.cli_commands.route_graph",
     "app.cli_commands.route_map_dump",
@@ -357,12 +358,18 @@ def verify_sandbox(route: str):
     attributes.
     """
     from flask import current_app
+    from flask_jwt_extended import create_access_token
 
     click.secho(
         f"\n[+] Executing schema verification on endpoint: {route}", fg="cyan"
     )
+
+    # Generate test bearer token for CLI verification
+    token = create_access_token(identity="sandbox_verifier")
+    headers = {"Authorization": f"Bearer {token}"}
+
     with current_app.test_client() as client:
-        response = client.get(route)
+        response = client.get(route, headers=headers)
         if response.status_code != 200:
             click.secho(
                 f"[-] FAILED: Route returned HTTP {response.status_code}",

@@ -1,4 +1,7 @@
-# app/blueprints/todo_routes.py
+# =============================================================================
+# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/blueprints/todo_routes.py
+# Subscriber Todo Routes (FINAL, CLEAN, RBAC-SAFE, NO HARDCODED IDENTITIES)
+# =============================================================================
 
 import logging
 from datetime import datetime, timezone
@@ -10,10 +13,13 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 from flask_login import current_user, login_required
 
+from app.constants import OPERATOR_MODE_KEY
+from app.decorators.access import has_permission
 from app.extensions import db
 from app.models.todo import Todo
 from app.models.user_dashboard import UserDashboard
@@ -29,12 +35,17 @@ todo_bp = Blueprint("todo", __name__, url_prefix="/sub/todos")
 # -------------------------------------------------------------------------
 def require_subscriber():
     """
-    Only authenticated subscribers may access /sub/todos routes.
+    Only authenticated subscribers or operators may access /sub/todos routes.
     """
-    if not current_user.is_authenticated:
+    if not getattr(current_user, "is_authenticated", False):
         abort(401)
+
+    if session.get(OPERATOR_MODE_KEY) is True or has_permission(current_user, "read_operational_data"):
+        return current_user
+
     if getattr(current_user, "role", None) != "subscriber":
         abort(403)
+
     return current_user
 
 
@@ -45,11 +56,6 @@ def _get_dashboard_settings(user) -> dict:
     """
     Ensure UserDashboard exists and return settings.
     """
-    # --- GOD MODE BYPASS ---
-    if getattr(user, "username", "") == "TERENCE_CORTEX_PRIME":
-        return UserDashboard.default_settings()
-    # -----------------------
-
     dashboard = getattr(user, "user_dashboard", None)
     if dashboard is None:
         dashboard = UserDashboard.create_for_user(user.id)
@@ -63,9 +69,7 @@ def _apply_sort_and_filter(query, settings: dict):
     Apply sort/filter preferences from UserDashboard.settings to a Todo query.
     """
     sort = settings.get("todo_sort", "created")  # created | priority | due
-    flt = settings.get(
-        "todo_filter", "all"
-    )  # all | pending | completed | overdue | high
+    flt = settings.get("todo_filter", "all")  # all | pending | completed | overdue | high
 
     # Filter
     if flt == "pending":
@@ -105,20 +109,6 @@ def _apply_sort_and_filter(query, settings: dict):
 @todo_bp.route("/", endpoint="list", methods=["GET"])
 @login_required
 def list_todos():
-    # --- GOD MODE BYPASS ---
-    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
-        today = datetime.now(timezone.utc).date()
-        return render_template(
-            "sub/todo/todo_list.html",
-            todos=[],
-            settings=UserDashboard.default_settings(),
-            pending_count=0,
-            completed_count=0,
-            overdue_count=0,
-            current_date=today,
-        )
-    # -----------------------
-
     user = require_subscriber()
     settings = _get_dashboard_settings(user)
 
@@ -158,12 +148,6 @@ def list_todos():
 @todo_bp.route("/add", methods=["POST"])
 @login_required
 def add_todo():
-    # --- GOD MODE BYPASS ---
-    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
-        flash("God Mode Active: Database writes bypassed.", "info")
-        return redirect(url_for("todo.list"))
-    # -----------------------
-
     user = require_subscriber()
     settings = _get_dashboard_settings(user)
 
@@ -211,14 +195,11 @@ def add_todo():
 @todo_bp.route("/toggle/<int:todo_id>", methods=["POST"])
 @login_required
 def toggle(todo_id):
-    # --- GOD MODE BYPASS ---
-    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
-        flash("God Mode Active: Database writes bypassed.", "info")
-        return redirect(url_for("todo.list"))
-    # -----------------------
-
     user = require_subscriber()
-    todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first_or_404()
+    todo = Todo.query.get_or_404(todo_id)
+
+    if not (has_permission(user, "manage_users") or todo.user_id == user.id):
+        abort(403)
 
     todo.completed = not todo.completed
     db.session.commit()
@@ -236,14 +217,11 @@ def toggle(todo_id):
 @todo_bp.route("/update/<int:todo_id>", methods=["POST"])
 @login_required
 def update_todo(todo_id):
-    # --- GOD MODE BYPASS ---
-    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
-        flash("God Mode Active: Database writes bypassed.", "info")
-        return redirect(url_for("todo.list"))
-    # -----------------------
-
     user = require_subscriber()
-    todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first_or_404()
+    todo = Todo.query.get_or_404(todo_id)
+
+    if not (has_permission(user, "manage_users") or todo.user_id == user.id):
+        abort(403)
 
     # Update core fields
     todo.text = request.form.get("text", todo.text).strip()
@@ -276,14 +254,11 @@ def update_todo(todo_id):
 @todo_bp.route("/delete/<int:todo_id>", methods=["POST"])
 @login_required
 def delete(todo_id):
-    # --- GOD MODE BYPASS ---
-    if getattr(current_user, "username", "") == "TERENCE_CORTEX_PRIME":
-        flash("God Mode Active: Database writes bypassed.", "info")
-        return redirect(url_for("todo.list"))
-    # -----------------------
-
     user = require_subscriber()
-    todo = Todo.query.filter_by(id=todo_id, user_id=user.id).first_or_404()
+    todo = Todo.query.get_or_404(todo_id)
+
+    if not (has_permission(user, "manage_users") or todo.user_id == user.id):
+        abort(403)
 
     db.session.delete(todo)
     db.session.commit()

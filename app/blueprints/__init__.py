@@ -39,6 +39,10 @@ _EXPLICIT_ORDER: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
         "app.cockpit.routes.drilldown",
         ("drilldown_bp",),
     ),  # Isolated out-of-tree template diagnostics layer
+    (
+        "app.blueprints.polsia_routes",
+        ("polsia_bp",),
+    ),  # Polsia autonomous agent webhook route handler
 )
 
 # Immutable exclusion set used to protect against double registration

@@ -1,16 +1,15 @@
 # =============================================================================
 # FILE: app/__init__.py
 # DESCRIPTION: Unified, hardened, cockpit-grade Flask application factory.
-#               Single authoritative blueprint registration path, single
-#               authoritative url_map rebuild, defensive guards to avoid
-#               double-registration and preserve admin UI aliases.
+#                Single authoritative blueprint registration path, single
+#                authoritative url_map rebuild, defensive guards to avoid
+#                double-registration and preserve admin UI aliases.
 # =============================================================================
-
-from __future__ import annotations
 
 import importlib
 import logging
 import os
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
@@ -23,8 +22,12 @@ from werkzeug.exceptions import BadRequest, HTTPException
 
 from app.blueprints import register_blueprints, validate_blueprints_graph
 from app.blueprints.admin_ui_routes import ensure_admin_aliases
+from app.cli import register_cli_commands
+from app.config import CONFIG_MAP, get_config_class
 from app.extensions import db, init_extensions, socketio
-from .config import get_config_class
+from app.routes.treasury_routes import treasury_bp
+from app.tracing import handle_traced_error
+from app.webhooks.views import webhooks
 
 _logger = logging.getLogger(__name__)
 
@@ -67,6 +70,50 @@ def add_route_prune_whitelist(endpoint: str) -> Set[str]:
 # =============================================================================
 # Internal helpers
 # =============================================================================
+
+
+def _ensure_admin_index_registered(app: Any) -> None:
+    """
+    Normalize the admin index rule after blueprint registration.
+
+    This is intentionally defensive because it is called during factory
+    initialization and may also receive lightweight test doubles.
+    """
+    try:
+        url_map = getattr(app, "url_map", None)
+        if url_map is None:
+            return None
+
+        rules_by_endpoint = getattr(url_map, "_rules_by_endpoint", None)
+        if not isinstance(rules_by_endpoint, dict):
+            return None
+
+        endpoint = "admin.admin_index"
+        rules = rules_by_endpoint.get(endpoint)
+
+        if not rules:
+            return None
+
+        # Preserve order while removing duplicate rule objects.
+        unique_rules = []
+        seen = set()
+
+        for rule in rules:
+            marker = id(rule)
+
+            if marker in seen:
+                continue
+
+            seen.add(marker)
+            unique_rules.append(rule)
+
+        rules_by_endpoint[endpoint] = unique_rules
+
+    except Exception:
+        # Route hygiene must never prevent application startup.
+        return None
+
+    return None
 
 
 def _safe_status_code(code: Any) -> int:
@@ -129,9 +176,9 @@ def _register_blueprints(flask_app: Flask) -> None:
             _guarded_register_blueprint  # type: ignore[assignment]
         )
         try:
-            # Explicit usage of line 25 imported graph utilities
             register_blueprints(flask_app)
             validate_blueprints_graph(flask_app)
+            flask_app.logger.info("All blueprints registered successfully.")
         finally:
             flask_app.register_blueprint = (  # type: ignore[method-assign]
                 _original_register_blueprint
@@ -147,8 +194,16 @@ def _register_blueprints(flask_app: Flask) -> None:
 def _register_cli_commands(flask_app: Flask) -> None:
     """
     Register top-level CLI commands onto the Flask application.
-    Executes the authoritative entrypoint in app.cli_top_level.
+    Executes the authoritative entrypoint in app.cli_top_level and app.cli.health_check.
     """
+    try:
+        from app.cli.health_check import health_check
+        flask_app.cli.add_command(health_check)
+    except Exception as exc:
+        flask_app.logger.warning(
+            "Failed to register health_check CLI command: %s", exc, exc_info=True
+        )
+
     try:
         import app.cli_top_level as cli_module
 
@@ -170,6 +225,12 @@ def _register_cli_commands(flask_app: Flask) -> None:
 # =============================================================================
 def _register_error_handlers(flask_app: Flask) -> None:
     def _handle_exception(e: Exception) -> Any:
+        # --- Interactive Error Tracing ---
+        try:
+            handle_traced_error(e)
+        except Exception:
+            pass
+
         # --- Diagnostic crash dump ---
         try:
             import traceback
@@ -282,6 +343,7 @@ def _ensure_db_tables(flask_app: Flask) -> None:
 # =============================================================================
 # Healthcheck registry + factories
 # =============================================================================
+
 HealthCheckResult = Dict[str, Any]
 HealthCheckFn = Callable[[], HealthCheckResult]
 
@@ -293,6 +355,7 @@ class HealthCheckRegistry:
     def register(self, name: str, fn: HealthCheckFn) -> None:
         if not callable(fn):
             raise TypeError("healthcheck must be callable")
+
         self._checks[name] = fn
         _logger.debug("Health check registered: %s", name)
 
@@ -302,33 +365,48 @@ class HealthCheckRegistry:
 
     def run_check(self, name: str) -> HealthCheckResult:
         fn = self._checks.get(name)
-        if not fn:
-            return {"ok": False, "error": "not_registered", "latency_ms": 0.0}
+
+        if fn is None:
+            return {
+                "ok": False,
+                "error": "not_registered",
+            }
 
         try:
-            res = fn()
-            if not isinstance(res, dict):
+            result = fn()
+
+            if not isinstance(result, dict):
                 return {
                     "ok": False,
                     "error": "invalid_result_type",
-                    "latency_ms": 0.0,
                 }
-            res["ok"] = bool(res.get("ok", False))
-            res.setdefault("latency_ms", 0.0)
-            return res
+
+            normalized = dict(result)
+            normalized["ok"] = bool(normalized.get("ok", False))
+
+            return normalized
+
         except Exception as exc:
             _logger.debug(
-                "Health check '%s' raised: %s", name, exc, exc_info=True
+                "Health check '%s' raised: %s",
+                name,
+                exc,
+                exc_info=True,
             )
-            return {"ok": False, "error": str(exc), "latency_ms": 0.0}
+
+            return {
+                "ok": False,
+                "error": str(exc),
+            }
 
     def run_all(self) -> Dict[str, HealthCheckResult]:
         return {
-            name: self.run_check(name) for name in sorted(self._checks.keys())
+            name: self.run_check(name)
+            for name in sorted(self._checks)
         }
 
     def list_checks(self) -> Tuple[str, ...]:
-        return tuple(sorted(self._checks.keys()))
+        return tuple(sorted(self._checks))
 
 
 _registry = HealthCheckRegistry()
@@ -345,12 +423,19 @@ def unregister_healthcheck(name: str) -> None:
 def _make_db_check() -> HealthCheckFn:
     def _db_check() -> HealthCheckResult:
         start = time.time()
+
         try:
             db.session.execute(text("SELECT 1"))
             latency_ms = (time.time() - start) * 1000.0
-            return {"ok": True, "latency_ms": round(latency_ms, 2)}
+
+            return {
+                "ok": True,
+                "latency_ms": round(latency_ms, 2),
+            }
+
         except Exception as exc:
             latency_ms = (time.time() - start) * 1000.0
+
             return {
                 "ok": False,
                 "error": str(exc),
@@ -363,18 +448,36 @@ def _make_db_check() -> HealthCheckFn:
 def _make_redis_check() -> HealthCheckFn:
     def _redis_check() -> HealthCheckResult:
         start = time.time()
+
         try:
-            rc = (
+            redis_client = (
                 getattr(current_app, "redis_client", None)
                 or _maybe_redis_client
             )
-            if not rc:
-                return {"ok": False, "error": "no_client", "latency_ms": 0.0}
-            pong = rc.ping() if hasattr(rc, "ping") else True
+
+            if not redis_client:
+                return {
+                    "ok": False,
+                    "error": "no_client",
+                    "latency_ms": 0.0,
+                }
+
+            pong = (
+                redis_client.ping()
+                if hasattr(redis_client, "ping")
+                else True
+            )
+
             latency_ms = (time.time() - start) * 1000.0
-            return {"ok": bool(pong), "latency_ms": round(latency_ms, 2)}
+
+            return {
+                "ok": bool(pong),
+                "latency_ms": round(latency_ms, 2),
+            }
+
         except Exception as exc:
             latency_ms = (time.time() - start) * 1000.0
+
             return {
                 "ok": False,
                 "error": str(exc),
@@ -382,6 +485,11 @@ def _make_redis_check() -> HealthCheckFn:
             }
 
     return _redis_check
+
+
+def _register_dependency_checks() -> None:
+    register_healthcheck("database", _make_db_check())
+    register_healthcheck("redis", _make_redis_check())
 
 
 def _make_migrations_check() -> HealthCheckFn:
@@ -399,23 +507,46 @@ def _make_migrations_check() -> HealthCheckFn:
 
             try:
                 row = db.session.execute(
-                    text("SELECT version_num FROM alembic_version LIMIT 1")
+                    text(
+                        "SELECT version_num "
+                        "FROM alembic_version "
+                        "LIMIT 1"
+                    )
                 ).first()
+
                 applied = bool(row and row[0])
+
                 return {
                     "ok": applied,
-                    "version": (row[0] if row else None),
+                    "version": row[0] if row else None,
                     "latency_ms": 0.0,
                 }
+
             except Exception as exc:
                 _logger.debug(
-                    "Migrations check query failed: %s", exc, exc_info=True
+                    "Migrations check query failed: %s",
+                    exc,
+                    exc_info=True,
                 )
-                return {"ok": False, "error": str(exc), "latency_ms": 0.0}
+
+                return {
+                    "ok": False,
+                    "error": str(exc),
+                    "latency_ms": 0.0,
+                }
 
         except Exception as exc:
-            _logger.debug("Migrations check failed: %s", exc, exc_info=True)
-            return {"ok": False, "error": str(exc), "latency_ms": 0.0}
+            _logger.debug(
+                "Migrations check failed: %s",
+                exc,
+                exc_info=True,
+            )
+
+            return {
+                "ok": False,
+                "error": str(exc),
+                "latency_ms": 0.0,
+            }
 
     return _migrations_check
 
@@ -445,23 +576,39 @@ class CorrelationIdFilter(logging.Filter):
         return True
 
 
+def setup_logging(app: Flask) -> None:
+    """
+    Centralized logging configuration that prevents duplicate log emissions
+    and standardizes PID formatting across handlers.
+    """
+    loggers = [
+        logging.getLogger("PlaidBridgeOpenBankingApi"),
+        app.logger if app else None,
+    ]
+
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s [PID: %(process)d]"
+    )
+
+    for logger in filter(None, loggers):
+        logger.propagate = False
+        logger.setLevel(logging.INFO)
+
+        if logger.hasHandlers():
+            logger.handlers.clear()
+
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+
 def _setup_logging(flask_app: Flask) -> None:
-    flask_app.logger.setLevel(logging.INFO)
+    """Internal factory logger setup using correlation filtering on stdout."""
+    setup_logging(flask_app)
     cid_filter = CorrelationIdFilter()
 
-    if not flask_app.logger.handlers:
-        handler = logging.StreamHandler()
-        fmt = (
-            '{"timestamp":"%(asctime)s","level":"%(levelname)s",'
-            '"correlation_id":"%(correlation_id)s","module":"%(module)s",'
-            '"message":"%(message)s"}'
-        )
-        handler.setFormatter(logging.Formatter(fmt))
-        handler.addFilter(cid_filter)
-        flask_app.logger.addHandler(handler)
-    else:
-        for h in flask_app.logger.handlers:
-            h.addFilter(cid_filter)
+    for h in flask_app.logger.handlers:
+        h.addFilter(cid_filter)
 
 
 # =============================================================================
@@ -489,7 +636,8 @@ def _build_dependency_graph(flask_app: Flask) -> Dict[str, Any]:
 
 def _register_core_routes(flask_app: Flask) -> None:
     """
-    Register core diagnostics routes other than /health and /healthz.
+    Register core diagnostics routes including /healthz, /readyz, /version,
+    /diagnostics, /dependency_graph, and /metrics.
     Safe to call unconditionally from create_app().
     """
     try:
@@ -499,15 +647,38 @@ def _register_core_routes(flask_app: Flask) -> None:
         dependency_graph_data = {"nodes": [], "edges": [], "dot": "digraph {}"}
 
     try:
+        def _run_readiness_checks() -> Tuple[Response, int]:
+            results = _registry.run_all()
+            overall_ok = all(v.get("ok", False) for v in results.values())
+
+            try:
+                start_time = float(
+                    flask_app.config.get("APP_START_TIME", time.time())
+                )
+                uptime = max(0.0, time.time() - start_time)
+            except (TypeError, ValueError):
+                uptime = 0.0
+
+            payload: Dict[str, Any] = {
+                "healthy": overall_ok,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "uptime": uptime,
+                "checks": results,
+            }
+
+            return jsonify(payload), 200 if overall_ok else 503
+
         if "readyz" not in flask_app.view_functions:
 
             @flask_app.route("/readyz", methods=["GET"])
             def readyz() -> Tuple[Response, int]:
-                results = _registry.run_all()
-                overall_ok = all(v.get("ok", False) for v in results.values())
-                return jsonify({"ok": overall_ok, "checks": results}), (
-                    200 if overall_ok else 503
-                )
+                return _run_readiness_checks()
+
+        if "healthz" not in flask_app.view_functions:
+
+            @flask_app.route("/healthz", methods=["GET"])
+            def healthz() -> Tuple[Response, int]:
+                return _run_readiness_checks()
 
         if "version" not in flask_app.view_functions:
 
@@ -896,8 +1067,11 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
     the factory boot sequence.
     """
     try:
-        lm = getattr(flask_app, "login_manager", None) or globals().get(
-            "login_manager"
+        lm = (
+            getattr(flask_app, "login_manager", None)
+            or flask_app.extensions.get("login_manager")
+            or flask_app.extensions.get("flask_login")
+            or globals().get("login_manager")
         )
         if not lm:
             flask_app.logger.debug(
@@ -927,12 +1101,17 @@ def _register_login_manager_loader(flask_app: Flask) -> None:
 
 def _register_jwt_loaders(flask_app: Flask) -> None:
     """
-    Registers robust JWT identity and lookup loaders optimized for UUID
-    strings, preserving legacy integer paths and the SystemOperator GOD-MODE
+    Registers robust JWT identity, lookup, and blocklist loaders optimized
+    for UUID strings, preserving legacy integer paths and the SystemOperator GOD-MODE
     intercept.
     """
     extensions = getattr(flask_app, "extensions", {})
-    jwt_manager = extensions.get("flask_jwt_extended") or globals().get("jwt")
+    jwt_manager = (
+        extensions.get("jwt")
+        or extensions.get("flask_jwt_extended")
+        or extensions.get("flask-jwt-extended")
+        or globals().get("jwt")
+    )
     if not jwt_manager:
         return
 
@@ -950,63 +1129,53 @@ def _register_jwt_loaders(flask_app: Flask) -> None:
         if not identity:
             return None
         from app.auth_handlers import _resolve_identity
+
         return _resolve_identity(identity)
+
+    @jwt_manager.token_in_blocklist_loader
+    def check_if_token_revoked(_jwt_header: dict, jwt_data: dict) -> bool:
+        try:
+            from app.auth_handlers import is_token_revoked
+
+            return is_token_revoked(_jwt_header, jwt_data)
+        except Exception:
+            return False
 
 
 # =============================================================================
 # Alias Fallbacks Refactor Helper
 # =============================================================================
-def _apply_alias_fallbacks(
-    app: Flask, source_prefix: str, target_prefix: str
-) -> None:
+def _apply_alias_fallbacks(app: Flask, old_prefix: str, new_prefix: str) -> None:
     """
-    Deduplicated alias fallback generator adhering strictly to length-based
-    endpoint slicing and collision prevention.
+    Registers legacy alias endpoints in both `view_functions` and `url_map`
+    so that `url_for()` calls targeting legacy blueprints (e.g., `admin_ui.*`)
+    resolve without throwing Werkzeug BuildError exceptions.
     """
-    source_rules = list(app.url_map.iter_rules())
-    processed_endpoints: Set[str] = set()
-    count = 0
+    for rule in list(app.url_map.iter_rules()):
+        if rule.endpoint.startswith(old_prefix):
+            new_endpoint = rule.endpoint.replace(old_prefix, new_prefix, 1)
+            view_func = app.view_functions.get(rule.endpoint)
 
-    for rule in source_rules:
-        # 1. Skip non-target endpoints and already processed endpoint names
-        if (
-            not rule.endpoint.startswith(source_prefix)
-            or rule.endpoint in processed_endpoints
-        ):
-            continue
+            if view_func and new_endpoint not in app.view_functions:
+                app.view_functions[new_endpoint] = view_func
 
-        processed_endpoints.add(rule.endpoint)
+            # Verify if rule/method combination already exists under new_endpoint
+            existing_endpoints = {
+                r.endpoint
+                for r in app.url_map.iter_rules()
+                if r.rule == rule.rule and set(r.methods or []) == set(rule.methods or [])
+            }
 
-        # 2. Compute alias_ep cleanly using length slicing
-        endpoint_suffix = rule.endpoint[len(source_prefix) :]
-        alias_ep = f"{target_prefix}{endpoint_suffix}"
-
-        # 3. Guard against duplicate registration
-        view_func = app.view_functions.get(rule.endpoint)
-        if not view_func or alias_ep in app.view_functions:
-            continue
-
-        app.view_functions[alias_ep] = view_func
-        app.add_url_rule(
-            rule.rule,
-            endpoint=alias_ep,
-            view_func=view_func,
-            methods=rule.methods,
-            defaults=rule.defaults,
-            strict_slashes=rule.strict_slashes,
-        )
-        count += 1
-
-    if count > 0:
-        label = target_prefix.rstrip(".")
-        if label == "main":
-            app.logger.info(
-                f"Applied legacy 'main' alias fallback for {count} endpoints."
-            )
-        else:
-            app.logger.info(
-                f"Applied {label} alias fallback for {count} endpoints."
-            )
+            if new_endpoint not in existing_endpoints:
+                app.add_url_rule(
+                    rule.rule,
+                    endpoint=new_endpoint,
+                    view_func=view_func,
+                    methods=rule.methods,
+                    defaults=rule.defaults,
+                    subdomain=rule.subdomain,
+                    strict_slashes=rule.strict_slashes,
+                )
 
 
 # =============================================================================
@@ -1019,31 +1188,88 @@ def create_app(
 ) -> Flask:
     """
     Unified Flask application factory.
+
+    Supports:
+        create_app()
+        create_app("testing")
+        create_app(env_name="testing")
+        create_app(config_class=TestingConfig)
+        create_app(config_class="app.config.TestingConfig")
     """
     app = Flask(__name__)
 
-    if config_class is None:
-        config_class = env_name or get_config_class()
+    # Normalize positional environment names passed as config_class
+    if (
+        isinstance(config_class, str)
+        and config_class.lower() in CONFIG_MAP
+        and env_name is None
+    ):
+        env_name = config_class
+        config_class = None
 
+    # Resolve target environment key
+    requested_env = (
+        env_name
+        or os.getenv("ENV_NAME")
+        or os.getenv("FLASK_ENV")
+        or "production"
+    ).lower()
+
+    # Select configuration class if explicit override wasn't provided
+    if config_class is None:
+        config_class = get_config_class(requested_env)
+
+    # Load configuration object into application context
     try:
-        if isinstance(config_class, str):
-            app.config.from_object(config_class)
-        elif isinstance(config_class, type) or isinstance(
-            config_class, object
-        ):
-            app.config.from_object(config_class)
+        app.config.from_object(config_class)
+
     except Exception as cfg_err:
         _logger.warning(
-            "Failed to load config class '%s': %s", config_class, cfg_err
+            "Failed to load config class '%s': %s",
+            config_class,
+            cfg_err,
         )
+
+        # Preserve testing behavior if configuration loading fails
+        if requested_env == "testing":
+            app.config["TESTING"] = True
+            app.config.setdefault(
+                "SQLALCHEMY_DATABASE_URI",
+                "sqlite:///:memory:",
+            )
+
+        # Fall back to default config class
         default_cfg = get_config_class()
-        if default_cfg and default_cfg != config_class:
+
+        if default_cfg is not config_class:
             try:
                 app.config.from_object(default_cfg)
-            except Exception:
-                pass
+            except Exception as fallback_err:
+                _logger.warning(
+                    "Failed to load fallback config class '%s': %s",
+                    default_cfg,
+                    fallback_err,
+                )
+
+        if requested_env == "testing":
+            app.config["TESTING"] = True
+            app.config.setdefault(
+                "SQLALCHEMY_DATABASE_URI",
+                "sqlite:///:memory:",
+            )
+
+    # Apply keyword argument configuration overrides
+    for key, value in kwargs.items():
+        app.config[key] = value
 
     _setup_logging(app)
+
+    # Log loaded configuration class name for auditing and test assertions
+    cfg_name = getattr(config_class, "__name__", str(config_class))
+    app.logger.info("Loaded configuration class: %s", cfg_name)
+
+    # Register dependency health checks
+    _register_dependency_checks()
 
     # Initialize extensions (socketio, db, etc.)
     init_extensions(app)
@@ -1051,6 +1277,20 @@ def create_app(
 
     # Register blueprints & CLI commands
     _register_blueprints(app)
+    app.register_blueprint(treasury_bp, url_prefix="/api/v1/treasury")
+    app.register_blueprint(webhooks, url_prefix="/webhooks")
+
+    # Standardized Blueprint Binding Diagnostics
+    for var_name, bp in app.blueprints.items():
+        app.logger.info(
+            "🔗 Operational blueprint link bound: variable=%s name=%s -> %s (Prefix mapping: %s)",
+            var_name,
+            bp.name,
+            bp.import_name,
+            bp.url_prefix or "ROOT",
+        )
+
+    register_cli_commands(app)
     _register_cli_commands(app)
     ensure_admin_aliases(app)
 
@@ -1068,12 +1308,14 @@ def create_app(
     _register_core_routes(app)
 
     # Route hygiene and alias fallbacks
+    _ensure_admin_index_registered(app)
     _prune_ignorable_route_rules(app)
     _cleanup_premature_oauth_registrations(app)
     _reconcile_oauth_callback_aliases(app)
 
-    # Apply alias fallbacks with refactored deduplication logic
+    # Apply alias fallbacks with refactored deduplication and url_map sync logic
     _apply_alias_fallbacks(app, "admin_bp.", "admin_ui.")
+    _apply_alias_fallbacks(app, "admin.", "admin_ui.")
     _apply_alias_fallbacks(app, "main_bp.", "main.")
 
     _enforce_route_uniqueness(app)
@@ -1088,17 +1330,9 @@ def create_app(
 get_app = create_app
 legacy_get_app = create_app
 
-
 # =============================================================================
-# Production Sentinel / Emergency Boot Guard
+# Direct Execution Entrypoint
 # =============================================================================
-if os.getenv("FLASK_ENV") == "production":
-    try:
-        _sentinel_app = create_app()
-    except Exception as _boot_err:
-        _logger.error(
-            "FATAL BOOT ERROR: Production startup failed: %s",
-            _boot_err,
-            exc_info=True,
-        )
-        raise
+if __name__ == "__main__":
+    app = create_app()
+    app.run()

@@ -5,6 +5,11 @@
 #              safe dict writing, and structured logging.
 # =============================================================================
 
+"""
+Dependency-free CSV import/export helpers for tests and lightweight services.
+Includes robust error handling, memory-safe dict writing, and structured logging.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -12,13 +17,13 @@ import io
 import logging
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
 
 def _derive_columns(
-    rows: list[dict[str, Any]], columns: list[str] | None = None
+    rows: list[dict[str, Any]], columns: Optional[Sequence[str]] = None
 ) -> list[str]:
     """Helper to extract column headers from the first dictionary found."""
     if columns:
@@ -31,17 +36,19 @@ def _derive_columns(
 
 def export_csv(
     rows: Iterable[dict[str, Any] | list[Any] | tuple[Any, ...]],
-    columns: list[str] | None = None,
+    columns: Optional[Sequence[str]] = None,
+    headers: Optional[Sequence[str]] = None,
     output_path: str | Path | None = None,
 ) -> bytes:
     """
     Export an iterable of mapping objects or sequences to CSV bytes.
 
     :param rows: Iterable of dictionaries or sequence types (lists/tuples).
-    :param columns: Explicit column order. Inferred from first row if omitted.
+    :param columns / headers: Explicit column order. Inferred from first row if omitted.
     :param output_path: Optional file path to write the output CSV to disk.
     :return: CSV content as UTF-8 encoded bytes.
     """
+    effective_cols = columns if columns is not None else headers
     rows_list = list(rows or [])
     if not rows_list:
         if output_path:
@@ -55,7 +62,7 @@ def export_csv(
                 )
         return b""
 
-    cols = _derive_columns(rows_list, columns)
+    cols = _derive_columns(rows_list, effective_cols)
     sio = io.StringIO()
 
     if cols:
@@ -120,20 +127,17 @@ def import_csv(source: str | bytes | Path) -> list[dict[str, str]]:
     elif isinstance(source, bytes):
         text = source.decode("utf-8")
     elif isinstance(source, str):
-        # Prevent OS errors by checking .exists() if string resembles a file path
         if "\n" not in source and len(source) < 255:
             p = Path(source)
             if p.exists() and p.is_file():
                 text = p.read_text(encoding="utf-8")
             elif "." in source or "/" in source or "\\" in source:
-                # Path string provided but file does not exist
                 return []
             else:
                 text = source
         else:
             text = source
 
-    # Normalize line endings strictly to \n to prevent Windows \r\r\n issues
     cleaned_text = "\n".join(text.splitlines())
 
     if not cleaned_text.strip():
@@ -142,13 +146,11 @@ def import_csv(source: str | bytes | Path) -> list[dict[str, str]]:
     buf = io.StringIO(cleaned_text)
     reader = csv.reader(buf)
 
-    # Filter out empty or whitespace-only rows
     raw_rows = [r for r in reader if any(cell.strip() for cell in r)]
 
     if not raw_rows:
         return []
 
-    # Strip headers to eliminate hidden whitespace / BOM characters
     header = [str(h).strip().lstrip("\ufeff") for h in raw_rows[0]]
     data_rows = raw_rows[1:]
 
@@ -207,9 +209,6 @@ def generate_pdf_from_csv(csv_path: str | Path, pdf_path: str | Path) -> None:
         )
 
 
-# -----------------------------------------------------------------------------
-# Explicit Exports
-# -----------------------------------------------------------------------------
 __all__ = [
     "export_csv",
     "import_csv",

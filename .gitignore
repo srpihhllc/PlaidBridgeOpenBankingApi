@@ -82,3 +82,24 @@ app-inspection.txt
 .env
 .env.*
 !.env.example
+
+
+
+# Local secrets, sessions, reports, and diagnostic files
+
+csrf.txt
+
+pa_cookies.txt
+
+pythonanywhere_session.txt
+
+finbrain_ai_report.json
+
+finbrain_structure.json
+
+forced_crash_dump.txt
+
+god_mode_audit.txt
+
+storage/manifest/
+

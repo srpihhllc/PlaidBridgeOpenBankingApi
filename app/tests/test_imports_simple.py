@@ -1,4 +1,4 @@
-#/home/srpihhllc/PlaidBridgeOpenBankingApi/test_imports_simple.py
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/test_imports_simple.py
 
 """Model-import smoke tests."""
 

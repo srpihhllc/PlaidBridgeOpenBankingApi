@@ -1,9 +1,9 @@
 # =============================================================================
 # FILE: app/utils/telemetry.py
 # DESCRIPTION: Cockpit-grade telemetry utilities providing counters, gauges,
-#              histograms, structured event logging, TTL pulses, and safe
-#              mock fallbacks for local/dev. Includes lifecycle events with
-#              context-safety and optional Redis-based dedupe.
+#               histograms, structured event logging, TTL pulses, and safe
+#               mock fallbacks for local/dev. Includes lifecycle events with
+#               context-safety and optional Redis-based dedupe.
 # =============================================================================
 import functools
 import json
@@ -13,6 +13,8 @@ import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any, TypeVar
+
+from app.utils.ttl_emit import ttl_emit
 
 logger = logging.getLogger(__name__)
 
@@ -418,10 +420,13 @@ def ttl_pulse_emit(
 
     try:
         try:
-            redis.setex(key, ttl_seconds, json.dumps(payload))
-        except TypeError:
-            # fallback for clients that use a different signature
-            redis.set(key, json.dumps(payload), ex=ttl_seconds)
+            ttl_emit(key, status, ttl_seconds, meta=meta, client=redis)
+        except Exception:
+            try:
+                redis.setex(key, ttl_seconds, json.dumps(payload))
+            except TypeError:
+                # fallback for clients that use a different signature
+                redis.set(key, json.dumps(payload), ex=ttl_seconds)
         logger.debug(f"TTL_EMIT (Redis): {key} ttl={ttl_seconds}s")
     except Exception as e:
         logger.error(

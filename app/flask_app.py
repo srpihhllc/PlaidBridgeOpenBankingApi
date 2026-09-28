@@ -13,6 +13,9 @@ from typing import Any
 
 from app import create_app as create_package_app
 
+# Canonical application factory alias for module and test compatibility
+create_app = create_package_app
+
 # Global instantiation variable reserved strictly for legacy callers
 # explicitly opting in via the environment flag.
 app: Any | None = None
@@ -43,4 +46,4 @@ def get_app() -> Any:
     return flask_app
 
 
-__all__ = ["get_app", "app"]
+__all__ = ["get_app", "app", "create_app"]

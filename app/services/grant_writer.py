@@ -1,94 +1,138 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/services/grant_writer.py
 
 """
-grant_writer.py — Core AI-ready utility engine for drafting proposal narratives.
-Centralized service for government funding applications and NOFO metadata processing.
+grant_writer.py — Grant-readiness orchestration service.
+
+This module preserves the existing compose_grant() API while adding
+evidence-based grant analysis, compliance review, budget defensibility,
+evaluation review, red-team critique, and human-approval controls.
 """
 
+from __future__ import annotations
+
 import logging
-from typing import Any, Dict
+from typing import Any, Callable
+
+from .grants.grant_intelligence import GrantIntelligence
+from .grants.schemas import (
+    EvidenceItem,
+    GrantProject,
+    Risk,
+)
 
 logger = logging.getLogger(__name__)
 
-# =============================================================================
-# 1. SPECIALIZED GRANT TEMPLATES (From your original blueprint logic)
-# =============================================================================
-
-
-def _compose_sbir(payload: Dict[str, Any]) -> str:
-    org = payload.get("org_profile", {})
-    project = payload.get("project", {})
-    mission = org.get("mission", "Our mission is to empower communities.")
-    goals = project.get("goals", "N/A")
-
-    return f"""
-[GRANT TYPE]: SBIR PROPOSAL NARRATIVE
-
-Organization: {org.get("name", "Unknown")} | Location: {org.get("location", "Unknown")}
-Project: {project.get("title", "Untitled")}
-Mission Alignment: {mission}
-Funding Goal: ${project.get("budget", "0")}
-Project Timeline: {project.get("timeline", "TBD")}
-
-Summary:
-This SBIR proposal seeks to fund an early-stage innovation that targets {goals}.
-Our team consists of interdisciplinary experts in R&D and social impact.
-We believe this aligns with the federal mandate to accelerate commercial readiness
-for high-tech entrepreneurs.
-""".strip()
-
-
-def _compose_cdbg(payload: Dict[str, Any]) -> str:
-    org_name = payload.get("org_profile", {}).get("name", "Organization")
-    return f"📜 [CDBG] Community Development Block Grant Narrative for {org_name} - Pipeline Pending."
-
-
-def _compose_rbdg(payload: Dict[str, Any]) -> str:
-    project_title = payload.get("project", {}).get("title", "Project")
-    return f"🌾 [RBDG] Rural Business Development Grant Narrative for {project_title} - Pipeline Pending."
-
-
-def _compose_eda(payload: Dict[str, Any]) -> str:
-    return "📈 [EDA] Economic Development Administration Proposal Narrative - Pipeline Pending."
-
 
 # =============================================================================
-# 2. GENERAL NOFO FALLBACK (From your original service logic)
+# Legacy-compatible narrative composers
 # =============================================================================
 
 
-def _compose_general_nofo(payload: Dict[str, Any]) -> str:
-    grant_type = payload.get("grant_type", "general")
-    nofo = payload.get("nofo", "No NOFO guidance provided.")
+def _compose_sbir(payload: dict[str, Any]) -> str:
+    """Compose a factual SBIR narrative from supplied applicant data."""
+    org = payload.get("org_profile") or {}
+    project = payload.get("project") or {}
 
-    return f"""
-[GRANT TYPE]: {grant_type.upper()}
+    return "\n".join(
+        [
+            "[GRANT TYPE]: SBIR PROPOSAL NARRATIVE",
+            "",
+            f"Organization: {org.get('name', 'Not provided')}",
+            f"Location: {org.get('location', 'Not provided')}",
+            f"Project: {project.get('title', 'Not provided')}",
+            f"Mission Alignment: {org.get('mission', 'Not provided')}",
+            f"Funding Request: {project.get('budget', 'Not provided')}",
+            f"Project Timeline: {project.get('timeline', 'Not provided')}",
+            "",
+            "Project Summary:",
+            str(project.get("summary", "Not provided")),
+            "",
+            "Goals:",
+            str(project.get("goals", "Not provided")),
+            "",
+            "Evidence and assumptions must be documented before submission.",
+        ]
+    )
 
-[OBJECTIVE]
-This grant proposal aims to fulfill the requirements defined in the provided NOFO guidance:
-"{nofo}"
 
-[STRATEGY]
-We propose a 3-phase implementation:
-1. Assessment of target population needs
-2. Allocation of resources based on verified impact zones
-3. Weekly reporting to ensure compliance and transparency
-
-[IMPACT]
-Our solution targets measurable outcomes in housing stability, applicant throughput,
-and cost reduction per capita.
-
-[COMPLIANCE]
-All documentation and funding will be tracked via FinBrain's orchestration memory and
-published via the org_score logs.
-""".strip()
+def _compose_cdbg(payload: dict[str, Any]) -> str:
+    return _compose_generic_type("CDBG", payload)
 
 
-# =============================================================================
-# 3. AUTHORITATIVE DISPATCH REGISTRY
-# =============================================================================
+def _compose_rbdg(payload: dict[str, Any]) -> str:
+    return _compose_generic_type("RBDG", payload)
 
-_GRANT_DISPATCHER = {
+
+def _compose_eda(payload: dict[str, Any]) -> str:
+    return _compose_generic_type("EDA", payload)
+
+
+def _compose_generic_type(
+    grant_type: str,
+    payload: dict[str, Any],
+) -> str:
+    org = payload.get("org_profile") or {}
+    project = payload.get("project") or {}
+
+    return "\n".join(
+        [
+            f"[GRANT TYPE]: {grant_type} PROPOSAL NARRATIVE",
+            "",
+            f"Organization: {org.get('name', 'Not provided')}",
+            f"Project: {project.get('title', 'Not provided')}",
+            f"Location: {org.get('location', 'Not provided')}",
+            "",
+            "Project Summary:",
+            str(project.get("summary", "Not provided")),
+            "",
+            "Statement of Need:",
+            str(project.get("need", "Not provided")),
+            "",
+            "Proposed Activities:",
+            str(project.get("activities", "Not provided")),
+            "",
+            "Expected Outcomes:",
+            str(project.get("outcomes", "Not provided")),
+            "",
+            "All claims, measurements, partnerships, and outcomes require "
+            "supporting documentation or explicit classification as assumptions.",
+        ]
+    )
+
+
+def _compose_general_nofo(payload: dict[str, Any]) -> str:
+    grant_type = str(payload.get("grant_type", "general")).upper()
+    nofo = payload.get("nofo", "No funding-opportunity guidance provided.")
+    project = payload.get("project") or {}
+
+    return "\n".join(
+        [
+            f"[GRANT TYPE]: {grant_type}",
+            "",
+            "[FUNDING OPPORTUNITY GUIDANCE]",
+            str(nofo),
+            "",
+            "[PROJECT SUMMARY]",
+            str(project.get("summary", "Not provided")),
+            "",
+            "[NEED]",
+            str(project.get("need", "Not provided")),
+            "",
+            "[ACTIVITIES]",
+            str(project.get("activities", "Not provided")),
+            "",
+            "[OUTPUTS AND OUTCOMES]",
+            str(project.get("outcomes", "Not provided")),
+            "",
+            "[COMPLIANCE NOTICE]",
+            "Eligibility, requirements, evidence, budget relationships, "
+            "evaluation measures, and unresolved risks require review before "
+            "submission.",
+        ]
+    )
+
+
+_GRANT_DISPATCHER: dict[str, Callable[[dict[str, Any]], str]] = {
     "sbir": _compose_sbir,
     "cdbg": _compose_cdbg,
     "rbdg": _compose_rbdg,
@@ -96,33 +140,181 @@ _GRANT_DISPATCHER = {
 }
 
 
-def compose_grant(payload: Dict[str, Any]) -> str:
+def compose_grant(payload: dict[str, Any]) -> str:
     """
-    Main entry point for SymphonyAI and subscriber services.
-    Routes the payload to the correct specialized template, or falls back to the general NOFO format.
+    Compose a grant narrative using the existing public API.
 
-    Args:
-        payload (dict): Requires a 'grant_type'. Can include 'org_profile', 'project', or 'nofo' strings.
+    The function does not predict funding outcomes, invent evidence, or
+    represent a draft as approved for submission.
     """
-    grant_type = payload.get("grant_type", "general")
+    grant_type = str(payload.get("grant_type") or "general").strip().lower()
+    composer = _GRANT_DISPATCHER.get(grant_type, _compose_general_nofo)
 
-    if not grant_type:
-        logger.warning(
-            "Empty grant_type provided. Defaulting to general NOFO payload."
-        )
-        grant_type = "general"
-
-    normalized_type = grant_type.strip().lower()
-
-    # Check if we have a specialized template (like SBIR)
-    dispatcher = _GRANT_DISPATCHER.get(normalized_type)
-
-    if dispatcher:
-        # Use specialized template
-        return dispatcher(payload)
-    else:
-        # Fall back to the generic NOFO logic
+    if composer is _compose_general_nofo and grant_type != "general":
         logger.info(
-            f"Using generic NOFO template for grant type: {grant_type}"
+            "Using general NOFO composer for unsupported grant type: %s",
+            grant_type,
         )
-        return _compose_general_nofo(payload)
+
+    return composer(payload)
+
+
+# =============================================================================
+# Grant-readiness orchestration
+# =============================================================================
+
+
+class GrantWriter:
+    """
+    Orchestrates grant-readiness analysis.
+
+    Human approval is always required before final submission.
+    """
+
+    def __init__(
+        self,
+        intelligence: GrantIntelligence | None = None,
+    ) -> None:
+        self.intelligence = intelligence or GrantIntelligence()
+
+    def analyze(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Analyze a project for eligibility, alignment, evidence quality,
+        program feasibility, budget defensibility, evaluation quality,
+        compliance, and submission readiness.
+        """
+        project = self._build_project(payload)
+        return self.intelligence.analyze(project)
+
+    def prepare(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """
+        Return a composed narrative together with its readiness analysis.
+        """
+        return {
+            "narrative": compose_grant(payload),
+            "readiness_analysis": self.analyze(payload),
+            "human_approval_required": True,
+        }
+
+    def approve_for_submission(self, human_approved: bool) -> bool:
+        """
+        Return True only when an authorized human explicitly approves.
+        """
+        return self.intelligence.can_submit(human_approved)
+
+    @staticmethod
+    def _build_project(payload: dict[str, Any]) -> GrantProject:
+        org_profile = payload.get("org_profile") or {}
+        project_data = payload.get("project") or {}
+
+        evidence = [
+            item
+            if isinstance(item, EvidenceItem)
+            else EvidenceItem(
+                claim=str(item.get("claim", "")),
+                source=item.get("source"),
+                citation=item.get("citation"),
+                evidence_type=item.get(
+                    "evidence_type",
+                    "applicant_claim",
+                ),
+                confidence=item.get("confidence"),
+                notes=item.get("notes"),
+            )
+            for item in payload.get("evidence", [])
+        ]
+
+        risks = [
+            item
+            if isinstance(item, Risk)
+            else Risk(
+                title=str(item.get("title", "Unspecified risk")),
+                description=str(item.get("description", "")),
+                severity=item.get("severity", "medium"),
+                mitigation=str(item.get("mitigation", "")),
+                owner=item.get("owner"),
+            )
+            for item in payload.get("risks", [])
+        ]
+
+        proposal_sections = dict(payload.get("proposal_sections") or {})
+
+        # Preserve common legacy fields when they are supplied at project level.
+        for field in (
+            "summary",
+            "need",
+            "activities",
+            "outputs",
+            "outcomes",
+            "goals",
+            "timeline",
+            "evaluation_plan",
+            "sustainability_plan",
+            "logic_model",
+            "smart_objectives",
+            "work_plan",
+            "budget_narrative",
+        ):
+            if field in project_data and field not in proposal_sections:
+                proposal_sections[field] = project_data[field]
+
+        applicant_data = dict(payload.get("applicant_data") or {})
+        applicant_data.setdefault("organization_name", org_profile.get("name"))
+        applicant_data.setdefault("location", org_profile.get("location"))
+        applicant_data.setdefault("mission", org_profile.get("mission"))
+        applicant_data.setdefault("capacity", org_profile.get("capacity"))
+
+        funding_opportunity = dict(
+            payload.get("funding_opportunity") or {}
+        )
+        if "requirements" not in funding_opportunity:
+            funding_opportunity["requirements"] = payload.get(
+                "requirements",
+                [],
+            )
+        if "eligibility" not in funding_opportunity:
+            funding_opportunity["eligibility"] = payload.get(
+                "eligibility",
+                [],
+            )
+        if "priorities" not in funding_opportunity:
+            funding_opportunity["priorities"] = payload.get(
+                "priorities",
+                [],
+            )
+
+        return GrantProject(
+            project_name=str(
+                project_data.get("title")
+                or payload.get("project_name")
+                or "Untitled Project"
+            ),
+            organization_name=str(
+                org_profile.get("name")
+                or payload.get("organization_name")
+                or "Unnamed Organization"
+            ),
+            applicant_data=applicant_data,
+            funding_opportunity=funding_opportunity,
+            evidence=evidence,
+            proposal_sections=proposal_sections,
+            budget=list(
+                payload.get("budget")
+                or project_data.get("budget_items")
+                or []
+            ),
+            risks=risks,
+        )
+
+
+# Optional functional entry points for existing callers.
+
+
+def analyze_grant(payload: dict[str, Any]) -> dict[str, Any]:
+    """Analyze a grant project without instantiating GrantWriter."""
+    return GrantWriter().analyze(payload)
+
+
+def prepare_grant(payload: dict[str, Any]) -> dict[str, Any]:
+    """Compose a narrative and return the associated readiness analysis."""
+    return GrantWriter().prepare(payload)

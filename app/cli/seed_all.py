@@ -1,6 +1,6 @@
 # FILE: app/cli/seed_all.py
 
-from subprocess import call
+from subprocess import CalledProcessError, check_call
 
 import click
 from flask.cli import with_appcontext
@@ -13,9 +13,19 @@ def seed_all():
 
     click.echo("🚀 Seeding identity core (Admin, Subscriber, Lender)...")
 
-    call(["flask", "seed-admin"])
-    call(["flask", "seed-subscriber"])
-    call(["flask", "seed-lender"])
+    commands = [
+        ["flask", "seed-admin"],
+        ["flask", "seed-subscriber"],
+        ["flask", "seed-lender"],
+    ]
+
+    for cmd in commands:
+        try:
+            check_call(cmd)
+        except CalledProcessError as exc:
+            raise click.ClickException(
+                f"❌ Identity seeding halted on command '{' '.join(cmd)}' (Exit code: {exc.returncode})."
+            )
 
     click.echo("\n📊 Cockpit-Grade Identity Seeding Summary")
     click.echo("--------------------------------")

@@ -4,6 +4,7 @@
 # =============================================================================
 
 import pytest
+from sqlalchemy import select
 from werkzeug.security import generate_password_hash
 
 from app.models.user import User
@@ -11,22 +12,25 @@ from app.models.user import User
 
 @pytest.mark.migration_backed
 @pytest.mark.auth
-def test_admin_seeded_records(db_session):
+def test_admin_seeded_records(clean_admin_user, db_session):
     """
     Ensure seeded admin has all required related records and FK integrity.
-    Uses defensive setup block matching test_admin_logout/login patterns.
+    Uses clean_admin_user fixture alongside session merging to safely handle 
+    duplicate key constraints on the authoritative admin UUID.
     """
 
     # 1. SETUP: Define the authoritative identities matching migration seeds
     target_email = "srpollardsihhllc@gmail.com"
     admin_uuid = "00000000-0000-0000-0000-000000000001"
 
-    # 2. LOOKUP: Check if the authoritative record already exists
-    user = db_session.query(User).filter_by(email=target_email).first()
-
-    # 3. FAILSAFE: Dynamic seed injection or identity attribute sync
+    # 2. LOOKUP: Query for pre-existing record by primary key or email (SQLAlchemy 2.0 compliant)
+    user = db_session.get(User, admin_uuid)
     if not user:
-        # Build authoritative record matching the application's root operator configuration
+        stmt = select(User).filter_by(email=target_email)
+        user = db_session.execute(stmt).scalar_one_or_none()
+
+    # 3. UPSERT: Use merge to securely construct or update state without primary key conflict
+    if not user:
         user = User(
             id=admin_uuid,
             username="sr_authoritative_operator",
@@ -37,22 +41,25 @@ def test_admin_seeded_records(db_session):
             is_approved=True,
             is_mfa_enabled=False,
         )
-        db_session.add(user)
-        db_session.commit()
     else:
-        # Patch pre-existing seeded row if migration defaults lacked explicit role attributes
-        updated = False
-        if user.role != "admin":
-            user.role = "admin"
-            updated = True
-        if not user.is_admin:
-            user.is_admin = True
-            updated = True
-        if updated:
-            db_session.commit()
+        user.id = admin_uuid
+        user.email = target_email
+        user.username = "sr_authoritative_operator"
+        user.is_admin = True
+        user.role = "admin"
+        user.is_approved = True
+        user.is_mfa_enabled = False
 
-    # 4. ACTION & VERIFICATION: Execute core identity checks
-    user = db_session.query(User).filter_by(email=target_email).first()
+    try:
+        user = db_session.merge(user)
+        db_session.commit()
+    except Exception as e:
+        db_session.rollback()
+        pytest.fail(f"Database commit failed during admin seed testing: {e}")
+
+    # 4. ACTION & VERIFICATION: Execute core identity checks (SQLAlchemy 2.0 compliant)
+    stmt = select(User).filter_by(email=target_email)
+    user = db_session.execute(stmt).scalar_one_or_none()
 
     assert user is not None, "Admin user must exist"
     assert (

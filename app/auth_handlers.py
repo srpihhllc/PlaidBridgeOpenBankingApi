@@ -2,12 +2,14 @@
 # FILE: app/auth_handlers.py
 # DESCRIPTION: Unified identity resolution and authentication lifecycles
 #              handling both Stateful (Session UI) and Stateless (JWT API)
-#              contexts.
+#              contexts strictly via persisted User records or SystemOperator intercepts.
 # =============================================================================
 
 from __future__ import annotations
 
 import logging
+
+from flask import current_app
 
 from app.extensions import db, jwt, login_manager
 from app.models.user import User
@@ -15,35 +17,35 @@ from app.models.user import User
 logger = logging.getLogger(__name__)
 
 
-# -------------------------------------------------------------------
-# 👑 SYSTEM OPERATOR SECURITY BOUNDARY
-# -------------------------------------------------------------------
 class SystemOperator:
-    """Virtual principal bypassing transient database states/migrations while
+    """Virtual identity principal for system operator / GOD-MODE intercepts."""
 
-    strictly satisfying Flask-Login and downstream platform security controls.
-    """
-
-    def __init__(self, user_id: str):
-        self.id = user_id
-        self.username = "OPERATOR_ADMIN"
+    def __init__(
+        self,
+        identity: str = "TERENCE_CORTEX_PRIME",
+        username: str = "OPERATOR_ADMIN",
+        role: str = "subscriber",
+    ):
+        self.id = identity
+        self.username = username
+        self.role = role
         self.is_authenticated = True
         self.is_active = True
         self.is_anonymous = False
-        # Satisfies core subscriber platform guard requirements
-        self.role = "subscriber"
+        self.is_operator = True
 
     def get_id(self) -> str:
-        return self.id
+        """Returns the unique identifier string required by Flask-Login user interface contract."""
+        return str(self.id)
 
 
 # -------------------------------------------------------------------
 # ⚙️ CORE IDENTITY RESOLUTION ENGINE (INTERNAL ONLY)
 # -------------------------------------------------------------------
 def _resolve_identity(identity: str | None) -> User | SystemOperator | None:
-    """Centralized pipeline for identity translation.
+    """Centralized pipeline for database and system operator identity translation.
 
-    Handles string sanitization, system intercepts, and dual-type DB mapping.
+    Handles string sanitization, GOD-MODE intercepts, and database principal resolution.
     """
     if not identity:
         return None
@@ -52,25 +54,16 @@ def _resolve_identity(identity: str | None) -> User | SystemOperator | None:
     if clean_id.lower() in ("", "none", "null"):
         return None
 
-    # ⭐ GOD-MODE INTERCEPT
-    if clean_id == "TERENCE_CORTEX_PRIME":
-        try:
-            # 🚀 FIRST PRIORITY: In-memory instantiation to avoid DB
-            # lookup locks
-            return SystemOperator(clean_id)
-        except Exception as e:
-            logger.error(
-                "Operator Exception: Failed to boot SystemOperator: %s", e
-            )
+    # Retrieve system operator settings from active Flask context
+    operator_enabled = True
+    target_operator_id = "TERENCE_CORTEX_PRIME"
+    if current_app:
+        operator_enabled = current_app.config.get("SYSTEM_OPERATOR_ENABLED", True)
+        target_operator_id = current_app.config.get("SYSTEM_OPERATOR_ID", "TERENCE_CORTEX_PRIME")
 
-            # 🛡️ EMERGENCY FALLBACK: Drop down to DB user if boot fails
-            try:
-                db_user = db.session.get(User, clean_id)
-                if db_user:
-                    return db_user
-            except Exception:
-                pass
-            return None
+    # GOD-MODE / SystemOperator Intercept
+    if operator_enabled and (clean_id == target_operator_id or clean_id.startswith("OPERATOR_")):
+        return SystemOperator(identity=clean_id, username="OPERATOR_ADMIN", role="subscriber")
 
     try:
         # 1. Primary Strategy: String/UUID Primary Key lookup
@@ -87,7 +80,7 @@ def _resolve_identity(identity: str | None) -> User | SystemOperator | None:
         except (ValueError, TypeError):
             pass
 
-        # 3. Consistency Strategy: Direct ORM query for stale execution states
+        # 3. Consistency Strategy: Direct ORM query fallback
         return User.query.filter_by(id=clean_id).first()
 
     except Exception:
@@ -116,4 +109,15 @@ def user_lookup_callback(
     _jwt_header, jwt_data: dict
 ) -> User | SystemOperator | None:
     """Loads a user principal out of a stateless JWT bearer token payload."""
-    return _resolve_identity(jwt_data.get("sub"))
+    if not jwt_data:
+        return None
+
+    raw_sub = jwt_data.get("sub") or jwt_data.get("identity")
+
+    # Unpack nested token claim payload dictionaries if present
+    if isinstance(raw_sub, dict):
+        identity = raw_sub.get("identity") or raw_sub.get("username") or raw_sub.get("id")
+    else:
+        identity = raw_sub
+
+    return _resolve_identity(identity)

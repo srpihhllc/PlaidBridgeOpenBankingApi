@@ -3,8 +3,9 @@
 # DESCRIPTION: Production-aligned seeder matching route authentication schema.
 # =============================================================================
 
+# FILE: app/cli/seed_subscriber.py
+
 import os
-import sys
 
 import click
 from flask.cli import with_appcontext
@@ -36,28 +37,22 @@ def seed_subscriber(email, password, username, interactive):
         )
         username = username or click.prompt("Subscriber username")
     else:
-        email = email or os.environ.get("USER_EMAIL")
-        password = password or os.environ.get("USER_PASSWORD")
-        username = username or os.environ.get(
-            "USER_USERNAME", "subscriber_user"
-        )
+        email = email or os.environ.get("USER_EMAIL", "subscriber@example.com")
+        password = password or os.environ.get("USER_PASSWORD", "SubscriberPass123!")
+        username = username or os.environ.get("USER_USERNAME", "subscriber_user")
 
     if not email or not password:
-        click.echo(
-            "❌ ERROR: USER_EMAIL and USER_PASSWORD must be set in the environment."
+        raise click.ClickException(
+            "❌ ERROR: USER_EMAIL and USER_PASSWORD must be provided or set in environment."
         )
-        sys.exit(1)
 
-    # Gather data mappings aligned directly with your registration route requirements
     ssn_last4 = os.environ.get("USER_SSN_LAST4", "2223")
     primary_phone = os.environ.get("USER_PRIMARY_PHONE", "901-555-0199")
     bank_name = os.environ.get("USER_BANK_NAME", "Demo Bank")
     routing_number = os.environ.get("USER_ROUTING_NUMBER", "123456789")
     account_ending = os.environ.get("USER_ACCOUNT_ENDING", "2223")
 
-    business_address = os.environ.get(
-        "USER_BUSINESS_ADDRESS", "123 Innovation Way"
-    )
+    business_address = os.environ.get("USER_BUSINESS_ADDRESS", "123 Innovation Way")
     business_city = os.environ.get("USER_BUSINESS_CITY", "Memphis")
     business_state = os.environ.get("USER_BUSINESS_STATE", "TN")
     business_zip = os.environ.get("USER_BUSINESS_ZIP", "38103")
@@ -68,16 +63,13 @@ def seed_subscriber(email, password, username, interactive):
     user = User.query.filter_by(email=email).first()
 
     if user:
-        click.echo(
-            f"ℹ️ Updating and synchronizing existing subscriber: {email}"
-        )
-        user.set_password(password)  # Using matching model helper from route
+        click.echo(f"ℹ️ Updating and synchronizing existing subscriber: {email}")
+        user.set_password(password)
         user.role = "subscriber"
         user.is_admin = False
         user.is_approved = True
         user.mfa_pending_setup = True
 
-        # Sync profile fields down to table context
         user.ssn_last4 = ssn_last4
         user.primary_phone = primary_phone
         user.bank_name = bank_name
@@ -91,16 +83,14 @@ def seed_subscriber(email, password, username, interactive):
         user.ein = ein
         user.home_address = home_address
     else:
-        click.echo(
-            f"🌱 Creating pristine registration-compliant subscriber: {email}"
-        )
+        click.echo(f"🌱 Creating pristine registration-compliant subscriber: {email}")
         user = User(
             username=username,
             email=email,
             role="subscriber",
             is_admin=False,
             is_approved=True,
-            mfa_pending_setup=True,  # Aligned with default route security state
+            mfa_pending_setup=True,
             ssn_last4=ssn_last4,
             primary_phone=primary_phone,
             bank_name=bank_name,
@@ -119,81 +109,70 @@ def seed_subscriber(email, password, username, interactive):
         db.session.add(user)
         db.session.flush()
 
-        # ---------------------------------------------------------------------
-        # Downstream Ecosystem Hydration
-        # ---------------------------------------------------------------------
-        dashboard = UserDashboard(user_id=user.id)
+    # Guarantee downstream ecosystem entities exist whether user is new or updated
+    if not UserDashboard.query.filter_by(user_id=user.id).first():
+        db.session.add(UserDashboard(user_id=user.id))
 
+    if not SubscriberProfile.query.filter_by(user_id=user.id).first():
         profile = SubscriberProfile(user_id=user.id)
         profile.generate_api_key()
+        db.session.add(profile)
 
-        institution = BankInstitution.query.filter_by(
-            institution_id="demo-bank-001"
-        ).first()
-        if not institution:
-            institution = BankInstitution(
+    if not BankInstitution.query.filter_by(institution_id="demo-bank-001").first():
+        db.session.add(
+            BankInstitution(
                 user_id=user.id, name=bank_name, institution_id="demo-bank-001"
             )
+        )
 
-        account = BankAccount.query.filter_by(
-            account_number="0001112223"
-        ).first()
-        if not account:
-            account = BankAccount(
+    if not BankAccount.query.filter_by(account_number="0001112223").first():
+        db.session.add(
+            BankAccount(
                 user_id=user.id,
                 account_type="checking",
                 account_number="0001112223",
                 balance=100.00,
             )
-
-        db.session.add_all([dashboard, profile, institution, account])
+        )
 
     try:
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
 
-        # Concurrency verification fallback
         user = User.query.filter_by(email=email).first()
+        if user:
+            if not SubscriberProfile.query.filter_by(user_id=user.id).first():
+                p = SubscriberProfile(user_id=user.id)
+                p.generate_api_key()
+                db.session.add(p)
 
-        if not SubscriberProfile.query.filter_by(user_id=user.id).first():
-            p = SubscriberProfile(user_id=user.id)
-            p.generate_api_key()
-            db.session.add(p)
+            if not UserDashboard.query.filter_by(user_id=user.id).first():
+                db.session.add(UserDashboard(user_id=user.id))
 
-        if not UserDashboard.query.filter_by(user_id=user.id).first():
-            db.session.add(UserDashboard(user_id=user.id))
-
-        if not BankInstitution.query.filter_by(
-            institution_id="demo-bank-001"
-        ).first():
-            db.session.add(
-                BankInstitution(
-                    user_id=user.id,
-                    name=bank_name,
-                    institution_id="demo-bank-001",
+            if not BankInstitution.query.filter_by(institution_id="demo-bank-001").first():
+                db.session.add(
+                    BankInstitution(
+                        user_id=user.id,
+                        name=bank_name,
+                        institution_id="demo-bank-001",
+                    )
                 )
-            )
 
-        if not BankAccount.query.filter_by(
-            account_number="0001112223"
-        ).first():
-            db.session.add(
-                BankAccount(
-                    user_id=user.id,
-                    account_type="checking",
-                    account_number="0001112223",
-                    balance=100.00,
+            if not BankAccount.query.filter_by(account_number="0001112223").first():
+                db.session.add(
+                    BankAccount(
+                        user_id=user.id,
+                        account_type="checking",
+                        account_number="0001112223",
+                        balance=100.00,
+                    )
                 )
-            )
-        db.session.commit()
+            db.session.commit()
 
     click.echo("✅ Subscriber user context fully synchronized and seeded.")
 
 
-# -----------------------------------------------------------------------------
-# Plural Command Alias
-# -----------------------------------------------------------------------------
 @click.command("seed-subscribers")
 @click.option("--email", default=None, help="Subscriber email")
 @click.option("--password", default=None, help="Subscriber password")

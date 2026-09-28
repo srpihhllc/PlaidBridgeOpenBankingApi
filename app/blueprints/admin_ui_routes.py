@@ -1,17 +1,15 @@
 # =============================================================================
+# FILE: app/blueprints/admin_ui_routes.py
 # DESCRIPTION: Admin UI routes with cockpit wiring and tiles.
-# Compatibility: blueprint is registered as "admin" (so legacy calls to
-# url_for('admin.*') continue to work). We also create admin_ui.* aliases
-# to preserve any JS/templates that reference admin_ui.* endpoints.
-#
-# This module also provides helper functions `ensure_admin_aliases(...)` and
-# `register_admin_blueprint(...)` intended to be called from your app factory.
+# AUDIT STATUS: Canonical registration under "admin". View-function aliasing for
+#               admin_ui ensures zero duplicate URL map collisions.
 # =============================================================================
 
 import io
 import json
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Iterable
 
@@ -51,12 +49,7 @@ from app.utils.time_utils import safe_parse_timestamp
 
 logger = logging.getLogger(__name__)
 
-# Defensive blueprint creation:
-# - Reuse an existing blueprint object if one was already created (helps tests
-#   or import-time reimports that may create the object earlier).
-# - Do NOT register the blueprint at import time; registration is handled
-#   centrally by register_blueprints(app) in the application factory.
-admin_bp = globals().get("admin_bp") or Blueprint(
+admin_bp = Blueprint(
     "admin",
     __name__,
     url_prefix="/admin",
@@ -65,17 +58,48 @@ admin_bp = globals().get("admin_bp") or Blueprint(
 
 
 # =============================================================================
+# INTERNAL HELPERS
+# =============================================================================
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _safe_cursor(value: str | None) -> int:
+    try:
+        return max(0, int(value or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _safe_trace_id(trace_id: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", trace_id)
+    return cleaned[:128] or "unknown"
+
+
+def _trace_sort_key(event: dict[str, object]) -> datetime:
+    parsed = safe_parse_timestamp(str(event.get("timestamp", "")))
+    if parsed is None:
+        return datetime.min.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _mock_redis_keys() -> list[dict[str, object]]:
+    return [
+        {"key": "session:user1", "ttl": 3600, "size": "string:120"},
+        {"key": "rate_limit:1.1.1.1", "ttl": 50, "size": "string:50"},
+        {"key": "operator:code:v1:", "ttl": 150, "size": "string:80"},
+    ]
+
+
+# =============================================================================
 # ADMIN INDEX & CANONICAL HOME
 # =============================================================================
 @admin_bp.route("/", strict_slashes=False, endpoint="admin_index")
 @admin_bp.route("/home", endpoint="admin_home")
 def admin_index():
-    """Unified Admin landing and canonical home view with feature gate &
-    fallbacks. Handles both /admin/ and /admin/home transparently as a single
-    execution point to satisfy template audit requirements and eliminate
-    alias fallback bloat.
-    """
-    # 1. Feature Gate: Diagnostic inventory
+    """Unified Admin landing and canonical home view."""
     if current_app.config.get("DEBUG_UI"):
         templates = [
             "admin_console.html",
@@ -85,37 +109,28 @@ def admin_index():
         ]
         return jsonify({"templates": templates}), 200
 
-    # 2. Production path: Authenticated admins
     if getattr(current_user, "is_authenticated", False) and getattr(
         current_user, "is_admin", False
     ):
         return render_template("admin/admin_console.html")
 
-    # 3. Fallback: Unauthenticated or non-admin target
     return render_template("auth/operator_login.html")
 
 
 # =============================================================================
-# Dynamic Admin Template Previewer (Fixes test_admin_template_render)
+# Dynamic Admin Template Previewer
 # =============================================================================
-@admin_bp.route("/t/<path:tpl>", endpoint="render_admin_template")
+@admin_bp.route("/t/", endpoint="render_admin_template")
 def render_admin_template(tpl):
-    """Dynamic preview router for admin templates.
-    Allows smoketests to render admin templates without authentication.
-    """
-    # Normalize extension strings cleanly
+    """Dynamic preview router for admin templates."""
     if not tpl.endswith(".html"):
         tpl = f"{tpl}.html"
 
-    # Prefix with admin/ folder segment if missing
     search_tpl = tpl if tpl.startswith("admin/") else f"admin/{tpl}"
-
-    # Verify template bounded reality path exists safely
     full_path = os.path.join(current_app.root_path, "templates", search_tpl)
     if not os.path.exists(full_path):
         abort(404)
 
-    # Mock admin user block to prevent AnonymousUserMixin evaluation crashes
     class MockAdmin:
         id = 0
         username = "preview_admin"
@@ -124,14 +139,12 @@ def render_admin_template(tpl):
         is_admin = True
 
     mock_admin = MockAdmin()
-
-    # Fill default mock context targets to satisfy deep template checks
     mock_context = {
         "current_user": mock_admin,
         "user": mock_admin,
         "audit_info": {
             "status": "ok",
-            "last_audit_date": datetime.now(timezone.utc).isoformat(),
+            "last_audit_date": _utc_now().isoformat(),
         },
         "system_status": {},
         "metrics": {},
@@ -146,86 +159,40 @@ def render_admin_template(tpl):
 
 
 # =============================================================================
-# BACKWARD-COMPATIBILITY: create admin_ui.* aliases pointing to admin.* views
-# Helper to be called centrally from app factory after blueprint registration.
+# BACKWARD-COMPATIBILITY: View-function level aliasing
 # =============================================================================
 def ensure_admin_aliases(app) -> list[str]:
-    """Dynamically register admin_ui alias endpoints for canonical admin routes.
+    """Register admin_ui.* view-function aliases for canonical admin.* views.
 
-    Creates admin_ui.<suffix> aliases for each admin.<suffix> endpoint by
-    explicitly adding URL rules so url_for('admin_ui.*') can resolve them.
-    Returns a list of created alias endpoint names.
+    URL rules are added separately by the application factory after all
+    canonical admin routes have been registered.
     """
     canonical_prefix = "admin."
     alias_prefix = "admin_ui."
-    created_aliases = []
+    created_aliases: list[str] = []
 
-    # Snapshot existing rules to safely iterate without mutating mid-loop
-    existing_rules = list(app.url_map.iter_rules())
-    rules_by_ep = getattr(app.url_map, "_rules_by_endpoint", {})
+    for endpoint, view_func in list(app.view_functions.items()):
+        if endpoint.startswith(canonical_prefix):
+            suffix = endpoint[len(canonical_prefix) :]
+            alias_ep = f"{alias_prefix}{suffix}"
+            if alias_ep not in app.view_functions:
+                app.view_functions[alias_ep] = view_func
+                created_aliases.append(alias_ep)
 
-    for rule in existing_rules:
-        if not rule.endpoint.startswith(canonical_prefix):
-            continue
-
-        suffix = rule.endpoint[len(canonical_prefix) :]
-        alias_ep = f"{alias_prefix}{suffix}"
-
-        # Retrieve canonical view function
-        vf = app.view_functions.get(rule.endpoint)
-        if vf is None:
-            continue
-
-        # 1. Map endpoint to view function
-        if alias_ep not in app.view_functions:
-            app.view_functions[alias_ep] = vf
-
-        # 2. Check if rule is already registered in url_map
-        existing_alias_rules = rules_by_ep.get(alias_ep, [])
-        already_registered = any(
-            r.rule == rule.rule for r in existing_alias_rules
-        )
-
-        if not already_registered:
-            # Re-register via app.add_url_rule to force Werkzeug to update
-            # internal routing indexes
-            options = {
-                "methods": rule.methods,
-                "defaults": rule.defaults,
-                "strict_slashes": rule.strict_slashes,
-                "subdomain": rule.subdomain,
-            }
-            options = {k: v for k, v in options.items() if v is not None}
-
-            app.add_url_rule(
-                rule.rule, endpoint=alias_ep, view_func=vf, **options
-            )
-            created_aliases.append(alias_ep)
-
-    app.logger.debug("Registered admin_ui aliases: %s", created_aliases)
+    app.logger.debug(
+        "Registered admin_ui view-function aliases: %s", created_aliases
+    )
     return created_aliases
 
 
-# =============================================================================
-# Helper to verify admin blueprint aliasing (no registration performed here)
-# =============================================================================
 def _get_expected_endpoints() -> Iterable[str]:
-    """Return a minimal list of endpoints we expect to exist after registration."""
     return ("admin.admin_index", "admin_ui.admin_index")
 
 
-def register_admin_blueprint(
-    app, *, verify: bool = True, raise_on_failure: bool = True
-):
-    """Verification-only helper.
-    IMPORTANT:
-    - Blueprint registration is handled centrally by register_blueprints(app).
-    - This helper simply verifies that expected endpoints exist.
-    """
-    if not verify:
-        return
-
-    # Perform verification in an app context
+def verify_admin_blueprint(
+    app, *, raise_on_failure: bool = True
+) -> None:
+    """Verification helper for application startup."""
     with app.app_context():
         missing = [
             ep
@@ -233,31 +200,28 @@ def register_admin_blueprint(
             if ep not in current_app.view_functions
         ]
 
-        if missing:
-            msg = (
-                "Admin blueprint alias verification failed; missing "
-                f"endpoints: {missing}"
-            )
-            if raise_on_failure:
-                logger.error(msg)
-                raise RuntimeError(msg)
-            else:
-                logger.warning(msg)
-        else:
+        if not missing:
             logger.debug("Admin blueprint and aliases verified successfully.")
+            return
+
+        msg = f"Admin blueprint alias verification failed; missing: {missing}"
+        if raise_on_failure:
+            logger.error(msg)
+            raise RuntimeError(msg)
+
+        logger.warning(msg)
 
 
 # =============================================================================
-# OPERATOR LOGIN UI (HARDENED CONSOLE ROUTE)
+# OPERATOR LOGIN UI
 # =============================================================================
 @admin_bp.route("/operator-login")
 def operator_login():
-    """Redirects all entry traffic directly to the master auth blueprint."""
     return redirect(url_for("auth.login_operator"))
 
 
 # =============================================================================
-# 2. ADMIN COCKPIT
+# ADMIN COCKPIT & RISK PAGES
 # =============================================================================
 @admin_bp.route("/cockpit")
 @login_required
@@ -266,9 +230,6 @@ def admin_cockpit():
     return render_template("cockpit/cockpit_dashboard.html")
 
 
-# =============================================================================
-# ADMIN COCKPIT — LENDER RISK PAGES
-# =============================================================================
 @admin_bp.route("/cockpit/lender_risk_day_detail")
 @login_required
 @admin_required
@@ -290,9 +251,6 @@ def lender_risk_overview():
     return render_template("cockpit/lender_risk_tile.html")
 
 
-# =============================================================================
-# Neural Console (Admin)
-# =============================================================================
 @admin_bp.route("/neural_console")
 @login_required
 @admin_required
@@ -300,9 +258,6 @@ def neural_console():
     return render_template("admin/neural_console.html")
 
 
-# =============================================================================
-# COCKPIT TRACE DETAIL PAGES
-# =============================================================================
 @admin_bp.route("/cockpit/trace_detail")
 @login_required
 @admin_required
@@ -317,9 +272,6 @@ def cockpit_trace_not_found():
     return render_template("cockpit/trace_not_found.html")
 
 
-# =============================================================================
-# 3. SUPER ADMIN CORTEX
-# =============================================================================
 @admin_bp.route("/cortex")
 @login_required
 @super_admin_required
@@ -328,7 +280,7 @@ def admin_cortex():
 
 
 # =============================================================================
-# 4. AUDIT VIEWER & NAV AUDIT
+# AUDIT VIEWER & NAV AUDIT
 # =============================================================================
 @admin_bp.route("/audit_viewer")
 @login_required
@@ -375,7 +327,7 @@ def nav_audit():
 
 
 # =============================================================================
-# 9. LENDER MANAGEMENT (finance_admin)
+# LENDER MANAGEMENT
 # =============================================================================
 @admin_bp.get("/lenders")
 @login_required
@@ -385,7 +337,7 @@ def show_lenders():
     return render_template("admin/lenders.html", lenders=lenders)
 
 
-@admin_bp.post("/lenders/<int:lender_id>/verify")
+@admin_bp.post("/lenders//verify")
 @login_required
 @roles_required("finance_admin")
 def verify_lender(lender_id):
@@ -401,16 +353,16 @@ def verify_lender(lender_id):
 
 
 # =============================================================================
-# 10. CREDIT LEDGER & PAYMENTS (credit_admin)
+# CREDIT LEDGER & PAYMENTS
 # =============================================================================
-@admin_bp.route("/view_credit_ledger/<int:user_id>")
+@admin_bp.route("/view_credit_ledger/")
 @login_required
 @roles_required("credit_admin")
 def view_credit_ledger(user_id):
     return render_template("admin/credit_dashboard.html", user_id=user_id)
 
 
-@admin_bp.route("/tile/exposure/<int:user_id>")
+@admin_bp.route("/tile/exposure/")
 @login_required
 @roles_required("credit_admin")
 def tile_exposure(user_id):
@@ -423,7 +375,7 @@ def tile_exposure(user_id):
     return render_template("admin/tiles/exposure_widget.html", data=data)
 
 
-@admin_bp.route("/tile/credit_ledger/<int:user_id>")
+@admin_bp.route("/tile/credit_ledger/")
 @login_required
 @roles_required("credit_admin")
 def tile_credit_ledger(user_id):
@@ -438,53 +390,67 @@ def tile_credit_ledger(user_id):
 @roles_required("credit_admin")
 def process_payment():
     try:
-        card_id = request.form["card_id"]
+        card_id = request.form["card_id"].strip()
         amount = float(request.form["amount"])
-    except (KeyError, ValueError):
+    except (KeyError, TypeError, ValueError):
         flash("Invalid payment request.", "warning")
+        return redirect(url_for("admin.admin_index"))
+
+    if not card_id or amount <= 0:
+        flash("Payment amount must be greater than zero.", "warning")
         return redirect(url_for("admin.admin_index"))
 
     ledger = MockLedger(id=1, user_id=1, card_id=card_id)
     ledger.balance_used = max(0.0, ledger.balance_used - amount)
 
     usage_ratio = (
-        ledger.balance_used / ledger.credit_limit if ledger.credit_limit else 0
+        ledger.balance_used / ledger.credit_limit
+        if ledger.credit_limit
+        else 0.0
     )
 
-    if usage_ratio > 0.9 and not ledger.suspended:
-        ledger.suspended = True
-        suspend_card(card_id)
-    elif usage_ratio <= 0.9 and ledger.suspended:
-        ledger.suspended = False
-        unfreeze_card(card_id)
+    try:
+        if usage_ratio > 0.9 and not ledger.suspended:
+            ledger.suspended = True
+            suspend_card(card_id)
+        elif usage_ratio <= 0.9 and ledger.suspended:
+            ledger.suspended = False
+            unfreeze_card(card_id)
+    except Exception:
+        logger.exception("Card state update failed for card %s", card_id)
+        flash("Unable to update card status.", "danger")
+        return redirect(
+            url_for("admin.view_credit_ledger", user_id=ledger.user_id)
+        )
 
-    flash(f"Processed payment of ${amount:.2f} for card {card_id}.", "success")
+    flash(f"Processed payment of ${amount:.2f}.", "success")
     return redirect(
         url_for("admin.view_credit_ledger", user_id=ledger.user_id)
     )
 
 
 # =============================================================================
-# 11. FRAUD & TRADELINES
+# FRAUD & TRADELINES
 # =============================================================================
 @admin_bp.route("/fraud_scanner")
 @login_required
 @roles_required("fraud_admin")
 def fraud_scanner():
+    now = _utc_now()
     frauds = [
         (
             1,
             "Large Purchase",
             5000.0,
             "Amount Threshold",
-            datetime.now(timezone.utc),
+            now,
         ),
         (
             2,
             "Geo Mismatch",
             150.0,
             "IP Mismatch",
-            datetime.now(timezone.utc) - timedelta(hours=1),
+            now - timedelta(hours=1),
         ),
     ]
     return render_template("admin/fraud_charts.html", frauds=frauds)
@@ -514,7 +480,7 @@ def approval_queue():
 
 
 # =============================================================================
-# 12. REDIS / DB PANELS / SQL PANEL
+# REDIS / DB PANELS / SQL PANEL
 # =============================================================================
 @admin_bp.route("/redis_panel")
 @login_required
@@ -524,30 +490,26 @@ def redis_panel():
     try:
         redis_client = get_redis_client()
     except Exception:
-        redis_client = None
+        logger.exception("Unable to connect to Redis")
 
-    keys = []
+    current_cursor = _safe_cursor(request.args.get("cursor"))
     match_pattern = request.args.get("match", "*")
-    cursor = int(request.args.get("cursor", 0))
     next_cursor = 0
+    keys: list[dict[str, object]] = []
 
     if redis_client:
         keys = [
-            {"key": "session:user1", "ttl": 3600, "size": "string:120"},
-            {"key": "rate_limit:1.1.1.1", "ttl": 50, "size": "string:50"},
-            {
-                "key": "operator:code:v1:ABCD123",
-                "ttl": 150,
-                "size": "string:80",
-            },
+            key
+            for key in _mock_redis_keys()
+            if match_pattern in ("*", key["key"])
         ]
-        next_cursor = 0 if cursor != 0 else 1
+        next_cursor = 0 if current_cursor != 0 else 1
 
     return render_template(
         "admin/redis_panel.html",
         redis_keys=keys,
         next_cursor=next_cursor,
-        current_cursor=cursor,
+        current_cursor=current_cursor,
         match_pattern=match_pattern,
         has_more=(next_cursor != 0),
     )
@@ -610,13 +572,13 @@ def log_viewer():
     log_path = current_app.config.get("LOG_FILE_PATH", default_log)
     lines = [
         "[2025-10-31 09:30:00] INFO: App started successfully.",
-        "[2025-10-31 09:31:15] DEBUG: Operator code generated: XYZW1234.",
+        "[2025-10-31 09:31:15] DEBUG: [mock] Operator code generated: .",
         "[2025-10-31 09:32:40] ERROR: DB connection pool exhausted.",
         f"Mocking log file content from: {log_path}",
     ]
     log_info = {
         "size_bytes": 4096,
-        "last_modified": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "last_modified": _utc_now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     return render_template(
         "admin/tiles/log_viewer.html", log_lines=lines, log_info=log_info
@@ -630,15 +592,12 @@ def log_viewer():
 @login_required
 @admin_required
 def tile_blueprint_drift_pulse():
-    """Dummy endpoint for the cockpit drift overlay.
-    TODO: Replace with actual drift calculation logic.
-    """
     return (
         jsonify(
             {
                 "status": "ok",
                 "drift_detected": False,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": _utc_now().isoformat(),
             }
         ),
         200,
@@ -671,15 +630,7 @@ def tile_redis_keys():
 
     keys = []
     if redis_client:
-        keys = [
-            {"key": "session:user1", "ttl": 3600, "size": "string:120"},
-            {"key": "rate_limit:1.1.1.1", "ttl": 50, "size": "string:50"},
-            {
-                "key": "operator:code:v1:ABCD123",
-                "ttl": 150,
-                "size": "string:80",
-            },
-        ]
+        keys = _mock_redis_keys()
     return render_template("admin/tiles/redis_keys.html", redis_keys=keys)
 
 
@@ -716,7 +667,7 @@ def tile_rate_limits():
 def tile_log_viewer():
     lines = [
         "[2025-10-31 09:30:00] INFO: App started successfully.",
-        "[2025-10-31 09:31:15] DEBUG: Operator code generated: XYZW1234.",
+        "[2025-10-31 09:31:15] DEBUG: [mock] Operator code generated: .",
         "[2025-10-31 09:32:40] ERROR: DB connection pool exhausted.",
     ]
     return render_template("admin/tiles/log_viewer.html", log_lines=lines)
@@ -749,7 +700,7 @@ def tile_trace_viewer():
 @login_required
 @admin_required
 def tile_statements_timeline():
-    now_utc = datetime.now(timezone.utc)
+    now_utc = _utc_now()
     logs = [
         {"timestamp": now_utc.isoformat()},
         {"timestamp": (now_utc - timedelta(hours=1)).isoformat()},
@@ -793,20 +744,21 @@ def tile_agent_activity():
 @login_required
 @admin_required
 def tile_schema_events():
+    now = _utc_now()
     events = [
         MockSchemaEvent(
             id=1,
             event_type="update",
             origin="system",
             detail="Changed X",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
         ),
         MockSchemaEvent(
             id=2,
             event_type="insert",
             origin="api",
             detail="Added Y",
-            timestamp=datetime.now(timezone.utc),
+            timestamp=now,
         ),
     ]
     return render_template("admin/tiles/schema_events.html", events=events)
@@ -816,16 +768,17 @@ def tile_schema_events():
 @login_required
 @admin_required
 def tile_schema_versions():
+    now = _utc_now()
     versions = [
         MockModel(
             id=1,
             version_hash="abc123",
-            applied_at=datetime.now(timezone.utc),
+            applied_at=now,
         ),
         MockModel(
             id=2,
             version_hash="def456",
-            applied_at=datetime.now(timezone.utc) - timedelta(days=1),
+            applied_at=now - timedelta(days=1),
         ),
     ]
     return render_template(
@@ -834,7 +787,7 @@ def tile_schema_versions():
 
 
 # =============================================================================
-# 13. TRACE VIEWER & EXPORT
+# TRACE VIEWER & EXPORT
 # =============================================================================
 @admin_bp.route("/trace_viewer")
 @login_required
@@ -855,16 +808,19 @@ def trace_viewer():
     )
 
 
-@admin_bp.route("/export_trace/<string:trace_id>")
+@admin_bp.route("/export_trace/")
 @login_required
 @admin_required
 def export_trace(trace_id):
-    now = datetime.now()
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", trace_id):
+        abort(400)
+
+    now = _utc_now()
     trace_events = [
         {"event": "start", "timestamp": now.isoformat()},
         {
             "event": "db_call",
-            "query": "SELECT *",
+            "query": "",
             "timestamp": (now + timedelta(milliseconds=10)).isoformat(),
         },
         {
@@ -872,9 +828,8 @@ def export_trace(trace_id):
             "timestamp": (now + timedelta(milliseconds=20)).isoformat(),
         },
     ]
-    trace_events.sort(
-        key=lambda x: safe_parse_timestamp(x.get("timestamp", ""))
-    )
+    trace_events.sort(key=_trace_sort_key)
+
     export_data = {
         "metadata": {
             "trace_id": trace_id,
@@ -884,10 +839,15 @@ def export_trace(trace_id):
         },
         "events": trace_events,
     }
+
     buffer = io.BytesIO(json.dumps(export_data, indent=2).encode("utf-8"))
     buffer.seek(0)
-    ts = now.strftime("%Y%m%d_%H%M%S")
-    filename = f"trace_export_{trace_id}_{ts}.json"
+
+    filename = (
+        f"trace_export_{_safe_trace_id(trace_id)}_"
+        f"{now.strftime('%Y%m%d_%H%M%S')}.json"
+    )
+
     return send_file(
         buffer,
         mimetype="application/json",
@@ -897,18 +857,19 @@ def export_trace(trace_id):
 
 
 # =============================================================================
-# 14. DISPUTE LOG MANAGEMENT
+# DISPUTE LOG MANAGEMENT
 # =============================================================================
-@admin_bp.route("/dispute_logs/<int:user_id>")
+@admin_bp.route("/dispute_logs/")
 @login_required
 @roles_required("credit_admin")
 def view_dispute_logs(user_id):
     user = MockUser(id=user_id)
+    now = _utc_now()
     logs = [
         MockModel(
             id=i,
             user_id=user_id,
-            timestamp=datetime.now(timezone.utc) - timedelta(days=i),
+            timestamp=now - timedelta(days=i),
         )
         for i in range(1, 4)
     ]
@@ -917,7 +878,7 @@ def view_dispute_logs(user_id):
     )
 
 
-@admin_bp.route("/preview_letter/<int:log_id>")
+@admin_bp.route("/preview_letter/")
 @login_required
 @roles_required("credit_admin")
 def preview_letter(log_id):
@@ -925,7 +886,7 @@ def preview_letter(log_id):
         content = render_letter_to_text(log_id)
     except Exception as e:
         content = f"Error rendering letter for log {log_id}: {e}"
-        logger.error(f"Letter preview error: {e}")
+        logger.error("Letter preview error: %s", e)
     return render_template(
         "admin/admin_letter_preview.html",
         log_id=log_id,
@@ -935,7 +896,7 @@ def preview_letter(log_id):
 
 
 # =============================================================================
-# 15. ADVANCED TELEMETRY DASHBOARD
+# ADVANCED TELEMETRY & SYSTEM DIAGNOSTICS
 # =============================================================================
 @admin_bp.route("/advanced_telemetry")
 @login_required
@@ -944,9 +905,6 @@ def advanced_telemetry():
     return render_template("admin/telemetry_dashboard.html")
 
 
-# =============================================================================
-# SYSTEM DIAGNOSTICS (Heartbeat, Cache Health, System Map)
-# =============================================================================
 @admin_bp.route("/system_heartbeat")
 @login_required
 @admin_required

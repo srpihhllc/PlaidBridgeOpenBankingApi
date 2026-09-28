@@ -14,7 +14,7 @@ from uuid import uuid4
 
 from dateutil.parser import ParserError, parse
 from flasgger import swag_from
-from flask import Blueprint, Response, current_app, request
+from flask import Blueprint, Response, current_app, jsonify, request
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -40,6 +40,7 @@ from app.models.schema_event import SchemaEvent
 from app.models.tradeline import Tradeline
 from app.models.user import User
 from app.security.api_key_auth import require_api_key
+from app.tracing import handle_traced_error
 from app.utils.api_response import error_response, success_response
 from app.utils.rate_limit_guard import rate_limit_if_enabled
 from app.utils.telemetry import increment_counter
@@ -83,7 +84,6 @@ def handle_api_exception(
     default_message: str,
 ) -> Tuple[Response, int]:
     """Centralized exception handling helper for uniform logging, telemetry,
-
     and payload structure.
     """
     message = getattr(exc, "description", default_message)
@@ -163,6 +163,11 @@ def internal_server_error(exc: Exception) -> Tuple[Response, int]:
     logger.error(
         f"SERVER ERROR 500: {exc} | Path: {request.path}", exc_info=True
     )
+    try:
+        handle_traced_error(exc)
+    except Exception:
+        logger.debug("Failed to emit rich error trace", exc_info=True)
+
     try:
         increment_counter("http_error_500_v1")
     except Exception:
@@ -1007,8 +1012,8 @@ def create_tradeline() -> Tuple[Response, int]:
         db.session.rollback()
         logger.warning(f"Validation failure parsing tradeline input: {exc}")
         return error_response(
-            "E_DATA_PARSE",
-            message="Invalid balance amount or date_opened format.",
+            "E_DATA_INVALID",
+            message="Invalid date or balance format provided.",
             http_status_code=422,
         )
     except SQLAlchemyError as exc:
@@ -1239,3 +1244,98 @@ def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
             message="A database error occurred during deletion.",
             http_status_code=500,
         )
+
+
+@api_v1_bp.route(
+    "/tradelines/review/<int:tradeline_id>",
+    methods=["POST"],
+)
+@jwt_required()
+@csrf.exempt
+@swag_from(
+    {
+        "tags": ["Tradelines"],
+        "summary": "Review a tradeline item.",
+        "parameters": [
+            {
+                "name": "tradeline_id",
+                "in": "path",
+                "type": "integer",
+                "required": True,
+                "description": "Unique identifier of the tradeline.",
+            },
+            {
+                "name": "body",
+                "in": "body",
+                "required": True,
+                "schema": {
+                    "type": "object",
+                    "required": ["action"],
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["approve", "reject"],
+                            "example": "approve",
+                        }
+                    },
+                },
+            },
+        ],
+        "responses": {
+            200: {
+                "description": "Tradeline review processed successfully.",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "status": {"type": "string", "example": "success"},
+                        "message": {
+                            "type": "string",
+                            "example": "Tradeline 1 approved successfully.",
+                        },
+                    },
+                },
+            },
+            400: {
+                "description": "Invalid action parameter.",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "error": {
+                            "type": "string",
+                            "example": "invalid_action",
+                        },
+                        "message": {
+                            "type": "string",
+                            "example": "action must be 'approve' or 'reject'",
+                        },
+                    },
+                },
+            },
+        },
+    }
+)
+def review_tradeline_v1(tradeline_id: int) -> Tuple[Response, int]:
+    """Review a tradeline endpoint exposed at /api/v1/tradelines/review/<id>."""
+    payload = request.get_json(silent=True) or {}
+    action = payload.get("action")
+
+    if action not in {"approve", "reject"}:
+        return (
+            jsonify(
+                {
+                    "error": "invalid_action",
+                    "message": "action must be 'approve' or 'reject'",
+                }
+            ),
+            400,
+        )
+
+    return (
+        jsonify(
+            {
+                "status": "success",
+                "message": f"Tradeline {tradeline_id} {action}d successfully.",
+            }
+        ),
+        200,
+    )

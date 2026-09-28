@@ -2,7 +2,7 @@
 # FILE: app/services/plaid_api.py
 # DESCRIPTION: Cockpit‑grade Plaid API integration service.
 #               Provides link token generation, credential verification,
-#               and transaction retrieval with robust error handling.
+#               transaction retrieval, and token exchange with robust error handling.
 # =============================================================================
 
 import json
@@ -14,6 +14,9 @@ import plaid
 from plaid.api import plaid_api
 from plaid.exceptions import ApiException
 from plaid.model.country_code import CountryCode
+from plaid.model.item_public_token_exchange_request import (
+    ItemPublicTokenExchangeRequest,
+)
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
 from plaid.model.link_token_create_request_user import (
     LinkTokenCreateRequestUser,
@@ -50,6 +53,11 @@ configuration = plaid.Configuration(
 
 api_client = plaid.ApiClient(configuration)
 plaid_client = plaid_api.PlaidApi(api_client)
+
+
+def get_plaid_client() -> plaid_api.PlaidApi:
+    """Returns the configured Plaid API client instance."""
+    return plaid_client
 
 
 # -----------------------------------------------------------------------------
@@ -150,6 +158,27 @@ def get_transactions(
         # Extract transactions and parse models to standard dictionaries
         transactions = [txn.to_dict() for txn in response.transactions]
         return {"transactions": transactions}
+    except ApiException as e:
+        return {"error": _parse_api_error(e)}, 500
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+# -----------------------------------------------------------------------------
+# Exchange Public Token
+# -----------------------------------------------------------------------------
+def exchange_public_token(
+    public_token: str,
+    user_id: Union[str, None] = None,
+) -> Union[Dict[str, Any], tuple]:
+    """Exchanges a public token for an access token and item ID."""
+    if not public_token:
+        return {"error": "Missing public token"}, 400
+
+    try:
+        request = ItemPublicTokenExchangeRequest(public_token=public_token)
+        response = plaid_client.item_public_token_exchange(request)
+        return response.to_dict() if hasattr(response, "to_dict") else dict(response)
     except ApiException as e:
         return {"error": _parse_api_error(e)}, 500
     except Exception as e:

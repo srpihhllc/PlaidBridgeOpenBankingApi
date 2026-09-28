@@ -1,3 +1,4 @@
+import ast
 # =============================================================================
 # FILE: app/tests/test_templates_wiring.py
 # DESCRIPTION:
@@ -26,35 +27,26 @@ DYNAMIC_RE = re.compile(r"render_template\(\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\)")
 # STATIC TEMPLATE SCANNER (docstring/comment safe)
 # -----------------------------------------------------------------------------
 def _referenced_static_templates():
-    """Extract static render_template("x.html") references from real code,
-
-    ignore docstrings and comments.
-    """
+    """Yield static template names passed to render_template()."""
     for pyfile in PROJECT_ROOT.rglob("*.py"):
-        text = pyfile.read_text(encoding="utf-8", errors="ignore")
-
-        cleaned_lines = []
-        in_docstring = False
-
-        for line in text.splitlines():
-            stripped = line.strip()
-
-            # Toggle docstring mode on/off
-            if stripped.startswith(('"""', "'''")):
-                in_docstring = not in_docstring
+        try:
+            source = pyfile.read_text(encoding="utf-8", errors="ignore")
+            tree = ast.parse(source, filename=str(pyfile))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not node.args:
                 continue
-
-            # Skip docstrings and comments entirely
-            if in_docstring or stripped.startswith("#"):
+            func = node.func
+            is_render_template = (isinstance(func, ast.Name) and func.id == "render_template") or (isinstance(func, ast.Attribute) and func.attr == "render_template")
+            if not is_render_template:
                 continue
+            template_arg = node.args[0]
+            if not isinstance(template_arg, ast.Constant) or not isinstance(template_arg.value, str) or not template_arg.value.endswith(".html"):
+                continue
+            yield template_arg.value
 
-            cleaned_lines.append(line)
 
-        cleaned_text = "\n".join(cleaned_lines)
-        yield from STATIC_RE.findall(cleaned_text)
-
-
-# -----------------------------------------------------------------------------
 # DYNAMIC TEMPLATE SCANNER
 # -----------------------------------------------------------------------------
 def _dynamic_calls():

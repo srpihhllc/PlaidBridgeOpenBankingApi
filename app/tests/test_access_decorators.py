@@ -17,6 +17,15 @@ from app.decorators.access import (
 )
 
 
+def _get_status_code(response):
+    """Return the status code from either a Flask response or response tuple."""
+    return (
+        response[1]
+        if isinstance(response, tuple)
+        else response.status_code
+    )
+
+
 def test_roles_required_explicit_mismatch(app):
     """Test role mismatch returns 403 Forbidden."""
 
@@ -27,7 +36,10 @@ def test_roles_required_explicit_mismatch(app):
     with app.app_context():
         token = create_access_token(
             identity="editor_user",
-            additional_claims={"role": "editor", "roles": ["editor"]},
+            additional_claims={
+                "role": "editor",
+                "roles": ["editor"],
+            },
         )
 
     mock_user = MagicMock()
@@ -35,22 +47,20 @@ def test_roles_required_explicit_mismatch(app):
     mock_user.roles = ["editor"]
 
     with patch(
-        "flask_jwt_extended.view_decorators._load_user", return_value=mock_user
+        "flask_jwt_extended.view_decorators._load_user",
+        return_value=mock_user,
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {token}"}
+            "/",
+            headers={"Authorization": f"Bearer {token}"},
         ):
             response = view()
-            status_code = (
-                response[1]
-                if isinstance(response, tuple)
-                else response.status_code
-            )
-            assert status_code == 403
+
+    assert _get_status_code(response) == 403
 
 
 def test_roles_required_multiple_claims_array(app):
-    """Test user with multiple roles array ['editor', 'analyst'] accessing an analyst endpoint."""
+    """Test a user with multiple roles can access a matching endpoint."""
 
     @roles_required("analyst")
     def view():
@@ -59,92 +69,86 @@ def test_roles_required_multiple_claims_array(app):
     with app.app_context():
         token = create_access_token(
             identity="multi_role_user",
-            additional_claims={"roles": ["editor", "analyst"]},
+            additional_claims={
+                "roles": ["editor", "analyst"],
+            },
         )
 
     mock_user = MagicMock()
     mock_user.roles = ["editor", "analyst"]
 
     with patch(
-        "flask_jwt_extended.view_decorators._load_user", return_value=mock_user
+        "flask_jwt_extended.view_decorators._load_user",
+        return_value=mock_user,
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {token}"}
+            "/",
+            headers={"Authorization": f"Bearer {token}"},
         ):
             response = view()
-            res, status = (
-                response
-                if isinstance(response, tuple)
-                else (response, response.status_code)
-            )
-            assert status == 200
+
+    assert _get_status_code(response) == 200
 
 
 def test_subscriber_required_success_and_failure(app):
-    """Test @subscriber_required allows subscriber role and blocks non-subscribers."""
+    """Test subscriber access succeeds and non-subscriber access fails."""
 
     @subscriber_required
     def view():
         return jsonify({"status": "subscriber_ok"}), 200
 
     with app.app_context():
-        sub_token = create_access_token(
+        subscriber_token = create_access_token(
             identity="sub_user",
-            additional_claims={"role": "subscriber", "roles": ["subscriber"]},
+            additional_claims={
+                "role": "subscriber",
+                "roles": ["subscriber"],
+            },
         )
 
-        non_sub_token = create_access_token(
+        non_subscriber_token = create_access_token(
             identity="guest_user",
-            additional_claims={"role": "guest", "roles": ["guest"]},
+            additional_claims={
+                "role": "guest",
+                "roles": ["guest"],
+            },
         )
 
-    # 1. Success path
-    mock_sub = MagicMock()
-    mock_sub.role = "subscriber"
-    mock_sub.roles = ["subscriber"]
-
-    with patch(
-        "flask_jwt_extended.view_decorators._load_user", return_value=mock_sub
-    ):
-        with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {sub_token}"}
-        ):
-            response = view()
-            res, status = (
-                response
-                if isinstance(response, tuple)
-                else (response, response.status_code)
-            )
-            assert status == 200
-
-    # 2. Failure path
-    mock_non_sub = MagicMock()
-    mock_non_sub.role = "guest"
-    mock_non_sub.roles = ["guest"]
+    subscriber_user = MagicMock()
+    subscriber_user.role = "subscriber"
+    subscriber_user.roles = ["subscriber"]
 
     with patch(
         "flask_jwt_extended.view_decorators._load_user",
-        return_value=mock_non_sub,
+        return_value=subscriber_user,
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {non_sub_token}"}
+            "/",
+            headers={"Authorization": f"Bearer {subscriber_token}"},
         ):
             response = view()
-            status_code = (
-                response[1]
-                if isinstance(response, tuple)
-                else response.status_code
-            )
-            assert status_code == 403
+
+    assert _get_status_code(response) == 200
+
+    non_subscriber_user = MagicMock()
+    non_subscriber_user.role = "guest"
+    non_subscriber_user.roles = ["guest"]
+
+    with patch(
+        "flask_jwt_extended.view_decorators._load_user",
+        return_value=non_subscriber_user,
+    ):
+        with app.test_request_context(
+            "/",
+            headers={"Authorization": f"Bearer {non_subscriber_token}"},
+        ):
+            response = view()
+
+    assert _get_status_code(response) == 403
 
 
 def test_jwt_rejects_refresh_token_on_access_endpoint(app):
-    """Ensure refresh tokens cannot be used to authenticate standard access endpoints.
-
-    Patch the verifier used by the decorator (app.decorators.access.verify_jwt_in_request)
-    so the decorator immediately raises the intended error and does not attempt to
-    decode the refresh token via the library internals.
-    """
+    """Ensure refresh tokens are rejected by access-only endpoints."""
 
     @roles_required("admin")
     def view():
@@ -156,41 +160,36 @@ def test_jwt_rejects_refresh_token_on_access_endpoint(app):
     class MockWrongTokenError(JWTExtendedException):
         pass
 
-    # Patch the symbol imported into our module (not the library implementation)
     with patch(
         "app.decorators.access.verify_jwt_in_request",
         side_effect=MockWrongTokenError("Only access tokens are allowed"),
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {refresh_token}"}
+            "/",
+            headers={"Authorization": f"Bearer {refresh_token}"},
         ):
             with pytest.raises(MockWrongTokenError):
                 view()
 
 
 def test_jwt_invalid_authorization_prefix(app):
-    """Non-Bearer authorization header should not crash; returns 401 when no session user exists."""
+    """Test that a non-Bearer authorization header returns 401."""
 
     @roles_required("admin")
     def view():
         return jsonify({"status": "ok"}), 200
 
-    # Non-Bearer prefix; decorator treats this as missing auth and falls back to session check.
     with app.test_request_context(
-        "/", headers={"Authorization": "Token abc123_invalid"}
+        "/",
+        headers={"Authorization": "Token abc123_invalid"},
     ):
         response = view()
-        status = (
-            response[1]
-            if isinstance(response, tuple)
-            else response.status_code
-        )
-        # When no session user exists, the decorator returns 401 (Missing Authorization Header).
-        assert status == 401
+
+    assert _get_status_code(response) == 401
 
 
 def test_jwt_expired_token(app):
-    """Ensure expired tokens trigger expiration exception."""
+    """Ensure expired tokens raise the expected exception."""
 
     @roles_required("admin")
     def view():
@@ -204,7 +203,8 @@ def test_jwt_expired_token(app):
         side_effect=MockExpiredSignatureError("Signature has expired"),
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": "Bearer expired.jwt.token"}
+            "/",
+            headers={"Authorization": "Bearer expired.jwt.token"},
         ):
             with pytest.raises(MockExpiredSignatureError):
                 view()
@@ -220,23 +220,24 @@ def test_admin_required_shortcut(app):
     with app.app_context():
         token = create_access_token(
             identity="admin_user",
-            additional_claims={"roles": ["admin"]},
+            additional_claims={
+                "roles": ["admin"],
+            },
         )
 
     mock_user = MagicMock()
+
     with patch(
-        "flask_jwt_extended.view_decorators._load_user", return_value=mock_user
+        "flask_jwt_extended.view_decorators._load_user",
+        return_value=mock_user,
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {token}"}
+            "/",
+            headers={"Authorization": f"Bearer {token}"},
         ):
             response = view()
-            res, status = (
-                response
-                if isinstance(response, tuple)
-                else (response, response.status_code)
-            )
-            assert status == 200
+
+    assert _get_status_code(response) == 200
 
 
 def test_super_admin_required_shortcut(app):
@@ -249,30 +250,30 @@ def test_super_admin_required_shortcut(app):
     with app.app_context():
         token = create_access_token(
             identity="super_user",
-            additional_claims={"roles": ["super_admin"]},
+            additional_claims={
+                "roles": ["super_admin"],
+            },
         )
 
     mock_user = MagicMock()
+
     with patch(
-        "flask_jwt_extended.view_decorators._load_user", return_value=mock_user
+        "flask_jwt_extended.view_decorators._load_user",
+        return_value=mock_user,
     ):
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {token}"}
+            "/",
+            headers={"Authorization": f"Bearer {token}"},
         ):
             response = view()
-            res, status = (
-                response
-                if isinstance(response, tuple)
-                else (response, response.status_code)
-            )
-            assert status == 200
+
+    assert _get_status_code(response) == 200
 
 
 @patch("app.decorators.access.current_user")
 def test_roles_required_fallback_to_session(mock_current_user, app):
-    """Test fallback to Flask-Login session when no JWT is provided."""
+    """Test fallback to Flask-Login when no JWT is provided."""
 
-    # Setup mock session user
     mock_current_user.is_authenticated = True
     mock_current_user.role = "editor"
     mock_current_user.is_admin = False
@@ -281,22 +282,16 @@ def test_roles_required_fallback_to_session(mock_current_user, app):
     def view():
         return jsonify({"status": "session_ok"}), 200
 
-    # Execute request with NO Authorization header
     with app.test_request_context("/"):
         response = view()
-        res, status = (
-            response
-            if isinstance(response, tuple)
-            else (response, response.status_code)
-        )
-        assert status == 200
+
+    assert _get_status_code(response) == 200
 
 
 @patch("app.decorators.access.current_user")
 def test_roles_required_jwt_fails_but_session_passes(mock_current_user, app):
-    """Test when JWT lacks required roles, but the session user HAS the role."""
+    """Test that a valid session role can satisfy a failed JWT role check."""
 
-    # Session user HAS the required admin role
     mock_current_user.is_authenticated = True
     mock_current_user.role = "admin"
     mock_current_user.is_admin = True
@@ -306,35 +301,36 @@ def test_roles_required_jwt_fails_but_session_passes(mock_current_user, app):
         return jsonify({"status": "fallback_ok"}), 200
 
     with app.app_context():
-        # JWT token deliberately lacks the admin role (has 'guest')
         token = create_access_token(
             identity="guest_user",
-            additional_claims={"roles": ["guest"]},
+            additional_claims={
+                "roles": ["guest"],
+            },
         )
 
     mock_user = MagicMock()
+
     with patch(
-        "flask_jwt_extended.view_decorators._load_user", return_value=mock_user
+        "flask_jwt_extended.view_decorators._load_user",
+        return_value=mock_user,
     ):
-        # Execute request WITH the weak JWT header
         with app.test_request_context(
-            "/", headers={"Authorization": f"Bearer {token}"}
+            "/",
+            headers={"Authorization": f"Bearer {token}"},
         ):
             response = view()
-            res, status = (
-                response
-                if isinstance(response, tuple)
-                else (response, response.status_code)
-            )
-            # Should still be 200 because it fell through to the session user check
-            assert status == 200
+
+    assert _get_status_code(response) == 200
 
 
 @patch("app.decorators.access.current_user")
 @patch("app.decorators.access.user_is_admin")
 @patch("app.decorators.access.url_for", return_value="/mock-login")
 def test_require_admin_legacy_ui(
-    mock_url_for, mock_user_is_admin, mock_current_user, app
+    mock_url_for,
+    mock_user_is_admin,
+    mock_current_user,
+    app,
 ):
     """Test the legacy session-only require_admin decorator."""
 
@@ -342,27 +338,28 @@ def test_require_admin_legacy_ui(
     def view():
         return jsonify({"status": "ui_admin_ok"}), 200
 
-    # Case 1: Not authenticated -> Redirects to login
+    # Unauthenticated users are redirected to the login page.
     mock_current_user.is_authenticated = False
+    mock_user_is_admin.return_value = False
+
     with app.test_request_context("/"):
         response = view()
-        assert response.status_code == 302
-        assert response.location == "/mock-login"
 
-    # Case 2: Authenticated, but not admin -> Aborts with 403
+    assert response.status_code == 302
+    assert response.location == "/mock-login"
+
+    # Authenticated non-admin users receive a 403 response.
     mock_current_user.is_authenticated = True
     mock_user_is_admin.return_value = False
+
     with app.test_request_context("/"):
         with pytest.raises(Forbidden):
             view()
 
-    # Case 3: Authenticated AND is admin -> 200 OK
+    # Authenticated administrators can access the endpoint.
     mock_user_is_admin.return_value = True
+
     with app.test_request_context("/"):
         response = view()
-        res, status = (
-            response
-            if isinstance(response, tuple)
-            else (response, response.status_code)
-        )
-        assert status == 200
+
+    assert _get_status_code(response) == 200

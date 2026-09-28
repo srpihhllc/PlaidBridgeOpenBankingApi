@@ -1,92 +1,66 @@
 # =============================================================================
 # FILE: app/services/mfa_service.py
-# DESCRIPTION: Redis‑backed MFA service with TTL expiry, one‑time use enforcement,
-#              fail‑count tracking, and optional DB persistence for audit trails.
+# DESCRIPTION: Unified Redis & DB-backed MFA service with atomic replacement,
+#              proper DB fallback, constant-time verification, and lockout handling.
 # =============================================================================
-import random
-from datetime import datetime, timezone, timedelta
 
+import random
+import logging
 from flask import current_app
 from flask_mail import Message
 
-from app.extensions import db, mail, redis_client
+from app.extensions import mail, redis_client
 from app.models.mfa_code import MFACode
+
+logger = logging.getLogger(__name__)
 
 
 def _get_redis_client():
-    """
-    Resolve a Redis client at call time.
-
-    Preference order:
-    1. current_app.redis_client (set during app init)
-    2. module-level redis_client imported from app.extensions
-
-    Returns None when no Redis client is available.
-    """
     return getattr(current_app, "redis_client", None) or redis_client
 
 
 def _to_int(value, default=0):
-    """Safely convert Redis-returned values (bytes/str/None) to int."""
     if value is None:
         return default
     try:
         return int(value)
     except Exception:
         try:
-            # bytes -> str
-            return int(
-                value.decode() if hasattr(value, "decode") else str(value)
-            )
+            return int(value.decode() if hasattr(value, "decode") else str(value))
         except Exception:
             return default
 
 
-def generate_mfa_code(user, ttl_seconds=300, persist=True):
+def generate_mfa_code(user, ttl_seconds=300, persist=True) -> str:
     """
-    Generate a one‑time MFA code for a user.
-    - Stores ephemeral code in Redis with TTL when available.
-    - Optionally persists to DB for audit trail.
+    Generate a 6-digit MFA code, store in Redis, and atomically create/replace 
+    the active row in the DB via MFACode.create_or_replace.
     """
-    code = str(random.randint(100000, 999999))
-    key = f"mfa:{user.id}:{code}"
-
+    code = f"{random.randint(0, 999999):06d}"
+    redis_key = f"mfa:{user.id}:{code}"
     client = _get_redis_client()
 
-    # Store in Redis with TTL when available; otherwise continue gracefully.
     if client:
         try:
-            # Accept both redis-py client and minimal mocks that support setex
-            client.setex(key, timedelta(seconds=ttl_seconds), "valid")
+            client.setex(redis_key, ttl_seconds, "valid")
         except Exception as e:
-            current_app.logger.warning(
-                "⚠️ Failed to set MFA key in Redis (continuing without Redis): %s",
-                e,
-            )
-    else:
-        current_app.logger.debug(
-            "No Redis client available; skipping Redis storage for MFA."
-        )
+            logger.warning("⚠️ Failed to set MFA key in Redis: %s", e)
 
-    # Persist to DB for audit trail if requested
     if persist:
-        expires_at = datetime.now(timezone.utc) + timedelta(
-            seconds=ttl_seconds
+        # Uses classmethod to clear old codes and avoid timezone mismatches
+        MFACode.create_or_replace(
+            user_id=str(user.id),
+            code=code,
+            ttl_seconds=ttl_seconds,
+            commit=True,
         )
-        mfa = MFACode(user_id=user.id, code=code, expires_at=expires_at)
-        db.session.add(mfa)
-        db.session.commit()
 
-    current_app.logger.info(
-        f"✅ MFA code {code} generated for user {user.email} with TTL={ttl_seconds}s"
-    )
+    logger.info("✅ MFA code %s generated for user %s", code, user.email)
     return code
 
 
-def send_mfa_code(user, ttl_seconds=300, persist=True):
-    """
-    Generate and deliver MFA code via email.
-    """
+def send_mfa_code(user, ttl_seconds=300, persist=True) -> str:
+    """Generate and send MFA code via email."""
     code = generate_mfa_code(user, ttl_seconds=ttl_seconds, persist=persist)
     msg = Message(
         subject="Your MFA Code",
@@ -94,123 +68,69 @@ def send_mfa_code(user, ttl_seconds=300, persist=True):
         body=f"Your MFA verification code is: {code}",
     )
     mail.send(msg)
-    current_app.logger.info(f"📩 MFA code {code} sent to {user.email}")
+    logger.info("📩 MFA code sent to %s", user.email)
     return code
 
 
-def verify_mfa_code(user, submitted_code, max_failures=3):
+def verify_mfa_code(user, submitted_code: str, max_failures: int = 3) -> bool:
     """
-    Verify MFA code:
-    - Checks Redis for validity when available.
-    - Enforces one‑time use by deleting key if present in Redis.
-    - Tracks fail‑count in Redis and/or DB.
-    - Locks out after max_failures.
+    Verify MFA code with dual Redis/DB checks, fail-counter tracking, and atomic consumption.
     """
-    key = f"mfa:{user.id}:{submitted_code}"
-    fail_key = f"mfa:fail:{user.id}"
-
+    user_id_str = str(user.id)
+    submitted_code = str(submitted_code).strip()
+    redis_key = f"mfa:{user_id_str}:{submitted_code}"
+    fail_key = f"mfa:fail:{user_id_str}"
     client = _get_redis_client()
 
-    # Attempt to read fail counter from Redis if available
+    # 1. Lockout Check (Redis)
     if client:
         try:
-            raw_fails = client.get(fail_key)
-            fails = _to_int(raw_fails, default=0)
+            fails = _to_int(client.get(fail_key), default=0)
+            if fails >= max_failures:
+                logger.warning("🚫 User %s locked out via Redis fail-counter", user.email)
+                return False
         except Exception as e:
-            current_app.logger.warning(
-                "Redis get for fail counter failed (falling back to DB): %s", e
-            )
-            client = None  # fall through to DB-only fallback
-            fails = 0
-    else:
-        fails = 0
+            logger.warning("Redis error reading fail counter: %s", e)
+            client = None
 
-    if fails >= max_failures:
-        current_app.logger.warning(
-            f"🚫 User {user.email} locked out after {fails} failed MFA attempts"
-        )
-        return False
-
-    # Redis-backed path
+    # 2. Redis-backed Verification Path
     if client:
         try:
-            val = client.get(key)
-            if val == b"valid" or val == "valid":
-                try:
-                    client.delete(key)  # enforce one‑time use
-                    client.delete(fail_key)  # reset fail counter
-                except Exception:
-                    current_app.logger.debug(
-                        "Partial Redis cleanup failed after verify."
-                    )
-                current_app.logger.info(
-                    f"✅ MFA code {submitted_code} verified for user {user.email}"
-                )
+            val = client.get(redis_key)
+            if val in (b"valid", "valid"):
+                client.delete(redis_key)
+                client.delete(fail_key)
+                
+                # Sync DB by consuming active code if present
+                active_db_mfa = MFACode.get_active_for_user(user_id_str)
+                if active_db_mfa:
+                    active_db_mfa.consume(commit=True)
+                
+                logger.info("✅ MFA code %s verified via Redis for %s", submitted_code, user.email)
                 return True
-
-            # Increment fail counter in Redis
-            try:
-                client.incr(fail_key)
-                client.expire(
-                    fail_key, 300
-                )  # expire fail counter after 5 minutes
-            except Exception:
-                current_app.logger.debug(
-                    "Failed to increment/expire Redis fail counter."
-                )
-
-            # Update DB fail_count if persisted
-            mfa = user.mfa_codes.filter_by(code=submitted_code).first()
-            if mfa:
-                mfa.fail_count = (mfa.fail_count or 0) + 1
-                db.session.add(mfa)
-                db.session.commit()
-
-            current_app.logger.warning(
-                f"❌ Invalid MFA code {submitted_code} for user {user.email}"
-            )
-            return False
-
         except Exception as e:
-            current_app.logger.warning(
-                "Redis-backed verification failed (falling back to DB-only): %s",
-                e,
-            )
-            # fall through to DB-only fallback
+            logger.warning("Redis verification failed, dropping to DB fallback: %s", e)
 
-    # DB-only fallback path (no Redis available or Redis errored)
-    mfa = user.mfa_codes.filter_by(code=submitted_code).first()
-    if mfa and mfa.is_valid():
-        try:
-            db.session.delete(mfa)
-            db.session.commit()
-            current_app.logger.info(
-                f"✅ MFA code {submitted_code} verified for user {user.email} (DB-only)"
-            )
+    # 3. DB Fallback Path (Runs if Redis missed, expired early, or threw error)
+    active_mfa = MFACode.get_active_for_user(user_id_str)
+    if active_mfa:
+        is_valid = active_mfa.validate_and_consume(submitted_code, max_failures=max_failures)
+        if is_valid:
+            if client:
+                try:
+                    client.delete(fail_key)
+                except Exception:
+                    pass
+            logger.info("✅ MFA code %s verified via DB for %s", submitted_code, user.email)
             return True
-        except Exception:
-            db.session.rollback()
-            current_app.logger.exception(
-                "Failed to consume MFACode id=%s", getattr(mfa, "id", None)
-            )
-            return False
 
-    # If not valid or not found, increment DB fail_count if there is a persisted row
-    if mfa:
+    # 4. Handle Invalid Submission
+    if client:
         try:
-            mfa.fail_count = (mfa.fail_count or 0) + 1
-            db.session.add(mfa)
-            if (mfa.fail_count or 0) >= max_failures:
-                db.session.delete(mfa)
-            db.session.commit()
+            client.incr(fail_key)
+            client.expire(fail_key, 300)
         except Exception:
-            db.session.rollback()
-            current_app.logger.exception(
-                "Failed to update fail_count for MFACode id=%s",
-                getattr(mfa, "id", None),
-            )
+            pass
 
-    current_app.logger.warning(
-        f"❌ Invalid MFA code {submitted_code} for user {user.email} (DB-only)"
-    )
+    logger.warning("❌ Invalid MFA code attempt for user %s", user.email)
     return False

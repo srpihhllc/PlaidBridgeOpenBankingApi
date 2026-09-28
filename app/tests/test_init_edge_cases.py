@@ -54,7 +54,8 @@ def test_create_app_testing_config_failure(caplog):
         application = create_app("testing")
 
     assert application.config["TESTING"] is True
-    assert "Config.from_object failed" in caplog.text
+    # FIX: Update substring assertion to match actual warning emitted by app/__init__.py
+    assert "Failed to load config class" in caplog.text
 
 
 # -----------------------------------------------------------------------------

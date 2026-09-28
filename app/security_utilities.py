@@ -22,112 +22,130 @@ MFA_REQUEST_LIMIT: int = (
 
 # -----------------------------------------------------------------------------
 # Canonical Import Shim Layer for MFA Core Helpers
-# - Resolves production enterprise modules dynamically.
-# - Safely traps structural import anomalies, falling back to local mock containers.
+# - Resolves production enterprise module references dynamically.
+# - Explicitly defines public wrapper functions locally so tests and local callers
+#   consistently route through this module's local Redis client and rate-limit boundary.
 # -----------------------------------------------------------------------------
+
+_ProductionCheckMFA = None
+_ProductionRecordMFA = None
+
 try:
-    # Attempt primary production service layer link
-    from app.services.mfa_helpers import (
-        check_mfa_send_rate_limit,
-        record_mfa_send_request,
+    from app.security.mfa_helpers import (
+        check_mfa_send_rate_limit as _ProductionCheckMFA,
+        record_mfa_send_request as _ProductionRecordMFA,
     )
 except (ImportError, ModuleNotFoundError):
     try:
-        # Fallback to secondary legacy engineering directory mappings
-        from app.services.security_helpers import (
-            check_mfa_send_rate_limit,
-            record_mfa_send_request,
+        from app.services.mfa_helpers import (
+            check_mfa_send_rate_limit as _ProductionCheckMFA,
+            record_mfa_send_request as _ProductionRecordMFA,
         )
     except (ImportError, ModuleNotFoundError):
-        logger.warning(
-            "Production MFA services unresolvable. Engaging localized Mock Rate Limiting engines."
-        )
-
-        # --- FALLBACK ARCHITECTURE: LOCAL SECURITY TESTING CONTRAST SHIMS ---
-
-        def check_mfa_send_rate_limit(
-            user_id: str | None, ip_address: str | None = None
-        ) -> bool:
-            """
-            Evaluates transmission limits locally utilizing the Mock Redis subsystem.
-            Returns True if allowable; False if blocked. Defaults to fail-open (True)
-            if internal caching nodes cannot be allocated.
-            """
-            client = get_redis_client()
-            if not client:
-                logger.debug(
-                    "MFA rate-limit skip triggered for User: %s | IP: %s (Caching engine unavailable).",
-                    user_id,
-                    ip_address,
-                )
-                return True
-
-            # Assert execution limits against identity configurations
-            if user_id:
-                user_key = f"rate:mfa_send:user:{user_id}"
-                user_count_str = client.get(user_key)
-                user_count = int(user_count_str) if user_count_str else 0
-                if user_count >= MFA_REQUEST_LIMIT:
-                    logger.warning(
-                        "MFA rate limit exhausted for User ID: %s (Active load: %d)",
-                        user_id,
-                        user_count,
-                    )
-                    return False
-
-            # Assert execution limits against infrastructure ip addresses
-            if ip_address:
-                ip_key = f"rate:mfa_send:ip:{ip_address}"
-                ip_count_str = client.get(ip_key)
-                ip_count = int(ip_count_str) if ip_count_str else 0
-                if ip_count >= MFA_REQUEST_LIMIT:
-                    logger.warning(
-                        "MFA rate limit exhausted for Origin IP: %s (Active load: %d)",
-                        ip_address,
-                        ip_count,
-                    )
-                    return False
-
-            return True
-
-        def record_mfa_send_request(
-            user_id: str | None,
-            ip_address: str | None = None,
-            channel: str = "sms",
-            masked_dest: str | None = None,
-        ) -> None:
-            """
-            Updates temporal velocity maps across target identities inside the caching node.
-            Guarantees operational parity with production endpoint function models.
-            """
-            client = get_redis_client()
-            if not client:
-                logger.debug(
-                    "MFA tracking telemetry dropped for User: %s | IP: %s | Channel: %s (Cache missing).",
-                    user_id,
-                    ip_address,
-                    channel,
-                )
-                return
-
-            window = MFA_LIMIT_WINDOW_SECONDS
-
-            # Atomically increment tracking indices inside current window parameters
-            if user_id:
-                user_key = f"rate:mfa_send:user:{user_id}"
-                client.incr_with_expire(user_key, window)
-
-            if ip_address:
-                ip_key = f"rate:mfa_send:ip:{ip_address}"
-                client.incr_with_expire(ip_key, window)
-
-            logger.debug(
-                "MFA token transaction cataloged for User: %s | IP: %s | Channel: %s Target: %s",
-                user_id,
-                ip_address,
-                channel,
-                masked_dest,
+        try:
+            from app.services.security_helpers import (
+                check_mfa_send_rate_limit as _ProductionCheckMFA,
+                record_mfa_send_request as _ProductionRecordMFA,
             )
+        except (ImportError, ModuleNotFoundError):
+            logger.warning(
+                "Production MFA services unresolvable. Engaging localized Mock Rate Limiting engines."
+            )
+
+
+def check_mfa_send_rate_limit(
+    user_id: str | None,
+    ip_address: str | None = None,
+) -> bool:
+    """
+    Evaluates transmission limits locally utilizing the Mock Redis subsystem.
+    Returns True if allowable; False if blocked. Defaults to fail-open (True)
+    if internal caching nodes cannot be allocated or encounter parsing issues.
+    """
+    client = get_redis_client()
+    if not client:
+        logger.debug(
+            "MFA rate-limit skip triggered for User: %s | IP: %s (Caching engine unavailable).",
+            user_id,
+            ip_address,
+        )
+        return True
+
+    try:
+        if user_id:
+            user_key = f"rate:mfa_send:user:{user_id}"
+            user_count_str = client.get(user_key)
+            user_count = int(user_count_str) if user_count_str else 0
+            if user_count >= MFA_REQUEST_LIMIT:
+                logger.warning(
+                    "MFA rate limit exhausted for User ID: %s (Active load: %d)",
+                    user_id,
+                    user_count,
+                )
+                return False
+
+        if ip_address:
+            ip_key = f"rate:mfa_send:ip:{ip_address}"
+            ip_count_str = client.get(ip_key)
+            ip_count = int(ip_count_str) if ip_count_str else 0
+            if ip_count >= MFA_REQUEST_LIMIT:
+                logger.warning(
+                    "MFA rate limit exhausted for Origin IP: %s (Active load: %d)",
+                    ip_address,
+                    ip_count,
+                )
+                return False
+
+        return True
+
+    except (TypeError, ValueError):
+        logger.exception(
+            "Malformed MFA rate-limit counter encountered. "
+            "Failing open for user_id=%s ip_address=%s",
+            user_id,
+            ip_address,
+        )
+        return True
+
+
+def record_mfa_send_request(
+    user_id: str | None,
+    ip_address: str | None = None,
+    channel: str = "sms",
+    masked_dest: str | None = None,
+) -> None:
+    """
+    Updates temporal velocity maps across target identities inside the caching node.
+    Guarantees operational parity with production endpoint function models.
+    """
+    client = get_redis_client()
+    if not client:
+        logger.debug(
+            "MFA tracking telemetry dropped for User: %s | IP: %s | Channel: %s (Cache missing).",
+            user_id,
+            ip_address,
+            channel,
+        )
+        return
+
+    window = MFA_LIMIT_WINDOW_SECONDS
+
+    # Atomically increment tracking indices inside current window parameters
+    if user_id:
+        user_key = f"rate:mfa_send:user:{user_id}"
+        client.incr_with_expire(user_key, window)
+
+    if ip_address:
+        ip_key = f"rate:mfa_send:ip:{ip_address}"
+        client.incr_with_expire(ip_key, window)
+
+    logger.debug(
+        "MFA token transaction cataloged for User: %s | IP: %s | Channel: %s Target: %s",
+        user_id,
+        ip_address,
+        channel,
+        masked_dest,
+    )
 
 
 # =============================================================================

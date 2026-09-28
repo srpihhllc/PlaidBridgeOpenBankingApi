@@ -1,7 +1,11 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tracing.py
 
 import json
+import linecache
+import sys
+import traceback
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
 from flask import current_app
 
@@ -19,6 +23,85 @@ def _client():
     before any Redis calls occur.
     """
     return get_redis_client()
+
+
+# -------------------------------------------------------------------------
+# STACK FRAME EXTRACTION HELPERS
+# -------------------------------------------------------------------------
+def _extract_rich_stack_frames(tb: Optional[Any] = None) -> List[Dict[str, Any]]:
+    """
+    Extract enriched stack frames with line numbers, code snippets, and call site details.
+    """
+    if tb is None:
+        _, _, tb = sys.exc_info()
+    frames: List[Dict[str, Any]] = []
+    if not tb:
+        return frames
+
+    try:
+        extracted = traceback.extract_tb(tb)
+        for frame in extracted:
+            filename, lineno, funcname, line_text = (
+                frame.filename,
+                frame.lineno,
+                frame.name,
+                frame.line,
+            )
+            snippet = []
+            try:
+                start_line = max(1, lineno - 2)
+                end_line = lineno + 2
+                for l_num in range(start_line, end_line + 1):
+                    code_l = linecache.getline(filename, l_num)
+                    if code_l:
+                        snippet.append(
+                            {
+                                "line_number": l_num,
+                                "code": code_l.rstrip(),
+                                "is_error_line": (l_num == lineno),
+                            }
+                        )
+            except Exception:
+                pass
+
+            frames.append(
+                {
+                    "file": filename,
+                    "line": lineno,
+                    "function": funcname,
+                    "code_line": line_text or "",
+                    "snippet": snippet,
+                }
+            )
+    except Exception:
+        pass
+
+    return frames
+
+
+def handle_traced_error(error: Exception) -> Dict[str, Any]:
+    """
+    Custom exception handler to enrich error trace payloads with line numbers,
+    code snippets, and stack frames, then emit to Redis.
+    """
+    _, _, exc_tb = sys.exc_info()
+    frames = _extract_rich_stack_frames(exc_tb)
+    faulty_frame = frames[-1] if frames else {}
+
+    payload = {
+        "error_type": type(error).__name__ if error else "Exception",
+        "error_message": str(error),
+        "faulty_file": faulty_frame.get("file"),
+        "faulty_line": faulty_frame.get("line"),
+        "faulty_function": faulty_frame.get("function"),
+        "faulty_code": faulty_frame.get("code_line"),
+        "stack_frames": frames,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    context = type(error).__name__ if error else "general"
+    trace_log(f"errors/traced/{context}", payload, ttl=1800)
+    return payload
 
 
 # -------------------------------------------------------------------------
@@ -55,8 +138,30 @@ def trace_boot(event_type, detail):
 
 
 def trace_error(context, error):
-    """Emit error trace with context."""
-    trace_log(f"errors/{context}", str(error), ttl=1800)
+    """Emit error trace with enriched stack trace context if available."""
+    _, _, exc_tb = sys.exc_info()
+    frames = _extract_rich_stack_frames(exc_tb) if exc_tb else []
+    faulty_frame = frames[-1] if frames else {}
+
+    if frames:
+        payload = {
+            "error": str(error),
+            "error_type": (
+                type(error).__name__
+                if isinstance(error, Exception)
+                else "Error"
+            ),
+            "faulty_file": faulty_frame.get("file"),
+            "faulty_line": faulty_frame.get("line"),
+            "faulty_function": faulty_frame.get("function"),
+            "faulty_code": faulty_frame.get("code_line"),
+            "stack_frames": frames,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        payload = str(error)
+
+    trace_log(f"errors/{context}", payload, ttl=1800)
 
 
 def trace_heartbeat(tile, status="ok"):
