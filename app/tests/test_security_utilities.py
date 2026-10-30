@@ -192,7 +192,7 @@ def test_log_standard_event_handles_serialization_exceptions(caplog):
 
         # Matches the precision tracking message signature recorded to stderr/logs
         assert any(
-            "Structural telemetry pipeline failure" in record.message
+            "Telemetry pipeline failure" in record.getMessage()
             for record in caplog.records
         )
 

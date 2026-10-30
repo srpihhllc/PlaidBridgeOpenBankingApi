@@ -2,12 +2,14 @@
 
 import logging
 import warnings
+from typing import Any
 
 from app.utils.telemetry import log_identity_event as canonical_logger
 
 # This module is deprecated. Target removal by Q4 2025.
 warnings.warn(
-    "app.utils.identity is deprecated. Use app.utils.telemetry.log_identity_event instead.",
+    "app.utils.identity is deprecated. Use "
+    "app.utils.telemetry.log_identity_event instead.",
     DeprecationWarning,
     stacklevel=2,
 )
@@ -18,33 +20,30 @@ logger = logging.getLogger(__name__)
 def log_identity_event(
     user_id: str,
     event_type: str,
-    details: dict | None = None,
-    reason: str = None,
-    **kwargs,
-):
+    details: dict[str, Any] | None = None,
+    reason: str | None = None,
+    **kwargs: Any,
+) -> Any:
     """
-    Deprecated: Logs an event related to user identity.
-    This function is a wrapper for app.utils.telemetry.log_identity_event.
-    Please update your imports to use the canonical logger directly.
+    Deprecated wrapper for app.utils.telemetry.log_identity_event.
+
+    Please update imports to use the canonical logger directly.
     """
-    # Log a warning to the application logger for structured monitoring
-    logger.warning(
-        "Deprecated log_identity_event called from app.utils.identity"
-    )
+    logger.warning("Deprecated log_identity_event called from app.utils.identity")
 
-    if details is None:
-        details = {}
+    # Treat details and extra keyword arguments as metadata for the canonical logger.
+    metadata: dict[str, Any] = {**(details or {}), **kwargs}
 
-    # Merge 'details' into kwargs, so they are passed to the canonical logger's **meta parameter
-    merged_kwargs = {**details, **kwargs}
+    # The explicit arguments take precedence over values supplied as metadata.
+    metadata.pop("user_id", None)
+    metadata.pop("event_type", None)
+    metadata.pop("reason", None)
 
-    # Remove any keys that would duplicate explicit parameters we pass below.
-    # This prevents "got multiple values for argument 'user_id'" when callers include
-    # user_id/event_type/reason inside details or kwargs.
-    for _dup in ("user_id", "event_type", "reason"):
-        merged_kwargs.pop(_dup, None)
+    if reason is not None:
+        metadata["reason"] = reason
 
-    # Call the canonical function, which handles all the Redis and DB logic
     return canonical_logger(
-        event_type=event_type, user_id=user_id, reason=reason, **merged_kwargs
+        event_type=event_type,
+        user_id=user_id,
+        **metadata,
     )

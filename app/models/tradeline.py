@@ -1,15 +1,19 @@
 # =============================================================================
-# FILE: app/models/banking/tradeline.py
+# FILE: app/models/tradeline.py
 # DESCRIPTION: Tradeline model aligned with UUID User.id, cascade semantics,
-#              and cockpit‑grade relationship clarity.
+#              and clear relationship definitions.
 # =============================================================================
+
+from typing import Any
 
 from ..extensions import db
 
+# Flask-SQLAlchemy's dynamically provided Model may not be visible to mypy.
+Model: Any = db.Model
 
-class Tradeline(db.Model):
+
+class Tradeline(Model):
     __tablename__ = "tradelines"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -33,5 +37,8 @@ class Tradeline(db.Model):
     # Relationship back to User
     user = db.relationship("User", back_populates="tradelines")
 
-    def __repr__(self):
-        return f"<Tradeline id={self.id} user_id={self.user_id} vendor='{self.vendor_name}'>"
+    def __repr__(self) -> str:
+        return (
+            f"<Tradeline id={self.id} user_id={self.user_id} "
+            f"vendor='{self.vendor_name}'>"
+        )

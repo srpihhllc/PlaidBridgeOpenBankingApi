@@ -1,22 +1,22 @@
 # =============================================================================
 # FILE: app/cockpit/template_tracer.py
-# DESCRIPTION: Cockpit-grade template tracer. Iterates over all GET routes,
-#              invokes them in a test request context, and records wiring health.
-#              Uses PARAMETERIZED_ENDPOINTS to supply safe dummy values.
-#              Verifies template existence and auto-creates placeholders.
-#              Distinguishes MISSING_TEMPLATE vs ERROR for cockpit dashboard.
+# DESCRIPTION: Cockpit-grade template tracer. Iterates over routes and requests
+#              them through Flask's test client, recording wiring health.
+#              Supplies safe dummy values for parameterized routes.
+#              Distinguishes missing templates and auth-blocked routes.
 # =============================================================================
 
 import os
 import traceback
 import uuid
 from pathlib import Path
+from typing import Any, cast
+from urllib.parse import urlencode
 
-from flask import Blueprint, current_app, g, has_app_context, render_template
+from flask import Blueprint, current_app, render_template
 
 bp = Blueprint("tracer", __name__, url_prefix="/cockpit")
 
-# Path to templates directory
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
 
 PLACEHOLDER = """{% extends "base.html" %}
@@ -45,108 +45,144 @@ def create_placeholder(template_name: str) -> str:
     return str(path)
 
 
-# =============================================================================
-# PARAMETERIZED ENDPOINT MAP
-# =============================================================================
+# Endpoint-specific URL values. Route arguments are passed to Werkzeug's
+# URL builder; "query" values are appended as query parameters.
 PARAMETERIZED_ENDPOINTS = {
-    "drilldown.drilldown_view": "?file=docs/README.md",
-    "api_v1.get_tradeline": "/1",
-    "api_v1.get_transaction": "/1",
-    "api_v1.get_dispute": "/1",
-    "api_v1.get_validation": "/1",
-    "admin.view_credit_ledger": "/1",
-    "admin.preview_letter": "/1",
-    "admin.dispatch_letter3": "/1",
-    "admin.view_dispute_logs": "/1",
-    "admin.export_trace": "/abc123",
-    "admin.identity_source": "/1",
-    "main.terence_entry": "",
-    "main.dispute_form": "",
-    "subscriber.dashboard": "/1",
-    "subscriber.update_profile": "/1",
-    "sub_ui.dashboard_liquidity": "/1",
-    "plaid.link_item": "/test_item",
-    "oauth.callback": "?code=dummy&state=test",
-    "oauth.token": "/dummy_token",
-    "funds.view_fund": "/1",
-    "funds.flow": "/1",
-    "lenders.view_lender": "/1",
-    "letters.dispute_form": "",
-    "letters.preview_letter": "/1",
-    "letters.dispatch_letter": "/1",
-    "webhooks.process_event": "/dummy_event",
-    "cockpit.telemetry_dashboard": "",
-    "tiles.trace_viewer": "/1",
-    "tiles.login_trace_tile": "/1",
+    "drilldown.drilldown_view": {"query": {"file": "docs/README.md"}},
+    "api_v1.get_tradeline": {},
+    "api_v1.get_transaction": {},
+    "api_v1.get_dispute": {},
+    "api_v1.get_validation": {},
+    "admin.view_credit_ledger": {},
+    "admin.preview_letter": {},
+    "admin.dispatch_letter3": {},
+    "admin.view_dispute_logs": {},
+    "admin.export_trace": {},
+    "admin.identity_source": {},
+    "main.terence_entry": {},
+    "main.dispute_form": {},
+    "subscriber.dashboard": {},
+    "subscriber.update_profile": {},
+    "sub_ui.dashboard_liquidity": {},
+    "plaid.link_item": {},
+    "oauth.callback": {"query": {"code": "dummy", "state": "test"}},
+    "oauth.token": {},
+    "funds.view_fund": {},
+    "funds.flow": {},
+    "lenders.view_lender": {},
+    "letters.dispute_form": {},
+    "letters.preview_letter": {},
+    "letters.dispatch_letter": {},
+    "webhooks.process_event": {},
+    "cockpit.telemetry_dashboard": {},
+    "tiles.trace_viewer": {},
+    "tiles.login_trace_tile": {},
+    "pulse.vault_pulse": {},
+    "pulse.access_token_pulse": {},
 }
 
 
-def trace_templates(app=None):
+def _dummy_value_for_argument(rule: Any, argument: str) -> Any:
+    """Return a safe value appropriate for a rule's URL converter."""
+    converter = rule._converters.get(argument)
+    converter_name = converter.__class__.__name__ if converter else ""
+
+    if converter_name == "IntegerConverter":
+        return 1
+    if converter_name == "FloatConverter":
+        return 1.0
+    if converter_name == "UUIDConverter":
+        return "00000000-0000-0000-0000-000000000001"
+    if converter_name in {"PathConverter", "AnyConverter"}:
+        return "sample"
+    return "sample"
+
+
+def _build_test_url(app: Any, rule: Any, method: str) -> str:
+    """Build a concrete URL for a rule, including query parameters."""
+    endpoint_config = PARAMETERIZED_ENDPOINTS.get(rule.endpoint, {})
+    if not isinstance(endpoint_config, dict):
+        endpoint_config = {}
+
+    values = {
+        argument: _dummy_value_for_argument(rule, argument)
+        for argument in rule.arguments
+    }
+    values.update(
+        {
+            key: value
+            for key, value in endpoint_config.items()
+            if key != "query" and key in rule.arguments
+        }
+    )
+
+    adapter = app.url_map.bind("localhost")
+    url = adapter.build(
+        rule.endpoint,
+        values=values,
+        method=method,
+        force_external=False,
+    )
+
+    query = endpoint_config.get("query", {})
+    if query:
+        url = f"{url}?{urlencode(query)}"
+
+    return cast(str, url)
+
+
+def trace_templates(app: Any = None) -> list[dict[str, Any]]:
     app = app or current_app
     results = []
+    client = app.test_client()
 
     for rule in app.url_map.iter_rules():
-        # Always skip static endpoints
         if rule.endpoint.startswith("static"):
             continue
 
-        # Determine usable methods for this rule (exclude HEAD/OPTIONS)
         methods = set(rule.methods or []) - {"HEAD", "OPTIONS"}
         if not methods:
             continue
 
-        # Only trace if rule supports GET, or if it's explicitly parameterized
-        if (
-            "GET" not in methods
-            and rule.endpoint not in PARAMETERIZED_ENDPOINTS
-        ):
+        if "GET" not in methods and rule.endpoint not in PARAMETERIZED_ENDPOINTS:
             continue
 
-        # Use a local trace tracking variable to preserve test context compatibility
-        current_req_id = str(uuid.uuid4())
+        req_id = str(uuid.uuid4())
 
         try:
-            view_func = app.view_functions.get(rule.endpoint)
-            if not view_func:
-                raise ValueError("No view function found")
+            method = "GET" if "GET" in methods else sorted(methods)[0]
+            test_url = _build_test_url(app, rule, method)
 
-            # Build the test URL (use any parameter suffix provided)
-            if rule.endpoint in PARAMETERIZED_ENDPOINTS:
-                test_url = rule.rule + PARAMETERIZED_ENDPOINTS[rule.endpoint]
-            else:
-                test_url = rule.rule
+            response = client.open(
+                test_url,
+                method=method,
+                headers={"X-Trace-Request-ID": req_id},
+            )
 
-            # Choose a method to invoke: prefer GET, otherwise pick one available method
-            method = "GET" if "GET" in methods else next(iter(sorted(methods)))
+            if response.status_code == 401:
+                results.append(
+                    {
+                        "endpoint": rule.endpoint,
+                        "rule": rule.rule,
+                        "status": "auth_blocked",
+                        "error": "Endpoint requires authentication.",
+                        "req_id": req_id,
+                    }
+                )
+                continue
 
-            with app.test_request_context(test_url, method=method):
-                # Safely populate request globals if needed within the active context block
-                if has_app_context():
-                    g.req_id = current_req_id
+            if response.status_code >= 400:
+                raise ValueError(f"Returned status {response.status_code}")
 
-                response = view_func()
-
-                # Normalize status extraction (Response object or (body, status) tuple)
-                status_code = None
-                if hasattr(response, "status_code"):
-                    status_code = getattr(response, "status_code")
-                elif (
-                    isinstance(response, (list, tuple))
-                    and len(response) >= 2
-                    and isinstance(response[1], int)
-                ):
-                    status_code = response[1]
-
-                if status_code is not None and status_code >= 400:
-                    raise ValueError(f"Returned status {status_code}")
-
-                # If the view returns an object exposing 'template', check it exists
-                tmpl = getattr(response, "template", None)
-                if tmpl and not template_exists(tmpl):
-                    placeholder_path = create_placeholder(tmpl)
-                    raise ValueError(
-                        f"MISSING_TEMPLATE: Created placeholder at {placeholder_path}"
-                    )
+            # Flask's test-client response does not normally expose the
+            # template name rendered by the view. Keep this check for
+            # responses that do expose it.
+            template_name = getattr(response, "template", None)
+            if template_name and not template_exists(template_name):
+                placeholder_path = create_placeholder(template_name)
+                raise ValueError(
+                    f"MISSING_TEMPLATE: Created placeholder at {placeholder_path}"
+                )
 
             results.append(
                 {
@@ -154,22 +190,23 @@ def trace_templates(app=None):
                     "rule": rule.rule,
                     "status": "ok",
                     "error": None,
-                    "req_id": current_req_id,
+                    "req_id": req_id,
                 }
             )
 
-        except Exception as e:
-            err_text = str(e)
-            status = "error"
-            if "MISSING_TEMPLATE" in err_text:
-                status = "missing_template"
+        except Exception as exc:
+            status = (
+                "missing_template"
+                if "MISSING_TEMPLATE" in str(exc)
+                else "error"
+            )
             results.append(
                 {
                     "endpoint": rule.endpoint,
                     "rule": rule.rule,
                     "status": status,
                     "error": traceback.format_exc(limit=2),
-                    "req_id": current_req_id,
+                    "req_id": req_id,
                 }
             )
 
@@ -177,34 +214,40 @@ def trace_templates(app=None):
 
 
 @bp.route("/template-tracer")
-def template_tracer():
+def template_tracer() -> str:
     results = trace_templates()
 
     telemetry_data = [
         {
-            "key": r["endpoint"],
+            "key": result["endpoint"],
             "expires_at": None,
             "remaining_seconds": 0,
-            "fresh": "True" if r["status"] == "ok" else "False",
+            "fresh": "True" if result["status"] == "ok" else "False",
             "redis_status": (
                 "OK"
-                if r["status"] == "ok"
+                if result["status"] == "ok"
                 else (
                     "MISSING_TEMPLATE"
-                    if r["status"] == "missing_template"
-                    else "ERROR"
+                    if result["status"] == "missing_template"
+                    else (
+                        "AUTH_BLOCKED"
+                        if result["status"] == "auth_blocked"
+                        else "ERROR"
+                    )
                 )
             ),
             "redis_ttl": "N/A",
-            "redis_value": r["error"] or "—",
+            "redis_value": result["error"] or "—",
         }
-        for r in results
+        for result in results
     ]
 
-    fresh_count = sum(1 for item in telemetry_data if item["fresh"] == "True")
+    fresh_count = sum(
+        1 for item in telemetry_data if item["fresh"] == "True"
+    )
     total_count = len(telemetry_data)
     health_percent = (
-        round((fresh_count / total_count) * 100, 2) if total_count > 0 else 0
+        round((fresh_count / total_count) * 100, 2) if total_count else 0
     )
 
     return render_template(

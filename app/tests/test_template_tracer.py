@@ -89,22 +89,33 @@ def test_trace_templates_returns_list(tracer_app):
                 "ok",
                 "error",
                 "missing_template",
+                "auth_blocked",
             )
         ), f"Unexpected status value: {r['status']!r} for endpoint {r['endpoint']!r}"
 
 
 def test_parameterized_endpoints_map_types():
-    """Every entry in PARAMETERIZED_ENDPOINTS must be str → str."""
+    """Every entry in PARAMETERIZED_ENDPOINTS must be str -> dict."""
     assert isinstance(
         PARAMETERIZED_ENDPOINTS, dict
     ), "PARAMETERIZED_ENDPOINTS must be a dict"
-    for ep, dummy in PARAMETERIZED_ENDPOINTS.items():
+
+    for ep, config in PARAMETERIZED_ENDPOINTS.items():
         assert isinstance(
             ep, str
         ), f"Key must be str, got {type(ep)} for {ep!r}"
+
         assert isinstance(
-            dummy, str
-        ), f"Value must be str, got {type(dummy)} for key {ep!r}"
+            config,
+            dict,
+        ), f"Value must be dict, got {type(config)} for key {ep!r}"
+
+        query = config.get("query")
+        if query is not None:
+            assert isinstance(
+                query,
+                dict,
+            ), f"'query' must be dict for key {ep!r}"
 
 
 def test_drilldown_blueprint_is_registered(tracer_app):

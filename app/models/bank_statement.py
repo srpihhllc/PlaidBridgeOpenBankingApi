@@ -1,3 +1,4 @@
+from app.extensions import db
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/banking/bank_statement.py
 
 from datetime import datetime, timezone

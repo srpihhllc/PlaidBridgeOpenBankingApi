@@ -19,6 +19,7 @@ from flask import (
 )
 from flask_jwt_extended import get_jwt, verify_jwt_in_request
 from flask_jwt_extended.exceptions import JWTExtendedException
+from app.security.founder import is_founder
 from flask_login import current_user
 from werkzeug.exceptions import Forbidden
 
@@ -28,6 +29,14 @@ from app.security.policy_engine import (
     SecurityTier,
 )
 
+
+
+def is_creator(user=None) -> bool:
+    """
+    Backward-compatible founder alias.
+    """
+    target_user = user if user is not None else current_user
+    return is_founder(target_user)
 
 def user_is_admin() -> bool:
     """
@@ -39,7 +48,7 @@ def user_is_admin() -> bool:
     """
     user_role = getattr(current_user, "role", None)
 
-    if user_role in ("admin", "super_admin"):
+    if user_role in ("admin", "super_admin", "creator", "owner"):
         return True
 
     if getattr(current_user, "is_admin", False) is True:

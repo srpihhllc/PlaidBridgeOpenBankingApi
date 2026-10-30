@@ -1,7 +1,6 @@
 # =============================================================================
 # FILE: app/models/registry.py
 # DESCRIPTION: Centralized registry model for user configurations.
-#              Updated to use dynamic backref to prevent KeyError on User mapper.
 # =============================================================================
 
 from datetime import datetime, timezone
@@ -10,18 +9,13 @@ from ..extensions import db
 
 
 class Registry(db.Model):
-    """
-    Represents a central registry for all users and their data within the system.
-    This model acts as a core reference point, holding key user attributes.
-    """
+    """A central registry for user configurations and related data."""
 
     __tablename__ = "registries"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # ✔ Must match User.id (String(36))
-    # ✔ Must include ondelete="CASCADE"
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -31,30 +25,29 @@ class Registry(db.Model):
     name = db.Column(db.String(128), nullable=False, unique=True)
     config_blob = db.Column(db.Text, nullable=True)
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
 
-    # -------------------------------------------------------------------------
-    # Relationships
-    # -------------------------------------------------------------------------
-
-    # ⭐ User Fix: Swapped back_populates to dynamic backref since User lacks 'registry_events'
     user = db.relationship(
         "User",
         backref=db.backref(
-            "registry_events", lazy="dynamic", passive_deletes=True
+            "registry_events",
+            lazy="dynamic",
+            passive_deletes=True,
         ),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Registry {self.name}>"
 
-    def trace_status(self):
+    def trace_status(self) -> dict[str, str]:
+        created_at = self.created_at
         return {
             "name": self.name,
-            "created_at": self.created_at.isoformat(),
+            "created_at": created_at.isoformat() if created_at else "",
             "config_summary": "loaded" if self.config_blob else "empty",
         }
 
-    def ping(self):
+    def ping(self) -> str:
         return f"Registry {self.name} is operational"

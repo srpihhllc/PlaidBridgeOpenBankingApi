@@ -1,8 +1,6 @@
 # =============================================================================
 # FILE: app/blueprints/admin_ui_routes.py
 # DESCRIPTION: Admin UI routes with cockpit wiring and tiles.
-# AUDIT STATUS: Canonical registration under "admin". View-function aliasing for
-#               admin_ui ensures zero duplicate URL map collisions.
 # =============================================================================
 
 import io
@@ -11,6 +9,7 @@ import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Iterable
 
 from flask import (
@@ -34,6 +33,7 @@ from app.blueprints.admin_routes import (
     MockModel,
     MockSchemaEvent,
     MockUser,
+    admin_switch_identity,
 )
 from app.decorators import (
     admin_required,
@@ -56,6 +56,13 @@ admin_bp = Blueprint(
     template_folder="../templates/admin",
 )
 
+# Bridge switch_identity to /admin/switch_identity
+admin_bp.add_url_rule(
+    "/switch_identity",
+    view_func=admin_switch_identity,
+    methods=["POST"],
+    endpoint="switch_identity",
+)
 
 # =============================================================================
 # INTERNAL HELPERS
@@ -121,52 +128,23 @@ def admin_index():
 # Dynamic Admin Template Previewer
 # =============================================================================
 @admin_bp.route("/t/", endpoint="render_admin_template")
-def render_admin_template(tpl):
-    """Dynamic preview router for admin templates."""
+@login_required
+@admin_required
+def render_admin_template(tpl: str):
     if not tpl.endswith(".html"):
         tpl = f"{tpl}.html"
 
-    search_tpl = tpl if tpl.startswith("admin/") else f"admin/{tpl}"
-    full_path = os.path.join(current_app.root_path, "templates", search_tpl)
-    if not os.path.exists(full_path):
+    template_dir = Path(current_app.root_path) / "templates" / "admin"
+    target_file = (template_dir / tpl).resolve()
+
+    if not target_file.is_file() or template_dir not in target_file.parents:
         abort(404)
 
-    class MockAdmin:
-        id = 0
-        username = "preview_admin"
-        full_name = "Preview Admin"
-        role = "admin"
-        is_admin = True
-
-    mock_admin = MockAdmin()
-    mock_context = {
-        "current_user": mock_admin,
-        "user": mock_admin,
-        "audit_info": {
-            "status": "ok",
-            "last_audit_date": _utc_now().isoformat(),
-        },
-        "system_status": {},
-        "metrics": {},
-        "events": [],
-        "logs": [],
-        "summary": {},
-        "is_operator": False,
-        "lenders": [],
-    }
-
-    return render_template(search_tpl, **mock_context)
+    rel_template_path = f"admin/{target_file.name}"
+    return render_template(rel_template_path, current_user=current_user)
 
 
-# =============================================================================
-# BACKWARD-COMPATIBILITY: View-function level aliasing
-# =============================================================================
 def ensure_admin_aliases(app) -> list[str]:
-    """Register admin_ui.* view-function aliases for canonical admin.* views.
-
-    URL rules are added separately by the application factory after all
-    canonical admin routes have been registered.
-    """
     canonical_prefix = "admin."
     alias_prefix = "admin_ui."
     created_aliases: list[str] = []
@@ -178,6 +156,26 @@ def ensure_admin_aliases(app) -> list[str]:
             if alias_ep not in app.view_functions:
                 app.view_functions[alias_ep] = view_func
                 created_aliases.append(alias_ep)
+
+    existing_endpoints = {rule.endpoint for rule in app.url_map.iter_rules()}
+    for rule in list(app.url_map.iter_rules()):
+        if rule.endpoint.startswith(canonical_prefix):
+            suffix = rule.endpoint[len(canonical_prefix) :]
+            alias_ep = f"{alias_prefix}{suffix}"
+            if alias_ep not in existing_endpoints:
+                view_func = app.view_functions.get(alias_ep) or app.view_functions.get(rule.endpoint)
+                methods = list(rule.methods) if rule.methods else None
+                app.add_url_rule(
+                    rule.rule,
+                    endpoint=alias_ep,
+                    view_func=view_func,
+                    methods=methods,
+                    defaults=rule.defaults,
+                    strict_slashes=rule.strict_slashes,
+                    subdomain=rule.subdomain,
+                    build_only=getattr(rule, "build_only", False),
+                )
+                existing_endpoints.add(alias_ep)
 
     app.logger.debug(
         "Registered admin_ui view-function aliases: %s", created_aliases
@@ -192,7 +190,6 @@ def _get_expected_endpoints() -> Iterable[str]:
 def verify_admin_blueprint(
     app, *, raise_on_failure: bool = True
 ) -> None:
-    """Verification helper for application startup."""
     with app.app_context():
         missing = [
             ep
@@ -329,21 +326,29 @@ def nav_audit():
 # =============================================================================
 # LENDER MANAGEMENT
 # =============================================================================
-@admin_bp.get("/lenders")
+
+@admin_bp.route("/lenders", methods=["GET"])
 @login_required
 @roles_required("finance_admin")
 def show_lenders():
     lenders = [MockLender(id=i) for i in range(1, 5)]
-    return render_template("admin/lenders.html", lenders=lenders)
+    return render_template(
+        "admin/lenders.html",
+        lenders=lenders,
+    )
 
 
-@admin_bp.post("/lenders//verify")
+@admin_bp.route(
+    "/lenders/<int:lender_id>/verify",
+    methods=["POST"],
+)
 @login_required
 @roles_required("finance_admin")
-def verify_lender(lender_id):
+def verify_lender(lender_id: int):
     lender = MockLender(id=lender_id)
     action = request.form.get("action")
     lender.is_verified = action == "approve"
+
     flash(
         f"Lender {getattr(lender, 'name', lender.id)} "
         f"{'approved' if lender.is_verified else 'denied'}.",
@@ -355,33 +360,42 @@ def verify_lender(lender_id):
 # =============================================================================
 # CREDIT LEDGER & PAYMENTS
 # =============================================================================
-@admin_bp.route("/view_credit_ledger/")
+
+@admin_bp.route("/view_credit_ledger/<int:user_id>/")
 @login_required
 @roles_required("credit_admin")
-def view_credit_ledger(user_id):
-    return render_template("admin/credit_dashboard.html", user_id=user_id)
+def view_credit_ledger(user_id: int):
+    return render_template(
+        "admin/credit_dashboard.html",
+        user_id=user_id,
+    )
 
 
-@admin_bp.route("/tile/exposure/")
+@admin_bp.route("/tile/exposure/<int:user_id>/")
 @login_required
 @roles_required("credit_admin")
-def tile_exposure(user_id):
+def tile_exposure(user_id: int):
     data = {
         "credit_limit": 5000.0,
         "repaid": 1200.0,
         "exposure_ratio": 0.24,
         "status": "ok",
     }
-    return render_template("admin/tiles/exposure_widget.html", data=data)
+    return render_template(
+        "admin/tiles/exposure_widget.html",
+        data=data,
+    )
 
 
-@admin_bp.route("/tile/credit_ledger/")
+@admin_bp.route("/tile/credit_ledger/<int:user_id>/")
 @login_required
 @roles_required("credit_admin")
-def tile_credit_ledger(user_id):
+def tile_credit_ledger(user_id: int):
     ledgers = [MockLedger(id=1, user_id=user_id)]
     return render_template(
-        "admin/tiles/credit_ledger.html", user_id=user_id, ledgers=ledgers
+        "admin/tiles/credit_ledger.html",
+        user_id=user_id,
+        ledgers=ledgers,
     )
 
 
@@ -420,18 +434,25 @@ def process_payment():
         logger.exception("Card state update failed for card %s", card_id)
         flash("Unable to update card status.", "danger")
         return redirect(
-            url_for("admin.view_credit_ledger", user_id=ledger.user_id)
+            url_for(
+                "admin.view_credit_ledger",
+                user_id=ledger.user_id,
+            )
         )
 
     flash(f"Processed payment of ${amount:.2f}.", "success")
     return redirect(
-        url_for("admin.view_credit_ledger", user_id=ledger.user_id)
+        url_for(
+            "admin.view_credit_ledger",
+            user_id=ledger.user_id,
+        )
     )
 
 
 # =============================================================================
 # FRAUD & TRADELINES
 # =============================================================================
+
 @admin_bp.route("/fraud_scanner")
 @login_required
 @roles_required("fraud_admin")
@@ -453,7 +474,10 @@ def fraud_scanner():
             now - timedelta(hours=1),
         ),
     ]
-    return render_template("admin/fraud_charts.html", frauds=frauds)
+    return render_template(
+        "admin/fraud_charts.html",
+        frauds=frauds,
+    )
 
 
 @admin_bp.route("/tradelines_panel")
@@ -461,10 +485,12 @@ def fraud_scanner():
 @roles_required("tradeline_admin")
 def tradelines_panel():
     tradelines = [
-        MockModel(id=i, vendor_name=f"Vendor {i}") for i in range(1, 3)
+        MockModel(id=i, vendor_name=f"Vendor {i}")
+        for i in range(1, 3)
     ]
     return render_template(
-        "admin/tradelines_panel.html", tradelines=tradelines
+        "admin/tradelines_panel.html",
+        tradelines=tradelines,
     )
 
 
@@ -473,15 +499,21 @@ def tradelines_panel():
 @roles_required("tradeline_admin")
 def approval_queue():
     status = request.args.get("status", "pending")
-    tradelines = [MockModel(id=i, status=status) for i in range(1, 3)]
+    tradelines = [
+        MockModel(id=i, status=status)
+        for i in range(1, 3)
+    ]
     return render_template(
-        "admin/approval_queue.html", tradelines=tradelines, status=status
+        "admin/approval_queue.html",
+        tradelines=tradelines,
+        status=status,
     )
 
 
 # =============================================================================
 # REDIS / DB PANELS / SQL PANEL
 # =============================================================================
+
 @admin_bp.route("/redis_panel")
 @login_required
 @admin_required
@@ -513,6 +545,7 @@ def redis_panel():
         match_pattern=match_pattern,
         has_more=(next_cursor != 0),
     )
+
 
 
 @admin_bp.route("/schema_diagram")

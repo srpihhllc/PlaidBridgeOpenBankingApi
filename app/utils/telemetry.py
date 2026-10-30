@@ -1,9 +1,9 @@
 # =============================================================================
 # FILE: app/utils/telemetry.py
 # DESCRIPTION: Cockpit-grade telemetry utilities providing counters, gauges,
-#               histograms, structured event logging, TTL pulses, and safe
-#               mock fallbacks for local/dev. Includes lifecycle events with
-#               context-safety and optional Redis-based dedupe.
+#              histograms, structured event logging, TTL pulses, and safe
+#              mock fallbacks for local/dev. Includes lifecycle events with
+#              context-safety and optional Redis-based dedupe.
 # =============================================================================
 import functools
 import json
@@ -12,9 +12,12 @@ import os
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, TypeVar
+from typing import Any, TypeVar, TYPE_CHECKING
 
 from app.utils.ttl_emit import ttl_emit
+
+if TYPE_CHECKING:
+    from redis import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +48,6 @@ _REDIS_AVAILABLE = False
 if not MOCK_MODE:
     try:
         from prometheus_client import REGISTRY, Counter, Gauge, Histogram
-
         from app.utils.redis_utils import get_redis_client
 
         PROMETHEUS_CLIENT_ENABLED = True
@@ -58,13 +60,10 @@ if not MOCK_MODE:
         PROMETHEUS_CLIENT_ENABLED = False
         _REDIS_AVAILABLE = False
 else:
-    # In mock mode we still want get_redis_client symbolically available for type-checkers,
-    # but at runtime we will never call it when no client is available.
     try:
-        from app.utils.redis_utils import get_redis_client  # type: ignore[import]
-    except Exception:  # pragma: no cover - purely defensive
-
-        def get_redis_client():  # type: ignore[assignment]
+        from app.utils.redis_utils import get_redis_client
+    except Exception:
+        def get_redis_client() -> "Redis[Any] | None":
             return None
 
 
@@ -132,10 +131,6 @@ class MockMetric:
         return self
 
     def time(self) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-        """
-        Provide a decorator-compatible timing helper to mirror prometheus_client's .time().
-        """
-
         def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -242,7 +237,6 @@ def _get_metric(name: str) -> Any | None:
     if MOCK_MODE:
         return _METRIC_LOOKUP.get(name)
     try:
-        # REGISTRY is only available when PROMETHEUS_CLIENT_ENABLED is True
         return (
             REGISTRY._names_to_collectors.get(name)
             if PROMETHEUS_CLIENT_ENABLED
@@ -308,12 +302,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 def time_metric(
     name: str, labels: dict[str, str] | None = None
 ) -> Callable[[F], F]:
-    """
-    Decorator factory that records timing samples for the wrapped function.
-    If the underlying metric exposes a .time() decorator (e.g. Prometheus),
-    we delegate to it; otherwise we use a generic wrapper.
-    """
-
     def decorator(func: F) -> F:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
@@ -327,13 +315,12 @@ def time_metric(
                     f"time_metric: {name}={duration:.4f}s labels={labels}"
                 )
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     metric = _get_metric(name)
     if metric and hasattr(metric, "time"):
         try:
-            # Prometheus Histogram/Timer exposes .time() as a decorator/context manager.
-            return metric.time()  # type: ignore[no-any-return]
+            return metric.time()
         except Exception:
             pass
     return decorator
@@ -343,11 +330,6 @@ def time_metric(
 # Helper: runtime Redis acquisition
 # =============================================================================
 def _acquire_redis_client() -> Any | None:
-    """
-    Try to obtain a Redis client from the app-level factory first (preferred),
-    then fall back to a local safe client. Return None if no client can be
-    established.
-    """
     rc = None
     try:
         rc = get_redis_client()
@@ -358,7 +340,6 @@ def _acquire_redis_client() -> Any | None:
     if rc:
         return rc
 
-    # Fall back to safe local client (non-import-time side effects)
     try:
         return _get_safe_redis_client()
     except Exception as e:
@@ -376,10 +357,6 @@ def ttl_pulse_emit(
     meta: dict[str, Any] | None = None,
     client: Any | None = None,
 ) -> None:
-    """
-    Emit a TTL payload to Redis (or mock/log). Optional client parameter allows
-    callers to provide an explicit Redis client.
-    """
     payload = {
         "status": status,
         "timestamp": time.time(),
@@ -388,7 +365,6 @@ def ttl_pulse_emit(
         "app_id": APP_ID,
     }
 
-    # Respect explicit mock mode
     if TELEMETRY_MODE == "mock":
         logger.info(
             "TTL_EMIT (Mock mode): %s status=%s ttl=%ss payload=%s",
@@ -399,10 +375,8 @@ def ttl_pulse_emit(
         )
         return
 
-    # Use supplied client if provided, otherwise obtain at runtime
     redis = client or _acquire_redis_client()
     if not redis:
-        # No Redis available
         if TELEMETRY_MODE == "redis":
             logger.error(
                 "TTL_EMIT: TELEMETRY_MODE=redis but Redis unavailable for key=%s",
@@ -425,7 +399,6 @@ def ttl_pulse_emit(
             try:
                 redis.setex(key, ttl_seconds, json.dumps(payload))
             except TypeError:
-                # fallback for clients that use a different signature
                 redis.set(key, json.dumps(payload), ex=ttl_seconds)
         logger.debug(f"TTL_EMIT (Redis): {key} ttl={ttl_seconds}s")
     except Exception as e:
@@ -481,13 +454,6 @@ def log_identity_event(
     user_agent: str | None = None,
     details: Any | None = None,
 ) -> None:
-    """
-    Record an identity event.
-    Behavior is controlled by TELEMETRY_MODE:
-      - auto (default): try Redis if available, otherwise log (mock).
-      - redis: require Redis; log error if absent.
-      - mock: never attempt Redis, only log.
-    """
     try:
         inc_metric("identity_events_total", labels={"event_type": event_type})
     except Exception:
@@ -503,15 +469,12 @@ def log_identity_event(
         "app_id": APP_ID,
     }
 
-    # Respect explicit mock mode
     if TELEMETRY_MODE == "mock":
         logger.info("Identity Event (Mock mode): %s", json.dumps(event))
         return
 
-    # Attempt runtime acquisition of Redis client
     redis = _acquire_redis_client()
     if not redis:
-        # No Redis available
         if TELEMETRY_MODE == "redis":
             logger.error(
                 "Identity event: TELEMETRY_MODE=redis but Redis unavailable for event=%s",
@@ -522,12 +485,10 @@ def log_identity_event(
         return
 
     try:
-        # Push to identity stream used by tests/helpers
         redis.lpush("identity_events_stream", json.dumps(event))
         try:
             redis.ltrim("identity_events_stream", 0, 4999)
         except Exception:
-            # Non-critical: some clients may not implement ltrim
             pass
 
         ttl_pulse_emit(
@@ -539,7 +500,6 @@ def log_identity_event(
         )
         logger.debug("Identity event logged: %s", event_type)
     except Exception as e:
-        # Non-fatal — record health metric and attempt fallback queueing for diagnostics
         logger.error(
             "CRITICAL: Identity event stream failure for %s: %s",
             event_type,
@@ -551,7 +511,6 @@ def log_identity_event(
         except Exception:
             pass
 
-        # Best-effort enqueue a lightweight fallback payload if possible
         try:
             payload = json.dumps(
                 {
@@ -562,7 +521,6 @@ def log_identity_event(
                 }
             )
             try:
-                # Try close-to-app-level redis client if available
                 from flask import current_app
 
                 r = (
@@ -595,9 +553,6 @@ def record_lifecycle_event(
     dedupe_window_seconds: int = 5,
     require_app_context: bool = False,
 ) -> None:
-    # ---------------------------------------------------------
-    # Skip lifecycle telemetry entirely during tests
-    # ---------------------------------------------------------
     if (
         os.getenv("FLASK_ENV") == "testing"
         or os.getenv("PYTEST_CURRENT_TEST")
@@ -613,24 +568,28 @@ def record_lifecycle_event(
         )
         evt = "restart"
 
+    app_context_obj = None
     try:
         from flask import current_app
+        app_context_obj = current_app._get_current_object() if current_app else None
     except Exception:
-        current_app = None
+        app_context_obj = None
 
-    if require_app_context and not current_app:
+    if require_app_context and not app_context_obj:
         raise RuntimeError(
             "record_lifecycle_event requires an active Flask app context"
         )
 
     did_push = False
+    ctx = None
     try:
-        if not current_app:
+        if not app_context_obj:
             try:
                 from app import create_app as _create_app
 
                 _app = _create_app()
-                _app.app_context().push()
+                ctx = _app.app_context()
+                ctx.push()
                 did_push = True
             except Exception:
                 logger.debug(
@@ -674,16 +633,13 @@ def record_lifecycle_event(
         logger.critical(json.dumps(structured))
         logger.info(f"✅ {evt.capitalize()} telemetry event recorded.")
     finally:
-        if did_push:
+        if did_push and ctx is not None:
             try:
-                from flask import _app_ctx_stack
-
-                _app_ctx_stack.pop()
+                ctx.pop()
             except Exception:
                 pass
 
 
-# Backwards-compatible alias expected by WSGI
 def record_restart_event(event_type: str = "restart") -> None:
     record_lifecycle_event(event_type)
 
@@ -848,19 +804,11 @@ def log_route(route_path: str) -> Callable[[F], F]:
 # =============================================================================
 # Telemetry lifecycle hooks expected by app/__init__.py
 # =============================================================================
-def add_telemetry_hooks(app):
-    """
-    Attach request-level telemetry hooks.
-    Placeholder implementation to satisfy imports and maintain architecture.
-    """
+def add_telemetry_hooks(app: Any) -> None:
     return
 
 
-def record_app_start(app):
-    """
-    Emit a startup lifecycle event.
-    Placeholder implementation that uses existing lifecycle primitives.
-    """
+def record_app_start(app: Any) -> None:
     try:
         record_lifecycle_event("restart")
     except Exception:
@@ -868,14 +816,9 @@ def record_app_start(app):
     return
 
 
-def register_cli_teardown(app):
-    """
-    Register teardown handlers for CLI commands.
-    Placeholder implementation that emits shutdown lifecycle events.
-    """
-
+def register_cli_teardown(app: Any) -> None:
     @app.teardown_appcontext
-    def _teardown(exc):
+    def _teardown(exc: Any) -> None:
         try:
             record_lifecycle_event("shutdown")
         except Exception:
@@ -883,11 +826,7 @@ def register_cli_teardown(app):
         return
 
 
-def _get_safe_redis_client():
-    """
-    Safely retrieves a Redis client, returning None if connection fails.
-    Used for TTL pulse emission and non-critical telemetry.
-    """
+def _get_safe_redis_client() -> Any | None:
     import os
 
     try:
@@ -899,9 +838,7 @@ def _get_safe_redis_client():
             db=int(os.getenv("REDIS_DB", 0)),
             decode_responses=True,
         )
-        # Test connection
         client.ping()
         return client
     except Exception:
-        # Fail silently - Redis is optional for telemetry
         return None

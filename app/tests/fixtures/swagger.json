@@ -44,7 +44,7 @@
             }
           }
         },
-        "summary": "Returns a server heartbeat and API version discovery context.",
+        "summary": "Returns a server heartbeat and API version discovery context[cite: 1].",
         "tags": [
           "System Discovery"
         ]
@@ -82,7 +82,7 @@
             "description": "Database operation failure."
           }
         },
-        "summary": "Toggle dark mode choices across user dashboard context rows.",
+        "summary": "Toggle dark mode choices across user dashboard context rows[cite: 1].",
         "tags": [
           "Subscriber Settings"
         ]
@@ -98,7 +98,7 @@
             "description": "Authentication required."
           }
         },
-        "summary": "Endpoint alias for template compatibility to generate fraud report.",
+        "summary": "Endpoint alias for template compatibility to generate fraud report[cite: 1].",
         "tags": [
           "Compliance Reports"
         ]
@@ -114,7 +114,7 @@
             "description": "Authentication required."
           }
         },
-        "summary": "Endpoint alias for template compatibility to generate fraud report PDF.",
+        "summary": "Endpoint alias for template compatibility to generate fraud report PDF[cite: 1].",
         "tags": [
           "Compliance Reports"
         ]
@@ -130,7 +130,7 @@
             "description": "Service degraded \u2014 DB or Redis check failed."
           }
         },
-        "summary": "Performs deep diagnostic health check on core engines.",
+        "summary": "Performs deep diagnostic health check on core engines[cite: 1].",
         "tags": [
           "System Discovery"
         ]
@@ -142,11 +142,14 @@
           "200": {
             "description": "Debug flags fetched or mutated successfully."
           },
+          "400": {
+            "description": "Unsupported flag mutation attempted."
+          },
           "403": {
             "description": "Operator access required."
           }
         },
-        "summary": "Inspects (GET) or modifies (POST) global engine tracking parameters dynamically.",
+        "summary": "Inspects (GET) or modifies whitelisted global engine tracking parameters with compliance audit logging.",
         "tags": [
           "Operator Cockpit"
         ]
@@ -156,11 +159,14 @@
           "200": {
             "description": "Debug flags fetched or mutated successfully."
           },
+          "400": {
+            "description": "Unsupported flag mutation attempted."
+          },
           "403": {
             "description": "Operator access required."
           }
         },
-        "summary": "Inspects (GET) or modifies (POST) global engine tracking parameters dynamically.",
+        "summary": "Inspects (GET) or modifies whitelisted global engine tracking parameters with compliance audit logging.",
         "tags": [
           "Operator Cockpit"
         ]
@@ -173,7 +179,7 @@
             "description": "Operator mode disabled successfully."
           }
         },
-        "summary": "Removes operator capability isolation configurations.",
+        "summary": "Removes operator capability isolation configurations[cite: 1].",
         "tags": [
           "Operator Cockpit"
         ]
@@ -194,11 +200,14 @@
           "200": {
             "description": "DTO structure inspected successfully."
           },
+          "403": {
+            "description": "Operator access required."
+          },
           "404": {
             "description": "Target DTO class not found."
           }
         },
-        "summary": "Operator-only Data Transfer Object reflection inspector engine.",
+        "summary": "Operator-only Data Transfer Object reflection inspector[cite: 1].",
         "tags": [
           "Operator Cockpit"
         ]
@@ -214,7 +223,7 @@
             "description": "Forbidden for non-operator personnel."
           }
         },
-        "summary": "Elevates connections into localized operator environment scopes.",
+        "summary": "Elevates connections into localized operator environment scopes[cite: 1].",
         "tags": [
           "Operator Cockpit"
         ]
@@ -230,7 +239,7 @@
             "description": "Operator access required."
           }
         },
-        "summary": "Returns sanitized subset of workspace infrastructure parameters.",
+        "summary": "Returns sanitized subset of workspace infrastructure parameters[cite: 1].",
         "tags": [
           "Operator Cockpit"
         ]
@@ -246,7 +255,7 @@
             "description": "Operator access required."
           }
         },
-        "summary": "Triggers dynamic blueprint drift validation check.",
+        "summary": "Triggers dynamic blueprint drift validation check and audits the mutation.",
         "tags": [
           "Operator Cockpit"
         ]
@@ -274,7 +283,7 @@
             "description": "Redis cluster unavailable."
           }
         },
-        "summary": "Inspect raw DB records or memory cache metrics (Operator-Only).",
+        "summary": "Inspect raw DB records or memory cache metrics with output size limit.",
         "tags": [
           "Operator Cockpit"
         ]
@@ -290,7 +299,7 @@
             "description": "Operator access required."
           }
         },
-        "summary": "Returns runtime state dumps from backend auto-discovery registries.",
+        "summary": "Returns runtime state dumps from backend auto-discovery registries[cite: 1].",
         "tags": [
           "Operator Cockpit"
         ]
@@ -306,7 +315,7 @@
             "description": "Forbidden for non-operator personnel."
           }
         },
-        "summary": "Toggles active session operator state on/off dynamically.",
+        "summary": "Toggles active session operator state on/off dynamically[cite: 1].",
         "tags": [
           "Operator Cockpit"
         ]
@@ -349,7 +358,7 @@
             }
           }
         },
-        "summary": "Returns a server heartbeat and API version discovery context.",
+        "summary": "Returns a server heartbeat and API version discovery context[cite: 1].",
         "tags": [
           "System Discovery"
         ]
@@ -387,7 +396,7 @@
             "description": "Database operation failure."
           }
         },
-        "summary": "Toggle dark mode choices across user dashboard context rows.",
+        "summary": "Toggle dark mode choices across user dashboard context rows[cite: 1].",
         "tags": [
           "Subscriber Settings"
         ]
@@ -403,7 +412,7 @@
             "description": "Authentication required."
           }
         },
-        "summary": "Endpoint alias for template compatibility to generate account statement.",
+        "summary": "Endpoint alias for template compatibility to generate account statement[cite: 1].",
         "tags": [
           "Compliance Reports"
         ]
@@ -419,7 +428,7 @@
             "description": "Service degraded \u2014 DB or Redis check failed."
           }
         },
-        "summary": "Performs deep diagnostic health check on core engines.",
+        "summary": "Performs deep diagnostic health check on core engines[cite: 1].",
         "tags": [
           "System Discovery"
         ]
@@ -444,7 +453,7 @@
             "description": "Authentication required."
           }
         },
-        "summary": "Orchestrates tradeline review and status update workflow.",
+        "summary": "Orchestrates tradeline review and status update workflow[cite: 1].",
         "tags": [
           "Tradeline Workflow"
         ]
@@ -482,16 +491,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Login successful. Returns access and refresh tokens."
+            "description": "Login successful. Returns access and refresh tokens[cite: 2]."
           },
           "401": {
-            "description": "Invalid credentials or missing MFA code."
+            "description": "Invalid credentials or missing MFA code[cite: 2]."
           },
           "403": {
-            "description": "Account pending administrative approval."
+            "description": "Account pending administrative approval[cite: 2]."
           }
         },
-        "summary": "User authentication and JWT token issuance.",
+        "summary": "User authentication and JWT token issuance[cite: 2].",
         "tags": [
           "Auth"
         ]
@@ -520,16 +529,16 @@
         ],
         "responses": {
           "200": {
-            "description": "MFA verified and enabled."
+            "description": "MFA verified and enabled[cite: 2]."
           },
           "401": {
-            "description": "Invalid MFA code."
+            "description": "Invalid MFA code[cite: 2]."
           },
           "422": {
-            "description": "Missing MFA code."
+            "description": "Missing MFA code[cite: 2]."
           }
         },
-        "summary": "Verifies MFA code and enables MFA on the current user account.",
+        "summary": "Verifies MFA code and enables MFA on the current user account[cite: 2].",
         "tags": [
           "Auth"
         ]
@@ -568,13 +577,13 @@
         ],
         "responses": {
           "201": {
-            "description": "Registration successful."
+            "description": "Registration successful[cite: 2]."
           },
           "422": {
-            "description": "Validation error or existing entity."
+            "description": "Validation error or existing entity[cite: 2]."
           }
         },
-        "summary": "Register a new user account with defensive input checks.",
+        "summary": "Register a new user account with defensive input checks[cite: 2].",
         "tags": [
           "Auth"
         ]
@@ -584,10 +593,10 @@
       "post": {
         "responses": {
           "200": {
-            "description": "New access token generated."
+            "description": "New access token generated[cite: 2]."
           }
         },
-        "summary": "Refreshes the JWT access token using a valid refresh token.",
+        "summary": "Refreshes the JWT access token using a valid refresh token[cite: 2].",
         "tags": [
           "Auth"
         ]
@@ -597,13 +606,13 @@
       "get": {
         "responses": {
           "200": {
-            "description": "System operating normally."
+            "description": "System operating normally[cite: 2]."
           },
           "503": {
-            "description": "Database or downstream dependency outage."
+            "description": "Database or downstream dependency outage[cite: 2]."
           }
         },
-        "summary": "Detailed V1 System Health Status.",
+        "summary": "Detailed V1 System Health Status[cite: 2].",
         "tags": [
           "Public"
         ]
@@ -613,10 +622,10 @@
       "get": {
         "responses": {
           "200": {
-            "description": "Heartbeat response."
+            "description": "Heartbeat response[cite: 2]."
           }
         },
-        "summary": "V1 Health Check Ping.",
+        "summary": "V1 Health Check Ping[cite: 2].",
         "tags": [
           "Public"
         ]
@@ -626,10 +635,10 @@
       "get": {
         "responses": {
           "200": {
-            "description": "Public system statistics."
+            "description": "Public system statistics[cite: 2]."
           },
           "401": {
-            "description": "Missing or invalid API key."
+            "description": "Missing or invalid API key[cite: 2]."
           }
         },
         "security": [
@@ -637,7 +646,7 @@
             "APIKeyAuth": []
           }
         ],
-        "summary": "Public System Statistics (Requires API Key).",
+        "summary": "Public System Statistics (Requires API Key)[cite: 2].",
         "tags": [
           "Public"
         ]
@@ -648,14 +657,14 @@
         "parameters": [
           {
             "default": 10,
-            "description": "Number of records to return (1-100).",
+            "description": "Number of records to return (1-100)[cite: 2].",
             "in": "query",
             "name": "limit",
             "type": "integer"
           },
           {
             "default": 0,
-            "description": "Number of records to skip.",
+            "description": "Number of records to skip[cite: 2].",
             "in": "query",
             "name": "offset",
             "type": "integer"
@@ -663,10 +672,10 @@
         ],
         "responses": {
           "200": {
-            "description": "Paginated list of tradelines."
+            "description": "Paginated list of tradelines[cite: 2]."
           }
         },
-        "summary": "Fetches paginated tradelines belonging to the authenticated user.",
+        "summary": "Fetches paginated tradelines belonging to the authenticated user[cite: 2].",
         "tags": [
           "Tradelines"
         ]
@@ -708,13 +717,13 @@
         ],
         "responses": {
           "201": {
-            "description": "Tradeline created successfully."
+            "description": "Tradeline created successfully[cite: 2]."
           },
           "422": {
-            "description": "Validation error or invalid payload format."
+            "description": "Validation error or invalid payload format[cite: 2]."
           }
         },
-        "summary": "Creates a new tradeline record for the authenticated user.",
+        "summary": "Creates a new tradeline record for the authenticated user[cite: 2].",
         "tags": [
           "Tradelines"
         ]
@@ -724,7 +733,7 @@
       "post": {
         "parameters": [
           {
-            "description": "Unique identifier of the tradeline.",
+            "description": "Unique identifier of the tradeline[cite: 2].",
             "in": "path",
             "name": "tradeline_id",
             "required": true,
@@ -754,7 +763,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Tradeline review processed successfully.",
+            "description": "Tradeline review processed successfully[cite: 2].",
             "schema": {
               "properties": {
                 "message": {
@@ -770,7 +779,7 @@
             }
           },
           "400": {
-            "description": "Invalid action parameter.",
+            "description": "Invalid action parameter[cite: 2].",
             "schema": {
               "properties": {
                 "error": {
@@ -786,7 +795,7 @@
             }
           }
         },
-        "summary": "Review a tradeline endpoint exposed at /api/v1/tradelines/review/<id>.",
+        "summary": "Review a tradeline endpoint exposed at /api/v1/tradelines/review/<id>[cite: 2].",
         "tags": [
           "Tradelines"
         ]
@@ -796,7 +805,7 @@
       "delete": {
         "parameters": [
           {
-            "description": "Unique identifier of the tradeline.",
+            "description": "Unique identifier of the tradeline[cite: 2].",
             "in": "path",
             "name": "tradeline_id",
             "required": true,
@@ -805,13 +814,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Tradeline deleted successfully."
+            "description": "Tradeline deleted successfully[cite: 2]."
           },
           "404": {
-            "description": "Tradeline not found or access denied."
+            "description": "Tradeline not found or access denied[cite: 2]."
           }
         },
-        "summary": "Deletes a specific tradeline record with ownership verification.",
+        "summary": "Deletes a specific tradeline record with ownership verification[cite: 2].",
         "tags": [
           "Tradelines"
         ]
@@ -819,7 +828,7 @@
       "get": {
         "parameters": [
           {
-            "description": "Unique identifier of the tradeline.",
+            "description": "Unique identifier of the tradeline[cite: 2].",
             "in": "path",
             "name": "tradeline_id",
             "required": true,
@@ -828,13 +837,13 @@
         ],
         "responses": {
           "200": {
-            "description": "Tradeline details."
+            "description": "Tradeline details[cite: 2]."
           },
           "404": {
-            "description": "Tradeline not found or access denied."
+            "description": "Tradeline not found or access denied[cite: 2]."
           }
         },
-        "summary": "Retrieves a single tradeline record verified by user ownership.",
+        "summary": "Retrieves a single tradeline record verified by user ownership[cite: 2].",
         "tags": [
           "Tradelines"
         ]
@@ -842,7 +851,7 @@
       "put": {
         "parameters": [
           {
-            "description": "Unique identifier of the tradeline.",
+            "description": "Unique identifier of the tradeline[cite: 2].",
             "in": "path",
             "name": "tradeline_id",
             "required": true,
@@ -869,16 +878,16 @@
         ],
         "responses": {
           "200": {
-            "description": "Tradeline updated successfully."
+            "description": "Tradeline updated successfully[cite: 2]."
           },
           "404": {
-            "description": "Tradeline not found or access denied."
+            "description": "Tradeline not found or access denied[cite: 2]."
           },
           "422": {
-            "description": "Invalid input payload."
+            "description": "Invalid input payload[cite: 2]."
           }
         },
-        "summary": "Updates an existing tradeline record with user authorization check.",
+        "summary": "Updates an existing tradeline record with user authorization check[cite: 2].",
         "tags": [
           "Tradelines"
         ]

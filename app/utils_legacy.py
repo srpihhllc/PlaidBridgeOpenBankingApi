@@ -1,16 +1,8 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/utils_legacy.py
-
-
-"""
-Utility functions for monitoring, loan analysis, fraud detection,
-PDF generation, and PDF merging.
-
-Rewritten for:
-- Explicit typing
-- mypy friendliness
-- Clear imports and relationships
-- Cockpit‑grade operator clarity
-"""
+# =============================================================================
+# FILE: app/utils_legacy.py
+# DESCRIPTION: Utility functions for monitoring, loan analysis, fraud detection,
+# PDF generation, and PDF merging.
+# =============================================================================
 
 from __future__ import annotations
 
@@ -19,11 +11,12 @@ import os
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 
 import requests
 from fpdf import FPDF
 from pypdf import PdfReader, PdfWriter
+
 
 # ==========================
 # PythonAnywhere API Monitoring
@@ -31,7 +24,7 @@ from pypdf import PdfReader, PdfWriter
 
 
 def get_pythonanywhere_cpu_quota() -> dict[str, Any]:
-    """Fetch CPU quota info from PythonAnywhere API."""
+    """Fetch CPU quota info from the PythonAnywhere API."""
     username = "srpihhllc"
     token = os.getenv("API_TOKEN")
 
@@ -42,7 +35,10 @@ def get_pythonanywhere_cpu_quota() -> dict[str, Any]:
     )
 
     if response.status_code == 200:
-        return response.json()
+        # requests.Response.json() is typed as Any. Cast it to the
+        # function's declared return type for mypy.
+        return cast(dict[str, Any], response.json())
+
     return {
         "error": f"Unexpected status {response.status_code}",
         "details": response.content.decode("utf-8", errors="replace"),
@@ -55,57 +51,64 @@ def get_pythonanywhere_cpu_quota() -> dict[str, Any]:
 
 
 def analyze_loan_agreement(agreement_text: str) -> dict[str, str]:
-    """AI‑style heuristic: flag agreements containing unethical terms."""
-    unethical_terms: Sequence[str] = [
+    """Flag agreements containing terms that may be unethical."""
+    unethical_terms: Sequence[str] = (
         "hidden fees",
         "predatory interest rates",
         "undisclosed penalties",
-    ]
+    )
+
     text = agreement_text.lower()
+
     for term in unethical_terms:
         if term in text:
             return {
                 "status": "flagged",
                 "reason": f"Contains unethical term: {term}",
             }
+
     return {"status": "approved"}
 
 
 def detect_fraudulent_transaction(description: str, amount: float) -> bool:
-    """Flags potentially fraudulent transactions based on patterns."""
-    suspicious_terms: Sequence[str] = [
+    """Flag potentially fraudulent transactions based on patterns."""
+    suspicious_terms: Sequence[str] = (
         "unexpected large withdrawal",
         "account drained",
         "unauthorized payment",
-    ]
+    )
+
     desc = description.lower()
+
     if amount > 5000:
         return True
-    if any(term in desc for term in suspicious_terms):
-        return True
-    return False
+
+    return any(term in desc for term in suspicious_terms)
 
 
 def execute_smart_contract(loan_agreement_id: int) -> dict[str, Any]:
     """
     Simulate smart contract automation for a loan agreement.
 
-    Loads models lazily to avoid circular imports.
+    Load models lazily to avoid circular imports.
     """
     from app.extensions import db
     from app.models.loan_agreement import LoanAgreement
 
-    # Modern SQLAlchemy 2.x lookup
     agreement: LoanAgreement | None = db.session.get(
-        LoanAgreement, loan_agreement_id
+        LoanAgreement,
+        loan_agreement_id,
     )
+
     if agreement is not None and agreement.status == "active":
         agreement.status = "under_contract"
         db.session.commit()
+
         return {
             "contract_status": "executed",
             "loan_agreement_id": loan_agreement_id,
         }
+
     return {
         "contract_status": "failed",
         "reason": "Invalid agreement or status.",
@@ -113,20 +116,24 @@ def execute_smart_contract(loan_agreement_id: int) -> dict[str, Any]:
 
 
 def notify_authorities(issue_details: str) -> dict[str, str]:
-    """Sends fraud alerts to compliance officers (placeholder implementation)."""
+    """Send a fraud alert to compliance officers."""
     print(f"Fraud Alert: {issue_details}")
     return {"status": "notified"}
 
 
 def time_since(dt: datetime) -> str:
-    """Return a compact human‑readable delta (e.g., '5m', '2h', '3d')."""
+    """Return a compact human-readable delta, such as '5m', '2h', or '3d'."""
     delta = datetime.now(timezone.utc) - dt
+
     if delta.days > 0:
         return f"{delta.days}d"
+
     if delta.seconds > 3600:
         return f"{delta.seconds // 3600}h"
+
     if delta.seconds > 60:
         return f"{delta.seconds // 60}m"
+
     return f"{delta.seconds}s"
 
 
@@ -136,9 +143,10 @@ def time_since(dt: datetime) -> str:
 
 
 def create_bank_statement(
-    data: Mapping[str, Any], signature_base64: str | None = None
+    data: Mapping[str, Any],
+    signature_base64: str | None = None,
 ) -> BytesIO:
-    """Generate a bank statement PDF using FPDF and return it as a BytesIO stream."""
+    """Generate a bank statement PDF and return it as a BytesIO stream."""
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
@@ -155,38 +163,73 @@ def create_bank_statement(
     pdf.ln(10)
 
     # Account details
-    pdf.cell(100, 10, f"Account Holder: {data.get('name', '')}", ln=True)
     pdf.cell(
-        100, 10, f"Account Number: {data.get('account_number', '')}", ln=True
+        100,
+        10,
+        f"Account Holder: {data.get('name', '')}",
+        ln=True,
+    )
+    pdf.cell(
+        100,
+        10,
+        f"Account Number: {data.get('account_number', '')}",
+        ln=True,
     )
     pdf.ln(5)
-    pdf.cell(100, 10, f"Balance: ${data.get('balance', 0)}", ln=True)
+    pdf.cell(
+        100,
+        10,
+        f"Balance: ${data.get('balance', 0)}",
+        ln=True,
+    )
     pdf.ln(10)
 
     # Transactions
     pdf.cell(200, 10, "Transactions:", ln=True)
-    for txn in data.get("transactions", []):
-        date_str = txn.get("date", "")
-        desc = txn.get("description", "")
-        amount = txn.get("amount", 0)
-        line = f"{date_str} | {desc} | ${amount}"
-        pdf.cell(200, 10, line, ln=True)
 
-    # Optional signature (basic image insertion)
+    transactions = data.get("transactions", [])
+    if isinstance(transactions, Iterable) and not isinstance(
+        transactions, (str, bytes, Mapping)
+    ):
+        for txn in transactions:
+            if not isinstance(txn, Mapping):
+                continue
+
+            date_str = txn.get("date", "")
+            desc = txn.get("description", "")
+            amount = txn.get("amount", 0)
+            line = f"{date_str} | {desc} | ${amount}"
+            pdf.cell(200, 10, line, ln=True)
+
+    # Optional signature
     if signature_base64:
+        sig_filename = "signature.png"
         try:
             sig_data = base64.b64decode(signature_base64)
-            sig_filename = "signature.png"
-            with open(sig_filename, "wb") as f:
-                f.write(sig_data)
-            pdf.ln(20)
-            pdf.image(sig_filename, x=10, y=pdf.get_y(), w=40)
-            os.remove(sig_filename)
-        except Exception as e:
-            print("Error processing signature:", e)
+            with open(sig_filename, "wb") as signature_file:
+                signature_file.write(sig_data)
 
-    pdf_stream = BytesIO()
-    pdf.output(pdf_stream)
+            pdf.ln(20)
+            pdf.image(
+                sig_filename,
+                x=10,
+                y=pdf.get_y(),
+                w=40,
+            )
+        except Exception as error:
+            print("Error processing signature:", error)
+        finally:
+            if os.path.exists(sig_filename):
+                os.remove(sig_filename)
+
+    # PyFPDF returns a Latin-1 string when using dest="S".
+    pdf_data = pdf.output(dest="S")
+    if isinstance(pdf_data, str):
+        pdf_bytes = pdf_data.encode("latin-1")
+    else:
+        pdf_bytes = bytes(pdf_data)
+
+    pdf_stream = BytesIO(pdf_bytes)
     pdf_stream.seek(0)
     return pdf_stream
 
@@ -199,13 +242,7 @@ def create_bank_statement(
 def merge_pdfs(
     pdf_list: Iterable[BytesIO | str | os.PathLike[str]],
 ) -> BytesIO:
-    """
-    Combine multiple PDFs into a single document.
-
-    Each item in pdf_list may be:
-    - a BytesIO stream
-    - a filesystem path (str or PathLike)
-    """
+    """Combine PDF streams and filesystem paths into one PDF."""
     writer = PdfWriter()
 
     for pdf_file in pdf_list:

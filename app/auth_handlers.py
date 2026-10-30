@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any, cast
 
 from flask import current_app
 
@@ -25,7 +26,7 @@ class SystemOperator:
         identity: str = "TERENCE_CORTEX_PRIME",
         username: str = "OPERATOR_ADMIN",
         role: str = "subscriber",
-    ):
+    ) -> None:
         self.id = identity
         self.username = username
         self.role = role
@@ -69,19 +70,22 @@ def _resolve_identity(identity: str | None) -> User | SystemOperator | None:
         # 1. Primary Strategy: String/UUID Primary Key lookup
         user = db.session.get(User, clean_id)
         if user:
-            return user
+            return cast(User | SystemOperator | None, user)
 
         # 2. Migration Strategy: Safe Integer Key parsing fallback
         try:
             int_id = int(clean_id)
             user = db.session.get(User, int_id)
             if user:
-                return user
+                return cast(User | SystemOperator | None, user)
         except (ValueError, TypeError):
             pass
 
         # 3. Consistency Strategy: Direct ORM query fallback
-        return User.query.filter_by(id=clean_id).first()
+        return cast(
+            User | SystemOperator | None,
+            User.query.filter_by(id=clean_id).first(),
+        )
 
     except Exception:
         logger.exception(
@@ -106,7 +110,7 @@ def load_user(user_id: str) -> User | SystemOperator | None:
 # -------------------------------------------------------------------
 @jwt.user_lookup_loader
 def user_lookup_callback(
-    _jwt_header, jwt_data: dict
+    _jwt_header: Any, jwt_data: dict[str, Any]
 ) -> User | SystemOperator | None:
     """Loads a user principal out of a stateless JWT bearer token payload."""
     if not jwt_data:

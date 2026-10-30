@@ -1,6 +1,7 @@
-# app/models/lender_risk.py
+"""Risk metrics associated with a lender."""
 
 from datetime import datetime, timezone
+from typing import Any
 
 from app.extensions import db
 
@@ -24,13 +25,14 @@ class LenderRisk(db.Model):
 
     # Metadata
     last_evaluated_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
 
     # Relationship
     lender = db.relationship("Lender", back_populates="risk_profile")
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "lender_id": self.lender_id,

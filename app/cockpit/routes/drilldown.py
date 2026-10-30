@@ -16,7 +16,6 @@ from pygments.lexers import PythonLexer
 drilldown_bp = Blueprint("drilldown", __name__, url_prefix="/cockpit")
 
 # Base repository path for safe file resolution.
-# This prevents directory traversal attacks.
 REPO_BASE_PATH = "/home/srpihhllc/PlaidBridgeOpenBankingApi"
 
 # Default file used when no ?file= param is provided (for audits/tracer runs)
@@ -34,10 +33,8 @@ def drilldown_view():
     - Reads the file content and renders syntax-highlighted code.
     - Provides friendly error messages inside the template instead of raw aborts.
     """
-    # Get the relative path from the query parameters, fallback to default
     rel_path = request.args.get("file") or DEFAULT_FILE
 
-    # Prevent directory traversal by joining the base path and normalizing
     safe_path = os.path.normpath(os.path.join(REPO_BASE_PATH, rel_path))
     if not safe_path.startswith(REPO_BASE_PATH):
         return render_template(
@@ -47,7 +44,6 @@ def drilldown_view():
             pygments_css="",
         )
 
-    # Check if the file exists on the filesystem
     if not os.path.exists(safe_path):
         return render_template(
             "cockpit/drilldown.html",
@@ -56,7 +52,6 @@ def drilldown_view():
             pygments_css="",
         )
 
-    # Read the file content with a safe encoding
     try:
         with open(safe_path, encoding="utf-8") as f:
             code = f.read()
@@ -68,13 +63,11 @@ def drilldown_view():
             pygments_css="",
         )
 
-    # Apply syntax highlighting using Pygments
     formatter = HtmlFormatter(
         linenos=True, anchorlinenos=True, full=False, cssclass="codehilite"
     )
     highlighted_code = highlight(code, PythonLexer(), formatter)
 
-    # Render the template with the file content and styling
     return render_template(
         "cockpit/drilldown.html",
         file_path=rel_path,

@@ -3,7 +3,7 @@
 # DESCRIPTION: Cockpit-grade CreditLedger model.
 #              Represents credit lines, limits, and real-time balances for Users.
 # =============================================================================
-from ..extensions import db
+from app.extensions import db
 
 
 class CreditLedger(db.Model):

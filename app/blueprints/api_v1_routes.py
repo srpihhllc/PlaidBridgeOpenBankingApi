@@ -63,12 +63,12 @@ api_v1_bp = Blueprint("api_v1", __name__, url_prefix="/api/v1")
 
 
 def generate_mfa_secret(user_id: int) -> str:
-    """Generates a mock secret for MFA setup."""
+    """Generates a mock secret for MFA setup[cite: 2]."""
     return f"MOCK_SECRET_{uuid4().hex[:16]}"
 
 
 def verify_mfa_code(user_id: int, secret: Optional[str], code: str) -> bool:
-    """Verifies an incoming MFA TOTP code."""
+    """Verifies an incoming MFA TOTP code[cite: 2]."""
     return code == "123456"
 
 
@@ -84,7 +84,7 @@ def handle_api_exception(
     default_message: str,
 ) -> Tuple[Response, int]:
     """Centralized exception handling helper for uniform logging, telemetry,
-    and payload structure.
+    and payload structure[cite: 2].
     """
     message = getattr(exc, "description", default_message)
     log_message = f"API Error {status_code}: {message} | Path: {request.path}"
@@ -197,12 +197,12 @@ def internal_server_error(exc: Exception) -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Public"],
-        "summary": "Simple ping check.",
-        "responses": {200: {"description": "Heartbeat response."}},
+        "summary": "Simple ping check[cite: 2].",
+        "responses": {200: {"description": "Heartbeat response[cite: 2]."}},
     }
 )
 def ping() -> Tuple[Response, int]:
-    """V1 Health Check Ping."""
+    """V1 Health Check Ping[cite: 2]."""
     return success_response({"status": "healthy"}, message="Pong!")
 
 
@@ -211,17 +211,17 @@ def ping() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Public"],
-        "summary": "Detailed system health metrics.",
+        "summary": "Detailed system health metrics[cite: 2].",
         "responses": {
-            200: {"description": "System operating normally."},
+            200: {"description": "System operating normally[cite: 2]."},
             503: {
-                "description": ("Database or downstream dependency outage.")
+                "description": ("Database or downstream dependency outage[cite: 2].")
             },
         },
     }
 )
 def api_health() -> Tuple[Response, int]:
-    """Detailed V1 System Health Status."""
+    """Detailed V1 System Health Status[cite: 2]."""
     db_status = "ok"
     try:
         db.session.execute(db.text("SELECT 1"))
@@ -254,16 +254,16 @@ def api_health() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Public"],
-        "summary": "Fetch public platform statistics.",
+        "summary": "Fetch public platform statistics[cite: 2].",
         "security": [{"APIKeyAuth": []}],
         "responses": {
-            200: {"description": "Public system statistics."},
-            401: {"description": "Missing or invalid API key."},
+            200: {"description": "Public system statistics[cite: 2]."},
+            401: {"description": "Missing or invalid API key[cite: 2]."},
         },
     }
 )
 def public_stats() -> Tuple[Response, int]:
-    """Public System Statistics (Requires API Key)."""
+    """Public System Statistics (Requires API Key)[cite: 2]."""
     stats = {
         "user_count": User.query.count(),
         "tradeline_count": Tradeline.query.count(),
@@ -276,7 +276,7 @@ def public_stats() -> Tuple[Response, int]:
 @api_v1_bp.route("/core/transactions", methods=["POST"])
 @csrf.exempt
 def create_transaction() -> Tuple[Response, int]:
-    """Create a transaction (Test Harness Endpoint)."""
+    """Create a transaction (Test Harness Endpoint)[cite: 2]."""
     if not request.is_json:
         return error_response(
             "E_JSON_REQUIRED",
@@ -319,7 +319,7 @@ def create_transaction() -> Tuple[Response, int]:
 @api_v1_bp.route("/sync", methods=["POST"])
 @csrf.exempt
 def enqueue_sync() -> Tuple[Response, int]:
-    """Enqueue a sync job for background processing."""
+    """Enqueue a sync job for background processing[cite: 2]."""
     if not request.is_json:
         return error_response(
             "E_JSON_REQUIRED",
@@ -416,7 +416,7 @@ def enqueue_sync() -> Tuple[Response, int]:
 @api_v1_bp.route("/sync/jobs/<path:job_id>", methods=["GET"])
 @csrf.exempt
 def get_sync_job_status(job_id: str) -> Tuple[Response, int]:
-    """Fetch status for an enqueued sync job."""
+    """Fetch status for an enqueued sync job[cite: 2]."""
     rc = current_app.extensions.get("redis_client") or getattr(
         current_app, "redis_client", None
     )
@@ -449,7 +449,7 @@ def get_sync_job_status(job_id: str) -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Auth"],
-        "summary": "Register a new user account.",
+        "summary": "Register a new user account[cite: 2].",
         "parameters": [
             {
                 "name": "body",
@@ -476,13 +476,13 @@ def get_sync_job_status(job_id: str) -> Tuple[Response, int]:
             }
         ],
         "responses": {
-            201: {"description": "Registration successful."},
-            422: {"description": "Validation error or existing entity."},
+            201: {"description": "Registration successful[cite: 2]."},
+            422: {"description": "Validation error or existing entity[cite: 2]."},
         },
     }
 )
 def register() -> Tuple[Response, int]:
-    """Register a new user account with defensive input checks."""
+    """Register a new user account with defensive input checks[cite: 2]."""
     data: Dict[str, Any] = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
@@ -578,7 +578,7 @@ def register() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Auth"],
-        "summary": "User login and JWT generation.",
+        "summary": "User login and JWT generation[cite: 2].",
         "parameters": [
             {
                 "name": "body",
@@ -607,16 +607,16 @@ def register() -> Tuple[Response, int]:
         "responses": {
             200: {
                 "description": (
-                    "Login successful. Returns access and refresh tokens."
+                    "Login successful. Returns access and refresh tokens[cite: 2]."
                 )
             },
-            401: {"description": "Invalid credentials or missing MFA code."},
-            403: {"description": "Account pending administrative approval."},
+            401: {"description": "Invalid credentials or missing MFA code[cite: 2]."},
+            403: {"description": "Account pending administrative approval[cite: 2]."},
         },
     }
 )
 def login() -> Tuple[Response, int]:
-    """User authentication and JWT token issuance."""
+    """User authentication and JWT token issuance[cite: 2]."""
     data: Dict[str, Any] = request.get_json(silent=True) or {}
     email = (data.get("email") or "").strip().lower()
     password = (data.get("password") or "").strip()
@@ -701,7 +701,7 @@ def login() -> Tuple[Response, int]:
 
     increment_counter("auth_login_success_v1")
 
-    response = success_response(
+    response, status_code = success_response(
         {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -714,7 +714,7 @@ def login() -> Tuple[Response, int]:
     )
 
     set_access_cookies(response, access_token)
-    return response
+    return response, status_code
 
 
 @api_v1_bp.route("/auth/token/refresh", methods=["POST"])
@@ -724,24 +724,25 @@ def login() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Auth"],
-        "summary": "Refresh expired access token.",
-        "responses": {200: {"description": "New access token generated."}},
+        "summary": "Refresh expired access token[cite: 2].",
+        "responses": {200: {"description": "New access token generated[cite: 2]."}},
     }
 )
 def refresh_token() -> Tuple[Response, int]:
-    """Refreshes the JWT access token using a valid refresh token."""
+    """Refreshes the JWT access token using a valid refresh token[cite: 2]."""
     current_user_id = get_jwt_identity()
     new_access_token = create_access_token(
         identity=current_user_id,
         expires_delta=timedelta(hours=JWT_EXPIRATION_HOURS),
     )
 
-    response = success_response(
+    response, status_code = success_response(
         {"access_token": new_access_token},
         message="Token refreshed successfully.",
     )
+
     set_access_cookies(response, new_access_token)
-    return response
+    return response, status_code
 
 
 @api_v1_bp.route("/auth/mfa/verify", methods=["POST"])
@@ -750,7 +751,7 @@ def refresh_token() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Auth"],
-        "summary": "Verify and enable MFA for user.",
+        "summary": "Verify and enable MFA for user[cite: 2].",
         "parameters": [
             {
                 "name": "body",
@@ -769,14 +770,14 @@ def refresh_token() -> Tuple[Response, int]:
             }
         ],
         "responses": {
-            200: {"description": "MFA verified and enabled."},
-            401: {"description": "Invalid MFA code."},
-            422: {"description": "Missing MFA code."},
+            200: {"description": "MFA verified and enabled[cite: 2]."},
+            401: {"description": "Invalid MFA code[cite: 2]."},
+            422: {"description": "Missing MFA code[cite: 2]."},
         },
     }
 )
 def mfa_verify() -> Tuple[Response, int]:
-    """Verifies MFA code and enables MFA on the current user account."""
+    """Verifies MFA code and enables MFA on the current user account[cite: 2]."""
     user_id = get_jwt_identity()
     data: Dict[str, Any] = request.get_json(silent=True) or {}
     mfa_code = data.get("mfa_code")
@@ -852,28 +853,28 @@ def mfa_verify() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Tradelines"],
-        "summary": "List tradelines with offset pagination.",
+        "summary": "List tradelines with offset pagination[cite: 2].",
         "parameters": [
             {
                 "name": "limit",
                 "in": "query",
                 "type": "integer",
                 "default": 10,
-                "description": "Number of records to return (1-100).",
+                "description": "Number of records to return (1-100)[cite: 2].",
             },
             {
                 "name": "offset",
                 "in": "query",
                 "type": "integer",
                 "default": 0,
-                "description": "Number of records to skip.",
+                "description": "Number of records to skip[cite: 2].",
             },
         ],
-        "responses": {200: {"description": "Paginated list of tradelines."}},
+        "responses": {200: {"description": "Paginated list of tradelines[cite: 2]."}},
     }
 )
 def list_tradelines() -> Tuple[Response, int]:
-    """Fetches paginated tradelines belonging to the authenticated user."""
+    """Fetches paginated tradelines belonging to the authenticated user[cite: 2]."""
     user_id = get_jwt_identity()
 
     try:
@@ -927,7 +928,7 @@ def list_tradelines() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Tradelines"],
-        "summary": "Create a new tradeline record.",
+        "summary": "Create a new tradeline record[cite: 2].",
         "parameters": [
             {
                 "name": "body",
@@ -956,15 +957,15 @@ def list_tradelines() -> Tuple[Response, int]:
             }
         ],
         "responses": {
-            201: {"description": "Tradeline created successfully."},
+            201: {"description": "Tradeline created successfully[cite: 2]."},
             422: {
-                "description": "Validation error or invalid payload format."
+                "description": "Validation error or invalid payload format[cite: 2]."
             },
         },
     }
 )
 def create_tradeline() -> Tuple[Response, int]:
-    """Creates a new tradeline record for the authenticated user."""
+    """Creates a new tradeline record for the authenticated user[cite: 2]."""
     user_id = get_jwt_identity()
     data: Dict[str, Any] = request.get_json(silent=True) or {}
 
@@ -1034,24 +1035,24 @@ def create_tradeline() -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Tradelines"],
-        "summary": "Fetch a specific tradeline by ID.",
+        "summary": "Fetch a specific tradeline by ID[cite: 2].",
         "parameters": [
             {
                 "name": "tradeline_id",
                 "in": "path",
                 "type": "integer",
                 "required": True,
-                "description": "Unique identifier of the tradeline.",
+                "description": "Unique identifier of the tradeline[cite: 2].",
             }
         ],
         "responses": {
-            200: {"description": "Tradeline details."},
-            404: {"description": "Tradeline not found or access denied."},
+            200: {"description": "Tradeline details[cite: 2]."},
+            404: {"description": "Tradeline not found or access denied[cite: 2]."},
         },
     }
 )
 def get_tradeline(tradeline_id: int) -> Tuple[Response, int]:
-    """Retrieves a single tradeline record verified by user ownership."""
+    """Retrieves a single tradeline record verified by user ownership[cite: 2]."""
     user_id = get_jwt_identity()
     tradeline = Tradeline.query.filter_by(
         id=tradeline_id, user_id=user_id
@@ -1077,14 +1078,14 @@ def get_tradeline(tradeline_id: int) -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Tradelines"],
-        "summary": "Update an existing tradeline.",
+        "summary": "Update an existing tradeline[cite: 2].",
         "parameters": [
             {
                 "name": "tradeline_id",
                 "in": "path",
                 "type": "integer",
                 "required": True,
-                "description": "Unique identifier of the tradeline.",
+                "description": "Unique identifier of the tradeline[cite: 2].",
             },
             {
                 "name": "body",
@@ -1103,14 +1104,14 @@ def get_tradeline(tradeline_id: int) -> Tuple[Response, int]:
             },
         ],
         "responses": {
-            200: {"description": "Tradeline updated successfully."},
-            404: {"description": "Tradeline not found or access denied."},
-            422: {"description": "Invalid input payload."},
+            200: {"description": "Tradeline updated successfully[cite: 2]."},
+            404: {"description": "Tradeline not found or access denied[cite: 2]."},
+            422: {"description": "Invalid input payload[cite: 2]."},
         },
     }
 )
 def update_tradeline(tradeline_id: int) -> Tuple[Response, int]:
-    """Updates an existing tradeline record with user authorization check."""
+    """Updates an existing tradeline record with user authorization check[cite: 2]."""
     user_id = get_jwt_identity()
     data: Dict[str, Any] = request.get_json(silent=True) or {}
 
@@ -1180,24 +1181,24 @@ def update_tradeline(tradeline_id: int) -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Tradelines"],
-        "summary": "Delete a specific tradeline.",
+        "summary": "Delete a specific tradeline[cite: 2].",
         "parameters": [
             {
                 "name": "tradeline_id",
                 "in": "path",
                 "type": "integer",
                 "required": True,
-                "description": "Unique identifier of the tradeline.",
+                "description": "Unique identifier of the tradeline[cite: 2].",
             }
         ],
         "responses": {
-            200: {"description": "Tradeline deleted successfully."},
-            404: {"description": "Tradeline not found or access denied."},
+            200: {"description": "Tradeline deleted successfully[cite: 2]."},
+            404: {"description": "Tradeline not found or access denied[cite: 2]."},
         },
     }
 )
 def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
-    """Deletes a specific tradeline record with ownership verification."""
+    """Deletes a specific tradeline record with ownership verification[cite: 2]."""
     user_id = get_jwt_identity()
     tradeline = Tradeline.query.filter_by(
         id=tradeline_id, user_id=user_id
@@ -1255,14 +1256,14 @@ def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
 @swag_from(
     {
         "tags": ["Tradelines"],
-        "summary": "Review a tradeline item.",
+        "summary": "Review a tradeline item[cite: 2].",
         "parameters": [
             {
                 "name": "tradeline_id",
                 "in": "path",
                 "type": "integer",
                 "required": True,
-                "description": "Unique identifier of the tradeline.",
+                "description": "Unique identifier of the tradeline[cite: 2].",
             },
             {
                 "name": "body",
@@ -1283,7 +1284,7 @@ def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
         ],
         "responses": {
             200: {
-                "description": "Tradeline review processed successfully.",
+                "description": "Tradeline review processed successfully[cite: 2].",
                 "schema": {
                     "type": "object",
                     "properties": {
@@ -1296,7 +1297,7 @@ def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
                 },
             },
             400: {
-                "description": "Invalid action parameter.",
+                "description": "Invalid action parameter[cite: 2].",
                 "schema": {
                     "type": "object",
                     "properties": {
@@ -1315,7 +1316,7 @@ def delete_tradeline(tradeline_id: int) -> Tuple[Response, int]:
     }
 )
 def review_tradeline_v1(tradeline_id: int) -> Tuple[Response, int]:
-    """Review a tradeline endpoint exposed at /api/v1/tradelines/review/<id>."""
+    """Review a tradeline endpoint exposed at /api/v1/tradelines/review/<id>[cite: 2]."""
     payload = request.get_json(silent=True) or {}
     action = payload.get("action")
 

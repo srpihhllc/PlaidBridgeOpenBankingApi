@@ -53,14 +53,16 @@ def build_summary(txns: Iterable[TransactionDTO]) -> TransactionSummary:
 def build_category_breakdown(
     txns: Iterable[TransactionDTO],
 ) -> CategoryBreakdown:
-    bucket = defaultdict(float)
+    bucket: defaultdict[str, float] = defaultdict(float)
+
     for t in txns:
         bucket[t.category] += t.amount
+
     return CategoryBreakdown(by_category=dict(bucket))
 
 
 def compute_fraud_insights(txns: Iterable[TransactionDTO]) -> FraudInsight:
-    flagged = []
+    flagged: list[TransactionDTO] = []
     risk = 0.0
 
     for t in txns:
@@ -73,9 +75,10 @@ def compute_fraud_insights(txns: Iterable[TransactionDTO]) -> FraudInsight:
             risk += 20.0
 
     risk_score = max(0.0, min(100.0, risk))
-    # Deduplicate flagged list
-    seen = set()
-    unique_flagged = []
+
+    # Deduplicate flagged list.
+    seen: set[object] = set()
+    unique_flagged: list[TransactionDTO] = []
     for t in flagged:
         if t.id not in seen:
             seen.add(t.id)

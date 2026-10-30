@@ -1,3 +1,4 @@
+from app.extensions import db
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/bank_institution.py
 
 from ..extensions import db

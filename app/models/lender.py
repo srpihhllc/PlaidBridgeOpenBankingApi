@@ -1,6 +1,7 @@
-#  /home/srpihhllc/PlaidBridgeOpenBankingApi/app/models/lender.py
+"""Lender profile model."""
 
 from datetime import datetime, timezone
+from typing import Any
 
 from ..extensions import db
 
@@ -11,8 +12,7 @@ class Lender(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # ✔ Must match User.id (String(36))
-    # ✔ Must include ondelete="CASCADE"
+    # Must match User.id (String(36)).
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -31,7 +31,8 @@ class Lender(db.Model):
     linked_at = db.Column(db.DateTime)
 
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at = db.Column(
         db.DateTime,
@@ -39,12 +40,8 @@ class Lender(db.Model):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    # ----------------------------------------------------------------------
-    # Relationships
-    # ----------------------------------------------------------------------
     user = db.relationship("User", back_populates="lender_profiles")
 
-    # ⭐ NEW — 1:1 lender risk profile
     risk_profile = db.relationship(
         "LenderRisk",
         back_populates="lender",
@@ -53,10 +50,7 @@ class Lender(db.Model):
         passive_deletes=True,
     )
 
-    # ----------------------------------------------------------------------
-    # Serialization
-    # ----------------------------------------------------------------------
-    def to_dict(self):
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -69,8 +63,6 @@ class Lender(db.Model):
             "verification_status": self.verification_status,
             "verification_score": self.verification_score,
             "bank_linked": self.bank_linked,
-            "linked_at": self.linked_at.isoformat()
-            if self.linked_at
-            else None,
-            "created_at": self.created_at.isoformat(),
+            "linked_at": self.linked_at.isoformat() if self.linked_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }

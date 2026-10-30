@@ -1,3 +1,4 @@
+from app.extensions import db
 # =============================================================================
 # FILE: app/models/bank_transaction.py
 # DESCRIPTION: BankTransaction model. Uses integer FKs matching BankAccount.id,

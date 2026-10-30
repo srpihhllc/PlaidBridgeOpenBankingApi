@@ -7,11 +7,15 @@
 
 import uuid
 from datetime import datetime, timezone
+from typing import Any
 
 from ..extensions import db
 
+# Flask-SQLAlchemy's dynamically provided Model may not be visible to mypy.
+Model: Any = db.Model
 
-class Transaction(db.Model):
+
+class Transaction(Model):
     __tablename__ = "transactions"
     __table_args__ = {"extend_existing": True}
 
@@ -48,11 +52,12 @@ class Transaction(db.Model):
     description = db.Column(db.String(255), nullable=True)
     is_pending = db.Column(db.Boolean, default=False)
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
 
     # -------------------------------------------------------------------------
-    # Plaid‑style enrichment fields
+    # Plaid-style enrichment fields
     # -------------------------------------------------------------------------
     mcc = db.Column(db.String(10), nullable=True)
     fraud_score = db.Column(db.Float, nullable=True)
@@ -80,9 +85,7 @@ class Transaction(db.Model):
         passive_deletes=True,
     )
 
-    # -------------------------------------------------------------------------
-    # FIXED: Rename audit_events → audit_logs to avoid collision with User.audit_events
-    # -------------------------------------------------------------------------
+    # Named audit_logs to avoid collision with User.audit_events.
     audit_logs = db.relationship(
         "AuditLog",
         back_populates="transaction",
@@ -93,5 +96,8 @@ class Transaction(db.Model):
     # -------------------------------------------------------------------------
     # Representation
     # -------------------------------------------------------------------------
-    def __repr__(self):
-        return f"<Transaction id={self.id} user_id={self.user_id} amount={self.amount}>"
+    def __repr__(self) -> str:
+        return (
+            f"<Transaction id={self.id} user_id={self.user_id} "
+            f"amount={self.amount}>"
+        )

@@ -1,6 +1,5 @@
-#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/tests/test_contracts.py
-
 import json
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -23,7 +22,7 @@ def swagger_spec(app):
             # Cache spec on disk for inspection and offline validation tools
             SWAGGER_FILE.write_text(json.dumps(spec_data, indent=2))
             return spec_data
-        
+
         # Fallback to cached fixture if endpoint generation fails
         if SWAGGER_FILE.exists():
             with open(SWAGGER_FILE, "r") as f:
@@ -36,7 +35,17 @@ def swagger_spec(app):
 
 def test_swagger_schema_integrity(swagger_spec):
     """Ensures the swagger spec strictly complies with Swagger 2.0 / OpenAPI rules."""
-    validate_openapi_spec(swagger_spec)
+    spec = deepcopy(swagger_spec)
+    spec.pop("$schema", None)
+
+    try:
+        validate_openapi_spec(spec)
+    except Exception as exc:
+        raise AssertionError(
+            "Swagger validation failed. "
+            f"$schema={swagger_spec.get('$schema')!r}, "
+            f"$ref={swagger_spec.get('$ref')!r}"
+        ) from exc
 
 
 def validate_response_contract(

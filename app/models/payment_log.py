@@ -1,7 +1,7 @@
 # =============================================================================
 # FILE: app/models/payment_log.py
-# DESCRIPTION: Cockpit‑grade PaymentLog model aligned with UUID user IDs,
-#              cascade delete semantics, and explicit two-way relationships.
+# DESCRIPTION: Payment logs linked to UUID-based user IDs with cascade delete
+#              semantics and a dynamically defined User relationship.
 # =============================================================================
 
 from datetime import datetime, timezone
@@ -15,8 +15,6 @@ class PaymentLog(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # ✔ Must match User.id (String(36))
-    # ✔ Must include ondelete="CASCADE"
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -27,18 +25,12 @@ class PaymentLog(db.Model):
     amount = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(5), nullable=False, default="USD")
 
-    status = db.Column(
-        db.String(50),
-        nullable=False,
-    )  # e.g., 'pending', 'succeeded', 'failed'
-
-    transaction_type = db.Column(
-        db.String(50),
-        nullable=False,
-    )  # e.g., 'ach', 'card', 'crypto'
+    status = db.Column(db.String(50), nullable=False)
+    transaction_type = db.Column(db.String(50), nullable=False)
 
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
     updated_at = db.Column(
         db.DateTime,
@@ -46,19 +38,17 @@ class PaymentLog(db.Model):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    # -------------------------------------------------------------------------
-    # Relationships (The Runtime Symmetry Fix)
-    # -------------------------------------------------------------------------
-
-    # ⭐ SENIOR FIX: Swapped back_populates for explicit dynamic backref.
-    # This dynamically injects 'payment_logs' into the User mapper frame at runtime,
-    # avoiding compile-time KeyError/InvalidRequestError checks.
     user = db.relationship(
         "User",
         backref=db.backref(
-            "payment_logs", lazy="dynamic", passive_deletes=True
+            "payment_logs",
+            lazy="dynamic",
+            passive_deletes=True,
         ),
     )
 
-    def __repr__(self):
-        return f"<PaymentLog id={self.id} user_id={self.user_id} status='{self.status}'>"
+    def __repr__(self) -> str:
+        return (
+            f"<PaymentLog id={self.id} user_id={self.user_id} "
+            f"status='{self.status}'>"
+        )

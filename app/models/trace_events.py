@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from app.extensions import db
 
+Model: Any = db.Model
 
-class TraceEvent(db.Model):
+
+class TraceEvent(Model):
     """
     A model to record application events, such as restarts, login attempts,
     or critical failures. Supports both authenticated and anonymous events.
@@ -56,7 +58,7 @@ class TraceEvent(db.Model):
     # This matches User.trace_events back_populates and allows mappers to configure.
     user = db.relationship(
         "User", back_populates="trace_events", foreign_keys=[user_id]
-    )  # type: ignore
+    )
 
     def __repr__(self) -> str:
         return f"<TraceEvent {self.event_type} event_id={self.event_id} user_id={self.user_id}>"
@@ -72,6 +74,6 @@ class TraceEvent(db.Model):
         if not self.meta:
             return {}
         try:
-            return json.loads(self.meta)
+            return cast(Dict[str, Any], json.loads(self.meta))
         except Exception:
             return {}

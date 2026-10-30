@@ -17,28 +17,23 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
-# ---- Exceptions ----
 class SendMFACodeError(Exception):
-    """Base send error."""
+    """Base error for MFA code delivery."""
 
 
 class SendMFATransientError(SendMFACodeError):
-    """Transient error (retryable)."""
+    """Retryable MFA delivery error."""
 
 
 class SendMFAPermanentError(SendMFACodeError):
-    """Permanent error (not retryable)."""
+    """Non-retryable MFA delivery error."""
 
 
-# ---- Config / hooks (override in tests or via DI) ----
-# Hook for generating codes (test can override)
 def _default_generate_code_hook() -> str:
-    return f"{secrets.randbelow(10**6):06d}"
+    return f"{secrets.randbelow(1_000_000):06d}"
 
 
 _generate_code_hook: Callable[[], str] = _default_generate_code_hook
-
-# Hook for telemetry (operator can swap-in)
 _telemetry_hook: Callable[[str, dict], None] | None = None
 
 
@@ -53,86 +48,96 @@ def register_telemetry_hook(fn: Callable[[str, dict], None]) -> None:
 
 
 def _emit_telemetry(evt: str, payload: dict) -> None:
+    # Do not put MFA codes or full contact details in telemetry.
     try:
         if _telemetry_hook:
             _telemetry_hook(evt, payload)
         else:
-            logger.debug("telemetry: %s %s", evt, payload)
+            logger.debug("MFA telemetry: %s %s", evt, payload)
     except Exception:
-        logger.exception("telemetry hook failed for %s", evt)
+        logger.exception("Telemetry hook failed for event=%s", evt)
 
 
-# ---- Low-level sender (legacy signature) ----
 def _send_via_phone(phone_number: str, code: str) -> bool:
     """
-    Low-level phone sender (legacy). Keep this trivial for now.
-    Replace with a real provider integration that returns True on success.
+    SMS provider integration point.
+
+    Replace this function with your provider's API call. It must return True
+    only if the provider accepts the message.
     """
-    try:
-        logger.info(
-            "[MOCK SMS] Sending MFA code to phone (masked): ****%s",
-            phone_number[-4:] if phone_number else "????",
-        )
-        _emit_telemetry(
-            "MFA_SEND_SMS_STUB",
-            {"phone_last4": phone_number[-4:] if phone_number else None},
-        )
-        return True
-    except Exception as exc:
-        logger.error("Low-level SMS send failed: %s", exc, exc_info=True)
-        raise SendMFATransientError("low-level sms send failed") from exc
+    del phone_number, code
+    raise SendMFAPermanentError("SMS provider is not configured; code was not sent.")
 
 
-# ---- Provider gateway (pluggable) ----
+def _send_via_email(email: str, code: str) -> bool:
+    """
+    Email provider integration point.
+
+    Replace this function with your provider's API call. It must return True
+    only if the provider accepts the message.
+    """
+    del email, code
+    raise SendMFAPermanentError("Email provider is not configured; code was not sent.")
+
+
 def new_send_mfa_code(
-    user: Any, code: str, purpose: str = "setup", persist: bool = True
+    user: Any,
+    code: str,
+    purpose: str = "setup",
+    persist: bool = True,
 ) -> bool:
-    """
-    Provider entrypoint. Default behaviour:
-      - prefer user.primary_phone
-      - fallback to user.email (development only)
-    Return True on success, False/raise on failure.
-    """
-    phone = getattr(user, "primary_phone", None)
+    """Send a code through a configured provider; never claim a mock send succeeded."""
+    del purpose, persist
+
+    phone = (
+        getattr(user, "primary_phone", None)
+        or getattr(user, "phone_number", None)
+        or getattr(user, "phone", None)
+        or getattr(user, "business_phone", None)
+    )
     email = getattr(user, "email", None)
     user_id = getattr(user, "id", None)
 
     if phone:
         try:
-            ok = _send_via_phone(phone, code)
-        except SendMFATransientError:
+            sent = _send_via_phone(str(phone), code)
+        except SendMFACodeError:
             _emit_telemetry(
-                "MFA_SEND_FAILURE_TRANSIENT",
-                {"user_id": user_id, "mode": "sms"},
+                "MFA_SEND_FAILURE",
+                {"user_id": user_id, "channel": "sms"},
             )
             raise
         except Exception as exc:
-            _emit_telemetry(
-                "MFA_SEND_FAILURE_PERMANENT",
-                {"user_id": user_id, "mode": "sms"},
-            )
-            raise SendMFAPermanentError("sms provider failure") from exc
-        _emit_telemetry("MFA_SEND_SMS_OK", {"user_id": user_id, "mode": "sms"})
-        return ok
-    elif email:
-        # Development fallback: we log and return True.
-        logger.info(
-            "[MOCK EMAIL] MFA code delivered to email (masked): %s",
-            email.split("@")[0] + "@***",
-        )
-        _emit_telemetry(
-            "MFA_SEND_EMAIL_OK", {"user_id": user_id, "mode": "email"}
-        )
+            raise SendMFATransientError("SMS provider failed") from exc
+
+        if not sent:
+            raise SendMFATransientError("SMS provider did not accept the message.")
+
+        _emit_telemetry("MFA_SEND_ACCEPTED", {"user_id": user_id, "channel": "sms"})
         return True
-    else:
-        logger.warning(
-            "No delivery address for user id=%s; cannot send MFA code", user_id
-        )
-        _emit_telemetry("MFA_SEND_NO_ADDRESS", {"user_id": user_id})
-        raise SendMFAPermanentError("no delivery address")
+
+    if email:
+        try:
+            sent = _send_via_email(str(email), code)
+        except SendMFACodeError:
+            _emit_telemetry(
+                "MFA_SEND_FAILURE",
+                {"user_id": user_id, "channel": "email"},
+            )
+            raise
+        except Exception as exc:
+            raise SendMFATransientError("Email provider failed") from exc
+
+        if not sent:
+            raise SendMFATransientError("Email provider did not accept the message.")
+
+        _emit_telemetry("MFA_SEND_ACCEPTED", {"user_id": user_id, "channel": "email"})
+        return True
+
+    _emit_telemetry("MFA_SEND_NO_ADDRESS", {"user_id": user_id})
+    raise SendMFAPermanentError("User has no configured MFA delivery address.")
 
 
-# ---- Wrapper (compat) ----
 def send_mfa_code(
     user_or_phone: Any,
     code: str | None = None,
@@ -145,79 +150,67 @@ def send_mfa_code(
     Backwards-compatible wrapper.
 
     Supports:
-      - send_mfa_code(user_obj) -> returns generated code
-      - send_mfa_code(user_obj, code="123456") -> returns the code
-      - send_mfa_code(phone_number, code) -> legacy; returns code on success
-
-    Raises SendMFACodeError on failure.
+      send_mfa_code(user_obj)
+      send_mfa_code(user_obj, code="123456")
+      send_mfa_code(phone_number, code="123456")
     """
-    # legacy phone + code path
+    # Legacy phone-number call.
     if isinstance(user_or_phone, str):
-        phone = user_or_phone
         if not code:
             raise TypeError(
-                "Legacy send_mfa_code(phone_number, code) requires a code argument"
+                "send_mfa_code(phone_number, code) requires a code argument"
             )
+
         try:
-            ok = _send_via_phone(phone, code)
-        except SendMFATransientError:
+            sent = _send_via_phone(user_or_phone, code)
+        except SendMFACodeError:
             raise
-        except Exception as e:
-            raise SendMFAPermanentError(str(e)) from e
-        if not ok:
-            raise SendMFATransientError("low-level phone send returned False")
+        except Exception as exc:
+            raise SendMFATransientError("SMS provider failed") from exc
+
+        if not sent:
+            raise SendMFATransientError("SMS provider did not accept the message.")
         return code
 
-    # user-like object
     user = user_or_phone
     user_id = getattr(user, "id", None)
-    if not code:
-        code = _generate_code_hook()
+    code = code or _generate_code_hook()
 
     attempt = 0
     while True:
         try:
-            ok = new_send_mfa_code(
-                user, code=code, purpose=purpose, persist=persist
+            sent = new_send_mfa_code(
+                user,
+                code=code,
+                purpose=purpose,
+                persist=persist,
             )
-            if not ok:
-                raise SendMFATransientError("provider returned False")
-            _emit_telemetry(
-                "MFA_SEND_OK", {"user_id": user_id, "purpose": purpose}
-            )
+            if not sent:
+                raise SendMFATransientError("Provider did not accept the message.")
+
+            _emit_telemetry("MFA_SEND_OK", {"user_id": user_id, "purpose": purpose})
             return code
-        except SendMFAPermanentError as e:
-            logger.warning(
-                "Permanent send failure for user=%s: %s", user_id, e
-            )
+
+        except SendMFAPermanentError:
             _emit_telemetry(
-                "MFA_SEND_PERMANENT", {"user_id": user_id, "error": str(e)}
+                "MFA_SEND_PERMANENT",
+                {"user_id": user_id, "purpose": purpose},
             )
             raise
-        except SendMFATransientError as e:
+
+        except SendMFATransientError:
             attempt += 1
             _emit_telemetry(
                 "MFA_SEND_TRANSIENT",
-                {"user_id": user_id, "attempt": attempt, "error": str(e)},
+                {"user_id": user_id, "attempt": attempt},
             )
-            logger.warning(
-                "Transient send failure for user=%s attempt=%s: %s",
-                user_id,
-                attempt,
-                e,
-            )
+
             if attempt > retry:
                 raise
-            # backoff then retry
-            if backoff:
+
+            if backoff > 0:
                 time.sleep(backoff * attempt)
-            continue
-        except Exception as e:
-            logger.exception(
-                "Unexpected exception while sending MFA code for user=%s",
-                user_id,
-            )
-            _emit_telemetry(
-                "MFA_SEND_UNEXPECTED", {"user_id": user_id, "error": str(e)}
-            )
-            raise SendMFATransientError(str(e)) from e
+
+        except Exception as exc:
+            logger.exception("Unexpected MFA send error for user_id=%s", user_id)
+            raise SendMFATransientError("Unexpected MFA delivery failure.") from exc

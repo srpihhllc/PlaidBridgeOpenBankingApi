@@ -1,16 +1,15 @@
 # =============================================================================
 # FILE: app/models/todo.py
-# DESCRIPTION: Todo model with UUID user linkage and cascade‑safe semantics.
+# DESCRIPTION: Todo model with UUID user linkage and cascade-safe semantics.
 # =============================================================================
 
 from datetime import date, datetime, timezone
-
-from sqlalchemy.orm import DeclarativeBase
+from typing import Any
 
 from app.extensions import db
 
-# Mypy-safe alias for Flask‑SQLAlchemy dynamic base
-Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
+# Flask-SQLAlchemy's dynamically provided Model may not be visible to mypy.
+Model: Any = db.Model
 
 
 class Todo(Model):
@@ -41,7 +40,9 @@ class Todo(Model):
 
     # Timestamps
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
     updated_at = db.Column(
         db.DateTime,
@@ -55,9 +56,12 @@ class Todo(Model):
 
     # Business logic
     def is_overdue(self) -> bool:
-        if self.completed or not self.due_date:
+        if self.completed or self.due_date is None:
             return False
-        return self.due_date < date.today()
+        return bool(self.due_date < date.today())
 
-    def __repr__(self):
-        return f"<Todo id={self.id} user_id={self.user_id} text={self.text!r}>"
+    def __repr__(self) -> str:
+        return (
+            f"<Todo id={self.id} user_id={self.user_id} "
+            f"text={self.text!r}>"
+        )

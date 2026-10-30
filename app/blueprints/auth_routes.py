@@ -9,10 +9,13 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
+import os
 import secrets
 from datetime import datetime, timezone
+from typing import Optional, cast
 
 from flask import (
     Blueprint,
@@ -175,7 +178,7 @@ def _resolve_mfa_user() -> User | None:
     if not uid:
         return None
     try:
-        return db.session.get(User, uid)
+        return cast(Optional[User], db.session.get(User, uid))
     except Exception:
         current_app.logger.exception(
             "Failed to load user from session.mfa_user_id"
@@ -199,7 +202,20 @@ def send_mfa_code(user: User, code: str | None = None) -> str:
     if code is None:
         code = f"{secrets.randbelow(10**6):06d}"
 
-    dest = getattr(user, "email", None) or getattr(user, "primary_phone", None)
+    # Resolve phone number using primary_phone from database schema
+    user_phone = (
+        getattr(user, "primary_phone", None)
+        or getattr(user, "phone_number", None)
+        or getattr(user, "phone", None)
+        or getattr(user, "business_phone", None)
+    )
+    if not user_phone:
+        logger.warning(
+            "[MOCK WARNING: No matching phone column name found in schema for user_id=%s]",
+            getattr(user, "id", None),
+        )
+
+    dest = getattr(user, "email", None) or user_phone
     if dest and "@" in dest:
         parts = dest.split("@", 1)
         masked = parts[0][:3] + "***@" + parts[1]
@@ -753,9 +769,57 @@ def login_subscriber():
     return login_view()
 
 
-@auth_bp.route("/login_operator", methods=["GET"])
+@auth_bp.route("/login_operator", methods=["GET", "POST"], endpoint="login_operator")
 def login_operator():
-    return render_template("auth/operator_login.html")
+    if request.method == "GET":
+        return render_template("auth/operator_login.html")
+
+    ip = request.remote_addr
+    user_agent = request.user_agent.string
+
+    # 1. Extract and normalize values
+    submitted = (request.form.get("passcode") or "").strip().upper()
+    raw_env_code = os.getenv("ROOT_IGNITION_CODE", "")
+    expected = raw_env_code.strip().upper()
+
+    # 2. Check environment configuration
+    if not expected:
+        current_app.logger.error("ROOT_IGNITION_CODE environment variable is unconfigured.")
+        flash("Operator login is temporarily disabled.", "danger")
+        return render_template("auth/operator_login.html"), 503
+
+    # 3. Secure timing-attack resistant comparison
+    if not hmac.compare_digest(submitted, expected):
+        log_identity_event(
+            0,
+            "AUTH_OPERATOR_LOGIN_FAIL",
+            ip=ip,
+            user_agent=user_agent,
+            details={"reason": "invalid_passcode"},
+        )
+        flash("Invalid operator ignition code.", "danger")
+        return render_template("auth/operator_login.html"), 401
+
+    # 4. Resolve or create the operator admin account
+    operator_user = db.session.query(User).filter_by(role="admin").first()
+    if not operator_user:
+        operator_user = db.session.query(User).filter_by(is_admin=True).first()
+
+    if not operator_user:
+        current_app.logger.error("No designated admin user account found for operator elevation.")
+        flash("System operator account not configured.", "danger")
+        return render_template("auth/operator_login.html"), 500
+
+    # 5. Authenticate session & log event
+    login_user(operator_user)
+    log_identity_event(
+        operator_user.id,
+        "AUTH_OPERATOR_LOGIN_SUCCESS",
+        ip=ip,
+        user_agent=user_agent,
+    )
+    flash("Operator authentication successful.", "success")
+    return redirect(url_for("admin.admin_index"))
 
 
 # API Logout

@@ -9,9 +9,12 @@ Hardened for PythonAnywhere & Production safety.
 Guards against the "Sticky URI" trap and component omission.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 import urllib.parse
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -20,13 +23,13 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 
-def as_bool(value: str, default: bool = False) -> bool:
+def as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
     return str(value).lower() in ("true", "1", "yes")
 
 
-def parse_rate_limits(raw: str):
+def parse_rate_limits(raw: str | None) -> list[str]:
     if not raw:
         return ["200 per day", "50 per hour"]
     parts = [p.strip() for p in raw.split(",") if p.strip()]
@@ -85,7 +88,7 @@ _GENERATED_URI = f"mysql+pymysql://{_DB_USER}:{_encoded_password}@{_DB_HOST}:{_D
 if _HAS_COMPONENTS:
     _SQLALCHEMY_DATABASE_URI = _GENERATED_URI
 else:
-    _SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
+    _SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "")
     if not _SQLALCHEMY_DATABASE_URI and _IS_PROD_OR_MIGRATION:
         raise RuntimeError(
             "CRITICAL: No database components found and no URI override provided."
@@ -106,7 +109,7 @@ if os.getenv("ALEMBIC_RUNNING") == "1":
     )
     print(f" [CONFIG] 🔗  Effective URI: {_masked_uri}")
     print(
-        f" [CONFIG] 🧪  Integrity:    Auth={'✅' if _DB_PASSWORD else '❌'}, "
+        f" [CONFIG] 🧪  Integrity:   Auth={'✅' if _DB_PASSWORD else '❌'}, "
         f"Port={_DB_PORT}"
     )
     print("═" * 60 + "\n")
@@ -133,7 +136,7 @@ class BaseConfig:
     }
 
     @classmethod
-    def validate(cls):
+    def validate(cls) -> None:
         if cls.ENV == "production":
             if cls.SECRET_KEY.startswith(
                 "DEV_"
@@ -143,7 +146,7 @@ class BaseConfig:
                 )
 
     @classmethod
-    def summarize(cls):
+    def summarize(cls) -> dict[str, Any]:
         return {
             "app": cls.APP_NAME,
             "version": cls.APP_VERSION,
@@ -199,12 +202,12 @@ CONFIG_MAP = {
 }
 
 
-def get_config_class(env_name: str = None):
+def get_config_class(env_name: str | None = None) -> type[BaseConfig]:
     raw = env_name or os.getenv("FLASK_ENV") or "production"
     return CONFIG_MAP.get(raw.lower(), ProductionConfig)
 
 
-def get_config(env_name: str = None):
+def get_config(env_name: str | None = None) -> BaseConfig:
     cls = get_config_class(env_name)
     cls.validate()
     return cls()
@@ -215,7 +218,7 @@ def get_config(env_name: str = None):
 # =============================================================================
 
 
-def probe_services(strict: bool = True) -> None:
+def probe_services(strict: bool = True) -> str | None:
     """
     Runs strict/lenient probe checks on database and Redis connectivity.
     Returns None on success; raises if strict=True and checks fail.

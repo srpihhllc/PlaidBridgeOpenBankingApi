@@ -12,8 +12,8 @@ from app.extensions import db
 @click.command("reset-and-reseed")
 @click.pass_context
 @with_appcontext
-def reset_and_reseed(ctx: click.Context):
-    """Purges all structural entities and hydrates identity targets atomically."""
+def reset_and_reseed(ctx: click.Context) -> None:
+    """Drop and recreate the database, then run the seed commands."""
 
     click.echo("⚠️  WARNING: This will DROP ALL TABLES and recreate them.")
     if not click.confirm("Continue?"):
@@ -26,21 +26,26 @@ def reset_and_reseed(ctx: click.Context):
     click.echo("🛠️  Creating tables...")
     db.create_all()
 
-    # Access the command registry from the root CLI (manage.py)
-    # The 'ctx.parent' refers to the FlaskGroup 'cli'
-    commands = ctx.parent.command.commands
+    # Walk up the Click context tree to find the Flask CLI command registry.
+    root_ctx = ctx.find_root()
+    root_command = root_ctx.command
+    commands = getattr(root_command, "commands", None)
 
-    # Helper to invoke safely
-    def run_seeder(name: str):
-        if name in commands:
-            click.echo(f"🌱 Invoking: {name}")
-            ctx.invoke(commands[name])
-        else:
-            click.echo(
-                f"❌ FATAL: Could not find command '{name}' in registry."
+    if not isinstance(commands, dict):
+        raise click.ClickException(
+            "Could not access the root CLI command registry."
+        )
+
+    def run_seeder(name: str) -> None:
+        command = commands.get(name)
+        if command is None:
+            raise click.ClickException(
+                f"Could not find required command '{name}' in registry."
             )
 
-    # Execute seeders in-process
+        click.echo(f"🌱 Invoking: {name}")
+        ctx.invoke(command)
+
     run_seeder("seed-admin")
     run_seeder("seed-subscriber")
     run_seeder("seed-lender")

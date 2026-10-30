@@ -20,6 +20,7 @@ from flask.cli import FlaskGroup, with_appcontext
 from app import create_app
 from app.cli.doctor import doctor
 from app.cli.doctor_pa import doctor_pa
+from app.cli_commands.basic_commands import init_db
 
 # Authoritative factory injection (automatically attaches Flask-Migrate 'db' group)
 cli = FlaskGroup(create_app=create_app)
@@ -29,9 +30,13 @@ cli = FlaskGroup(create_app=create_app)
 # -----------------------------------------------------------------------------
 cli.add_command(doctor)
 cli.add_command(doctor_pa)
+cli.add_command(init_db)
 
 # -----------------------------------------------------------------------------
 # CLI Registry configuration (Cockpit-Grade CLI Modules)
+# Note: app.cli_commands.basic_commands is intentionally excluded from this list
+# to prevent auto-registering its simple verify-sandbox command, which conflicts
+# with the advanced verify-sandbox command defined below.
 # -----------------------------------------------------------------------------
 _command_modules = [
     # 🛠️ Audit, Security, & Telemetry Infrastructure (app/cli_commands)
@@ -45,7 +50,6 @@ _command_modules = [
     "app.cli_commands.blueprint_drift_tracer",
     "app.cli_commands.blueprint_emit",
     "app.cli_commands.emit_blueprint_inspector",
-    "app.cli_commands.route_audit",
     "app.cli_commands.route_drift",
     "app.cli_commands.route_graph",
     "app.cli_commands.route_map_dump",
@@ -56,6 +60,7 @@ _command_modules = [
     "app.cli_commands.combined_template_endpoint_audit",
     "app.cli_commands.email_telemetry",
     "app.cli_commands.omega_templates",
+    "app.cli_commands.check_operator",  # 👈 Newly modularized command
     # ⚡ Core Identity Seeders & Pipeline Orchestrators (app/cli)
     "app.cli.reset_and_reseed",
     "app.cli.seed_admin",
@@ -65,8 +70,8 @@ _command_modules = [
     "app.cli.seed_everything",
     # 📦 Extended Fintech Systems & Mock Environment Hydration (app/cli)
     "app.cli.cockpit_pdf_test",
-    # "app.cli.doctor",  <-- Explicitly registered above
     "app.cli.grant_pulse",
+    "app.cli.health_check",  # 👈 Added missing existing file
     "app.cli.probe_db_auth",
     "app.cli.redis_inspect",
     "app.cli.seed_fraud_cases",
@@ -94,7 +99,6 @@ def _safe_register(module_path: str) -> None:
             if isinstance(v, click.core.Command):
                 if v.name and "_" in v.name:
                     v.name = v.name.replace("_", "-")
-                # Avoid double registration if command already exists
                 if v.name not in cli.commands:
                     cli.add_command(v)
     except Exception as exc:
@@ -116,7 +120,6 @@ for mod_path in _command_modules:
 @click.pass_context
 def doctor_auto(ctx):
     """Auto-detects environment and runs the appropriate doctor diagnostic."""
-    # Detect PythonAnywhere by checking standard PA environment variables or path structure
     is_pa = (
         "PYTHONANYWHERE_DOMAIN" in os.environ
         or "PYTHONANYWHERE_SITE" in os.environ
@@ -149,7 +152,6 @@ def doctor_suite(ctx):
         bold=True,
     )
 
-    # Capture local doctor output
     f_local = io.StringIO()
     with redirect_stdout(f_local):
         try:
@@ -158,7 +160,6 @@ def doctor_suite(ctx):
             pass
     local_lines = f_local.getvalue().splitlines()
 
-    # Capture PA doctor output
     f_pa = io.StringIO()
     with redirect_stdout(f_pa):
         try:
@@ -167,7 +168,6 @@ def doctor_suite(ctx):
             pass
     pa_lines = f_pa.getvalue().splitlines()
 
-    # Pad lists to equal length for side-by-side rendering
     max_len = max(len(local_lines), len(pa_lines))
     local_lines.extend([""] * (max_len - len(local_lines)))
     pa_lines.extend([""] * (max_len - len(pa_lines)))
@@ -180,14 +180,13 @@ def doctor_suite(ctx):
     click.secho("-" * 130)
 
     for local_line, p in zip(local_lines, pa_lines):
-        # Truncate slightly to prevent terminal wrapping issues, maintaining 60 chars per side
         l_trunc = local_line[:58]
         p_trunc = p[:68]
         click.echo(f"{l_trunc:<60} | {p_trunc}")
 
 
 # -----------------------------------------------------------------------------
-# DevOps & Subprocess Execution Engine (Former Makefile Targets)
+# DevOps & Subprocess Execution Engine
 # -----------------------------------------------------------------------------
 VENV = "venv"
 RUNTIME_LOCK = "requirements.lock"
@@ -332,6 +331,96 @@ def run_clean():
 # -----------------------------------------------------------------------------
 # Application & Architecture Inspection Commands
 # -----------------------------------------------------------------------------
+@cli.command("check-operator")
+@click.option(
+    "--seed",
+    is_flag=True,
+    help="Auto-seed operator user if missing from database.",
+)
+@click.option(
+    "--password",
+    default=None,
+    help="Verify password hash against the operator user.",
+)
+@with_appcontext
+def check_operator(seed: bool, password: str | None):
+    """Audit Gods Mode config flags, verify operator DB record, and optionally seed or check credentials."""
+    from flask import current_app
+    from werkzeug.security import check_password_hash, generate_password_hash
+    from app.extensions import db
+    from app.models import User
+
+    click.secho("\n=== 1. GODS MODE CONFIG STATUS ===", fg="cyan", bold=True)
+    keys = [
+        "OPERATOR_PASSPHRASE",
+        "GODS_MODE_PASSPHRASE",
+        "TERENCE_PASSPHRASE",
+        "OPERATOR_PASSWORD",
+        "ADMIN_PASSWORD",
+    ]
+    for k in keys:
+        val = current_app.config.get(k) or os.getenv(k)
+        if val:
+            click.echo(f"{k:<24}: ✅ SET (Length: {len(val)})")
+        else:
+            click.echo(f"{k:<24}: ❌ NOT SET")
+
+    click.secho("\n=== 2. OPERATOR USER DATABASE STATUS ===", fg="cyan", bold=True)
+    user = (
+        db.session.query(User)
+        .filter(
+            (User.username == "terence")
+            | (User.role == "admin")
+            | (User.role == "operator")
+        )
+        .first()
+    )
+
+    if not user:
+        click.secho("❌ No operator/admin user record found in DB.", fg="red", bold=True)
+        if seed:
+            click.secho("\n[+] Auto-seeding operator user ('terence')...", fg="yellow")
+            op_pass = (
+                current_app.config.get("OPERATOR_PASSWORD")
+                or os.getenv("OPERATOR_PASSWORD")
+                or "ChangeMe123!"
+            )
+            user = User(
+                username="terence",
+                email="terence@plaidbridge.internal",
+                role="operator",
+            )
+            if hasattr(user, "set_password"):
+                user.set_password(op_pass)
+            else:
+                user.password_hash = generate_password_hash(op_pass)
+
+            db.session.add(user)
+            db.session.commit()
+            click.secho("✅ Operator user ('terence') successfully created!", fg="green", bold=True)
+        else:
+            click.secho("💡 Run with --seed to create the missing record automatically.", fg="cyan")
+    else:
+        role_val = getattr(user, "role", "N/A")
+        click.secho(
+            f"✅ Operator Record Found: username=\"{user.username}\", role=\"{role_val}\"",
+            fg="green",
+            bold=True,
+        )
+
+    if user and password:
+        click.secho("\n=== 3. CREDENTIAL VERIFICATION ===", fg="cyan", bold=True)
+        if hasattr(user, "check_password"):
+            is_valid = user.check_password(password)
+        else:
+            is_valid = check_password_hash(getattr(user, "password_hash", ""), password)
+
+        if is_valid:
+            click.secho("✅ Password verification PASSED.", fg="green", bold=True)
+        else:
+            click.secho("❌ Password verification FAILED.", fg="red", bold=True)
+
+
 @cli.command("entrypoints")
 @with_appcontext
 def entrypoints():
@@ -353,10 +442,7 @@ def entrypoints():
 )
 @with_appcontext
 def verify_sandbox(route: str):
-    """Verify sandbox mock endpoints for anti-phishing & compliance schema
-
-    attributes.
-    """
+    """Verify sandbox mock endpoints for anti-phishing & compliance schema attributes."""
     from flask import current_app
     from flask_jwt_extended import create_access_token
 
@@ -364,7 +450,6 @@ def verify_sandbox(route: str):
         f"\n[+] Executing schema verification on endpoint: {route}", fg="cyan"
     )
 
-    # Generate test bearer token for CLI verification
     token = create_access_token(identity="sandbox_verifier")
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -433,8 +518,7 @@ def verify_routes():
             click.echo(f"  - Path '{rule}' registered in '{ep1}' and '{ep2}'")
     else:
         click.secho(
-            "\n[✔] ROUTE TREE CLEAN: No duplicate endpoint registrations"
-            " found.",
+            "\n[✔] ROUTE TREE CLEAN: No duplicate endpoint registrations found.",
             fg="green",
             bold=True,
         )

@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from typing import cast
 
 import jwt
 from flask import current_app
@@ -21,14 +22,19 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Microsoft ID Token Verification
 # ---------------------------------------------------------------------------
-def verify_ms_token(id_token: str | None, *args, **kwargs) -> dict:
+def verify_ms_token(
+    id_token: str | None,
+    *args: object,
+    **kwargs: object,
+) -> dict[str, object]:
     if not id_token:
         raise ValueError("Missing Microsoft ID token")
 
     try:
-        return jwt.decode(id_token, options={"verify_signature": False})
+        claims = jwt.decode(id_token, options={"verify_signature": False})
+        return cast(dict[str, object], claims)
     except Exception as e:
-        logger.warning(f"Could not parse Microsoft ID token structure: {e}")
+        logger.warning("Could not parse Microsoft ID token structure: %s", e)
         return {"id_token": id_token}
 
 
@@ -50,10 +56,10 @@ def exchange_code_for_user(provider: ProviderName, code: str) -> User:
 
     provider_obj = OAuthProvider(provider, config=config)
 
-    # 1. Token exchange (Exceptions propagate to oauth_routes.py to record OAUTH_TOKEN_ERROR once)
+    # 1. Token exchange. Exceptions propagate to oauth_routes.py.
     token_response = provider_obj.exchange_code(code)
 
-    # 2. Microsoft-specific ID token validation
+    # 2. Microsoft-specific ID token validation.
     if provider == ProviderName.MICROSOFT:
         id_token = (
             token_response.get("id_token")
@@ -76,7 +82,9 @@ def exchange_code_for_user(provider: ProviderName, code: str) -> User:
         if isinstance(token_response, dict):
             token_response["claims"] = claims
 
-    # 3. User creation (Let exceptions propagate cleanly so oauth_routes.py logs OAUTH_LOGIN_FAILURE)
+    # 3. Create or retrieve the user.
     user = User.get_or_create_from_oauth(provider, token_response)
 
-    return user
+    # This method may be typed as Any by the ORM/model declaration. Keep the
+    # service's public return type explicit for static type checking.
+    return cast(User, user)

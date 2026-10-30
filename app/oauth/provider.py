@@ -11,7 +11,7 @@ import json
 import logging
 import time
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 from urllib.parse import urlencode
 
 import requests
@@ -33,14 +33,14 @@ def _get_apple_jwks() -> Dict[str, Any]:
     now = int(time.time())
     cached = _apple_jwks_cache
     if cached["jwks"] and (now - cached["fetched_at"] < _APPLE_JWKS_TTL):
-        return cached["jwks"]
+        return cast(Dict[str, Any], cached["jwks"])
 
     resp = requests.get("https://appleid.apple.com/auth/keys", timeout=5)
     resp.raise_for_status()
     jwks = resp.json()
     cached["jwks"] = jwks
     cached["fetched_at"] = now
-    return jwks
+    return cast(Dict[str, Any], jwks)
 
 
 class OAuthProvider:
@@ -122,7 +122,7 @@ class OAuthProvider:
                 timeout=10,
             )
             resp.raise_for_status()
-            return resp.json()
+            return cast(Dict[str, Any], resp.json())
 
         if self.provider == ProviderName.MICROSOFT:
             token_url = (
@@ -140,7 +140,7 @@ class OAuthProvider:
                 timeout=10,
             )
             resp.raise_for_status()
-            return resp.json()
+            return cast(Dict[str, Any], resp.json())
 
         if self.provider == ProviderName.APPLE:
             client_id = self.config.get("client_id")
@@ -174,7 +174,10 @@ class OAuthProvider:
             }
             headers = {"kid": key_id}
             client_assertion = jwt.encode(
-                payload, private_key, algorithm="ES256", headers=headers
+                payload,
+                cast(Any, private_key),
+                algorithm="ES256",
+                headers=headers,
             )
 
             token_url = "https://appleid.apple.com/auth/token"
@@ -190,7 +193,7 @@ class OAuthProvider:
                 timeout=10,
             )
             resp.raise_for_status()
-            return resp.json()
+            return cast(Dict[str, Any], resp.json())
 
         raise NotImplementedError(f"Provider {self.provider} not supported")
 
@@ -204,7 +207,7 @@ class OAuthProvider:
                 timeout=10,
             )
             resp.raise_for_status()
-            d = resp.json()
+            d = cast(Dict[str, Any], resp.json())
             return {
                 "email": d.get("email"),
                 "sub": d.get("sub"),
@@ -220,7 +223,7 @@ class OAuthProvider:
                 timeout=10,
             )
             resp.raise_for_status()
-            d = resp.json()
+            d = cast(Dict[str, Any], resp.json())
             email = d.get("mail") or d.get("userPrincipalName")
             return {
                 "email": email,
@@ -274,7 +277,7 @@ class OAuthProvider:
                 public_key = RSAAlgorithm.from_jwk(json.dumps(key_dict))
                 payload = jwt.decode(
                     id_token,
-                    public_key,
+                    cast(Any, public_key),
                     algorithms=["RS256"],
                     audience=client_id,
                 )

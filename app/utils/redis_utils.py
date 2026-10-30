@@ -40,8 +40,7 @@ REDIS_DEBUG_FLAGS_HASH: str = "app:config:debug_flags"
 # Metrics Counter (mocked if missing)
 # -------------------------------------------------------------------------
 try:
-    # app.metrics may be untyped; if absent, provide a noop counter to keep runtime behavior
-    from app.metrics import REDIS_CONNECT_FAILURES_COUNTER  # type: ignore
+    from app.metrics import REDIS_CONNECT_FAILURES_COUNTER
 except Exception:
 
     class _MockCounter:
@@ -62,41 +61,18 @@ def _get_utc_timestamp() -> str:
 
 
 def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
-    """
-    Normalize Redis URI to avoid passing unsupported kwargs to redis-py:
-    - If scheme is 'redis+ssl' -> 'rediss'
-    - If scheme is 'redis' and query contains ssl=true, promote to 'rediss'
-    - If credentials are provided but username is missing (e.g. redis://:pass@host:port),
-      insert a safe default username ("default") so redis-py and some hosted providers
-      that require a username/password form work correctly.
-    - Remove 'ssl' from the query string so TLS is inferred from the scheme only.
-
-    Returns:
-      (normalized_uri, tls_enabled)
-    """
     if not uri:
         return uri, False
 
     parsed = urlparse(uri)
-
-    # Normalize 'redis+ssl' -> 'rediss'
     scheme = parsed.scheme
     if scheme.lower() == "redis+ssl":
         scheme = "rediss"
 
-    # Parse and sanitize query params, possibly promoting tls
     q = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    ssl_q = (
-        q.pop("ssl", "").strip().lower()
-    )  # remove ssl from query if present
+    promote_tls = q.get("ssl", "").lower() == "true"
+    q.pop("ssl", "")
 
-    promote_tls = False
-    if ssl_q in {"1", "true", "yes"} and scheme == "redis":
-        scheme = "rediss"
-        promote_tls = True
-
-    # If credentials exist but username is empty (e.g. ":password@host"),
-    # insert a default username ("default") for compatibility with ACL-enabled Redis.
     username = parsed.username
     password = parsed.password
     hostname = parsed.hostname or ""
@@ -128,12 +104,6 @@ def _normalize_redis_uri(uri: str) -> tuple[str, bool]:
 
 
 def _masked_endpoint(uri: str) -> str:
-    """
-    Mask credentials in a URI for safe logging:
-    Examples:
-      - rediss://user:****@host:port/db
-      - redis://default:****@host/db
-    """
     try:
         p = urlparse(uri)
         username = p.username
@@ -153,204 +123,175 @@ def _masked_endpoint(uri: str) -> str:
 
 
 # -------------------------------------------------------------------------
-# Core factory with caching
+# Core factory with caching (Singleton)
 # -------------------------------------------------------------------------
-def get_redis_client() -> Redis[Any] | None:
+_REDIS_CLIENT: Redis | None = None
+
+
+def get_redis_client() -> Redis | None:
     """
-    Returns a cached Redis client if available, otherwise creates one.
+    Enterprise-grade Redis singleton.
+
+    Characteristics:
+    - Safe under Python 3.12.
+    - Lazy initialization.
+    - Cached globally.
+    - Cached on Flask app object.
+    - Graceful degradation.
+    - Never raises to caller.
     """
-    # Explicit CLI/migration guard
-    if os.environ.get("DISABLE_REDIS"):
-        logger.info("DISABLE_REDIS set; skipping Redis client creation.")
+    global _REDIS_CLIENT
+
+    if os.getenv("DISABLE_REDIS"):
+        logger.info("DISABLE_REDIS enabled; Redis disabled.")
         return None
 
-    # Prefer an already-cached client attached to the Flask app context
+    if _REDIS_CLIENT is not None:
+        return _REDIS_CLIENT
+
     if has_app_context():
         cached = getattr(current_app, "redis_client", None)
         if cached is not None:
-            return cast(Any, cached)
+            _REDIS_CLIENT = cast(Redis, cached)
+            return _REDIS_CLIENT
 
-    raw_url = os.getenv("REDIS_STORAGE_URI", "").strip()
-    if os.environ.get("FLASK_ENV") == "testing" and not raw_url:
-        logger.debug(
-            "Testing environment with no REDIS_STORAGE_URI; skipping Redis client creation."
-        )
-        return None
+    raw_url = (
+        os.getenv("REDIS_URL")
+        or os.getenv("REDIS_STORAGE_URI")
+        or ""
+    ).strip()
 
     if not raw_url:
-        logger.debug(
-            "REDIS_STORAGE_URI not set; get_redis_client returning None."
-        )
+        logger.info("Redis URL not configured.")
         return None
 
-    url, tls_enabled = _normalize_redis_uri(raw_url)
-
-    kwargs: dict[str, Any] = {
-        "decode_responses": True,
-        "socket_connect_timeout": (
-            current_app.config.get("REDIS_CONNECT_TIMEOUT", 5)
-            if has_app_context()
-            else int(os.getenv("REDIS_CONNECT_TIMEOUT", 5))
-        ),
-        "socket_timeout": (
-            current_app.config.get("REDIS_SOCKET_TIMEOUT", 5)
-            if has_app_context()
-            else int(os.getenv("REDIS_SOCKET_TIMEOUT", 5))
-        ),
-        "max_connections": int(os.getenv("REDIS_MAX_CONNECTIONS", "20")),
-    }
-
     try:
-        client = Redis.from_url(url, **kwargs)
+        url, tls_enabled = _normalize_redis_uri(raw_url)
 
-        try:
-            client.ping()
-        except Exception as ping_exc:
-            REDIS_CONNECT_FAILURES_COUNTER.inc()
-            logger.warning(
-                "Redis ping failed for %s: %s", _masked_endpoint(url), ping_exc
-            )
-            try:
-                ttl_emit(
-                    key=REDIS_PING_KEY,
-                    status=f"ping_error:{ping_exc}",
-                    ttl=REDIS_FAIL_TTL,
-                )
-            except Exception:
-                pass
-            return None
+        redis_client = Redis.from_url(
+            url,
+            decode_responses=True,
+            socket_connect_timeout=int(
+                os.getenv("REDIS_CONNECT_TIMEOUT", "5")
+            ),
+            socket_timeout=int(
+                os.getenv("REDIS_SOCKET_TIMEOUT", "5")
+            ),
+            max_connections=int(
+                os.getenv("REDIS_MAX_CONNECTIONS", "20")
+            ),
+        )
+
+        redis_client.ping()
 
         logger.info(
-            "🟢 Redis ping successful—client checked out. endpoint=%s tls=%s",
+            "🟢 Redis ping successful. endpoint=%s tls=%s",
             _masked_endpoint(url),
             tls_enabled,
         )
+
         try:
             ttl_emit(
                 key=REDIS_PING_SUCCESS_KEY,
                 status="success",
                 ttl=REDIS_PING_TTL,
-                client=client,
+                client=redis_client,
             )
             ttl_emit(
                 key=REDIS_PING_SUCCESS_TS_KEY,
                 status=_get_utc_timestamp(),
                 ttl=REDIS_PING_TTL,
-                client=client,
+                client=redis_client,
             )
-            flushed = flush_emit_queue(client)
+            flushed = flush_emit_queue(redis_client)
             logger.info("Flushed %d queued TTL emits.", flushed)
             ttl_emit(
                 key=REDIS_QUEUE_FLUSH_KEY,
                 status="success",
                 ttl=REDIS_QUEUE_FLUSH_TTL,
-                client=client,
+                client=redis_client,
             )
             ttl_emit(
                 key=REDIS_PING_KEY,
                 status="success",
                 ttl=REDIS_PING_TTL,
-                client=client,
+                client=redis_client,
             )
         except Exception:
-            logger.debug(
-                "Best-effort telemetry/flush failed (continuing).",
-                exc_info=True,
-            )
+            logger.debug("Telemetry emit failed.", exc_info=True)
+
+        _REDIS_CLIENT = redis_client
 
         if has_app_context():
-            current_app.redis_client = client
+            current_app.redis_client = redis_client
 
-        return client
+        return redis_client
 
-    except TypeError as te:
+    except Exception as error:
         REDIS_CONNECT_FAILURES_COUNTER.inc()
+
         logger.error(
-            "Redis TypeError during connect (likely ssl kwarg issue): %s",
-            te,
+            "Redis initialization failed: %s",
+            error,
             exc_info=True,
         )
+
         try:
             ttl_emit(
                 key=REDIS_PING_KEY,
-                status=f"type_error:{te}",
+                status=f"error:{error}",
                 ttl=REDIS_FAIL_TTL,
             )
         except Exception:
             pass
-        return None
 
-    except Exception as e:
-        REDIS_CONNECT_FAILURES_COUNTER.inc()
-        logger.error(
-            "Redis connection/ping failed for %s: %s",
-            _masked_endpoint(raw_url),
-            e,
-            exc_info=True,
-        )
-        try:
-            ttl_emit(
-                key=REDIS_PING_KEY, status=f"error:{e}", ttl=REDIS_FAIL_TTL
-            )
-        except Exception:
-            pass
         return None
 
 
 # -------------------------------------------------------------------------
-# Dynamic Cluster Debug Flag Store (Prevents WSGI Worker Drift)
+# Dynamic Cluster Debug Flag Store
 # -------------------------------------------------------------------------
 def get_cluster_debug_flags() -> dict[str, Any]:
-    """
-    Retrieves dynamic debug flags from shared Redis state.
-    Falls back to current_app.config if Redis is unreachable or unconfigured.
-    """
     flags: dict[str, Any] = {}
 
-    # 1. Start with process-local Flask config defaults
     if has_app_context():
-        flags = {
-            k: v
-            for k, v in current_app.config.items()
-            if k.isupper() and ("DEBUG" in k or "FLAG" in k)
-        }
+        flags.update(
+            {
+                k: v
+                for k, v in current_app.config.items()
+                if "DEBUG" in k or "FLAG" in k
+            }
+        )
 
-    # 2. Layer shared Redis overrides on top
     client = get_redis_client()
-    if client:
-        try:
-            raw_hash = client.hgetall(REDIS_DEBUG_FLAGS_HASH)
-            for k, v in raw_hash.items():
-                key_str = k.decode("utf-8") if isinstance(k, bytes) else str(k)
-                val_str = v.decode("utf-8") if isinstance(v, bytes) else str(v)
-                try:
-                    flags[key_str] = json.loads(val_str)
-                except (json.JSONDecodeError, TypeError):
-                    flags[key_str] = val_str
-        except Exception as exc:
-            logger.warning(
-                "Redis flag lookup failed, relying on local config fallback: %s",
-                exc,
-            )
+
+    if client is None:
+        return flags
+
+    try:
+        for k, v in client.hgetall(REDIS_DEBUG_FLAGS_HASH).items():
+            try:
+                flags[str(k)] = json.loads(v)
+            except Exception:
+                flags[str(k)] = v
+    except Exception:
+        logger.warning(
+            "Redis debug-flag retrieval failed.",
+            exc_info=True,
+        )
 
     return flags
 
 
 def set_cluster_debug_flags(updates: dict[str, Any]) -> dict[str, Any]:
-    """
-    Persists debug flag mutations into shared Redis storage and updates process config.
-    Returns the dictionary of successfully applied flag key-value pairs.
-    """
     client = get_redis_client()
     applied: dict[str, Any] = {}
 
     for key, value in updates.items():
-        # Update current process memory if inside Flask app context
         if has_app_context():
             current_app.config[key] = value
         applied[key] = value
 
-        # Sync across WSGI workers via Redis Hash
         if client:
             try:
                 serialized = json.dumps(value)
@@ -369,7 +310,7 @@ def set_cluster_debug_flags(updates: dict[str, Any]) -> dict[str, Any]:
 # Utility helpers
 # -------------------------------------------------------------------------
 def set_job_status(
-    job_id: str, status: str, data: dict | None = None, ttl: int = 3600
+    job_id: str, status: str, data: dict[str, Any] | None = None, ttl: int = 3600
 ) -> None:
     client = get_redis_client()
     if not client:
@@ -430,7 +371,7 @@ def init_progress(blast_id: str, total: int) -> None:
         )
 
 
-def call_reflector_ai(payload: dict) -> dict[str, Any]:
+def call_reflector_ai(payload: dict[str, Any]) -> dict[str, Any]:
     if not has_app_context():
         logger.error("ReflectorAI call requires a Flask app context.")
         return {"error": "No application context"}
@@ -447,10 +388,14 @@ def call_reflector_ai(payload: dict) -> dict[str, Any]:
                 "Authorization": f"Bearer {api_key}",
             },
             json=payload,
-            timeout=10,
+            timeout=(5, 10),
         )
         resp.raise_for_status()
         try:
+            content_type = resp.headers.get("Content-Type", "")
+            if "application/json" not in content_type:
+                current_app.logger.error("ReflectorAI returned non-JSON content type: %s", content_type)
+                return {"error": "Invalid response type from ReflectorAI"}
             return cast(dict[str, Any], resp.json())
         except ValueError:
             current_app.logger.error("ReflectorAI returned non‑JSON response")
@@ -460,15 +405,7 @@ def call_reflector_ai(payload: dict) -> dict[str, Any]:
         return {"error": "Failed to call ReflectorAI API"}
 
 
-# -------------------------------------------------------------------------
-# Log retrieval helper for cockpit tiles
-# -------------------------------------------------------------------------
 def get_recent_logs(key: str, lines: int = 200) -> list[str]:
-    """
-    Retrieve recent log lines stored in Redis under a given key.
-    Expects logs to be stored as a Redis list (LPUSH / RPUSH).
-    Returns newest → oldest.
-    """
     client = get_redis_client()
     if not client:
         return []

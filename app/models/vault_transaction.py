@@ -6,14 +6,19 @@
 #              work without schema churn.
 # =============================================================================
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import Any
 
 from sqlalchemy.orm import synonym
 
 from ..extensions import db
 
+Model: Any = db.Model
 
-class VaultTransaction(db.Model):
+
+class VaultTransaction(Model):
     __tablename__ = "vault_transactions"
     __table_args__ = {"extend_existing": True}
 
@@ -68,7 +73,7 @@ class VaultTransaction(db.Model):
         "BorrowerCard", backref="vault_transactions", lazy="joined"
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<VaultTransaction id={self.id} borrower_id={self.user_id} "
             f"card_id={self.card_id} amount={self.amount} reconciled={self.reconciled}>"

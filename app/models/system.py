@@ -3,7 +3,6 @@
 # DESCRIPTION: System-level models including rate limiting, schema versioning,
 #              and boot logs. SystemVersion is tied to a specific User and must
 #              align with UUID primary keys and cascade semantics.
-#              Updated to use dynamic backref to prevent KeyError on User mapper.
 # =============================================================================
 
 from datetime import datetime, timezone
@@ -19,7 +18,9 @@ class RateLimit(db.Model):
     ip_address = db.Column(db.String(50), unique=True, nullable=False)
     requests = db.Column(db.Integer, default=0)
     timestamp = db.Column(
-        db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
     )
 
 
@@ -29,8 +30,7 @@ class SystemVersion(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # ✔ Must match User.id (String(36))
-    # ✔ Must include ondelete="CASCADE"
+    # Must match User.id (String(36)) and cascade when the user is deleted.
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -39,23 +39,24 @@ class SystemVersion(db.Model):
 
     version_hash = db.Column(db.String(40), nullable=False)
     applied_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
 
-    # -------------------------------------------------------------------------
-    # Relationships
-    # -------------------------------------------------------------------------
-
-    # ⭐ User Fix: Swapped back_populates to dynamic backref since User lacks 'system_events'
     user = db.relationship(
         "User",
         backref=db.backref(
-            "system_events", lazy="dynamic", passive_deletes=True
+            "system_events",
+            lazy="dynamic",
+            passive_deletes=True,
         ),
     )
 
-    def __repr__(self):
-        return f"<SystemVersion id={self.id} user_id={self.user_id} hash={self.version_hash}>"
+    def __repr__(self) -> str:
+        return (
+            f"<SystemVersion id={self.id} user_id={self.user_id} "
+            f"hash={self.version_hash}>"
+        )
 
 
 class SystemBootLog(db.Model):
@@ -66,9 +67,12 @@ class SystemBootLog(db.Model):
     operator_id = db.Column(db.Integer)
     sequence_origin = db.Column(db.String(255))
     ignition_timestamp = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc)
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
     )
     message = db.Column(db.Text)
 
-    def __repr__(self):
-        return f"<SystemBootLog id={self.id} operator_id={self.operator_id}>"
+    def __repr__(self) -> str:
+        return (
+            f"<SystemBootLog id={self.id} operator_id={self.operator_id}>"
+        )

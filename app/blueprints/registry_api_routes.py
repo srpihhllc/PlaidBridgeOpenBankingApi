@@ -3,6 +3,8 @@
 # DESCRIPTION: API route for dynamic cockpit tile serialization
 # =============================================================================
 
+from __future__ import annotations
+
 from flask import Blueprint, current_app, jsonify
 
 from app.services.registry import get_service_registry
@@ -12,7 +14,7 @@ registry_api_bp = Blueprint(
 )
 
 
-@registry_api_bp.get("/")
+@registry_api_bp.route("/", methods=["GET"])
 def get_dynamic_registry_json():
     """Serves the 39 dynamic backend service objects directly to the Cockpit UI."""
     try:

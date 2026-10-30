@@ -10,16 +10,21 @@ from app.services.registry import get_service_registry
 registry_ui_bp = Blueprint("registry_ui", __name__, url_prefix="/registry")
 
 
-@registry_ui_bp.get("/")
-def show_registry_html():
-    """Renders the HTML layout view using the live filesystem discovery context."""
+@registry_ui_bp.route("/", methods=["GET"])
+def show_registry_html() -> str:
+    """Render the HTML registry view using the live filesystem discovery context."""
     try:
         services = get_service_registry()
         return render_template(
-            "registry.html", registries=services, count=len(services)
+            "registry.html",
+            registries=services,
+            count=len(services),
         )
     except Exception as err:
-        current_app.logger.error(f"❌ Registry HTML rendering failed: {err}")
+        current_app.logger.error("❌ Registry HTML rendering failed: %s", err)
         return render_template(
-            "registry.html", registries=[], count=0, error=str(err)
+            "registry.html",
+            registries=[],
+            count=0,
+            error=str(err),
         )

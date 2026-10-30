@@ -19,13 +19,8 @@ import json
 import logging
 import os
 import time
-from typing import Any
-
-try:
-    from app import create_app
-except Exception:  # pragma: no cover - exercised only when imports fail
-    create_app = None
-
+from collections.abc import Callable
+from typing import Any, cast
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -33,25 +28,36 @@ logger.setLevel(logging.INFO)
 REDIS_LIST_KEY = os.getenv("WORKER_SYNC_LIST_KEY", "sync:jobs")
 POLL_INTERVAL = float(os.getenv("WORKER_POLL_INTERVAL", "1.0"))
 
+AppFactory = Callable[[], Any]
+
+
+def _load_app_factory() -> AppFactory | None:
+    """Import the Flask application factory when available."""
+    try:
+        from app import create_app
+    except ImportError:
+        logger.exception("Unable to import the application factory")
+        return None
+
+    return cast(AppFactory, create_app)
+
+
+create_app = _load_app_factory()
+
 
 def process_job(job_payload: dict[str, Any]) -> None:
-    """
-    Process one decoded job payload.
-
-    Replace this placeholder with the real synchronization logic.
-    """
+    """Process one decoded job payload."""
     logger.info(
         "Processing job: id=%s type=%s",
         job_payload.get("job_id"),
         job_payload.get("type"),
     )
 
-    # TODO: replace with real handler code:
-    # - validate payload
+    # TODO: Replace this placeholder with the real synchronization logic:
+    # - validate the payload
     # - call connector adapters
     # - persist normalized data
     # - emit audit logs and metrics
-
     time.sleep(0.1)
 
 
@@ -69,18 +75,12 @@ def _get_extension(app: Any, name: str) -> Any:
 
 
 def _get_redis_client(app: Any) -> Any:
-    """
-    Get Redis from the Flask app, then fall back to app.extensions.
-
-    Finally, try the optional app.extensions.get_redis_client helper.
-    """
+    """Get Redis from the app, its extensions, or the optional helper."""
     redis_client = getattr(app, "redis_client", None)
-
     if redis_client is not None:
         return redis_client
 
     redis_client = _get_extension(app, "redis_client")
-
     if redis_client is not None:
         return redis_client
 
@@ -101,23 +101,20 @@ def _decode_job(item: Any) -> dict[str, Any]:
     Convert a Redis BLPOP result into a dictionary payload.
 
     redis-py normally returns (key, value), where values may be bytes.
-    Invalid JSON is preserved under the 'raw' key.
+    Invalid JSON is preserved under the "raw" key.
     """
-    if isinstance(item, (list, tuple)) and len(item) == 2:
-        raw = item[1]
-    else:
-        raw = item
+    raw = item[1] if isinstance(item, (list, tuple)) and len(item) == 2 else item
 
     if isinstance(raw, (bytes, bytearray)):
         raw = raw.decode("utf-8", errors="replace")
 
     try:
-        payload = json.loads(raw)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        payload = {"raw": raw}
+        payload: Any = json.loads(raw)
+    except (TypeError, ValueError):
+        return {"raw": raw}
 
     if isinstance(payload, dict):
-        return payload
+        return cast(dict[str, Any], payload)
 
     return {"raw": payload}
 
@@ -159,7 +156,6 @@ def main(max_iterations: int | None = None) -> None:
                 time.sleep(POLL_INTERVAL)
         except KeyboardInterrupt:
             logger.info("Worker stopped by KeyboardInterrupt")
-
         return
 
     try:
@@ -169,7 +165,7 @@ def main(max_iterations: int | None = None) -> None:
             try:
                 item = redis_client.blpop(REDIS_LIST_KEY, timeout=5)
             except TypeError:
-                # Compatibility with clients that do not accept timeout.
+                # Compatibility with clients that do not accept a timeout.
                 item = None
 
             if not item:

@@ -17,15 +17,15 @@ from sendgrid.helpers.mail import (
     Mail,
 )
 
-from app.utils.redis_utils import set_job_status  # cockpit Redis tracking
-from app.utils.telemetry import _get_safe_redis_client  # TTL pulse emitter
+from app.utils.redis_utils import set_job_status
+from app.utils.telemetry import _get_safe_redis_client
 
 _logger = logging.getLogger(__name__)
 
-# Load API key and sender email from environment
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 SENDGRID_FROM_EMAIL = os.getenv(
-    "SENDGRID_FROM_EMAIL", "noreply@yourdomain.com"
+    "SENDGRID_FROM_EMAIL",
+    "noreply@yourdomain.com",
 )
 
 
@@ -38,9 +38,10 @@ def send_email_with_attachment(
     job_id: str | None = None,
 ) -> None:
     """
-    Sends an email with a file attachment via SendGrid.
-    Tracks success/failure in Redis for cockpit visibility.
-    Emits TTL pulses for cockpit overlays.
+    Send an email with a file attachment via SendGrid.
+
+    Track success or failure in Redis when a job ID is provided, and emit a
+    telemetry pulse for the result.
     """
     if not SENDGRID_API_KEY:
         raise RuntimeError("SENDGRID_API_KEY not configured")
@@ -49,13 +50,12 @@ def send_email_with_attachment(
         raise ValueError("Missing required email fields")
 
     try:
-        # Encode file for SendGrid attachment
-        encoded_file = base64.b64encode(file_bytes).decode()
+        encoded_file = base64.b64encode(file_bytes).decode("ascii")
 
         attachment = Attachment(
             FileContent(encoded_file),
             FileName(filename),
-            FileType("application/pdf"),  # adjust if needed
+            FileType("application/pdf"),
             Disposition("attachment"),
         )
 
@@ -67,11 +67,8 @@ def send_email_with_attachment(
         )
         message.attachment = attachment
 
-        # Send the email
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        response = sg.send(message)
+        response = SendGridAPIClient(SENDGRID_API_KEY).send(message)
 
-        # Log success to Redis
         if job_id:
             set_job_status(
                 job_id,
@@ -84,40 +81,43 @@ def send_email_with_attachment(
                 },
             )
 
-        # Cockpit TTL pulse for successful send
-        _get_safe_redis_client(pulse_key="ttl:email:dispute_blast", ttl=300)
+        # _get_safe_redis_client accepts pulse_key, but not ttl.
+        _get_safe_redis_client(pulse_key="ttl:email:dispute_blast")
 
         _logger.info(
-            "Email sent successfully to %s (job_id=%s)", to_email, job_id
+            "Email sent successfully to %s (job_id=%s)",
+            to_email,
+            job_id,
         )
 
-    except Exception as e:
+    except Exception as exc:
         _logger.exception(
-            "Failed to send email to %s (job_id=%s)", to_email, job_id
+            "Failed to send email to %s (job_id=%s)",
+            to_email,
+            job_id,
         )
 
-        # Log failure to Redis
         if job_id:
             set_job_status(
                 job_id,
                 "failed",
-                {"recipient": to_email, "filename": filename, "error": str(e)},
+                {
+                    "recipient": to_email,
+                    "filename": filename,
+                    "error": str(exc),
+                },
             )
 
-        # Cockpit TTL pulse for failed send
-        _get_safe_redis_client(
-            pulse_key="ttl:email:dispute_blast_error", ttl=300
-        )
+        _get_safe_redis_client(pulse_key="ttl:email:dispute_blast_error")
         raise
 
 
 def send_password_reset_email(
-    to_email: str, reset_token: str, job_id: str | None = None
+    to_email: str,
+    reset_token: str,
+    job_id: str | None = None,
 ) -> None:
-    """
-    Sends a password reset email using the existing email sending infrastructure.
-    This function is a specific-purpose wrapper for reset tokens.
-    """
+    """Send a password-reset email using the existing email infrastructure."""
     subject = "Plaid Bridge Open Banking API - Password Reset"
     content = f"""
         <h1>Password Reset</h1>
@@ -130,8 +130,6 @@ def send_password_reset_email(
         <p>If you did not request this, please ignore this email.</p>
     """
 
-    # For text-only emails, we pass a placeholder file attachment.
-    # In production, consider a dedicated function for text-only emails.
     send_email_with_attachment(
         to_email,
         subject,

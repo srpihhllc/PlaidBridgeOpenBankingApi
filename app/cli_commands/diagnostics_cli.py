@@ -9,7 +9,7 @@ import json
 import os
 import sys
 import time
-from typing import Any
+from typing import Any, cast
 
 import click
 from flask import current_app
@@ -27,19 +27,14 @@ from app.blueprints.diagnostics import get_full_diagnostics
 )
 @with_appcontext
 def diagnostics_full(watch: bool) -> None:
-    """
-    Run the unified diagnostics health check engine from the CLI context.
-    """
+    """Run the unified diagnostics health check engine from the CLI context."""
 
     def _execute_isolated_diagnostic() -> dict[str, Any]:
-        """Executes the diagnostic pipeline within the established app context."""
-
-        # Cache the original state to guarantee zero permanent pollution
+        """Execute the diagnostic pipeline within the established app context."""
         original_mode = current_app.config.get("DIAGNOSTICS_CLI_MODE", False)
         current_app.config["DIAGNOSTICS_CLI_MODE"] = True
 
         try:
-            # Provision a mock request block for internal dependencies
             with current_app.test_request_context("/__cli_diagnostics__"):
                 result = get_full_diagnostics()
 
@@ -49,11 +44,17 @@ def diagnostics_full(watch: bool) -> None:
                 response_body = result
 
             if isinstance(response_body, Response):
-                return json.loads(response_body.get_data(as_text=True))
-            elif isinstance(response_body, dict):
-                return response_body
-            else:
-                return {"data": str(response_body)}
+                parsed_body: Any = json.loads(
+                    response_body.get_data(as_text=True)
+                )
+                if isinstance(parsed_body, dict):
+                    return cast(dict[str, Any], parsed_body)
+                return {"data": parsed_body}
+
+            if isinstance(response_body, dict):
+                return cast(dict[str, Any], response_body)
+
+            return {"data": str(response_body)}
 
         except Exception as exc:
             current_app.logger.exception("Diagnostics CLI pipeline failure.")
@@ -65,18 +66,17 @@ def diagnostics_full(watch: bool) -> None:
         finally:
             current_app.config["DIAGNOSTICS_CLI_MODE"] = original_mode
 
-    # --- CLI RUNTIME EXECUTION GATEWAY ---
     if not watch:
         data = _execute_isolated_diagnostic()
         click.echo(json.dumps(data, indent=2))
         return
 
-    # Continuous Watch loop orchestration
     click.secho(
         "🛰️ Starting Neural Pulse Watcher... (Ctrl+C to stop)",
         fg="yellow",
         bold=True,
     )
+
     try:
         while True:
             data = _execute_isolated_diagnostic()
@@ -85,11 +85,12 @@ def diagnostics_full(watch: bool) -> None:
 
             timestamp = time.strftime("%H:%M:%S")
             click.secho(
-                f"--- LIVE PULSE | {timestamp} ---", fg="cyan", bold=True
+                f"--- LIVE PULSE | {timestamp} ---",
+                fg="cyan",
+                bold=True,
             )
             click.echo(json.dumps(data, indent=2))
 
-            # Simple health check alert
             infra_map = data.get("infra", {})
             if isinstance(infra_map, dict):
                 db_map = infra_map.get("database", {})
@@ -102,14 +103,15 @@ def diagnostics_full(watch: bool) -> None:
                     )
 
             time.sleep(5)
+
     except KeyboardInterrupt:
         click.echo("\nWatcher gracefully disengaged.")
 
 
 @click.command("mail-debug")
 @with_appcontext
-def mail_debug():
-    """Inspects currently loaded Mail configurations vs OS environment."""
+def mail_debug() -> None:
+    """Inspect loaded mail configuration against OS environment variables."""
     click.echo("--- Mail Configuration Debug ---")
     keys = ["MAIL_SERVER", "MAIL_PORT", "MAIL_USE_TLS", "MAIL_USERNAME"]
 

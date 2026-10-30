@@ -8,6 +8,7 @@ import os
 import threading
 from collections.abc import Iterator
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from flask import (
     Blueprint,
@@ -28,7 +29,7 @@ from app.constants import (
     DEFAULT_TTL,
     OPERATOR_MODE_KEY,
 )
-from app.decorators.access import has_permission
+from app.decorators.access import has_permission, is_creator
 from app.dto.transaction_dto import TransactionDTO
 from app.extensions import db
 from app.models.registry import Registry
@@ -41,39 +42,100 @@ from app.services.timeline_analytics import compute_timeline
 from app.utils.redis_utils import get_redis_client
 from app.utils.telemetry import log_identity_event
 
-# =============================================================================
-# Blueprint
-# =============================================================================
-
 sub_bp = Blueprint("sub_ui", __name__, url_prefix="/sub")
 
 
 # =============================================================================
-# Role Guard
+# Access Control
 # =============================================================================
 
-def require_subscriber():
-    """
-    Hard guard: only authenticated subscribers or operators may access /sub routes.
-    """
+def require_subscriber() -> Any:
+    """Strictly deny lenders; allow creators/owners and authorized subscribers."""
     if not getattr(current_user, "is_authenticated", False):
         abort(401)
 
-    if session.get(OPERATOR_MODE_KEY) is True or has_permission(current_user, "read_operational_data"):
+    role = getattr(current_user, "role", None)
+
+    # 1. Absolute lender denial
+    if role == "lender":
+        current_app.logger.warning(
+            "ACCESS DENIED: Standard lender role attempted subscriber UI access"
+        )
+        abort(403)
+
+    # 2. Creator / owner / admin super-user check
+    if is_creator(current_user) or role in ("creator", "owner", "admin"):
         return current_user
 
-    if getattr(current_user, "role", None) != "subscriber":
+    # 3. Operator mode / operational access
+    operator_mode = session.get(OPERATOR_MODE_KEY) is True
+    operational_access = has_permission(current_user, "read_operational_data")
+
+    if operator_mode or operational_access:
+        return current_user
+
+    # 4. Standard subscriber check
+    if role != "subscriber":
+        current_app.logger.warning(
+            "ACCESS CHECK: operator_mode=%r role=%r operational_access=%r",
+            operator_mode,
+            role,
+            operational_access,
+        )
         abort(403)
 
     return current_user
 
 
 # =============================================================================
-# Template Drift Audit
+# Dashboard Telemetry & Missing API Routes
+# =============================================================================
+
+@sub_bp.route("/api/subscriber/token-pulse", methods=["GET"])
+@login_required
+def subscriber_token_pulse():
+    """Return access token telemetry for the dashboard card."""
+    user = require_subscriber()
+    return jsonify({
+        "status": "active",
+        "ttl_seconds": 3600,
+        "user_id": getattr(user, "id", None),
+        "username": getattr(user, "username", "subscriber"),
+    }), 200
+
+
+@sub_bp.route("/api/subscriber/vault-activity", methods=["GET"])
+@login_required
+def subscriber_vault_activity():
+    """Return recent vault activity data for the dashboard card."""
+    require_subscriber()
+    return jsonify({
+        "status": "ok",
+        "activity": [],
+        "total_events": 0,
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+    }), 200
+
+
+@sub_bp.route("/api/trace/<key>", methods=["GET"])
+@login_required
+def get_trace_overlay(key: str):
+    """Serve trace diagnostic data for trace_overlay.js mounts."""
+    require_subscriber()
+    return jsonify({
+        "key": key,
+        "label": f"Trace ({key})",
+        "remaining_seconds": 300,
+        "fresh": "True",
+    }), 200
+
+
+# =============================================================================
+# Template Audit
 # =============================================================================
 
 TTL_KEY = BLUEPRINT_AUDIT_KEY
-TEMPLATE_RENDER_ERROR_SUB = "E401"
+TTL_SECONDS = DEFAULT_TTL
 
 _EXPECTED_TEMPLATES_MANIFEST: set[str] = {
     "sub/subscriber_dashboard.html",
@@ -83,7 +145,6 @@ _EXPECTED_TEMPLATES_MANIFEST: set[str] = {
     "sub/vault_dashboard.html",
 }
 
-TTL_SECONDS = DEFAULT_TTL
 _TEMPLATE_CACHE: list[str] = []
 _TEMPLATE_CACHE_LAST_WALK = datetime.min.replace(tzinfo=timezone.utc)
 _TEMPLATE_CACHE_EXPIRY_SECONDS = 300
@@ -91,109 +152,137 @@ _TEMPLATE_CACHE_LOCK = threading.Lock()
 
 
 def list_templates() -> Iterator[str]:
-    global _TEMPLATE_CACHE, _TEMPLATE_CACHE_LAST_WALK
+    """Return cached HTML template paths."""
+    global _TEMPLATE_CACHE
+    global _TEMPLATE_CACHE_LAST_WALK
 
     force_refresh = current_app.config.get("FORCE_TEMPLATE_REFRESH", False)
     expired = (
         datetime.now(timezone.utc) - _TEMPLATE_CACHE_LAST_WALK
     ).total_seconds() >= _TEMPLATE_CACHE_EXPIRY_SECONDS
 
-    if not force_refresh and _TEMPLATE_CACHE and not expired:
+    if _TEMPLATE_CACHE and not force_refresh and not expired:
         return iter(_TEMPLATE_CACHE)
 
     with _TEMPLATE_CACHE_LOCK:
-        if not force_refresh and _TEMPLATE_CACHE and not expired:
+        if _TEMPLATE_CACHE and not force_refresh and not expired:
             return iter(_TEMPLATE_CACHE)
 
-        root = os.path.join(current_app.root_path, "templates")
-        all_templates: list[str] = []
+        template_root = os.path.join(current_app.root_path, "templates")
+        templates: list[str] = []
 
-        for base, _, files in os.walk(root):
-            for fname in files:
-                if fname.endswith(".html") and not fname.startswith("_"):
-                    rel = os.path.relpath(os.path.join(base, fname), root)
-                    all_templates.append(rel.replace(os.sep, "/"))
+        for base, _, files in os.walk(template_root):
+            for filename in files:
+                if not filename.endswith(".html") or filename.startswith("_"):
+                    continue
 
-        _TEMPLATE_CACHE = all_templates
+                absolute_path = os.path.join(base, filename)
+                relative_path = os.path.relpath(absolute_path, template_root)
+                templates.append(relative_path.replace(os.sep, "/"))
+
+        _TEMPLATE_CACHE = templates
         _TEMPLATE_CACHE_LAST_WALK = datetime.now(timezone.utc)
 
     return iter(_TEMPLATE_CACHE)
 
 
-def is_subscriber_template(tpl: str) -> bool:
-    return tpl.startswith("sub/")
+def is_subscriber_template(template_name: str) -> bool:
+    return template_name.startswith("sub/")
 
 
-def _emit_blueprint_audit_trace() -> dict:
-    all_templates = set(list(list_templates()))
+def _emit_blueprint_audit_trace() -> dict[str, Any]:
+    all_templates = set(list_templates())
     expected = _EXPECTED_TEMPLATES_MANIFEST
 
     missing = expected - all_templates
-    extras = {t for t in all_templates if is_subscriber_template(t)} - expected
+    extras = {
+        template
+        for template in all_templates
+        if is_subscriber_template(template)
+    } - expected
 
     status = "DRIFT_DETECTED" if missing or extras else "COCKPIT_ACTIVE"
 
-    audit_data = {
+    audit_data: dict[str, Any] = {
         "last_audit_date": datetime.now(timezone.utc).isoformat(),
         "status": status,
         "audit_status": status,
         "expected_sub": len(expected),
         "actual_sub": sum(
-            1 for t in all_templates if is_subscriber_template(t)
+            1 for template in all_templates if is_subscriber_template(template)
         ),
         "missing": len(missing),
         "extras": len(extras),
         "audit_issues": len(missing) + len(extras),
         "drift_details": {
-            "missing_list": list(missing),
-            "extras_list": list(extras),
+            "missing_list": sorted(missing),
+            "extras_list": sorted(extras),
         },
     }
 
     try:
-        r = getattr(current_app, "redis_client", None) or get_redis_client()
-        if r:
-            r.setex(TTL_KEY, TTL_SECONDS, json.dumps(audit_data))
-    except Exception as e:
+        redis_client = (
+            getattr(current_app, "redis_client", None) or get_redis_client()
+        )
+
+        if redis_client:
+            redis_client.setex(TTL_KEY, TTL_SECONDS, json.dumps(audit_data))
+    except Exception as exc:
         audit_data["status"] = "error"
         audit_data["audit_status"] = "ERROR"
-        audit_data["message"] = str(e)
+        audit_data["message"] = str(exc)
 
     return audit_data
 
 
-def get_audit_info() -> dict:
+def get_audit_info() -> dict[str, Any]:
     try:
-        r = getattr(current_app, "redis_client", None) or get_redis_client()
-        if r:
-            raw = r.get(TTL_KEY)
-            if raw:
-                return json.loads(raw)
+        redis_client = (
+            getattr(current_app, "redis_client", None) or get_redis_client()
+        )
+
+        if redis_client:
+            raw_data = redis_client.get(TTL_KEY)
+
+            if raw_data:
+                if isinstance(raw_data, bytes):
+                    raw_data = raw_data.decode("utf-8")
+
+                parsed_data: Any = json.loads(raw_data)
+                if isinstance(parsed_data, dict):
+                    return cast(dict[str, Any], parsed_data)
+
+                raise ValueError("Stored audit data must be a JSON object.")
+
         return _emit_blueprint_audit_trace()
-    except Exception as e:
+
+    except Exception as exc:
         return {
             "last_audit_date": datetime.now(timezone.utc).isoformat(),
             "status": "unavailable",
             "audit_status": "UNAVAILABLE",
             "audit_issues": 0,
             "message": "Error retrieving audit data.",
-            "error": type(e).__name__,
+            "error": type(exc).__name__,
         }
 
 
 # =============================================================================
-# Telemetry Helper
+# Telemetry
 # =============================================================================
 
-
 def _emit_subscriber_ui_rendered(
-    user, view_name: str, template_name: str, extra=None
+    user,
+    view_name: str,
+    template_name: str,
+    extra: dict | None = None,
 ):
     details = {
         "view": view_name,
         "template": template_name,
         "path": request.path,
     }
+
     if extra:
         details.update(extra)
 
@@ -209,33 +298,36 @@ def _emit_subscriber_ui_rendered(
 # Subscriber Routes
 # =============================================================================
 
-
 @sub_bp.route("/", strict_slashes=False)
 def sub_index():
     if current_app.config.get("DEBUG_UI"):
         try:
-            tpl_list = list(list_templates())
+            templates = list(list_templates())
         except Exception:
-            tpl_list = []
-        return jsonify({"templates": tpl_list}), 200
+            templates = []
 
-    is_sub = (
-        getattr(current_user, "is_authenticated", False)
+        return jsonify({"templates": templates}), 200
+
+    authenticated = getattr(
+        current_user,
+        "is_authenticated",
+        False,
+    )
+    is_subscriber = (
+        authenticated
         and getattr(current_user, "role", None) == "subscriber"
     )
     is_operator = session.get(OPERATOR_MODE_KEY) is True
 
-    if is_sub or is_operator:
-        try:
-            user = require_subscriber()
-            log_identity_event(
-                user_id=getattr(user, "id", "operator"),
-                event_type="SUBSCRIBER_INDEX_ACCESS",
-                details={"via": "sub_ui.sub_index"},
-                ip=request.remote_addr,
-            )
-        except Exception:
-            pass
+    if is_subscriber or is_operator:
+        user = require_subscriber()
+
+        log_identity_event(
+            user_id=getattr(user, "id", "operator"),
+            event_type="SUBSCRIBER_INDEX_ACCESS",
+            details={"via": "sub_ui.sub_index"},
+            ip=request.remote_addr,
+        )
 
         return redirect(url_for("sub_ui.dashboard"))
 
@@ -245,7 +337,7 @@ def sub_index():
 @sub_bp.route("/dashboard", endpoint="dashboard")
 @login_required
 def dashboard():
-    user = current_user._get_current_object()
+    user = require_subscriber()
     is_operator = bool(session.get(OPERATOR_MODE_KEY, False))
 
     log_identity_event(
@@ -257,14 +349,19 @@ def dashboard():
 
     try:
         audit_info = get_audit_info()
-        if not audit_info or not isinstance(audit_info, dict):
-            raise ValueError("Malformed audit data struct")
-    except Exception as e:
+
+        if not isinstance(audit_info, dict):
+            raise ValueError("Malformed audit data")
+
+    except Exception as exc:
         current_app.logger.warning(
-            f"Defaulting sparse audit payload: {str(e)}"
+            "Using fallback audit payload: %s",
+            exc,
         )
         audit_info = {
-            "last_audit_date": datetime.now(timezone.utc).isoformat(),
+            "last_audit_date": datetime.now(
+                timezone.utc
+            ).isoformat(),
             "audit_status": "INITIALIZING",
             "audit_issues": 0,
         }
@@ -275,21 +372,27 @@ def dashboard():
     }
 
     dashboard_model = getattr(user, "user_dashboard", None)
+
     if dashboard_model is None:
         dashboard_model = UserDashboard.create_for_user(user.id)
         db.session.add(dashboard_model)
         db.session.commit()
 
     dashboard_settings = (
-        dashboard_model.settings or UserDashboard.default_settings()
+        dashboard_model.settings
+        or UserDashboard.default_settings()
     )
 
-    raw_txns = (
-        Transaction.query.filter_by(user_id=user.id)
+    raw_transactions = (
+        Transaction.query
+        .filter_by(user_id=user.id)
         .order_by(Transaction.date.desc())
         .all()
     )
-    transactions = [TransactionDTO.from_model(t) for t in raw_txns]
+    transactions = [
+        TransactionDTO.from_model(transaction)
+        for transaction in raw_transactions
+    ]
 
     category_summary = compute_category_summary(transactions)
     fraud_summary = compute_fraud_summary(transactions)
@@ -300,40 +403,63 @@ def dashboard():
             compute_transaction_summary,
         )
 
-        transaction_summary = compute_transaction_summary(transactions)
+        transaction_summary = compute_transaction_summary(
+            transactions,
+        )
     except Exception:
         transaction_summary = None
 
-    page = request.args.get("page", 1, type=int)
+    page = max(
+        request.args.get("page", 1, type=int),
+        1,
+    )
     per_page = 20
     total_items = len(transactions)
-    total_pages = (total_items + per_page - 1) // per_page
-    paged_transactions = transactions[(page - 1) * per_page : page * per_page]
+    total_pages = max(
+        (total_items + per_page - 1) // per_page,
+        1,
+    )
 
-    todo_q = Todo.query.filter_by(user_id=user.id)
-    pending_todos = todo_q.filter_by(completed=False).all()
-    completed_todos = todo_q.filter_by(completed=True).all()
+    start_index = (page - 1) * per_page
+    end_index = page * per_page
+    paged_transactions = transactions[start_index:end_index]
+
+    todo_query = Todo.query.filter_by(user_id=user.id)
+    pending_todos = todo_query.filter_by(
+        completed=False,
+    ).all()
+    completed_todos = todo_query.filter_by(
+        completed=True,
+    ).all()
 
     if is_operator:
         seeded_services = Registry.query.all()
     else:
-        seeded_services = Registry.query.filter_by(user_id=user.id).all()
+        seeded_services = Registry.query.filter_by(
+            user_id=user.id,
+        ).all()
 
     processed_services = []
-    for svc in seeded_services:
+
+    for service in seeded_services:
         try:
-            config_dict = (
-                json.loads(svc.config_blob)
-                if isinstance(svc.config_blob, str)
-                else svc.config_blob
-            )
+            if isinstance(service.config_blob, str):
+                config = json.loads(service.config_blob)
+            else:
+                config = service.config_blob
+
             processed_services.append(
-                {"id": svc.id, "name": svc.name, "config": config_dict}
+                {
+                    "id": service.id,
+                    "name": service.name,
+                    "config": config,
+                }
             )
         except Exception:
             continue
 
     template_name = "sub/subscriber_dashboard.html"
+
     _emit_subscriber_ui_rendered(
         user,
         view_name="sub_ui.dashboard",
@@ -364,6 +490,37 @@ def dashboard():
     )
 
 
+@sub_bp.route(
+    "/update-profile",
+    methods=["POST"],
+    endpoint="update_profile",
+)
+@login_required
+def update_profile():
+    user = require_subscriber()
+
+    user.primary_phone = request.form.get(
+        "primary_phone",
+        "",
+    ).strip()
+    user.business_phone = request.form.get(
+        "business_phone",
+        "",
+    ).strip()
+    user.first_name = request.form.get(
+        "first_name",
+        "",
+    ).strip()
+    user.last_name = request.form.get(
+        "last_name",
+        "",
+    ).strip()
+
+    db.session.commit()
+
+    return redirect(url_for("sub_ui.settings"))
+
+
 @sub_bp.route("/settings", endpoint="settings")
 @login_required
 def settings():
@@ -377,13 +534,15 @@ def settings():
     )
 
     dashboard_model = getattr(user, "user_dashboard", None)
+
     if dashboard_model is None:
         dashboard_model = UserDashboard.create_for_user(user.id)
         db.session.add(dashboard_model)
         db.session.commit()
 
     dashboard_settings = (
-        dashboard_model.settings or UserDashboard.default_settings()
+        dashboard_model.settings
+        or UserDashboard.default_settings()
     )
     template_name = "sub/settings.html"
 
@@ -399,21 +558,32 @@ def settings():
     )
 
 
-@sub_bp.route("/fraud/drilldown", endpoint="fraud_drilldown")
+@sub_bp.route(
+    "/fraud/drilldown",
+    endpoint="fraud_drilldown",
+)
 @login_required
 def fraud_drilldown():
     user = require_subscriber()
 
-    raw_txns = (
-        Transaction.query.filter_by(user_id=user.id)
+    raw_transactions = (
+        Transaction.query
+        .filter_by(user_id=user.id)
         .order_by(Transaction.date.desc())
         .all()
     )
-    transactions = [TransactionDTO.from_model(t) for t in raw_txns]
+    transactions = [
+        TransactionDTO.from_model(transaction)
+        for transaction in raw_transactions
+    ]
 
     fraud_summary = compute_fraud_summary(transactions)
     timeline = compute_timeline(transactions)
-    flagged = [t for t in transactions if getattr(t, "is_flagged", False)]
+    flagged_transactions = [
+        transaction
+        for transaction in transactions
+        if getattr(transaction, "is_flagged", False)
+    ]
 
     template_name = "sub/fraud_drilldown.html"
 
@@ -421,13 +591,15 @@ def fraud_drilldown():
         user,
         view_name="sub_ui.fraud_drilldown",
         template_name=template_name,
-        extra={"flagged_count": len(flagged)},
+        extra={
+            "flagged_count": len(flagged_transactions),
+        },
     )
 
     return render_template(
         template_name,
         fraud_summary=fraud_summary,
-        flagged_transactions=flagged,
+        flagged_transactions=flagged_transactions,
         timeline=timeline,
     )
 
@@ -442,7 +614,6 @@ def audit_trace():
         "role": user.role,
         "path": request.path,
         "endpoint": request.endpoint,
-        "ip": request.remote_addr,
     }
 
     log_identity_event(
@@ -489,17 +660,25 @@ def vault_dashboard():
         compute_vault_summary,
     )
 
-    raw = (
-        VaultTransaction.query.filter_by(user_id=user.id)
+    raw_transactions = (
+        VaultTransaction.query
+        .filter_by(user_id=user.id)
         .order_by(VaultTransaction.created_at.desc())
         .all()
     )
 
-    vault_txns = [VaultTransactionDTO.from_model(t) for t in raw]
+    vault_transactions = [
+        VaultTransactionDTO.from_model(transaction)
+        for transaction in raw_transactions
+    ]
 
-    summary = compute_vault_summary(raw)
-    flow_labels, flow_values = compute_vault_flow(raw)
-    fraud_signals = compute_vault_fraud_signals(raw)
+    summary = compute_vault_summary(raw_transactions)
+    flow_labels, flow_values = compute_vault_flow(
+        raw_transactions,
+    )
+    fraud_signals = compute_vault_fraud_signals(
+        raw_transactions,
+    )
 
     template_name = "sub/vault_dashboard.html"
 
@@ -507,12 +686,14 @@ def vault_dashboard():
         user,
         view_name="sub_ui.vault_dashboard",
         template_name=template_name,
-        extra={"vault_txn_count": len(vault_txns)},
+        extra={
+            "vault_txn_count": len(vault_transactions),
+        },
     )
 
     return render_template(
         template_name,
-        vault_txns=vault_txns,
+        vault_txns=vault_transactions,
         summary=summary,
         flow_labels=flow_labels,
         flow_values=flow_values,
@@ -521,59 +702,79 @@ def vault_dashboard():
 
 
 # =============================================================================
-# Operator Tool Placeholders (to prevent 404s)
+# Operator and Diagnostic Placeholders
 # =============================================================================
-
 
 @sub_bp.route("/debug/dto", endpoint="debug_dto")
 @login_required
 def debug_dto():
+    require_subscriber()
+
     return render_template_string(
-        "<h1>DTO Inspector (Placeholder)</h1>"
-        "<p>This tool will inspect DTO mappings.</p>"
+        """
+        <h1>DTO Inspector</h1>
+        <p>This tool will inspect DTO mappings.</p>
+        """
     )
 
 
 @sub_bp.route("/audit/report", endpoint="audit_report")
 @login_required
 def audit_report():
+    require_subscriber()
+
     return render_template_string(
-        "<h1>Audit Report (Placeholder)</h1>"
-        "<p>This will show audit results and schema drift.</p>"
+        """
+        <h1>Audit Report</h1>
+        <p>This will show audit results and schema drift.</p>
+        """
     )
 
 
-@sub_bp.route("/tile/diagnostics", endpoint="tile_diagnostics")
+@sub_bp.route(
+    "/tile/diagnostics",
+    endpoint="tile_diagnostics",
+)
 @login_required
 def tile_diagnostics():
+    require_subscriber()
+
     return render_template_string(
-        "<h1>Tile Diagnostics (Placeholder)</h1>"
-        "<p>This will show tile render status and errors.</p>"
+        """
+        <h1>Tile Diagnostics</h1>
+        <p>This will show tile render status and errors.</p>
+        """
     )
 
 
 # =============================================================================
-# Dynamic Template Previewer (Fixes test_sub_template_render 404 & 500 context)
+# Dynamic Template Previewer
 # =============================================================================
 
+@sub_bp.route(
+    "/t/<path:tpl>",
+    endpoint="render_sub_template",
+)
+@login_required
+def render_sub_template(tpl: str):
+    user = require_subscriber()
 
-@sub_bp.route("/t/<path:tpl>", endpoint="render_sub_template")
-def render_sub_template(tpl):
     if not tpl.endswith(".html"):
         tpl = f"{tpl}.html"
 
-    search_tpl = tpl if tpl.startswith("sub/") else f"sub/{tpl}"
+    template_name = (
+        tpl if tpl.startswith("sub/") else f"sub/{tpl}"
+    )
 
-    if search_tpl not in _EXPECTED_TEMPLATES_MANIFEST:
+    if template_name not in _EXPECTED_TEMPLATES_MANIFEST:
         abort(404)
 
-    if getattr(current_user, "is_authenticated", False):
-        user = require_subscriber()
-        _emit_subscriber_ui_rendered(
-            user,
-            view_name="sub_ui.render_sub_template",
-            template_name=search_tpl,
-        )
+    _emit_subscriber_ui_rendered(
+        user,
+        view_name="sub_ui.render_sub_template",
+        template_name=template_name,
+        extra={"preview": True},
+    )
 
     class MockUser:
         id = 0
@@ -590,12 +791,17 @@ def render_sub_template(tpl):
     mock_context = {
         "current_user": mock_user,
         "user": mock_user,
-        "dashboard_settings": {"theme": "dark", "compact_mode": False},
+        "dashboard_settings": {
+            "theme": "dark",
+            "compact_mode": False,
+        },
         "audit_info": {
             "status": "ok",
             "audit_status": "COCKPIT_ACTIVE",
             "audit_issues": 0,
-            "last_audit_date": datetime.now(timezone.utc).isoformat(),
+            "last_audit_date": datetime.now(
+                timezone.utc,
+            ).isoformat(),
         },
         "profile": {
             "username": "smoke_test_user",
@@ -604,9 +810,16 @@ def render_sub_template(tpl):
         "transactions": [],
         "flagged_transactions": [],
         "category_summary": {},
-        "fraud_summary": {"flagged_count": 0, "total_risk_score": 0.0},
+        "fraud_summary": {
+            "flagged_count": 0,
+            "total_risk_score": 0.0,
+        },
         "timeline": [],
-        "transaction_summary": {"income": 0, "expenses": 0, "net": 0},
+        "transaction_summary": {
+            "income": 0,
+            "expenses": 0,
+            "net": 0,
+        },
         "page": 1,
         "total_pages": 1,
         "pending_todos": [],
@@ -620,4 +833,7 @@ def render_sub_template(tpl):
         "fraud_signals": [],
     }
 
-    return render_template(search_tpl, **mock_context)
+    return render_template(
+        template_name,
+        **mock_context,
+    )

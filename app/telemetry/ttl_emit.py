@@ -133,15 +133,43 @@ def _resolve_client(
     explicit_client: Any | None = None,
     alias_r: Any | None = None,
 ) -> Any | None:
-    """Resolve a Redis-like client in order: explicit, alias, lazy factory."""
+    """
+    Resolve a Redis-like client in priority order:
+
+    1. Explicit caller-provided client
+    2. Legacy alias client (r)
+    3. Flask current_app.redis_client
+    4. Flask extensions["redis_client"]
+    5. Central get_redis_client() helper
+    """
+
     if explicit_client is not None:
         return explicit_client
+
     if alias_r is not None:
         return alias_r
+
+    try:
+        from flask import current_app
+
+        app_client = getattr(current_app, "redis_client", None)
+        if app_client is not None:
+            return app_client
+
+        extensions = getattr(current_app, "extensions", {})
+        if isinstance(extensions, dict):
+            ext_client = extensions.get("redis_client")
+            if ext_client is not None:
+                return ext_client
+
+    except Exception:
+        pass
+
     try:
         from app.utils.redis_utils import get_redis_client
 
         return get_redis_client()
+
     except Exception as e:
         logger.debug("No redis client resolved: %s", e)
         return None

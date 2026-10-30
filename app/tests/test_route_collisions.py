@@ -49,3 +49,4 @@ def test_no_route_collisions(app):
                 f"  New endpoint:      {c['new_endpoint']}\n"
             )
         raise AssertionError("\n".join(msg_lines))
+

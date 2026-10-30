@@ -2,20 +2,18 @@
 # FILE: app/tests/conftest.py
 # =============================================================================
 """
-Pytest fixtures for the test suite.
+Global pytest fixtures and test harness configuration.
 
-Notes:
-- Single canonical session-scoped `app` fixture seeds an admin user at startup.
-- No session-scoped fixture depends on a narrower-scoped fixture (avoids ScopeMismatch).
-- Tests may still define their own function-scoped fixtures, but they will not
-  conflict with the session-scoped app fixture used for global setup.
-- The `client` fixture uses row deletion for per-test isolation instead of
-  drop_all/create_all, so the session-scoped schema is never destroyed mid-session.
-  (SQLAlchemy 2.x removed session.bind; transaction rollback via connection binding
-  is not supported in Flask-SQLAlchemy 3.x + SQLAlchemy 2.x.)
-- Test-only routes (e.g. for test_validation.py) are registered here inside the
-  `app` fixture before yield, guaranteeing they exist before the first request.
-- Autouse fixtures dynamically configure environment keys and mock global telemetry.
+Design Goals
+------------
+- Single canonical session-scoped Flask application fixture.
+- Centralized database lifecycle management.
+- Stable test isolation without drop/create churn between tests.
+- Global telemetry suppression.
+- Dynamic test-only route registration.
+- Shared fixture registration via pytest_plugins.
+- Flask-Login and JWT compatibility helpers.
+- SQLAlchemy 2.x compatible patterns.
 """
 
 import datetime
@@ -23,13 +21,16 @@ import os
 import uuid
 from unittest.mock import patch
 
-# Ensure the test environment is set before importing the app so the package
-# shim does not detect production at import-time and create the unsafe fallback.
+# -----------------------------------------------------------------------------
+# Force testing mode before importing application modules.
+# -----------------------------------------------------------------------------
+
 os.environ["FLASK_ENV"] = "testing"
 
 import pytest
 from cryptography.fernet import Fernet
-from flask import jsonify as _jsonify, request as _request
+from flask import jsonify as _jsonify
+from flask import request as _request
 from werkzeug.security import generate_password_hash
 
 from app import create_app
@@ -38,6 +39,17 @@ from app.extensions import init_extensions
 from app.models.trace_events import TraceEvent
 from app.models.user import User
 
+# =============================================================================
+# SHARED TEST FIXTURE REGISTRATION
+# =============================================================================
+
+pytest_plugins = [
+    "app.tests.fixtures.mock_wallet",
+    "app.tests.fixtures.mock_customer",
+    "app.tests.fixtures.mock_gl_account",
+    "app.tests.fixtures.mock_ledger",
+    "app.tests.fixtures.mock_journal_entry",
+]
 # =============================================================================
 # GLOBAL AUTO-USE FIXTURES
 # =============================================================================

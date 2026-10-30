@@ -1,3 +1,4 @@
+from app.extensions import db
 # =============================================================================
 # FILE: app/models/complaint_log.py
 # DESCRIPTION: Finalized relationship constraints coordinating both dynamic

@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from collections.abc import Callable
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from flasgger import Swagger
@@ -20,6 +21,7 @@ from flask_socketio import SocketIO
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect
 from sqlalchemy import MetaData
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.pool import StaticPool
 
 from app.operator_cortex import OperatorCortex
@@ -40,8 +42,10 @@ naming_convention = {
 }
 
 metadata = MetaData(naming_convention=naming_convention)
+Base = declarative_base(metadata=metadata)
 
-db: SQLAlchemy = SQLAlchemy(metadata=metadata)
+# Flask-SQLAlchemy exposes db.Model dynamically.
+db: Any = SQLAlchemy(model_class=Base)
 
 
 # =============================================================================
@@ -68,8 +72,39 @@ redis_client: object | None = None
 # =============================================================================
 
 
+def _is_sqlite_memory_database(app: Any) -> bool:
+    """Return whether the configured database URL uses in-memory SQLite."""
+    database_uri = app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if not isinstance(database_uri, str) or not database_uri.strip():
+        return False
+
+    try:
+        parsed_uri = urlparse(database_uri.strip())
+    except ValueError:
+        return False
+
+    scheme = parsed_uri.scheme.lower()
+    path = parsed_uri.path.lower()
+
+    is_sqlite = scheme == "sqlite" or scheme.startswith("sqlite+")
+    if not is_sqlite:
+        return False
+
+    # Covers URLs such as sqlite://, sqlite:///:memory:, and
+    # sqlite+pysqlite:///:memory:.
+    return path in {"", "/", "/:memory:"}
+
+
 def _build_engine_options_from_env(app: Any) -> dict[str, Any]:
-    """Build SQLAlchemy engine options from environment variables."""
+    """Build SQLAlchemy engine options from configuration and environment."""
+    if _is_sqlite_memory_database(app):
+        # Keep one shared in-memory database connection across app threads.
+        # Pool sizing options are intentionally omitted for StaticPool.
+        return {
+            "poolclass": StaticPool,
+            "connect_args": {"check_same_thread": False},
+        }
+
     try:
         return {
             "pool_pre_ping": True,
@@ -78,7 +113,7 @@ def _build_engine_options_from_env(app: Any) -> dict[str, Any]:
             "max_overflow": int(os.getenv("SQLALCHEMY_MAX_OVERFLOW", "10")),
             "pool_timeout": int(os.getenv("SQLALCHEMY_POOL_TIMEOUT", "30")),
         }
-    except Exception:
+    except (TypeError, ValueError):
         app.logger.exception(
             "[DB] Failed building engine options; falling back to defaults"
         )
@@ -88,7 +123,9 @@ def _build_engine_options_from_env(app: Any) -> dict[str, Any]:
         }
 
 
-def _get_limiter_defaults(app: Any) -> list[str]:
+def _get_limiter_defaults(
+    app: Any,
+) -> list[str | Callable[[], str]]:
     """Read rate-limit defaults from Flask configuration."""
     configured_limits = app.config.get("LIMITER_DEFAULTS")
 
@@ -99,7 +136,16 @@ def _get_limiter_defaults(app: Any) -> list[str]:
         return [configured_limits]
 
     if isinstance(configured_limits, (list, tuple, set)):
-        return [str(value) for value in configured_limits]
+        limits: list[str | Callable[[], str]] = []
+        for value in configured_limits:
+            if isinstance(value, str) or callable(value):
+                limits.append(value)
+            else:
+                app.logger.warning(
+                    "[LIMITER] Ignoring unsupported default limit value: %r",
+                    value,
+                )
+        return limits
 
     app.logger.warning(
         "[LIMITER] Invalid LIMITER_DEFAULTS value; using built-in defaults"
@@ -108,11 +154,7 @@ def _get_limiter_defaults(app: Any) -> list[str]:
 
 
 def _create_limiter(app: Any) -> Limiter:
-    """
-    Create a limiter owned exclusively by this Flask application.
-
-    This object must not be shared between Flask applications.
-    """
+    """Create a limiter owned exclusively by this Flask application."""
     return Limiter(
         key_func=get_remote_address,
         default_limits=_get_limiter_defaults(app),
@@ -163,12 +205,7 @@ def _configure_limiter(
     app_limiter: Limiter,
     redis_enabled: bool,
 ) -> None:
-    """
-    Configure and bind an app-specific limiter.
-
-    A failed binding leaves this limiter disabled. The exception is logged,
-    but the caller can still safely attach the disabled limiter to the app.
-    """
+    """Configure and bind an app-specific limiter."""
     is_testing = bool(app.config.get("TESTING"))
 
     is_pytest = bool(
@@ -178,7 +215,6 @@ def _configure_limiter(
     )
 
     rate_limit_enabled = bool(app.config.get("RATE_LIMIT_ENABLED", True))
-
     disabled_by_config = is_testing or is_pytest or not rate_limit_enabled
 
     if disabled_by_config:
@@ -224,7 +260,6 @@ def _configure_limiter(
         app_limiter.init_app(app)
 
         backend_type = "Redis" if redis_enabled else "in-memory"
-
         app.logger.info(
             "[LIMITER] Initialized with %s backend [PID: %s]",
             backend_type,
@@ -238,8 +273,7 @@ def _configure_limiter(
 
         app_limiter.enabled = False
 
-        # The limiter remains app-owned even when initialization fails.
-        # Do not replace it with a module-level fallback.
+        # Keep the limiter app-owned; do not replace it with a module-level one.
         try:
             app_limiter.init_app(app)
         except Exception:
@@ -250,11 +284,8 @@ def _configure_limiter(
 
 
 def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
-    """
-    Initialize or restore the limiter belonging to this Flask application.
-    """
+    """Initialize or restore the limiter belonging to this Flask application."""
     extensions = app.extensions
-
     existing_limiter = extensions.get("limiter")
 
     if existing_limiter is not None:
@@ -266,7 +297,7 @@ def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
             "[PID: %s]",
             os.getpid(),
         )
-        return existing_limiter
+        return cast(Limiter, existing_limiter)
 
     app_limiter = _create_limiter(app)
 
@@ -284,8 +315,7 @@ def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
         )
         app_limiter.enabled = False
 
-    # These are intentionally assigned together. The extension object is the
-    # authoritative reference, while app.limiter is a compatibility alias.
+    # The extension is authoritative; app.limiter is a compatibility alias.
     app.limiter = app_limiter
     extensions["limiter"] = app_limiter
     extensions["app_limiter_initialized"] = True
@@ -476,6 +506,7 @@ def init_extensions(app: Any) -> None:
             @jwt.user_lookup_loader
             def user_lookup_callback(_jwt_header, jwt_data):
                 from app.auth_handlers import _resolve_identity
+
                 return _resolve_identity(jwt_data.get("sub"))
 
         except Exception:

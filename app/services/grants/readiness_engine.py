@@ -10,6 +10,7 @@ from .schemas import (
     ReadinessDimensions,
     ReadinessReport,
     ReviewerReport,
+    Risk,
 )
 
 
@@ -42,11 +43,11 @@ class ReadinessEngine:
         for reviewer in reviewers:
             if reviewer.severity in {"high", "critical"}:
                 risks.append(
-                    {
-                        "title": f"{reviewer.reviewer} concern",
-                        "description": reviewer.required_revision,
-                        "severity": reviewer.severity,
-                    }
+                    Risk(
+                        title=f"{reviewer.reviewer} concern",
+                        description=reviewer.required_revision,
+                        severity=reviewer.severity,
+                    )
                 )
 
         revisions = [
@@ -109,7 +110,7 @@ class ReadinessEngine:
             item.evidence_type == "verified_fact"
             for item in project.evidence
         )
-        return round((verified / len(project.evidence)) * 100, 2)
+        return float(round((verified / len(project.evidence)) * 100, 2))
 
     @staticmethod
     def _budget_score(project: GrantProject) -> float:
@@ -131,14 +132,16 @@ class ReadinessEngine:
             bool(value) for value in project.proposal_sections.values()
         )
         total = max(len(REQUIRED_SECTIONS), 1)
-        return round(min(populated / total, 1.0) * 100, 2)
+        return float(round(min(populated / total, 1.0) * 100, 2))
 
     @staticmethod
     def _weighted_score(dimensions: ReadinessDimensions) -> float:
         values = asdict(dimensions)
-        return round(
-            sum(values[name] * weight for name, weight in READINESS_WEIGHTS.items()),
-            2,
+        return float(
+            round(
+                sum(values[name] * weight for name, weight in READINESS_WEIGHTS.items()),
+                2,
+            )
         )
 
     @staticmethod

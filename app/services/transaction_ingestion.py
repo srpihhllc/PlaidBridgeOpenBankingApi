@@ -1,112 +1,159 @@
 # =============================================================================
 # FILE: app/services/transaction_ingestion.py
 # DESCRIPTION:
-#   Plaid-backed ingestion into Transaction model (cockpit‑grade).
-#   - Safe date parsing for all Plaid formats
-#   - Idempotent upserts keyed by Plaid transaction_id
+#   Plaid-backed ingestion into the Transaction model.
+#   - Safe date parsing for Plaid date formats
+#   - Idempotent upserts keyed by Plaid transaction ID
 #   - Normalized fields for UI safety
-#   - Resilient ingestion (one bad record never breaks the batch)
+#   - Resilient ingestion: one bad record does not stop the batch
 # =============================================================================
 
+from __future__ import annotations
+
+from collections.abc import Mapping
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from app.extensions import db
 from app.models.transactions import Transaction
-from app.services.plaid_api import fetch_recent_transactions
+from app.services import plaid_api
 
 
-# -----------------------------------------------------------------------------
-# Safe date parsing
-# -----------------------------------------------------------------------------
-def _safe_parse_date(value: str | None) -> datetime:
-    """
-    Safely parse Plaid date formats:
-    - "2024-01-15"
-    - "2024-01-15T00:00:00Z"
-    - "2024-01-15T00:00:00"
-    Falls back to UTC now if parsing fails.
-    """
-    if not value:
+def _safe_parse_date(value: object) -> datetime:
+    """Parse a Plaid date value, returning a timezone-aware UTC datetime."""
+    if not isinstance(value, str) or not value:
         return datetime.now(timezone.utc)
 
     try:
-        return datetime.fromisoformat(value.replace("Z", ""))
-    except Exception:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
         try:
-            return datetime.strptime(value[:10], "%Y-%m-%d")
-        except Exception:
+            parsed = datetime.strptime(value[:10], "%Y-%m-%d")
+        except ValueError:
             return datetime.now(timezone.utc)
 
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
 
-# -----------------------------------------------------------------------------
-# Ingestion / Upsert
-# -----------------------------------------------------------------------------
+    return parsed.astimezone(timezone.utc)
+
+
+def _fetch_recent_transactions(
+    access_token: str,
+) -> list[Mapping[str, Any]]:
+    """Call the recent-transactions function exposed by plaid_api."""
+    fetcher = getattr(plaid_api, "fetch_recent_transactions", None)
+    if not callable(fetcher):
+        raise RuntimeError(
+            "app.services.plaid_api does not expose a callable "
+            "'fetch_recent_transactions'. Update this lookup to match "
+            "the function provided by plaid_api."
+        )
+
+    result = fetcher(access_token)
+    if not isinstance(result, list):
+        raise TypeError("fetch_recent_transactions must return a list.")
+
+    return cast(list[Mapping[str, Any]], result)
+
+
 def sync_user_transactions_from_plaid(
-    user_id: int, plaid_access_token: str
+    user_id: int,
+    plaid_access_token: str,
 ) -> int:
     """
-    Fetches recent Plaid transactions and upserts them into the Transaction table.
-    Returns the count of newly inserted rows (not updates).
+    Fetch and upsert recent Plaid transactions.
+
+    Return the number of newly inserted rows; existing rows are updated.
     """
-    plaid_txns = fetch_recent_transactions(plaid_access_token)
-    upserted = 0
+    plaid_transactions = _fetch_recent_transactions(plaid_access_token)
+    inserted_count = 0
+    changed = False
 
-    for p in plaid_txns:
+    for transaction_data in plaid_transactions:
         try:
-            txn_id = p["transaction_id"]
-            existing = Transaction.query.filter_by(id=txn_id).first()
+            if not isinstance(transaction_data, Mapping):
+                raise TypeError("Transaction record must be a mapping.")
 
-            # Normalize date
-            date_val = _safe_parse_date(p.get("date"))
+            transaction_id = transaction_data.get("transaction_id")
+            if not isinstance(transaction_id, str) or not transaction_id:
+                raise ValueError("Transaction record has no valid transaction_id.")
 
-            # Normalize category
-            category_list = p.get("category") or []
+            existing = Transaction.query.filter_by(id=transaction_id).first()
+
+            raw_category = transaction_data.get("category")
             category_name = (
-                category_list[0] if category_list else "Uncategorized"
+                raw_category[0]
+                if isinstance(raw_category, list)
+                and raw_category
+                and isinstance(raw_category[0], str)
+                else "Uncategorized"
             )
 
-            # -----------------------------------------------------------------
-            # Update existing transaction
-            # -----------------------------------------------------------------
-            if existing:
-                existing.amount = p.get("amount") or 0.0
-                existing.currency = p.get("iso_currency_code") or "USD"
-                existing.date = date_val
-                existing.name = p.get("name") or "(no description)"
-                existing.category = category_name
-                existing.is_pending = p.get("pending", False)
-                existing.merchant_name = p.get("merchant_name")
-                existing.payment_channel = p.get("payment_channel")
+            amount = transaction_data.get("amount")
+            if not isinstance(amount, (int, float)):
+                amount = 0.0
+
+            currency = transaction_data.get("iso_currency_code")
+            if not isinstance(currency, str) or not currency:
+                currency = "USD"
+
+            name = transaction_data.get("name")
+            if not isinstance(name, str) or not name:
+                name = "(no description)"
+
+            pending = transaction_data.get("pending", False)
+            if not isinstance(pending, bool):
+                pending = False
+
+            merchant_name = transaction_data.get("merchant_name")
+            if not isinstance(merchant_name, str):
+                merchant_name = None
+
+            payment_channel = transaction_data.get("payment_channel")
+            if not isinstance(payment_channel, str):
+                payment_channel = None
+
+            account_id = transaction_data.get("account_id")
+            if not isinstance(account_id, str):
+                account_id = None
+
+            values = {
+                "amount": float(amount),
+                "currency": currency,
+                "date": _safe_parse_date(transaction_data.get("date")),
+                "name": name,
+                "category": category_name,
+                "is_pending": pending,
+                "merchant_name": merchant_name,
+                "payment_channel": payment_channel,
+            }
+
+            if existing is not None:
+                for field, value in values.items():
+                    setattr(existing, field, value)
+                changed = True
                 continue
 
-            # -----------------------------------------------------------------
-            # Insert new transaction
-            # -----------------------------------------------------------------
-            txn = Transaction(
-                id=txn_id,
+            transaction = Transaction(
+                id=transaction_id,
                 user_id=user_id,
-                plaid_account_id=p.get("account_id"),
-                account_id=p.get("account_id"),
-                amount=p.get("amount") or 0.0,
-                currency=p.get("iso_currency_code") or "USD",
-                date=date_val,
-                name=p.get("name") or "(no description)",
-                category=category_name,
-                is_pending=p.get("pending", False),
-                merchant_name=p.get("merchant_name"),
-                payment_channel=p.get("payment_channel"),
+                plaid_account_id=account_id,
+                account_id=account_id,
+                **values,
             )
+            db.session.add(transaction)
+            inserted_count += 1
+            changed = True
 
-            db.session.add(txn)
-            upserted += 1
-
-        except Exception as e:
-            # Ingestion must be resilient — log and continue
+        except Exception as error:
+            transaction_id_for_log = transaction_data.get("transaction_id")
             print(
-                f"[WARN] Failed to ingest transaction {p.get('transaction_id')}: {e}"
+                f"[WARN] Failed to ingest transaction "
+                f"{transaction_id_for_log}: {error}"
             )
 
-    if upserted:
+    if changed:
         db.session.commit()
 
-    return upserted
+    return inserted_count

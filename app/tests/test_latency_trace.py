@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 # Fixtures
 # -----------------------------------------------------------------------------
 @pytest.fixture(autouse=True)
-def clear_ttl_data():
+def clear_ttl_data() -> Iterator[None]:
     """
     Ensure _ttl_data is cleared for each test to guarantee isolation for tests that
     inspect ttl_summary() or rely on global telemetry state. Uses a lock to be
@@ -53,7 +53,7 @@ def clear_ttl_data():
 
 
 @pytest.fixture
-def capture_ttl_emit(monkeypatch) -> Any:
+def capture_ttl_emit(monkeypatch: Any) -> Any:
     """
     Function-scoped fixture that captures calls to app.utils.latency.ttl_emit.
 
@@ -151,13 +151,13 @@ class ThreadSafeCapture:
         with self._lock:
             return list(self._calls)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Tuple[Tuple[Any, ...], Dict[str, Any]]]:
         with self._lock:
             return iter(list(self._calls))
 
 
 @contextmanager
-def capture_ttl_emit_context():
+def capture_ttl_emit_context() -> Iterator[ThreadSafeCapture]:
     """
     Context manager that patches app.utils.latency.ttl_emit and yields a fresh
     ThreadSafeCapture. Use this inside Hypothesis-driven tests so each example
@@ -189,14 +189,15 @@ def capture_ttl_emit_context():
 # Helpers
 # -----------------------------------------------------------------------------
 def _extract_key(kwargs: Dict[str, Any]) -> str:
-    return kwargs.get("key", "")
+    val = kwargs.get("key", "")
+    return str(val) if val is not None else ""
 
 
 # -----------------------------------------------------------------------------
 # Signature Coverage
 # -----------------------------------------------------------------------------
 @pytest.mark.ci
-def test_new_signature_positional(capture_ttl_emit):
+def test_new_signature_positional(capture_ttl_emit: Any) -> None:
     """New-style positional: emit_latency_trace(stage, request_uuid, start_ts, r)."""
     start_time = time.time() - 0.1  # Simulate ~100ms latency
     emit_latency_trace("auth", "req-123", start_time, r="fake")
@@ -215,7 +216,7 @@ def test_new_signature_positional(capture_ttl_emit):
 
 
 @pytest.mark.ci
-def test_legacy_signature_positional(capture_ttl_emit):
+def test_legacy_signature_positional(capture_ttl_emit: Any) -> None:
     """Legacy-style positional: emit_latency_trace(endpoint, latency_ms, r)."""
     emit_latency_trace("user_login", 123.45, r="fake")
     assert len(capture_ttl_emit) == 1
@@ -232,7 +233,7 @@ def test_legacy_signature_positional(capture_ttl_emit):
 
 
 @pytest.mark.ci
-def test_new_signature_keyword(capture_ttl_emit):
+def test_new_signature_keyword(capture_ttl_emit: Any) -> None:
     """New-style keyword: emit_latency_trace(stage=..., request_uuid=..., start_ts=..., r=...)."""
     start_time = time.time() - 0.2
     emit_latency_trace(
@@ -249,7 +250,7 @@ def test_new_signature_keyword(capture_ttl_emit):
 
 
 @pytest.mark.ci
-def test_legacy_signature_keyword(capture_ttl_emit):
+def test_legacy_signature_keyword(capture_ttl_emit: Any) -> None:
     """Legacy-style keyword: emit_latency_trace(endpoint=..., latency_ms=..., r=...)."""
     emit_latency_trace(endpoint="refresh", latency_ms=456.78, r="fake")
     assert len(capture_ttl_emit) == 1
@@ -266,7 +267,7 @@ def test_legacy_signature_keyword(capture_ttl_emit):
 # TTL Behavior
 # -----------------------------------------------------------------------------
 @pytest.mark.ci
-def test_custom_ttl_override(capture_ttl_emit):
+def test_custom_ttl_override(capture_ttl_emit: Any) -> None:
     emit_latency_trace(
         "auth", "req-123", time.time(), r="fake", ttl_seconds=120
     )
@@ -276,7 +277,7 @@ def test_custom_ttl_override(capture_ttl_emit):
 
 
 @pytest.mark.ci
-def test_multiple_emits(capture_ttl_emit):
+def test_multiple_emits(capture_ttl_emit: Any) -> None:
     emit_latency_trace("auth", "req-1", time.time(), r="fake")
     emit_latency_trace("auth", "req-2", time.time(), r="fake")
     assert len(capture_ttl_emit) == 2
@@ -289,7 +290,7 @@ def test_multiple_emits(capture_ttl_emit):
 
 
 @pytest.mark.ci
-def test_negative_duration_fallback(capture_ttl_emit):
+def test_negative_duration_fallback(capture_ttl_emit: Any) -> None:
     emit_latency_trace("auth", "req-xyz", time.time() + 100, r="fake")
     assert len(capture_ttl_emit) == 1
     _, kwargs = capture_ttl_emit[0]
@@ -301,13 +302,13 @@ def test_negative_duration_fallback(capture_ttl_emit):
 # Error Handling
 # -----------------------------------------------------------------------------
 @pytest.mark.ci
-def test_invalid_arguments_raises_typeerror():
+def test_invalid_arguments_raises_typeerror() -> None:
     with pytest.raises(TypeError):
         emit_latency_trace("only_one_argument")
 
 
 @pytest.mark.ci
-def test_ttl_emit_signature_mismatch(monkeypatch, caplog):
+def test_ttl_emit_signature_mismatch(monkeypatch: Any, caplog: Any) -> None:
     """
     If the underlying ttl_emit has an incompatible signature or raises a TypeError,
     emit_latency_trace should surface the error and log a warning. Behavior depends
@@ -315,7 +316,7 @@ def test_ttl_emit_signature_mismatch(monkeypatch, caplog):
     """
     caplog.set_level("WARNING")
 
-    def broken_ttl_emit(*_args, **_kwargs):
+    def broken_ttl_emit(*_args: Any, **_kwargs: Any) -> None:
         raise TypeError("bad signature")
 
     monkeypatch.setattr("app.utils.latency.ttl_emit", broken_ttl_emit)
@@ -333,7 +334,7 @@ def test_ttl_emit_signature_mismatch(monkeypatch, caplog):
 # Trace Delegation (emit_boot_trace)
 # -----------------------------------------------------------------------------
 @pytest.mark.ci
-def test_emit_boot_trace_delegates_to_ttl_emit(monkeypatch):
+def test_emit_boot_trace_delegates_to_ttl_emit(monkeypatch: Any) -> None:
     calls: List[Tuple[Tuple[Any, ...], Dict[str, Any]]] = []
 
     def fake_ttl_emit(*args: Any, **kwargs: Any) -> None:
@@ -355,7 +356,7 @@ def test_emit_boot_trace_delegates_to_ttl_emit(monkeypatch):
 # TTL Summary
 # -----------------------------------------------------------------------------
 @pytest.mark.ci
-def test_ttl_summary_expiry_and_freshness():
+def test_ttl_summary_expiry_and_freshness() -> None:
     now = datetime.datetime.now()
     _ttl_data["key:fresh"] = {
         "expires_at": now + datetime.timedelta(seconds=10),
@@ -392,8 +393,8 @@ def test_ttl_summary_expiry_and_freshness():
     ],
 )
 def test_stress_emits_performance(
-    capture_ttl_emit, num_emits, perf_limit_seconds
-):
+    capture_ttl_emit: Any, num_emits: int, perf_limit_seconds: float
+) -> None:
     logging.info(
         "Starting stress test with %d emits (limit %.2fs).",
         num_emits,
@@ -422,7 +423,7 @@ def test_stress_emits_performance(
 
 
 @pytest.mark.ci
-def test_boundary_ttl(capture_ttl_emit):
+def test_boundary_ttl(capture_ttl_emit: Any) -> None:
     emit_latency_trace(
         "auth", "req-zero", time.time(), r="fake", ttl_seconds=0
     )
@@ -438,7 +439,7 @@ def test_boundary_ttl(capture_ttl_emit):
 
 
 @pytest.mark.ci
-def test_emit_boot_trace_with_meta(monkeypatch):
+def test_emit_boot_trace_with_meta(monkeypatch: Any) -> None:
     calls: List[Tuple[Tuple[Any, ...], Dict[str, Any]]] = []
 
     def fake_ttl_emit(*args: Any, **kwargs: Any) -> None:
@@ -474,7 +475,7 @@ def _concurrent_emit_task(thread_id: int, num_calls: int) -> None:
 
 
 @pytest.mark.ci
-def test_concurrent_emits(capture_ttl_emit):
+def test_concurrent_emits(capture_ttl_emit: Any) -> None:
     num_threads = 5
     calls_per_thread = 20
     total_expected_calls = num_threads * calls_per_thread
@@ -528,7 +529,7 @@ ttls = st.integers(min_value=-100, max_value=3600)
     start_ts=timestamps,
     ttl=ttls,
 )
-def test_property_based_new_signature(stage, request_id, start_ts, ttl):
+def test_property_based_new_signature(stage: str, request_id: str, start_ts: float, ttl: int) -> None:
     # Use context manager to ensure a fresh capture list per Hypothesis example.
     with capture_ttl_emit_context() as capture_ttl_emit:
         time_before_call = time.time()
@@ -574,7 +575,7 @@ def test_property_based_new_signature(stage, request_id, start_ts, ttl):
 @pytest.mark.ci
 @settings(max_examples=50, deadline=None)
 @given(endpoint=safe_text, latency=latencies, ttl=ttls)
-def test_property_based_legacy_signature(endpoint, latency, ttl):
+def test_property_based_legacy_signature(endpoint: str, latency: float, ttl: int) -> None:
     with capture_ttl_emit_context() as capture_ttl_emit:
         emit_latency_trace(endpoint, latency, r="fake", ttl_seconds=ttl)
         assert len(capture_ttl_emit) == 1
@@ -623,7 +624,7 @@ def _concurrent_property_worker(
         unique_by=lambda x: x[0],
     ),
 )
-def test_property_based_concurrent_new_signature(stage, inputs):
+def test_property_based_concurrent_new_signature(stage: str, inputs: List[Tuple[str, float, int]]) -> None:
     """
     Property-based concurrent test: spawn 5 threads, each performing exactly one
     emit. Use context manager for per-example isolation.
@@ -658,7 +659,7 @@ def test_property_based_concurrent_new_signature(stage, inputs):
 # Soak Test (explicit opt-in)
 # -----------------------------------------------------------------------------
 @pytest.mark.nightly
-def test_soak_test_memory_leak():
+def test_soak_test_memory_leak() -> None:
     if not os.getenv("RUN_SOAK_TEST"):
         pytest.skip(
             "Skipping soak test. Set RUN_SOAK_TEST=1 to run this test."

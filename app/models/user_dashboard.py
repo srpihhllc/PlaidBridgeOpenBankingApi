@@ -1,22 +1,25 @@
 # =============================================================================
 # FILE: app/models/user_dashboard.py
 # DESCRIPTION: Subscriber dashboard settings model with UUID FK linkage,
-#              cockpit‑grade defaults, and safe update helpers.
-#              Updated to use dynamic 1:1 backref to fix User mapper KeyError.
+#              cockpit-grade defaults, and safe update helpers.
 # =============================================================================
 
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from ..extensions import db
 
+Model: Any = db.Model
 
-class UserDashboard(db.Model):
+
+class UserDashboard(Model):
     __tablename__ = "user_dashboards"
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # UUID FK with cascade delete
     user_id = db.Column(
         db.String(36),
         db.ForeignKey("users.id", ondelete="CASCADE"),
@@ -25,12 +28,12 @@ class UserDashboard(db.Model):
         index=True,
     )
 
-    # JSON settings for layout, widget visibility, preferences
     settings = db.Column(db.JSON, nullable=True)
 
-    # Timestamping for cockpit audits
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
     updated_at = db.Column(
         db.DateTime,
@@ -39,85 +42,69 @@ class UserDashboard(db.Model):
         nullable=False,
     )
 
-    # -------------------------------------------------------------------------
-    # Relationships
-    # -------------------------------------------------------------------------
-
-    # ⭐ User Fix: Swapped back_populates to a dynamic backref.
-    # Included uselist=False to ensure a strict 1:1 scalar mapping on the User model.
     user = db.relationship(
         "User",
         backref=db.backref(
-            "user_dashboard", uselist=False, passive_deletes=True
+            "user_dashboard",
+            uselist=False,
+            passive_deletes=True,
         ),
     )
 
-    # -------------------------------------------------------------------------
-    # Default dashboard settings (cockpit‑grade)
-    # -------------------------------------------------------------------------
     @staticmethod
-    def default_settings():
+    def default_settings() -> dict[str, Any]:
         return {
             "layout": "two_column",
             "theme": "light",
-            # Widget visibility
             "show_todo_tile": True,
             "show_today_widget": True,
             "show_balance_tile": True,
             "show_activity_tile": True,
-            # Todo preferences
-            "todo_sort": "created",  # created | priority | due
-            "todo_filter": "all",  # all | pending | completed
+            "todo_sort": "created",
+            "todo_filter": "all",
             "default_priority": "normal",
             "default_category": None,
         }
 
-    # -------------------------------------------------------------------------
-    # Initialization helper
-    # -------------------------------------------------------------------------
     @classmethod
-    def create_for_user(cls, user_id: str):
+    def create_for_user(cls, user_id: str) -> UserDashboard:
         return cls(
             user_id=user_id,
             settings=cls.default_settings(),
         )
 
-    # -------------------------------------------------------------------------
-    # Settings helpers (safe getters/setters)
-    # -------------------------------------------------------------------------
-    def get_setting(self, key, default=None):
-        if not self.settings:
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        settings = self.settings
+        if not isinstance(settings, dict):
             return default
-        return self.settings.get(key, default)
+        return settings.get(key, default)
 
-    def set_setting(self, key, value):
-        if not self.settings:
-            self.settings = {}
-        self.settings[key] = value
-        return self.settings
+    def set_setting(self, key: str, value: Any) -> dict[str, Any]:
+        settings = self.settings
+        if not isinstance(settings, dict):
+            settings = {}
+            self.settings = settings
 
-    def enable_widget(self, widget_name: str):
+        typed_settings = cast(dict[str, Any], settings)
+        typed_settings[key] = value
+        return typed_settings
+
+    def enable_widget(self, widget_name: str) -> dict[str, Any]:
         return self.set_setting(widget_name, True)
 
-    def disable_widget(self, widget_name: str):
+    def disable_widget(self, widget_name: str) -> dict[str, Any]:
         return self.set_setting(widget_name, False)
 
-    def toggle_widget(self, widget_name: str):
+    def toggle_widget(self, widget_name: str) -> dict[str, Any]:
         current = self.get_setting(widget_name, False)
         return self.set_setting(widget_name, not current)
 
-    # -------------------------------------------------------------------------
-    # Commit helper (atomic dashboard updates)
-    # -------------------------------------------------------------------------
-    def save(self):
+    def save(self) -> UserDashboard:
         db.session.add(self)
         db.session.commit()
         return self
 
-    # -------------------------------------------------------------------------
-    # Representation
-    # -------------------------------------------------------------------------
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<UserDashboard user_id={self.user_id} "
             f"layout={self.get_setting('layout')}>"

@@ -3,17 +3,17 @@
 import json
 import logging
 import os
-
+from typing import Any
 
 _logger = logging.getLogger(__name__)
 
 
-def detect_schema_drift(redis_client=None) -> dict:
+def detect_schema_drift(redis_client=None) -> dict[str, Any]:
     """Compares current manifest against stable baseline."""
     curr_path = "storage/manifest/model_manifest.json"
     stab_path = "storage/manifest/model_manifest_stable.json"
 
-    report = {
+    report: dict[str, Any] = {
         "drift_detected": False,
         "drift_details": {},
         "models_scanned": 0,

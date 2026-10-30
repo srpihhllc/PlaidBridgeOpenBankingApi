@@ -4,14 +4,14 @@
 #              Used by Flask-JWT-Extended's token_in_blocklist_loader.
 # =============================================================================
 
-from datetime import datetime, timezone
+from __future__ import annotations
 
-from sqlalchemy.orm import DeclarativeBase
+from datetime import datetime, timezone
+from typing import Any
 
 from ..extensions import db
 
-# Mypy-safe alias: db.Model behaves like a SQLAlchemy declarative base
-Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
+Model: Any = db.Model
 
 
 class RevokedToken(Model):

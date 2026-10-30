@@ -8,8 +8,10 @@ from .schemas import EvidenceItem
 class EvidenceEngine:
     """Maintains a distinction between facts, claims, assumptions, and gaps."""
 
-    def classify(self, items: list[EvidenceItem]) -> dict[str, list[EvidenceItem]]:
-        result = {
+    def classify(
+        self, items: list[EvidenceItem]
+    ) -> dict[str, list[EvidenceItem]]:
+        result: dict[str, list[EvidenceItem]] = {
             "verified_facts": [],
             "applicant_claims": [],
             "assumptions": [],

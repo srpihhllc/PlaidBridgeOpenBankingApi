@@ -16,11 +16,7 @@ from app.models.dispute_log import DisputeLog
 from app.models.schema_event import SchemaEvent
 from app.models.user import User
 from app.utils.email_utils import send_email_with_attachment
-from app.utils.redis_utils import (
-    increment_progress,
-    init_progress,
-    set_job_status,
-)
+from app.utils.redis_utils import increment_progress, init_progress, set_job_status
 
 logger = logging.getLogger(__name__)
 
@@ -47,21 +43,24 @@ async def _retry_async(
     context: str = "",
 ) -> Any:
     attempt = 0
+
     while True:
         try:
             return func()
-        except Exception as e:
+        except Exception as exc:
             attempt += 1
             logger.warning(
                 "Retryable error in %s (attempt %s/%s): %s",
                 context,
                 attempt,
                 retries,
-                e,
+                exc,
             )
+
             if attempt >= retries:
-                logger.error("Exhausted retries in %s: %s", context, e)
+                logger.error("Exhausted retries in %s: %s", context, exc)
                 raise
+
             await asyncio.sleep(delay_seconds)
             delay_seconds *= backoff
 
@@ -76,9 +75,14 @@ async def _process_bureau_dispute(
 ) -> DisputeJobResult:
     job_id = f"dispute:job:{user.id}:{bureau['name']}"
     set_job_status(job_id, "queued", {"bureau": bureau["name"]})
+
     logger.info(
         "Dispute job queued",
-        extra={"job_id": job_id, "bureau": bureau["name"], "user_id": user.id},
+        extra={
+            "job_id": job_id,
+            "bureau": bureau["name"],
+            "user_id": user.id,
+        },
     )
 
     content_hash: str | None = None
@@ -88,29 +92,37 @@ async def _process_bureau_dispute(
     error_msg: str | None = None
 
     try:
-        # render_letter expects a plain dict; make sure we pass a dict not a TypedDict
         letter_body = render_letter(
             template_name,
             user=user_payload,
             bureau=dict(bureau),
             metadata=metadata,
         )
-        content_hash = hashlib.sha256(letter_body.encode("utf-8")).hexdigest()
+        content_hash = hashlib.sha256(
+            letter_body.encode("utf-8")
+        ).hexdigest()
 
         content_lines = letter_body.splitlines()
         pdf_filename = narratable_filename(
-            prefix=f"dispute_{user.id}_{bureau['name']}", ext="pdf"
+            prefix=f"dispute_{user.id}_{bureau['name']}",
+            ext="pdf",
         )
-        pdf_path = write_pdf(
+        generated_pdf_path = write_pdf(
             content_lines,
             filename=pdf_filename,
             title=f"Credit Dispute Letter: {template_name}",
             operator=user.full_name,
         )
 
+        if generated_pdf_path is None:
+            raise RuntimeError("PDF generation did not return a file path")
+
+        pdf_path = generated_pdf_path
+
         def _send() -> None:
-            with open(pdf_path, "rb") as f:
-                file_bytes = f.read()
+            with open(generated_pdf_path, "rb") as pdf_file:
+                file_bytes = pdf_file.read()
+
             send_email_with_attachment(
                 to_email=bureau["email"],
                 subject=f"Dispute Letter - {user.full_name}",
@@ -123,11 +135,14 @@ async def _process_bureau_dispute(
         await _retry_async(_send, context=f"send_email:{job_id}")
 
         set_job_status(
-            job_id, "sent", {"bureau": bureau["name"], "pdf": pdf_filename}
+            job_id,
+            "sent",
+            {"bureau": bureau["name"], "pdf": pdf_filename},
         )
-        # Only increment progress when we have a concrete blast_id (not None)
+
         if blast_id:
             increment_progress(blast_id, "sent")
+
         log_status = "sent"
         email_status = "sent"
 
@@ -141,10 +156,12 @@ async def _process_bureau_dispute(
             },
         )
 
-    except Exception as e:
-        error_msg = str(e)
+    except Exception as exc:
+        error_msg = str(exc)
         set_job_status(
-            job_id, "failed", {"bureau": bureau["name"], "error": error_msg}
+            job_id,
+            "failed",
+            {"bureau": bureau["name"], "error": error_msg},
         )
         logger.exception(
             "Dispute job failed",
@@ -172,7 +189,10 @@ async def _process_bureau_dispute(
         SchemaEvent(
             event_type=f"DISPUTE_{log_status.upper()}",
             origin="dispute_blast",
-            detail=f"Letter {log_status} to {bureau['name']} for user_id={user.id}",
+            detail=(
+                f"Letter {log_status} to {bureau['name']} "
+                f"for user_id={user.id}"
+            ),
         )
     )
 
@@ -207,12 +227,10 @@ async def send_dispute_blast_async(
         "ssn_last4": user.ssn_last4,
     }
 
-    # Only initialize progress if we have a concrete blast id
     if blast_id:
         init_progress(blast_id, total=len(BUREAUS))
 
     tasks: list[Awaitable[DisputeJobResult]] = []
-    # BUREAUS may be untyped at import site; cast each item to the Bureau TypedDict.
     for bureau in BUREAUS:
         tasks.append(
             _process_bureau_dispute(
@@ -225,9 +243,7 @@ async def send_dispute_blast_async(
             )
         )
 
-    results: list[DisputeJobResult] = await asyncio.gather(
-        *tasks, return_exceptions=False
-    )
+    results = await asyncio.gather(*tasks)
 
     try:
         db.session.commit()
@@ -241,13 +257,13 @@ async def send_dispute_blast_async(
 
     return [
         {
-            "bureau": r.bureau,
-            "status": r.status,
-            "pdf_path": r.pdf_path,
-            "content_hash": r.content_hash,
-            "error": r.error,
+            "bureau": result.bureau,
+            "status": result.status,
+            "pdf_path": result.pdf_path,
+            "content_hash": result.content_hash,
+            "error": result.error,
         }
-        for r in results
+        for result in results
     ]
 
 
@@ -257,10 +273,7 @@ def send_dispute_blast(
     metadata: dict[str, Any] | None = None,
     blast_id: str | None = None,
 ) -> list[dict[str, Any]]:
-    """
-    Sync entrypoint for WSGI/Flask callers.
-    Runs the async orchestrator in a private event loop.
-    """
+    """Synchronous entry point for WSGI/Flask callers."""
     return asyncio.run(
         send_dispute_blast_async(
             user_id=user_id,

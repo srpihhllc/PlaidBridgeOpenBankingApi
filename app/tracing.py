@@ -1,4 +1,10 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/tracing.py
+# =============================================================================
+# FILE: app/tracing.py
+# DESCRIPTION: Cockpit-grade request and error tracing with rich stack frame
+#              extraction, line code snippets, and Redis persistence.
+# =============================================================================
+
+from __future__ import annotations
 
 import json
 import linecache
@@ -9,58 +15,41 @@ from typing import Any, Dict, List, Optional
 
 from flask import current_app
 
-from app.utils.redis_utils import (
-    get_redis_client,
-)  # ✅ centralised, SSL‑safe client
+from app.utils.redis_utils import get_redis_client
 
 
-# -------------------------------------------------------------------------
-# LAZY REDIS CLIENT — never call Redis at import time
-# -------------------------------------------------------------------------
-def _client():
-    """
-    Always fetch the Redis client lazily so tests can stub it
-    before any Redis calls occur.
-    """
+def _client() -> Any:
+    """Fetch the Redis client lazily so tests can stub it before use."""
     return get_redis_client()
 
 
-# -------------------------------------------------------------------------
-# STACK FRAME EXTRACTION HELPERS
-# -------------------------------------------------------------------------
 def _extract_rich_stack_frames(tb: Optional[Any] = None) -> List[Dict[str, Any]]:
-    """
-    Extract enriched stack frames with line numbers, code snippets, and call site details.
-    """
+    """Extract stack frames with line numbers, code snippets, and call details."""
     if tb is None:
         _, _, tb = sys.exc_info()
+
     frames: List[Dict[str, Any]] = []
     if not tb:
         return frames
 
     try:
-        extracted = traceback.extract_tb(tb)
-        for frame in extracted:
-            filename, lineno, funcname, line_text = (
-                frame.filename,
-                frame.lineno,
-                frame.name,
-                frame.line,
-            )
-            snippet = []
+        for frame in traceback.extract_tb(tb):
+            filename = frame.filename
+            lineno = frame.lineno
+            snippet: List[Dict[str, Any]] = []
+
             try:
-                start_line = max(1, lineno - 2)
-                end_line = lineno + 2
-                for l_num in range(start_line, end_line + 1):
-                    code_l = linecache.getline(filename, l_num)
-                    if code_l:
-                        snippet.append(
-                            {
-                                "line_number": l_num,
-                                "code": code_l.rstrip(),
-                                "is_error_line": (l_num == lineno),
-                            }
-                        )
+                if lineno is not None:
+                    for line_number in range(max(1, lineno - 2), lineno + 3):
+                        code_line = linecache.getline(filename, line_number)
+                        if code_line:
+                            snippet.append(
+                                {
+                                    "line_number": line_number,
+                                    "code": code_line.rstrip(),
+                                    "is_error_line": line_number == lineno,
+                                }
+                            )
             except Exception:
                 pass
 
@@ -68,8 +57,8 @@ def _extract_rich_stack_frames(tb: Optional[Any] = None) -> List[Dict[str, Any]]
                 {
                     "file": filename,
                     "line": lineno,
-                    "function": funcname,
-                    "code_line": line_text or "",
+                    "function": frame.name,
+                    "code_line": frame.line or "",
                     "snippet": snippet,
                 }
             )
@@ -80,16 +69,13 @@ def _extract_rich_stack_frames(tb: Optional[Any] = None) -> List[Dict[str, Any]]
 
 
 def handle_traced_error(error: Exception) -> Dict[str, Any]:
-    """
-    Custom exception handler to enrich error trace payloads with line numbers,
-    code snippets, and stack frames, then emit to Redis.
-    """
+    """Build an enriched error payload and emit it to Redis."""
     _, _, exc_tb = sys.exc_info()
     frames = _extract_rich_stack_frames(exc_tb)
     faulty_frame = frames[-1] if frames else {}
 
-    payload = {
-        "error_type": type(error).__name__ if error else "Exception",
+    payload: Dict[str, Any] = {
+        "error_type": type(error).__name__,
         "error_message": str(error),
         "faulty_file": faulty_frame.get("file"),
         "faulty_line": faulty_frame.get("line"),
@@ -99,18 +85,12 @@ def handle_traced_error(error: Exception) -> Dict[str, Any]:
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    context = type(error).__name__ if error else "general"
-    trace_log(f"errors/traced/{context}", payload, ttl=1800)
+    trace_log(f"errors/traced/{type(error).__name__}", payload, ttl=1800)
     return payload
 
 
-# -------------------------------------------------------------------------
-# TRACE EMITTERS
-# -------------------------------------------------------------------------
-def trace_log(event_type, payload, ttl=3600):
-    """
-    Emit a trace with TTL and timestamp.
-    """
+def trace_log(event_type: str, payload: Any, ttl: int = 3600) -> None:
+    """Emit a trace with a TTL and timestamp."""
     client = _client()
     if not client:
         _log_unavailable(f"trace_log({event_type})")
@@ -128,29 +108,26 @@ def trace_log(event_type, payload, ttl=3600):
     try:
         client.setex(key, ttl, value)
         print(f"📝 Emitted trace: {key}")
-    except Exception as e:
-        _log_failure(f"trace_log({event_type})", e)
+    except Exception as exc:
+        _log_failure(f"trace_log({event_type})", exc)
 
 
-def trace_boot(event_type, detail):
-    """Shortcut for boot-time traces."""
+def trace_boot(event_type: str, detail: Any) -> None:
+    """Emit a boot-time trace."""
     trace_log(f"boot/{event_type}", detail)
 
 
-def trace_error(context, error):
-    """Emit error trace with enriched stack trace context if available."""
+def trace_error(context: str, error: Exception | str) -> None:
+    """Emit an error trace, including stack context when available."""
     _, _, exc_tb = sys.exc_info()
     frames = _extract_rich_stack_frames(exc_tb) if exc_tb else []
     faulty_frame = frames[-1] if frames else {}
 
+    payload: Any
     if frames:
         payload = {
             "error": str(error),
-            "error_type": (
-                type(error).__name__
-                if isinstance(error, Exception)
-                else "Error"
-            ),
+            "error_type": type(error).__name__ if isinstance(error, Exception) else "Error",
             "faulty_file": faulty_frame.get("file"),
             "faulty_line": faulty_frame.get("line"),
             "faulty_function": faulty_frame.get("function"),
@@ -164,12 +141,12 @@ def trace_error(context, error):
     trace_log(f"errors/{context}", payload, ttl=1800)
 
 
-def trace_heartbeat(tile, status="ok"):
+def trace_heartbeat(tile: str, status: str = "ok") -> None:
     """Emit a short-lived heartbeat for cockpit tiles."""
     trace_log(f"heartbeat/{tile}", {"status": status}, ttl=300)
 
 
-def check_redis_health():
+def check_redis_health() -> None:
     """Emit a trace confirming Redis connectivity."""
     client = _client()
     if not client:
@@ -179,45 +156,38 @@ def check_redis_health():
     try:
         pong = client.ping()
         trace_log("boot/redis_health", f"Redis ping: {pong}")
-    except Exception as e:
-        trace_error("redis_ping", e)
+    except Exception as exc:
+        trace_error("redis_ping", exc)
 
 
-def emit_context_entry(name):
-    """Emit trace when entering app context."""
+def emit_context_entry(name: str) -> None:
+    """Emit a trace when entering an application context."""
     trace_log(f"context/{name}/entered", "App context entered")
 
 
-def emit_context_exit(name):
-    """Emit trace when exiting app context."""
+def emit_context_exit(name: str) -> None:
+    """Emit a trace when exiting an application context."""
     trace_log(f"context/{name}/exited", "App context exited")
 
 
-# -------------------------------------------------------------------------
-# INTERNAL HELPERS
-# -------------------------------------------------------------------------
-def _log_unavailable(context):
-    msg = f"[{context}] Redis unavailable — trace not recorded"
+def _log_unavailable(context: str) -> None:
+    message = f"[{context}] Redis unavailable — trace not recorded"
     try:
-        current_app.logger.error(msg)
+        current_app.logger.error(message)
     except RuntimeError:
-        # current_app may not be active
-        print(f"❌ {msg}")
+        print(f"❌ {message}")
 
 
-def _log_failure(context, error):
-    msg = f"[{context}] Failed to write trace to Redis: {error}"
+def _log_failure(context: str, error: Exception) -> None:
+    message = f"[{context}] Failed to write trace to Redis: {error}"
     try:
-        current_app.logger.error(msg)
+        current_app.logger.error(message)
     except RuntimeError:
-        print(f"❌ {msg}")
+        print(f"❌ {message}")
 
 
-def trace_session_warning(model_name: str, context: str = ""):
-    """
-    Emit a trace when unsafe .query access is detected.
-    Helps operators spot session drift between test and prod.
-    """
+def trace_session_warning(model_name: str, context: str = "") -> None:
+    """Emit a trace when unsafe `.query` access is detected."""
     payload = {
         "model": model_name,
         "context": context or "unknown",

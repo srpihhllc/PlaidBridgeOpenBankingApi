@@ -1,5 +1,10 @@
+# =============================================================================
 # FILE: app/security/isolation.py
+# =============================================================================
 
+from __future__ import annotations
+
+from typing import cast
 from flask_jwt_extended import get_jwt_identity
 
 from app.models.user import User
@@ -26,4 +31,4 @@ def assert_lender_context() -> User:
             "Subscriber context may not access lender sandbox APIs."
         )
 
-    return user
+    return cast(User, user)

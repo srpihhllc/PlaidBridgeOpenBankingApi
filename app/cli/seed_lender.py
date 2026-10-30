@@ -21,24 +21,29 @@ from app.models import BankAccount, BankInstitution, Lender, User
 @click.option("--interactive", is_flag=True, help="Prompt for fields")
 @with_appcontext
 def seed_lender(email, password, username, interactive):
-    """Create or update a lender user with sandbox-safe mock data using environment config."""
+    """Create or update a lender user with sandbox-safe mock data."""
 
     if interactive:
         email = email or click.prompt("Lender email")
         password = password or click.prompt(
-            "Lender password", hide_input=True, confirmation_prompt=True
+            "Lender password",
+            hide_input=True,
+            confirmation_prompt=True,
         )
         username = username or click.prompt("Lender username")
     else:
-        # Fall back strictly to environment variables instead of hardcoded defaults
+        # Use environment variables when values are not provided as arguments.
         email = email or os.environ.get("LENDER_EMAIL")
         password = password or os.environ.get("LENDER_PASSWORD")
-        username = username or os.environ.get("LENDER_USERNAME", "lender_user")
+        username = username or os.environ.get(
+            "LENDER_USERNAME",
+            "lender_user",
+        )
 
-    # Enforce mandatory credentials
     if not email or not password:
         click.echo(
-            "❌ ERROR: LENDER_EMAIL and LENDER_PASSWORD must be set in the environment or provided via arguments."
+            "❌ ERROR: LENDER_EMAIL and LENDER_PASSWORD must be set "
+            "in the environment or provided via arguments."
         )
         sys.exit(1)
 
@@ -46,6 +51,7 @@ def seed_lender(email, password, username, interactive):
 
     if user:
         click.echo(f"ℹ️ Updating existing lender: {email}")
+
         user.password_hash = generate_password_hash(password)
         user.role = "lender"
         user.is_admin = False
@@ -53,6 +59,7 @@ def seed_lender(email, password, username, interactive):
         user.is_mfa_enabled = False
     else:
         click.echo(f"🌱 Creating new lender: {email}")
+
         user = User(
             username=username,
             email=email,
@@ -62,10 +69,10 @@ def seed_lender(email, password, username, interactive):
             is_approved=True,
             is_mfa_enabled=False,
         )
-        db.session.add(user)
-        db.session.flush()  # Get user.id
 
-        # Create lender profile using actual model fields
+        db.session.add(user)
+        db.session.flush()
+
         lender = Lender(
             user_id=user.id,
             business_name="Example Lending LLC",
@@ -80,19 +87,21 @@ def seed_lender(email, password, username, interactive):
         )
         db.session.add(lender)
 
-        # Mock bank + account
         institution = BankInstitution(
             user_id=user.id,
             name="Sandbox Lender Bank",
             institution_id="sandbox-lender-001",
         )
+
         account = BankAccount(
             user_id=user.id,
             account_type="checking",
             account_number="999888777",
             balance=5000.00,
         )
+
         db.session.add_all([institution, account])
 
     db.session.commit()
+
     click.echo("✅ Lender user context seeded successfully.")

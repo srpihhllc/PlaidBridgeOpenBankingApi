@@ -1,11 +1,12 @@
 # =============================================================================
 # FILE: app/utils/token_utils.py
-# DESCRIPTION: Cockpit‑grade token utilities with SchemaEvent persistence,
+# DESCRIPTION: Cockpit-grade token utilities with SchemaEvent persistence,
 #              Redis fallback, and user_id provenance for auditability.
 # =============================================================================
 
 import json
 import logging
+from typing import Any
 
 from flask import current_app, has_app_context
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
@@ -19,33 +20,35 @@ _logger = logging.getLogger(__name__)
 
 
 def _emit_schema_event(
-    event_type: str, origin: str, detail: str, user_id: int | None = None
+    event_type: str,
+    origin: str,
+    detail: str,
+    user_id: int | None = None,
 ) -> None:
-    """
-    Persist a SchemaEvent row safely, with rollback on error and Redis fallback.
-    Always include user_id when available for cockpit‑grade provenance.
-    """
+    """Persist a SchemaEvent, falling back to Redis if persistence fails."""
     try:
-        ev = SchemaEvent(
+        event = SchemaEvent(
             user_id=user_id,
             event_type=event_type,
             origin=origin,
             detail=detail,
         )
-        db.session.add(ev)
+        db.session.add(event)
         db.session.commit()
     except Exception as exc:
         _logger.exception(
-            "Failed to persist SchemaEvent %s: %s", event_type, exc
+            "Failed to persist SchemaEvent %s: %s",
+            event_type,
+            exc,
         )
         try:
             db.session.rollback()
         except Exception:
             _logger.exception("Rollback failed after SchemaEvent failure")
-        # Fallback: push a lightweight representation to Redis
+
         try:
-            rc = get_redis_client()
-            if rc:
+            redis_client = get_redis_client()
+            if redis_client:
                 payload = json.dumps(
                     {
                         "event_type": event_type,
@@ -54,22 +57,19 @@ def _emit_schema_event(
                         "user_id": user_id,
                     }
                 )
-                rc.lpush("schema_event_fallback:token", payload)
-                rc.ltrim("schema_event_fallback:token", 0, 199)
+                redis_client.lpush("schema_event_fallback:token", payload)
+                redis_client.ltrim("schema_event_fallback:token", 0, 199)
         except Exception:
             _logger.exception("Redis fallback for SchemaEvent also failed")
 
 
 def generate_reset_token(email: str) -> str:
-    """
-    Create a time‑limited reset token and emit a schema event.
-    Returns the token string.
-    """
+    """Create a time-limited reset token and emit a schema event."""
     if not has_app_context():
         raise RuntimeError("generate_reset_token requires a Flask app context")
 
     secret = current_app.config.get("SECRET_KEY")
-    if not secret:
+    if not isinstance(secret, str) or not secret:
         _emit_schema_event(
             event_type="TOKEN_CONFIG_ERROR",
             origin="token_utils",
@@ -80,34 +80,31 @@ def generate_reset_token(email: str) -> str:
     serializer = URLSafeTimedSerializer(secret)
     token = serializer.dumps(email, salt="password-reset-salt")
 
-    # Resolve user_id for provenance
     user = User.query.filter_by(email=email).first()
-    if not user:
-        _logger.warning("Reset token issued for non‑existent email: %s", email)
+    if user is None:
+        _logger.warning("Reset token issued for non-existent email: %s", email)
 
     _emit_schema_event(
         event_type="RESET_TOKEN_ISSUED",
         origin="token_utils",
         detail=f"Password reset token issued for {email}",
-        user_id=user.id if user else None,
+        user_id=user.id if user is not None else None,
     )
 
     return token
 
 
 def verify_reset_token(
-    token: str, expiration: int | None = None
+    token: str,
+    expiration: int | None = None,
 ) -> str | None:
-    """
-    Validate a reset token and emit success/failure events.
-    Returns the email on success or None on failure.
-    """
+    """Validate a reset token and return its email, or None on failure."""
     if not has_app_context():
         _logger.error("verify_reset_token called without app context")
         return None
 
     secret = current_app.config.get("SECRET_KEY")
-    if not secret:
+    if not isinstance(secret, str) or not secret:
         _logger.error("SECRET_KEY not configured for token verification")
         _emit_schema_event(
             event_type="TOKEN_CONFIG_ERROR",
@@ -116,22 +113,35 @@ def verify_reset_token(
         )
         return None
 
-    expiration = expiration or current_app.config.get(
-        "RESET_TOKEN_EXPIRATION", 3600
+    configured_expiration: Any = current_app.config.get(
+        "RESET_TOKEN_EXPIRATION",
+        3600,
     )
+    max_age = expiration if expiration is not None else configured_expiration
+    if not isinstance(max_age, int):
+        _logger.error("RESET_TOKEN_EXPIRATION must be an integer")
+        return None
+
     serializer = URLSafeTimedSerializer(secret)
 
     try:
-        email = serializer.loads(
-            token, salt="password-reset-salt", max_age=expiration
+        decoded: Any = serializer.loads(
+            token,
+            salt="password-reset-salt",
+            max_age=max_age,
         )
+        if not isinstance(decoded, str):
+            _logger.warning("Reset token payload is not a string")
+            return None
+
+        email: str = decoded
         user = User.query.filter_by(email=email).first()
 
         _emit_schema_event(
             event_type="TOKEN_VERIFIED_SUCCESS",
             origin="token_utils",
             detail=f"Reset token verified for {email}",
-            user_id=user.id if user else None,
+            user_id=user.id if user is not None else None,
         )
         return email
 
@@ -158,6 +168,6 @@ def verify_reset_token(
         _emit_schema_event(
             event_type="TOKEN_VERIFICATION_ERROR",
             origin="token_utils",
-            detail=f"Unexpected verification error: {str(exc)}",
+            detail=f"Unexpected verification error: {exc}",
         )
         return None

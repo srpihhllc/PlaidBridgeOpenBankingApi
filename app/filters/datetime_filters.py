@@ -1,5 +1,3 @@
-# app/filters/datetime_filters.py
-
 """
 Datetime filters for Jinja templates.
 
@@ -9,19 +7,22 @@ Usage (register in your app factory):
 
 Then in Jinja:
     {{ last_audit_epoch | timeago }}
-    {{ some_iso_string | fmt_datetime('America/Chicago', '%Y-%m-%d %H:%M') }}
-    {{ some_epoch | fmt_date('America/Chicago') }}
+    {{ last_audit_iso | datetimeformat('%Y-%m-%d') }}
+    {{ created_at | time_since }}
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 try:
     # Python 3.9+ standard library timezones
     from zoneinfo import ZoneInfo
+    HAS_ZONEINFO = True
 except Exception:  # pragma: no cover
-    ZoneInfo = None  # Fallback if not available; tz features will assume UTC
+    HAS_ZONEINFO = False
+    ZoneInfo = None  # type: ignore[assignment, misc]
 
 
 Number = int | float
@@ -73,55 +74,89 @@ def _coerce_datetime_utc(value: DateLike) -> datetime | None:
     return None
 
 
-def timeago(epoch: Number) -> str:
+def timeago(value: DateLike) -> str:
     """
-    Render a compact relative time from epoch seconds
-    (e.g., '12s ago', '5m ago', '3h ago', '2d ago').
-    Returns '' on invalid input.
+    Render a compact relative time from an epoch, ISO string, or datetime.
     """
-    try:
-        ts = int(epoch)
-    except Exception:
+    dt = _coerce_datetime_utc(value)
+
+    if dt is None:
         return ""
-    now = datetime.now(UTC)
-    then = datetime.fromtimestamp(ts, tz=UTC)
-    delta = now - then
-    seconds = int(delta.total_seconds())
+
+    seconds = int((datetime.now(UTC) - dt).total_seconds())
+
     if seconds < 0:
-        # Future timestamp; show 'in Xs/min/h/d'
         seconds = abs(seconds)
-        if seconds < 60:
-            return f"in {seconds}s"
-        minutes = seconds // 60
-        if minutes < 60:
-            return f"in {minutes}m"
-        hours = minutes // 60
-        if hours < 24:
-            return f"in {hours}h"
-        days = hours // 24
-        return f"in {days}d"
+        prefix = "in "
+        suffix = ""
+    else:
+        prefix = ""
+        suffix = " ago"
 
     if seconds < 60:
-        return f"{seconds}s ago"
+        return f"{prefix}{seconds}s{suffix}"
+
     minutes = seconds // 60
     if minutes < 60:
-        return f"{minutes}m ago"
+        return f"{prefix}{minutes}m{suffix}"
+
     hours = minutes // 60
     if hours < 24:
-        return f"{hours}h ago"
+        return f"{prefix}{hours}h{suffix}"
+
     days = hours // 24
-    return f"{days}d ago"
+    return f"{prefix}{days}d{suffix}"
 
 
 def timeago_any(value: DateLike) -> str:
     """
-    Like timeago, but accepts epoch, ISO string, or datetime.
-    Returns '' on invalid input.
+    Alias for timeago for backwards compatibility.
+    """
+    return timeago(value)
+
+
+def datetimeformat(
+    value: DateLike,
+    fmt: str = "%Y-%m-%d %H:%M:%S",
+) -> str:
+    """
+    Format a date-like value in UTC using the specified strftime format.
+    """
+    return fmt_datetime(value, "UTC", fmt)
+
+
+def time_since(value: DateLike) -> str:
+    """
+    Render a readable elapsed time without the word 'ago'.
+    Useful for UI templates that manually append 'ago' or format offsets.
     """
     dt = _coerce_datetime_utc(value)
     if dt is None:
         return ""
-    return timeago(dt.timestamp())
+
+    seconds = max(0, int((datetime.now(UTC) - dt).total_seconds()))
+
+    if seconds < 60:
+        return "just now"
+
+    minutes = seconds // 60
+    if minutes < 60:
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} hour{'s' if hours != 1 else ''}"
+
+    days = hours // 24
+    if days < 30:
+        return f"{days} day{'s' if days != 1 else ''}"
+
+    months = days // 30
+    if months < 12:
+        return f"{months} month{'s' if months != 1 else ''}"
+
+    years = months // 12
+    return f"{years} year{'s' if years != 1 else ''}"
 
 
 def fmt_iso_utc(value: DateLike) -> str:
@@ -144,7 +179,7 @@ def fmt_datetime(
     dt_utc = _coerce_datetime_utc(value)
     if dt_utc is None:
         return ""
-    if ZoneInfo and tz_name:
+    if HAS_ZONEINFO and ZoneInfo is not None and tz_name:
         try:
             dt_local = dt_utc.astimezone(ZoneInfo(tz_name))
         except Exception:
@@ -175,13 +210,15 @@ def fmt_time(
     return fmt_datetime(value, tz_name, fmt)
 
 
-def register_datetime_filters(app) -> None:
+def register_datetime_filters(app: Any) -> None:
     """
-    Register all filters on the provided Flask app.
-    Call from within your create_app() after the app is constructed.
+    Register all datetime filters on the provided Flask app instance.
+    Call from within create_app() after constructing the Flask app instance.
     """
     app.jinja_env.filters["timeago"] = timeago
     app.jinja_env.filters["timeago_any"] = timeago_any
+    app.jinja_env.filters["datetimeformat"] = datetimeformat
+    app.jinja_env.filters["time_since"] = time_since
     app.jinja_env.filters["fmt_iso_utc"] = fmt_iso_utc
     app.jinja_env.filters["fmt_datetime"] = fmt_datetime
     app.jinja_env.filters["fmt_date"] = fmt_date

@@ -1,5 +1,3 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/cli_commands/sweep_endpoints.py
-
 # =============================================================================
 # FILE: app/cli_commands/sweep_endpoints.py
 # DESCRIPTION: CLI command to list all registered Flask endpoints and routes.
@@ -9,7 +7,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from typing import List
+from typing import Any
 
 import click
 from flask import current_app
@@ -115,23 +113,25 @@ def sweep_endpoints(
             click.echo(f"{(r.endpoint or 'unknown'):60} : {methods}")
         return
 
+    # Compute blueprint groups for use in both blueprints-only and standard grouped view
+    bp_groups: dict[str, list[Any]] = defaultdict(list)
+    for r in rules:
+        bp_name = (
+            r.endpoint.split(".")[0]
+            if r.endpoint and "." in r.endpoint
+            else "root"
+        )
+        bp_groups[bp_name].append(r)
+
     # Blueprints-only output (name + count)
     if blueprints_only:
-        groups: dict[str, List] = defaultdict(list)
-        for r in rules:
-            bp = (
-                r.endpoint.split(".")[0]
-                if r.endpoint and "." in r.endpoint
-                else "root"
-            )
-            groups[bp].append(r)
-        for bp in sorted(groups.keys()):
-            click.echo(f"{bp}: {len(groups[bp])}")
+        for bp in sorted(bp_groups.keys()):
+            click.echo(f"{bp}: {len(bp_groups[bp])}")
         return
 
     # Human-friendly header with counts
-    click.echo(f"Registered rules:   {total_rules}")
-    click.echo(f"Unique endpoints:   {unique_endpoints}")
+    click.echo(f"Registered rules:    {total_rules}")
+    click.echo(f"Unique endpoints:    {unique_endpoints}")
     click.echo("-" * 80)
 
     # Flat list (no grouping)
@@ -149,17 +149,8 @@ def sweep_endpoints(
         return
 
     # Group by blueprint for readability
-    groups: dict[str, List] = defaultdict(list)
-    for r in rules:
-        bp = (
-            r.endpoint.split(".")[0]
-            if r.endpoint and "." in r.endpoint
-            else "root"
-        )
-        groups[bp].append(r)
-
-    for bp in sorted(groups.keys()):
-        bp_rules = groups[bp]
+    for bp in sorted(bp_groups.keys()):
+        bp_rules = bp_groups[bp]
         click.echo(f"[{bp}] ({len(bp_rules)} rules)")
         for r in bp_rules:
             methods = (

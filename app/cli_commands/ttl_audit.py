@@ -3,6 +3,8 @@
 # DESCRIPTION: Cockpit-grade TTL audit engine with dynamic Redis type decoding.
 # =============================================================================
 
+from __future__ import annotations
+
 import click
 from flask.cli import with_appcontext
 
@@ -17,7 +19,7 @@ from app.utils.redis_utils import get_redis_client
     help="Telemetry domain to audit (boot, cli, migration, etc.)",
 )
 @with_appcontext
-def ttl_audit(domain: str):
+def ttl_audit(domain: str) -> None:
     """
     Scans Redis for all ttl:{domain}:* keys, dynamically determines their
     underlying Redis data type, extracts payload data, and audits TTL states.
@@ -55,7 +57,7 @@ def ttl_audit(domain: str):
 
     readable = 0
     unreadable = 0
-    status_counts = {}
+    status_counts: dict[str, int] = {}
 
     for key_bytes in keys:
         key = (
@@ -79,23 +81,23 @@ def ttl_audit(domain: str):
             if key_type == "string":
                 val = redis_client.get(key)
                 if val:
-                    decoded = (
+                    str_decoded = (
                         val.decode("utf-8")
                         if isinstance(val, bytes)
                         else str(val)
                     )
-                    value_summary = decoded
+                    value_summary = str_decoded
                     status = "string"
 
             elif key_type == "hash":
                 fields = redis_client.hgetall(key)
-                decoded = {
+                hash_decoded = {
                     (k.decode("utf-8") if isinstance(k, bytes) else k): (
                         v.decode("utf-8") if isinstance(v, bytes) else v
                     )
                     for k, v in fields.items()
                 }
-                value_summary = f"HashData({decoded})"
+                value_summary = f"HashData({hash_decoded})"
                 status = "hash"
 
             elif key_type == "list":

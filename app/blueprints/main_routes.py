@@ -4,6 +4,7 @@
 #              Bulletproof URL endpoints, safe telemetry, and explicit errors.
 # =============================================================================
 
+import hmac
 import os
 
 from flask import (
@@ -15,6 +16,7 @@ from flask import (
     render_template_string,
     request,
     send_from_directory,
+    session,
     url_for,
 )
 from flask_login import current_user, login_required, login_user
@@ -22,9 +24,9 @@ from jinja2 import TemplateNotFound
 from sqlalchemy.exc import OperationalError
 from werkzeug.security import check_password_hash
 
-from app.decorators.access import has_permission
 from app.extensions import csrf
 from app.models.user import User
+from app.security.founder import is_founder
 from app.services.ignition_service import enable_operator_mode
 from app.utils.redis_utils import get_redis_client
 
@@ -37,25 +39,46 @@ main_bp = Blueprint(
 
 
 # -------------------------------------------------------------------------
+# Direct Fallback / Redirect Route for Un-Prefixed Tile Calls
+# -------------------------------------------------------------------------
+
+@main_bp.route("/tiles/<path:tile_path>", methods=["GET", "POST"])
+def redirect_unprefixed_tiles(tile_path: str):
+    """
+    Redirects direct calls to /tiles/... to the admin tiles namespace /admin/tiles/...
+    """
+    admin_tile_url = f"/admin/tiles/{tile_path}"
+    if request.query_string:
+        admin_tile_url += f"?{request.query_string.decode('utf-8')}"
+    return redirect(admin_tile_url, code=307)
+
+
+# -------------------------------------------------------------------------
+# Ignition session configuration
+# -------------------------------------------------------------------------
+
+IGNITION_SESSION_KEY = "finbrain_ignition_authenticated"
+IGNITION_STAGE_KEY = "finbrain_ignition_stage"
+IGNITION_STAGE_VALUE = "operator_authenticated"
+IGNITION_USER_ID_KEY = "ignition_user_id"
+IGNITION_NEXT_ENDPOINT = "sub_ui.sub_index"
+
+IGNITION_EXEMPT_ENDPOINTS = frozenset(
+    {
+        "subscriber.update_profile",
+    }
+)
+
+
+# -------------------------------------------------------------------------
 # Helpers
 # -------------------------------------------------------------------------
+
 def is_creator(user) -> bool:
-    """Return whether the user matches a configured creator identity."""
-    if not user:
-        return False
-
-    creator_email = os.getenv("CREATOR_EMAIL")
-    creator_username = os.getenv("CREATOR_USERNAME")
-
-    return any(
-        (
-            creator_email
-            and getattr(user, "email", None) == creator_email,
-            creator_username
-            and getattr(user, "username", None) == creator_username,
-            getattr(user, "role", None) == "creator",
-        )
-    )
+    """
+    Backward-compatible founder alias.
+    """
+    return is_founder(user)
 
 
 def _get_redis_client():
@@ -126,16 +149,51 @@ def emit_narrative_trace(
         )
 
 
-def _render_login() :
+def _render_login():
     return render_template(
         "auth/login.html",
         app=current_app,
     )
 
 
+def mark_ignition_complete(user) -> None:
+    """Store successful ignition state in the signed Flask session."""
+    session.permanent = True
+    session[IGNITION_SESSION_KEY] = True
+    session[IGNITION_STAGE_KEY] = IGNITION_STAGE_VALUE
+    session[IGNITION_USER_ID_KEY] = getattr(user, "id", None)
+
+    current_app.logger.info(
+        "Ignition session established for user_id=%s",
+        getattr(user, "id", "unknown"),
+    )
+
+
+def ignition_is_complete() -> bool:
+    """Return whether the current session completed ignition."""
+    current_user_id = getattr(current_user, "id", None)
+    ignition_user_id = session.get(IGNITION_USER_ID_KEY)
+
+    return (
+        getattr(current_user, "is_authenticated", False)
+        and session.get(IGNITION_SESSION_KEY) is True
+        and session.get(IGNITION_STAGE_KEY) == IGNITION_STAGE_VALUE
+        and ignition_user_id is not None
+        and str(ignition_user_id) == str(current_user_id)
+    )
+
+
+def clear_ignition_state() -> None:
+    """Remove ignition state from the current session."""
+    session.pop(IGNITION_SESSION_KEY, None)
+    session.pop(IGNITION_STAGE_KEY, None)
+    session.pop(IGNITION_USER_ID_KEY, None)
+
+
 # -------------------------------------------------------------------------
 # Static / Favicon
 # -------------------------------------------------------------------------
+
 @main_bp.route("/favicon.ico")
 def favicon():
     """Serve favicon.ico when present."""
@@ -143,7 +201,11 @@ def favicon():
         current_app.root_path,
         "static",
     )
-    favicon_path = os.path.join(static_folder, "favicon.ico")
+
+    favicon_path = os.path.join(
+        static_folder,
+        "favicon.ico",
+    )
 
     if os.path.isfile(favicon_path):
         return send_from_directory(
@@ -157,6 +219,7 @@ def favicon():
 # -------------------------------------------------------------------------
 # Public landing
 # -------------------------------------------------------------------------
+
 @main_bp.route("/", endpoint="home")
 def home():
     redis_ttl = safe_get_redis_ttl("boot:render:home_view")
@@ -208,9 +271,7 @@ def home():
 
         return (
             render_template_string(
-                "<html><body>"
                 "<h1>Welcome (fallback, TemplateNotFound)</h1>"
-                "</body></html>"
             ),
             200,
         )
@@ -230,9 +291,7 @@ def home():
 
         return (
             render_template_string(
-                "<html><body>"
                 "<h1>Welcome (Database Error Fallback)</h1>"
-                "</body></html>"
             ),
             503,
         )
@@ -252,13 +311,15 @@ def home():
 
         return (
             render_template_string(
-                "<html><body>"
                 "<h1>Welcome (Internal Error Fallback)</h1>"
-                "</body></html>"
             ),
             500,
         )
 
+
+# -------------------------------------------------------------------------
+# Dispute form and PDF upload
+# -------------------------------------------------------------------------
 
 @main_bp.route("/dispute-form", methods=["GET"])
 def dispute_form():
@@ -293,6 +354,7 @@ def upload_pdf():
 # -------------------------------------------------------------------------
 # Auth flows
 # -------------------------------------------------------------------------
+
 def handle_login_post(source: str):
     email = request.form.get("email", "").strip()
     password = request.form.get("password", "")
@@ -339,6 +401,7 @@ def handle_login_post(source: str):
             "Login error for email=%s",
             email,
         )
+
         flash(
             "Login error. Please try again.",
             "danger",
@@ -396,10 +459,12 @@ def logout_alias():
 # -------------------------------------------------------------------------
 # Subscriber dashboards
 # -------------------------------------------------------------------------
+
 @main_bp.route("/welcome_back")
 @login_required
 def welcome_back():
     user_email = getattr(current_user, "email", "")
+
     ttl = safe_get_redis_ttl(
         f"subscriber_registered:{user_email}",
     )
@@ -447,132 +512,135 @@ def dashboard_redirect():
         url_for("sub_ui.dashboard"),
     )
 
-
 # -------------------------------------------------------------------------
 # Special entry / ignition
 # -------------------------------------------------------------------------
-@main_bp.route("/terence_entry")
+
+@main_bp.route("/terence_entry", methods=["GET"])
 def terence_entry():
-    return render_template(
-        "terence_entry.html",
-        app=current_app,
-    )
+    if ignition_is_complete():
+        current_app.logger.info(
+            "Ignition already complete; continuing to %s",
+            IGNITION_NEXT_ENDPOINT,
+        )
+        return redirect(url_for(IGNITION_NEXT_ENDPOINT))
+
+    return render_template("terence_entry.html", app=current_app)
 
 
 @main_bp.route(
     "/ignite-cortex",
     methods=["GET", "POST"],
+    endpoint="ignite_cortex",
 )
 @csrf.exempt
 def ignite_cortex():
+    """
+    Validate ROOT_IGNITION_CODE, log in the creator user, enable operator
+    mode, persist ignition state, and redirect.
+    """
     if request.method == "GET":
-        return redirect(
-            url_for("main.terence_entry"),
-        )
+        return redirect(url_for("main.terence_entry"))
 
-    if getattr(current_user, "is_authenticated", False):
-        has_operator_access = (
-            is_creator(current_user)
-            or has_permission(
-                current_user,
-                "read_operational_data",
-            )
-        )
+    passcode = request.form.get("passcode", "").strip()
+    expected_passcode = os.getenv("ROOT_IGNITION_CODE", "").strip()
 
-        if has_operator_access:
-            try:
-                enable_operator_mode(current_user)
+    current_app.logger.info(
+        "Ignition POST received: passcode_present=%s, "
+        "entered_length=%d, configured=%s, configured_length=%d",
+        bool(passcode),
+        len(passcode),
+        bool(expected_passcode),
+        len(expected_passcode),
+    )
 
-            except Exception:
-                current_app.logger.exception(
-                    "Authenticated operator ignition failed for user_id=%s",
-                    getattr(current_user, "id", "unknown"),
-                )
-                flash(
-                    "Unable to enable operator mode.",
-                    "danger",
-                )
-                return redirect(
-                    url_for("main.terence_entry"),
-                )
+    if not expected_passcode:
+        current_app.logger.error("ROOT_IGNITION_CODE is not configured")
+        flash("Ignition is temporarily unavailable.", "danger")
+        return redirect(url_for("main.terence_entry"))
 
-            flash(
-                "Creator ignition successful.",
-                "success",
-            )
+    if not hmac.compare_digest(passcode, expected_passcode):
+        current_app.logger.warning("Ignition rejected: passphrase mismatch")
+        flash("Invalid ignition code.", "danger")
+        return redirect(url_for("main.terence_entry"))
 
-            return redirect(
-                url_for("sub_ui.sub_index"),
-            )
-
-    passcode = request.form.get(
-        "passcode",
-        "",
-    ).strip()
-    expected_passcode = os.getenv("ROOT_IGNITION_CODE")
-
-    if not expected_passcode or passcode != expected_passcode:
-        flash(
-            "Invalid ignition code.",
-            "danger",
-        )
-        return redirect(
-            url_for("main.terence_entry"),
-        )
+    current_app.logger.info("Ignition passphrase accepted")
 
     creator_email = (
-        os.getenv("CREATOR_EMAIL")
-        or "terence@cortex.prime"
+        os.getenv("CREATOR_EMAIL", "terence@cortex.prime")
+        .strip()
+        .lower()
     )
 
     try:
-        user = User.query.filter_by(
-            email=creator_email,
-        ).first()
-
+        user = User.query.filter_by(email=creator_email).first()
     except Exception:
-        current_app.logger.exception(
-            "Ignition user lookup failed for %s",
-            creator_email,
-        )
-        return (
-            "Critical Error: Unable to load creator user profile.",
-            503,
-        )
+        current_app.logger.exception("Ignition user lookup failed")
+        flash("Unable to load the operator profile.", "danger")
+        return redirect(url_for("main.terence_entry"))
 
-    if not user:
-        current_app.logger.error(
-            "Ignition aborted: creator user record for %s "
-            "is missing from the database.",
-            creator_email,
-        )
-        return (
-            "Critical Error: Creator user profile not found in database.",
-            500,
-        )
+    if user is None:
+        current_app.logger.error("Ignition creator user was not found")
+        flash("Operator profile is not configured.", "danger")
+        return redirect(url_for("main.terence_entry"))
+
+    user_id = getattr(user, "id", "unknown")
 
     try:
-        login_user(user)
-        enable_operator_mode(user)
+        login_user(user, remember=True)
+
+        current_app.logger.info(
+            "Ignition login succeeded for user_id=%s",
+            user_id,
+        )
+
+        enable_operator_mode(actor=user)
+
+        current_app.logger.info(
+            "Operator mode enabled for user_id=%s",
+            user_id,
+        )
+
+        mark_ignition_complete(user)
 
     except Exception:
         current_app.logger.exception(
             "Passcode ignition failed for user_id=%s",
-            getattr(user, "id", "unknown"),
+            user_id,
         )
-        flash(
-            "Unable to enable operator mode.",
-            "danger",
-        )
-        return redirect(
-            url_for("main.terence_entry"),
-        )
+        clear_ignition_state()
+        flash("Unable to enable operator mode.", "danger")
+        return redirect(url_for("main.terence_entry"))
 
-    flash(
-        "Cortex ignition successful.",
-        "success",
-    )
+    flash("Cortex ignition successful.", "success")
 
-    return redirect(
-        url_for("sub_ui.sub_index"),
+    target_url = url_for(IGNITION_NEXT_ENDPOINT)
+    current_app.logger.info(
+        "Ignition complete; redirecting to %s",
+        target_url,
     )
+    return redirect(target_url)
+
+
+@main_bp.before_app_request
+def enforce_ignition_sequence():
+    if not request.path.startswith("/sub"):
+        return None
+
+    if not getattr(current_user, "is_authenticated", False):
+        return None
+
+    if request.endpoint in IGNITION_EXEMPT_ENDPOINTS:
+        return None
+
+    if ignition_is_complete():
+        return None
+
+    current_app.logger.warning(
+        "Authenticated user reached subscriber area without "
+        "ignition state: endpoint=%s path=%s method=%s",
+        request.endpoint,
+        request.path,
+        request.method,
+    )
+    return redirect(url_for("main.terence_entry"))

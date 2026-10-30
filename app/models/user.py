@@ -4,17 +4,19 @@
 #              MFA, audit fields, computed metrics, Todo, and Transaction integration.
 # =============================================================================
 
+from __future__ import annotations
+
 import json
 import uuid
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from flask_login import UserMixin
-from sqlalchemy.orm import DeclarativeBase
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..extensions import db
 
-Model: type[DeclarativeBase] = db.Model  # type: ignore[attr-defined]
+Model: Any = db.Model
 
 
 # ---------------------------------------------------------------------------
@@ -27,7 +29,7 @@ def _generate_uuid_string() -> str:
 
 
 def _generate_secure_fallback_hash() -> str:
-    return generate_password_hash(uuid.uuid4().hex)
+    return cast(str, generate_password_hash(uuid.uuid4().hex))
 
 
 def _get_naive_utc_now() -> datetime:
@@ -105,6 +107,8 @@ class User(UserMixin, Model):
     # -----------------------------------------------------------------------
     # Extended Profile
     # -----------------------------------------------------------------------
+    first_name = db.Column(db.String(128))
+    last_name = db.Column(db.String(128))
     ssn_last4 = db.Column(db.String(4))
     primary_phone = db.Column(db.String(20))
     bank_name = db.Column(db.String(128))
@@ -151,18 +155,21 @@ class User(UserMixin, Model):
         lazy="dynamic",
         passive_deletes=True,
     )
+
     bank_statements = db.relationship(
         "BankStatement",
         back_populates="user",
         lazy="dynamic",
         passive_deletes=True,
     )
+
     bank_institutions = db.relationship(
         "BankInstitution",
         back_populates="user",
         lazy="dynamic",
         passive_deletes=True,
     )
+
     tradelines = db.relationship(
         "Tradeline",
         back_populates="user",
@@ -184,9 +191,14 @@ class User(UserMixin, Model):
         lazy="dynamic",
         passive_deletes=True,
     )
+
     lender_profiles = db.relationship(
-        "Lender", back_populates="user", lazy="dynamic", passive_deletes=True
+        "Lender",
+        back_populates="user",
+        lazy="dynamic",
+        passive_deletes=True,
     )
+
     underwriter_profiles = db.relationship(
         "UnderwriterAgent",
         back_populates="user",
@@ -223,7 +235,7 @@ class User(UserMixin, Model):
         back_populates="user",
         lazy="dynamic",
         passive_deletes=True,
-        overlaps="schema_events",  # Silences SAWarning conflict with backref/schema_events
+        overlaps="schema_events",
     )
 
     # -----------------------------------------------------------------------
@@ -257,11 +269,12 @@ class User(UserMixin, Model):
         Gracefully defaults to 0.0 if an anomaly occurs during summation.
         """
         try:
-            return sum(
-                account.balance
-                for account in self.bank_accounts
-                if account.balance is not None
-            )
+            total = 0.0
+            for account in self.bank_accounts.all():
+                balance = account.balance
+                if balance is not None:
+                    total += cast(float, balance)
+            return total
         except Exception:
             return 0.0
 
@@ -269,22 +282,22 @@ class User(UserMixin, Model):
     # Password Hashing
     # -----------------------------------------------------------------------
     def set_password(self, password: str) -> None:
-        """
-        Hash the provided plaintext password and save it to the database.
-        """
+        """Hash the provided plaintext password and save it to the database."""
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
-        """
-        Verify a plaintext password against the stored password hash.
-        """
-        return check_password_hash(self.password_hash, password)
+        """Verify a plaintext password against the stored password hash."""
+        return cast(
+            bool, check_password_hash(str(self.password_hash), password)
+        )
 
     # -----------------------------------------------------------------------
     # OAuth Resolver
     # -----------------------------------------------------------------------
     @classmethod
-    def get_or_create_from_oauth(cls, provider, token_response):
+    def get_or_create_from_oauth(
+        cls, provider: Any, token_response: Any
+    ) -> Any:
         """
         Resolve or create a User from an OAuth provider + token response.
         Emits two TraceEvents: OAUTH_LOGIN_SUCCESS and SESSION_ESTABLISHED.
@@ -304,13 +317,14 @@ class User(UserMixin, Model):
             raise ValueError("OAuth profile missing email")
 
         user = cls.query.filter_by(email=email).first()
+
         if user is None:
             user = cls(email=email, username=name)
             db.session.add(user)
             db.session.commit()
 
-        def _emit(event_type: str, meta: dict):
-            ev = TraceEvent(
+        def _emit(event_type: str, meta: dict[str, Any]) -> None:
+            event = TraceEvent(
                 event_id=str(uuid.uuid4()),
                 event_type=event_type,
                 user_id=user.id,
@@ -318,10 +332,16 @@ class User(UserMixin, Model):
                 meta=json.dumps(meta),
                 detail=meta.get("detail"),
             )
-            db.session.add(ev)
+            db.session.add(event)
 
-        _emit("OAUTH_LOGIN_SUCCESS", {"provider": provider.value, "sub": sub})
-        _emit("SESSION_ESTABLISHED", {"provider": provider.value, "sub": sub})
+        _emit(
+            "OAUTH_LOGIN_SUCCESS",
+            {"provider": provider.value, "sub": sub},
+        )
+        _emit(
+            "SESSION_ESTABLISHED",
+            {"provider": provider.value, "sub": sub},
+        )
 
         db.session.commit()
         return user

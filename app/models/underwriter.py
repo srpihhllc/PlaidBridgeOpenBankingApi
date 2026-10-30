@@ -1,17 +1,20 @@
 # =============================================================================
 # FILE: app/models/underwriter.py
 # DESCRIPTION: Underwriter agent profiles linked to a User. Supports specialty,
-#              status, and cockpit‑grade auditability. UUID FK + cascade‑safe.
+#              status, and cockpit-grade auditability. UUID FK + cascade-safe.
 # =============================================================================
 
 from datetime import datetime, timezone
+from typing import Any
 
 from ..extensions import db
 
+# Flask-SQLAlchemy's dynamically provided Model may not be visible to mypy.
+Model: Any = db.Model
 
-class UnderwriterAgent(db.Model):
+
+class UnderwriterAgent(Model):
     __tablename__ = "underwriter_agents"
-    __table_args__ = {"extend_existing": True}
     __table_args__ = {"extend_existing": True}
 
     id = db.Column(db.Integer, primary_key=True)
@@ -29,15 +32,17 @@ class UnderwriterAgent(db.Model):
     specialty = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(50), default="active", nullable=False)
 
-    # Audit timestamps
+    # Audit timestamp
     created_at = db.Column(
-        db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
     )
 
     # Relationship back to User
     user = db.relationship("User", back_populates="underwriter_profiles")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (
             f"<UnderwriterAgent id={self.id} user_id={self.user_id} "
             f"name='{self.name}' specialty='{self.specialty}'>"

@@ -63,6 +63,13 @@
     "endpoint": "admin_api.operator_entry"
   },
   {
+    "rule": "/admin/api/v1/switch_identity",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_api.admin_switch_identity"
+  },
+  {
     "rule": "/admin/api/v1/traces/recent",
     "methods": [
       "GET"
@@ -238,28 +245,28 @@
     "endpoint": "admin_ui.admin_cortex"
   },
   {
-    "rule": "/admin/dispute_logs/<int:user_id>",
+    "rule": "/admin/dispute_logs/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.view_dispute_logs"
   },
   {
-    "rule": "/admin/dispute_logs/<int:user_id>",
+    "rule": "/admin/dispute_logs/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin_ui.view_dispute_logs"
   },
   {
-    "rule": "/admin/export_trace/<string:trace_id>",
+    "rule": "/admin/export_trace/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.export_trace"
   },
   {
-    "rule": "/admin/export_trace/<string:trace_id>",
+    "rule": "/admin/export_trace/",
     "methods": [
       "GET"
     ],
@@ -378,14 +385,14 @@
     "endpoint": "admin_ui.process_payment"
   },
   {
-    "rule": "/admin/preview_letter/<int:log_id>",
+    "rule": "/admin/preview_letter/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.preview_letter"
   },
   {
-    "rule": "/admin/preview_letter/<int:log_id>",
+    "rule": "/admin/preview_letter/",
     "methods": [
       "GET"
     ],
@@ -462,6 +469,20 @@
     "endpoint": "admin_ui.sweep_expired_keys"
   },
   {
+    "rule": "/admin/switch_identity",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin.switch_identity"
+  },
+  {
+    "rule": "/admin/switch_identity",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "admin_ui.switch_identity"
+  },
+  {
     "rule": "/admin/system_health",
     "methods": [
       "GET"
@@ -504,14 +525,14 @@
     "endpoint": "admin_ui.system_map"
   },
   {
-    "rule": "/admin/t/<path:tpl>",
+    "rule": "/admin/t/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.render_admin_template"
   },
   {
-    "rule": "/admin/t/<path:tpl>",
+    "rule": "/admin/t/",
     "methods": [
       "GET"
     ],
@@ -532,28 +553,28 @@
     "endpoint": "admin_ui.tile_agent_activity"
   },
   {
-    "rule": "/admin/tile/credit_ledger/<int:user_id>",
+    "rule": "/admin/tile/credit_ledger/<int:user_id>/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_credit_ledger"
   },
   {
-    "rule": "/admin/tile/credit_ledger/<int:user_id>",
+    "rule": "/admin/tile/credit_ledger/<int:user_id>/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin_ui.tile_credit_ledger"
   },
   {
-    "rule": "/admin/tile/exposure/<int:user_id>",
+    "rule": "/admin/tile/exposure/<int:user_id>/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.tile_exposure"
   },
   {
-    "rule": "/admin/tile/exposure/<int:user_id>",
+    "rule": "/admin/tile/exposure/<int:user_id>/",
     "methods": [
       "GET"
     ],
@@ -742,14 +763,14 @@
     "endpoint": "admin_ui.tradelines_panel"
   },
   {
-    "rule": "/admin/view_credit_ledger/<int:user_id>",
+    "rule": "/admin/view_credit_ledger/<int:user_id>/",
     "methods": [
       "GET"
     ],
     "endpoint": "admin.view_credit_ledger"
   },
   {
-    "rule": "/admin/view_credit_ledger/<int:user_id>",
+    "rule": "/admin/view_credit_ledger/<int:user_id>/",
     "methods": [
       "GET"
     ],
@@ -789,6 +810,13 @@
       "GET"
     ],
     "endpoint": "api.generate_fraud_report_pdf"
+  },
+  {
+    "rule": "/api/gemini/transaction-summary",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "api.gemini_transaction_summary"
   },
   {
     "rule": "/api/generate_link_token",
@@ -958,6 +986,13 @@
       "POST"
     ],
     "endpoint": "api_v1.refresh_token"
+  },
+  {
+    "rule": "/api/v1/banking/transfer",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.transfer"
   },
   {
     "rule": "/api/v1/core/transactions",
@@ -1225,7 +1260,8 @@
   {
     "rule": "/auth/login_operator",
     "methods": [
-      "GET"
+      "GET",
+      "POST"
     ],
     "endpoint": "auth.login_operator"
   },
@@ -1586,6 +1622,13 @@
     "endpoint": "introspection.diagnose_brain"
   },
   {
+    "rule": "/lender/applications/<int:application_id>/snapshots",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "lender.application_snapshots"
+  },
+  {
     "rule": "/login",
     "methods": [
       "GET",
@@ -1634,6 +1677,13 @@
       "GET"
     ],
     "endpoint": "pulse.healthz"
+  },
+  {
+    "rule": "/pulse/tiles/blueprint_drift_overlay/pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "pulse.blueprint_drift_pulse"
   },
   {
     "rule": "/pulse/vault/<int:vault_id>",
@@ -1686,6 +1736,13 @@
     "endpoint": "repair.system_heartbeat"
   },
   {
+    "rule": "/send-test-email",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "email.send_test_email"
+  },
+  {
     "rule": "/static/<path:filename>",
     "methods": [
       "GET"
@@ -1698,6 +1755,27 @@
       "GET"
     ],
     "endpoint": "sub_ui.sub_index"
+  },
+  {
+    "rule": "/sub/api/subscriber/token-pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.subscriber_token_pulse"
+  },
+  {
+    "rule": "/sub/api/subscriber/vault-activity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.subscriber_vault_activity"
+  },
+  {
+    "rule": "/sub/api/trace/<key>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "sub_ui.get_trace_overlay"
   },
   {
     "rule": "/sub/audit/report",
@@ -1798,11 +1876,39 @@
     "endpoint": "todo.update_todo"
   },
   {
+    "rule": "/sub/update-profile",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "sub_ui.update_profile"
+  },
+  {
     "rule": "/sub/vaults",
     "methods": [
       "GET"
     ],
     "endpoint": "sub_ui.vault_dashboard"
+  },
+  {
+    "rule": "/subscriber/api-key/regenerate",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "subscriber.subscriber_regenerate_api_key"
+  },
+  {
+    "rule": "/subscriber/api/subscriber/token-pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "subscriber.subscriber_token_pulse"
+  },
+  {
+    "rule": "/subscriber/api/subscriber/vault-activity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "subscriber.subscriber_vault_activity"
   },
   {
     "rule": "/subscriber/dashboard",
@@ -1812,6 +1918,27 @@
     "endpoint": "main.subscriber_dashboard"
   },
   {
+    "rule": "/subscriber/fraud",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "subscriber.subscriber_fraud"
+  },
+  {
+    "rule": "/subscriber/settings/security",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "subscriber.subscriber_security_settings"
+  },
+  {
+    "rule": "/subscriber/token-pulse",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "subscriber.subscriber_token_pulse"
+  },
+  {
     "rule": "/subscriber/update_profile",
     "methods": [
       "POST"
@@ -1819,11 +1946,33 @@
     "endpoint": "subscriber.update_profile"
   },
   {
+    "rule": "/subscriber/vault-activity",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "subscriber.subscriber_vault_activity"
+  },
+  {
     "rule": "/terence_entry",
     "methods": [
       "GET"
     ],
     "endpoint": "main.terence_entry"
+  },
+  {
+    "rule": "/test-email-page",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "email.test_email_page"
+  },
+  {
+    "rule": "/tiles/<path:tile_path>",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "main.redirect_unprefixed_tiles"
   },
   {
     "rule": "/tracer/template_tracer",

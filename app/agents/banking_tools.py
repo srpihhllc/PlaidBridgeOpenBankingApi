@@ -1,3 +1,4 @@
+# mypy: disable-error-code="arg-type"
 # =============================================================================
 # FILE: app/agents/banking_tools.py
 # DESCRIPTION: Finalized Gemini Function Declarations using google-genai.

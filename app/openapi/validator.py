@@ -1,38 +1,69 @@
-# /home/srpihhllc/PlaidBridgeOpenBankingApi/app/openapi/validator.py
 
 import yaml
-from openapi_core import create_spec
-from openapi_core.contrib.flask import (
-    FlaskOpenAPIRequest,
-    FlaskOpenAPIResponse,
-)
-from openapi_core.validation.request.validators import RequestValidator
-from openapi_core.validation.response.validators import ResponseValidator
 
-_spec = None
-_request_validator = None
-_response_validator = None
+from openapi_core import OpenAPI
+
+from openapi_core.contrib.flask import (
+
+    FlaskOpenAPIRequest,
+
+    FlaskOpenAPIResponse,
+
+)
+
+
+
+_openapi = None
+
+
+
 
 
 def load_spec(path: str):
-    global _spec, _request_validator, _response_validator
-    with open(path, "r") as f:
+
+    global _openapi
+
+
+
+    with open(path, "r", encoding="utf-8") as f:
+
         raw = yaml.safe_load(f)
-    _spec = create_spec(raw)
-    _request_validator = RequestValidator(_spec)
-    _response_validator = ResponseValidator(_spec)
+
+
+
+    _openapi = OpenAPI.from_dict(raw)
+
+
+
 
 
 def validate_flask_request(req):
-    openapi_req = FlaskOpenAPIRequest(req)
-    result = _request_validator.validate(openapi_req)
-    result.raise_for_errors()  # raises exception on first error
-    return result
+
+    if _openapi is None:
+
+        raise RuntimeError("OpenAPI spec has not been loaded; call load_spec() first")
+
+
+
+    return _openapi.validate_request(FlaskOpenAPIRequest(req))
+
+
+
 
 
 def validate_flask_response(req, resp):
-    openapi_req = FlaskOpenAPIRequest(req)
-    openapi_resp = FlaskOpenAPIResponse(resp)
-    result = _response_validator.validate(openapi_req, openapi_resp)
-    result.raise_for_errors()
-    return result
+
+    if _openapi is None:
+
+        raise RuntimeError("OpenAPI spec has not been loaded; call load_spec() first")
+
+
+
+    return _openapi.validate_response(
+
+        FlaskOpenAPIRequest(req),
+
+        FlaskOpenAPIResponse(resp),
+
+    )
+

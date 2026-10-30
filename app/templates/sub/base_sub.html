@@ -30,7 +30,7 @@
     {% block body %}
 
     {% block navbar %}
-      {% include "sub/_sub_navbar.html" %}
+      {% include "sub/_sub_navbar.html" ignore missing %}
     {% endblock navbar %}
 
     <main class="container-fluid mt-4">
@@ -49,11 +49,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <!-- Cockpit/Operator overlays (subscriber dashboard uses operator mode) -->
-    <script src="{{ url_for('static', filename='js/cockpit.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/trace_overlay.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/cockpit.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/trace_overlay.js') }}" defer></script>
 
-    <!-- App-wide JS -->
-    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <!-- App-wide JS (routed directly to static/js/app.js) -->
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
     {% endblock scripts %}
 
     {% endblock body %}

@@ -103,3 +103,5 @@ god_mode_audit.txt
 
 storage/manifest/
 
+
+.env

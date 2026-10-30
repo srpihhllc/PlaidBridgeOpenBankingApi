@@ -1,90 +1,43 @@
 # /home/srpihhllc/PlaidBridgeOpenBankingApi/app/scripts/seed.py
 
 """
-Seed script for Financial Powerhouse API.
-Populates the database with sample borrowers, lenders, and transactions
-for local testing and demos.
-
-Usage:
-    make seed
+Relationship audit script for inspecting SQLAlchemy model relationships,
+foreign keys, and navigational attributes.
 """
 
-import datetime
-from datetime import timezone
+import logging
+from typing import Any
+from sqlalchemy.inspection import inspect as sa_inspect
 
-from sqlalchemy.orm import Session
-
-from app import models
-from app.database import Base, SessionLocal, engine
+from app.database import Base
 
 
-def seed():
-    # Ensure tables exist (in case migrations not run)
-    Base.metadata.create_all(bind=engine)
+logger = logging.getLogger(__name__)
 
-    session: Session = SessionLocal()
 
-    try:
-        # Clear existing demo data
-        session.query(models.Transaction).delete()
-        session.query(models.Loan).delete()
-        session.query(models.Borrower).delete()
-        session.query(models.Lender).delete()
+def get_model_name(obj: Any) -> str:
+    """Safely extracts and returns the string name of a model or object."""
+    name = getattr(obj, "__name__", None)
+    if isinstance(name, str):
+        return name
+    return str(name)
 
-        # Create sample lender
-        lender = models.Lender(
-            name="Demo Lender Inc.",
-            account_number="LEND123456",
-            health_score=95,
-        )
 
-        # Create sample borrower
-        borrower = models.Borrower(
-            name="Alice Borrower", account_number="BORR654321", health_score=72
-        )
+def audit_relationships() -> None:
+    """Inspects and prints model relationships across SQLAlchemy metadata."""
+    print("🚀 Starting SQLAlchemy Relationship Audit...")
 
-        session.add_all([lender, borrower])
-        session.flush()  # assign IDs
+    for mapper in Base.registry.mappers:
+        class_ = mapper.class_
+        model_name = get_model_name(class_)
+        print(f"\nModel: {model_name}")
 
-        # Create a loan agreement
-        loan = models.Loan(
-            borrower_id=borrower.id,
-            lender_id=lender.id,
-            principal_amount=5000,
-            interest_rate=0.05,
-            status="active",
-            created_at=datetime.datetime.now(timezone.utc),
-        )
-        session.add(loan)
-        session.flush()
-
-        # Add some transactions
-        tx1 = models.Transaction(
-            loan_id=loan.id,
-            amount=-200,
-            description="Monthly repayment",
-            timestamp=datetime.datetime.now(timezone.utc),
-        )
-        tx2 = models.Transaction(
-            loan_id=loan.id,
-            amount=+5000,
-            description="Loan disbursement",
-            timestamp=datetime.datetime.now(timezone.utc),
-        )
-
-        session.add_all([tx1, tx2])
-        session.commit()
-
-        print(
-            "✅ Database seeded with demo borrower, lender, loan, and transactions."
-        )
-
-    except Exception as e:
-        session.rollback()
-        print(f"❌ Error seeding database: {e}")
-    finally:
-        session.close()
+        inspection = sa_inspect(class_)
+        if inspection and hasattr(inspection, "relationships"):
+            for rel_name, rel in inspection.relationships.items():
+                target_entity = get_model_name(rel.mapper.class_)
+                print(f"  - Relationship: {rel_name} -> Target: {target_entity} (Direction: {rel.direction.name})")
 
 
 if __name__ == "__main__":
-    seed()
+    audit_relationships()

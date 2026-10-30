@@ -6,7 +6,7 @@ Unified System Stabilization & Diagnostic Suite
 3. Dashboard Crash Guard (Fallback Context & Error Handling)
 4. Comprehensive Routing Topology Mapping Engine
 """
-
+from typing import TypedDict
 from functools import wraps
 
 from flask import (
@@ -195,12 +195,22 @@ User Mode: {{ operator_state.role }}
 # ==============================================================================
 
 
-def generate_routing_topology_map(app: Flask):
+class RouteEntry(TypedDict):
+    rule: str
+    endpoint: str
+    methods: list[str]
+    blueprint: str
+
+
+RoutingTopology = dict[str, list[RouteEntry]]
+
+
+def generate_routing_topology_map(app: Flask) -> RoutingTopology:
     """
-    Scans the application rule tree and dumps a detailed routing tree,
-    mapping prefixes, endpoints, HTTP methods, and Blueprint origins.
+    Scans the application rule tree and builds a routing map of prefixes,
+    endpoints, HTTP methods, and Blueprint origins.
     """
-    topology = {}
+    topology: RoutingTopology = {}
 
     for rule in app.url_map.iter_rules():
         endpoint_name = rule.endpoint
@@ -208,23 +218,25 @@ def generate_routing_topology_map(app: Flask):
             endpoint_name.split(".")[0] if "." in endpoint_name else "ROOT"
         )
 
-        methods = [m for m in rule.methods if m not in ("HEAD", "OPTIONS")]
+        methods = [
+            method
+            for method in rule.methods
+            if method not in ("HEAD", "OPTIONS")
+        ]
 
-        route_entry = {
+        route_entry: RouteEntry = {
             "rule": rule.rule,
             "endpoint": endpoint_name,
             "methods": methods,
             "blueprint": blueprint_name,
         }
 
-        if blueprint_name not in topology:
-            topology[blueprint_name] = []
-        topology[blueprint_name].append(route_entry)
+        topology.setdefault(blueprint_name, []).append(route_entry)
 
     return topology
 
 
-def print_routing_topology(app: Flask):
+def print_routing_topology(app: Flask) -> None:
     """Prints a formatted ASCII topology tree to standard output."""
     topology = generate_routing_topology_map(app)
 
@@ -232,15 +244,22 @@ def print_routing_topology(app: Flask):
     print(" 📊 FULL APPLICATION ROUTING TOPOLOGY MAP")
     print("=" * 80)
 
-    for bp, routes in sorted(topology.items()):
-        print(f"\n🔹 Blueprint Node: [{bp}] ({len(routes)} active endpoints)")
-        for r in sorted(routes, key=lambda x: x["rule"]):
-            methods_str = "|".join(r["methods"])
+    for blueprint_name, routes in sorted(topology.items()):
+        print(
+            f"\n🔹 Blueprint Node: [{blueprint_name}] "
+            f"({len(routes)} active endpoints)"
+        )
+        for route in sorted(routes, key=lambda item: item["rule"]):
+            methods_str = "|".join(route["methods"])
             print(
-                f"  ├── {r['rule']:<35} [{methods_str:<10}] -> {r['endpoint']}"
+                f"  ├── {route['rule']:<35} "
+                f"[{methods_str:<10}] -> {route['endpoint']}"
             )
 
     print("\n" + "=" * 80 + "\n")
+
+
+
 
 
 # ==============================================================================

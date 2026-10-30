@@ -3,6 +3,8 @@
 # DESCRIPTION: Modernized auto-fixer for broken url_for() namespace references.
 # =============================================================================
 
+from __future__ import annotations
+
 import json
 import os
 import re
@@ -55,7 +57,7 @@ ENDPOINT_REWRITE_MAP = {
 
 @click.command("endpoint_autofix")
 @with_appcontext
-def endpoint_autofix():
+def endpoint_autofix() -> None:
     """
     Scans templates for legacy endpoint namespaces and rewires them
     to the modern, explicit blueprint topology.
