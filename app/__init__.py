@@ -11,6 +11,7 @@ import logging
 import os
 import sys
 import time
+import traceback
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
@@ -65,6 +66,9 @@ ROUTE_PRUNE_WHITELIST: Set[str] = {
 }
 
 _maybe_redis_client: Any | None = None
+
+# Debug instrumentation for duplicate factory invocation analysis.
+_BOOT_COUNTER = 0
 
 
 # =============================================================================
@@ -1320,6 +1324,17 @@ def create_app(
     **kwargs: Any,
 ) -> Flask:
     """Unified Flask application factory."""
+
+    global _BOOT_COUNTER
+
+    _BOOT_COUNTER += 1
+
+    print("\n" + "=" * 80)
+    print(f"CREATE_APP ENTRY #{_BOOT_COUNTER}")
+    print(f"PID={os.getpid()}")
+    traceback.print_stack(limit=25)
+    print("=" * 80 + "\n")
+
     requested_env = "production"
 
     try:
