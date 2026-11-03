@@ -10,8 +10,8 @@ import importlib
 import logging
 import os
 import sys
+import threading
 import time
-import traceback
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, cast
@@ -66,9 +66,6 @@ ROUTE_PRUNE_WHITELIST: Set[str] = {
 }
 
 _maybe_redis_client: Any | None = None
-
-# Debug instrumentation for duplicate factory invocation analysis.
-_BOOT_COUNTER = 0
 
 
 # =============================================================================
@@ -1325,16 +1322,6 @@ def create_app(
 ) -> Flask:
     """Unified Flask application factory."""
 
-    global _BOOT_COUNTER
-
-    _BOOT_COUNTER += 1
-
-    print("\n" + "=" * 80)
-    print(f"CREATE_APP ENTRY #{_BOOT_COUNTER}")
-    print(f"PID={os.getpid()}")
-    traceback.print_stack(limit=25)
-    print("=" * 80 + "\n")
-
     requested_env = "production"
 
     try:
@@ -1528,17 +1515,32 @@ def create_app(
 # Package Exports
 # =============================================================================
 
-try:
-    app = create_app()
-except Exception:
-    app = _create_fallback_app()
+_cached_app: Optional[Flask] = None
+_cache_lock = threading.RLock()
 
-application = app
+
+def _get_legacy_app() -> Flask:
+    """Build the legacy module-level app on first access only."""
+    global _cached_app
+    with _cache_lock:
+        if _cached_app is None:
+            try:
+                _cached_app = create_app()
+            except Exception:
+                _cached_app = _create_fallback_app()
+        return _cached_app
+
+
+def __getattr__(name: str) -> Any:
+    # Keeps `from app import app` / `app.application` working without
+    # booting a Flask app at import time.
+    if name in ("app", "application"):
+        return _get_legacy_app()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "create_app",
-    "app",
-    "application",
     "db",
     "socketio",
     "scheduler",
@@ -1549,4 +1551,4 @@ __all__ = [
 # =============================================================================
 
 if __name__ == "__main__":
-    application.run()
+    _get_legacy_app().run()

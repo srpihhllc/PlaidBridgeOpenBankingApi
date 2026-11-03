@@ -122,6 +122,8 @@ def test_fallback_app_guard(monkeypatch, caplog):
     try:
         with caplog.at_level(logging.INFO):
             importlib.reload(app_module)
+            # The legacy module-level app is now built lazily on first access.
+            _ = app_module.app
 
         fatal_messages = [
             record.getMessage()
