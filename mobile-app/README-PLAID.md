@@ -21,6 +21,6 @@ export PLAID_SECRET="your_plaid_secret"
 export PLAID_ENV="sandbox"
 
 # Run Flask (host on 0.0.0.0 so ngrok can forward)
-export FLASK_APP=PlaidBridgeOpenBankingApi.app
+export FLASK_APP=app:create_app
 export FLASK_ENV=development
 flask run --host=0.0.0.0 --port=5000
