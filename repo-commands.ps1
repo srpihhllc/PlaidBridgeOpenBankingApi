@@ -17,7 +17,7 @@ python -m pytest -q -p no:pytest_cov
 python -m alembic -c PlaidBridgeOpenBankingApi/migrations/alembic.ini upgrade head --sql
 
 # 7) run the Flask app locally (development):
-$env:FLASK_APP = 'PlaidBridgeOpenBankingApi.app:create_app'
+$env:FLASK_APP = 'app:create_app'
 $env:FLASK_ENV = 'development'
 flask run
 

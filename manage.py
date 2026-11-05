@@ -312,7 +312,7 @@ def run_doctor():
 def run_dev():
     """Run Flask app locally in development mode."""
     env = os.environ.copy()
-    env["FLASK_APP"] = "app"
+    env["FLASK_APP"] = "app:create_app"
     env["FLASK_ENV"] = "development"
     click.secho(
         "[+] Starting Flask Development Server...", fg="cyan", bold=True

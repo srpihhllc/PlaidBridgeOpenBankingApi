@@ -58,8 +58,7 @@ if not _SKIP_ALEMBIC:
     # -----------------------------------------------------------------------
     def _import_create_app():
         candidates = [
-            ("PlaidBridgeOpenBankingApi.app", "create_app"),
-            ("PlaidBridgeOpenBankingApi.flask_app", "create_app"),
+            ("app", "create_app"),
             ("flask_app", "create_app"),
             ("app.flask_app", "create_app"),
         ]
@@ -86,8 +85,7 @@ if not _SKIP_ALEMBIC:
 
         raise ImportError(
             "Could not find create_app callable. Tried: "
-            "PlaidBridgeOpenBankingApi.app, PlaidBridgeOpenBankingApi.flask_app, "
-            "flask_app, app.flask_app, and app.create_app."
+            "app, flask_app, and app.flask_app."
         )
 
     create_app = _import_create_app()
