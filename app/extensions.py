@@ -229,9 +229,7 @@ def _configure_limiter(
             app_limiter.init_app(app)
         except Exception:
             app.logger.exception(
-                "[LIMITER] Disabled limiter initialization failed "
-                "[PID: %s]",
-                os.getpid(),
+                "[LIMITER] Disabled limiter initialization failed",
             )
 
         app.logger.info(
@@ -261,14 +259,12 @@ def _configure_limiter(
 
         backend_type = "Redis" if redis_enabled else "in-memory"
         app.logger.info(
-            "[LIMITER] Initialized with %s backend [PID: %s]",
+            "[LIMITER] Initialized with %s backend",
             backend_type,
-            os.getpid(),
         )
     except Exception:
         app.logger.exception(
-            "[LIMITER] Initialization failed; disabling limiter [PID: %s]",
-            os.getpid(),
+            "[LIMITER] Initialization failed; disabling limiter",
         )
 
         app_limiter.enabled = False
@@ -278,8 +274,7 @@ def _configure_limiter(
             app_limiter.init_app(app)
         except Exception:
             app.logger.exception(
-                "[LIMITER] Failed to attach disabled limiter [PID: %s]",
-                os.getpid(),
+                "[LIMITER] Failed to attach disabled limiter",
             )
 
 
@@ -293,9 +288,7 @@ def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
         extensions["app_limiter_initialized"] = True
 
         app.logger.warning(
-            "[LIMITER] Already initialized; restored app-specific limiter "
-            "[PID: %s]",
-            os.getpid(),
+            "[LIMITER] Already initialized; restored app-specific limiter",
         )
         return cast(Limiter, existing_limiter)
 
@@ -309,9 +302,7 @@ def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
         )
     except Exception:
         app.logger.exception(
-            "[LIMITER] Unexpected binding failure; disabling limiter "
-            "[PID: %s]",
-            os.getpid(),
+            "[LIMITER] Unexpected binding failure; disabling limiter",
         )
         app_limiter.enabled = False
 
@@ -350,10 +341,9 @@ def _initialize_redis(app: Any) -> object | None:
             scheme = parsed.scheme if parsed and parsed.scheme else "redis"
 
             app.logger.info(
-                "[REDIS] Connected to host: %s (scheme: %s) [PID: %s]",
+                "[REDIS] Connected to host: %s (scheme: %s)",
                 safe_host,
                 scheme,
-                os.getpid(),
             )
 
     except Exception:
@@ -476,8 +466,7 @@ def init_extensions(app: Any) -> None:
         app.extensions["app_db_initialized"] = True
 
         app.logger.info(
-            "[DB] SQLAlchemy and Migrate initialized [PID: %s]",
-            os.getpid(),
+            "[DB] SQLAlchemy and Migrate initialized",
         )
 
     # -------------------------------------------------------------------------
@@ -490,8 +479,7 @@ def init_extensions(app: Any) -> None:
         app.extensions["app_jwt_initialized"] = True
 
         app.logger.info(
-            "[JWT] Initialized [PID: %s]",
-            os.getpid(),
+            "[JWT] Initialized",
         )
 
         try:
@@ -559,6 +547,5 @@ def init_extensions(app: Any) -> None:
         _emit_registry_telemetry(app)
 
     app.logger.info(
-        "[EXTENSIONS] Initialization complete [PID: %s]",
-        os.getpid(),
+        "[EXTENSIONS] Initialization complete",
     )

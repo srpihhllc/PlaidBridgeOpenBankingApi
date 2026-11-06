@@ -289,11 +289,10 @@ def _register_error_handlers(flask_app: Flask) -> None:
     def log_detailed_responses(response):
         if response.status_code in (404, 403, 422):
             _logger.warning(
-                "HTTP %s %s -> Status %s [PID: %s]",
+                "HTTP %s %s -> Status %s",
                 request.method,
                 request.full_path,
                 response.status_code,
-                os.getpid(),
             )
         return response
 
