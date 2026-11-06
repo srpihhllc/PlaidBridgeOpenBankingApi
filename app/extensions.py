@@ -200,23 +200,20 @@ def _get_limiter_storage_uri(app: Any, redis_enabled: bool) -> str:
     return "redis://localhost:6379/0"
 
 
-def _configure_limiter(
+def configure_limiter(
     app: Any,
     app_limiter: Limiter,
     redis_enabled: bool,
 ) -> None:
     """Configure and bind an app-specific limiter."""
-    is_testing = bool(app.config.get("TESTING"))
-
-    is_pytest = bool(
+    istesting = bool(app.config.get("TESTING"))
+    ispytest = bool(
         os.getenv("PYTEST_CURRENT_TEST")
         or os.getenv("PYTEST_RUNNING")
         or os.getenv("PYTEST_ADDOPTS")
     )
-
-    rate_limit_enabled = bool(app.config.get("RATE_LIMIT_ENABLED", True))
-    disabled_by_config = is_testing or is_pytest or not rate_limit_enabled
-
+    ratelimit_enabled = bool(app.config.get("RATELIMIT_ENABLED", True))
+    disabled_by_config = istesting or ispytest or not ratelimit_enabled
     if disabled_by_config:
         app_limiter.enabled = False
         app.config["RATELIMIT_STORAGE_URI"] = "memory://"
@@ -224,159 +221,123 @@ def _configure_limiter(
             "RATELIMIT_STRATEGY",
             app.config.get("RATELIMIT_STRATEGY", "fixed-window"),
         )
-
         try:
             app_limiter.init_app(app)
         except Exception:
             app.logger.exception(
-                "[LIMITER] Disabled limiter initialization failed "
-                "[PID: %s]",
-                os.getpid(),
+                "[LIMITER] Disabled limiter initialization failed",
             )
-
         app.logger.info(
             "[LIMITER] Disabled "
-            "(TESTING=%s, PYTEST=%s, RATE_LIMIT_ENABLED=%s)",
-            is_testing,
-            is_pytest,
-            rate_limit_enabled,
+            "(TESTING=%s, PYTEST=%s, RATELIMIT_ENABLED=%s)",
+            istesting,
+            ispytest,
+            ratelimit_enabled,
         )
         return
-
     storage_uri = _get_limiter_storage_uri(
         app,
         redis_enabled=redis_enabled,
     )
-
     app.config["RATELIMIT_STORAGE_URI"] = storage_uri
     app.config.setdefault(
         "RATELIMIT_STRATEGY",
         app.config.get("RATELIMIT_STRATEGY", "fixed-window"),
     )
-
     app_limiter.enabled = True
-
     try:
         app_limiter.init_app(app)
-
         backend_type = "Redis" if redis_enabled else "in-memory"
         app.logger.info(
-            "[LIMITER] Initialized with %s backend [PID: %s]",
+            "[LIMITER] Initialized with %s backend",
             backend_type,
-            os.getpid(),
         )
     except Exception:
         app.logger.exception(
-            "[LIMITER] Initialization failed; disabling limiter [PID: %s]",
-            os.getpid(),
+            "[LIMITER] Initialization failed; disabling limiter",
         )
-
         app_limiter.enabled = False
-
         # Keep the limiter app-owned; do not replace it with a module-level one.
         try:
             app_limiter.init_app(app)
         except Exception:
             app.logger.exception(
-                "[LIMITER] Failed to attach disabled limiter [PID: %s]",
-                os.getpid(),
+                "[LIMITER] Failed to attach disabled limiter",
             )
 
 
-def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
+def initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
     """Initialize or restore the limiter belonging to this Flask application."""
     extensions = app.extensions
     existing_limiter = extensions.get("limiter")
-
     if existing_limiter is not None:
         app.limiter = existing_limiter
         extensions["app_limiter_initialized"] = True
-
         app.logger.warning(
-            "[LIMITER] Already initialized; restored app-specific limiter "
-            "[PID: %s]",
-            os.getpid(),
+            "[LIMITER] Already initialized; restored app-specific limiter"
         )
         return cast(Limiter, existing_limiter)
-
     app_limiter = _create_limiter(app)
-
     try:
-        _configure_limiter(
+        configure_limiter(
             app,
             app_limiter,
             redis_enabled=redis_enabled,
         )
     except Exception:
         app.logger.exception(
-            "[LIMITER] Unexpected binding failure; disabling limiter "
-            "[PID: %s]",
-            os.getpid(),
+            "[LIMITER] Unexpected binding failure; disabling limiter"
         )
         app_limiter.enabled = False
-
     # The extension is authoritative; app.limiter is a compatibility alias.
     app.limiter = app_limiter
     extensions["limiter"] = app_limiter
     extensions["app_limiter_initialized"] = True
-
     return app_limiter
 
 
 def _initialize_redis(app: Any) -> object | None:
     """Initialize Redis once for this Flask application."""
     global redis_client
-
     if app.extensions.get("app_redis_initialized"):
         return getattr(app, "redis_client", None)
-
     try:
         client = get_redis_client()
-
         app.redis_client = client
         redis_client = client
-
         if client:
             redis_uri = os.getenv("REDIS_STORAGE_URI", "") or os.getenv(
                 "REDIS_URL", ""
             )
-
             parsed = urlparse(redis_uri) if redis_uri else None
-            safe_host = (
+            safehost = (
                 parsed.hostname
                 if parsed and parsed.hostname
                 else "unknown-host"
             )
             scheme = parsed.scheme if parsed and parsed.scheme else "redis"
-
             app.logger.info(
-                "[REDIS] Connected to host: %s (scheme: %s) [PID: %s]",
-                safe_host,
+                "[REDIS] Connected to host: %s (scheme: %s)",
+                safehost,
                 scheme,
-                os.getpid(),
             )
-
     except Exception:
         app.redis_client = None
         redis_client = None
-
         app.logger.exception("[REDIS] Redis initialization failed")
-
     app.extensions["app_redis_initialized"] = True
     return getattr(app, "redis_client", None)
 
 
-def _emit_registry_telemetry(app: Any) -> None:
+def emit_registry_telemetry(app: Any) -> None:
     """Emit registry telemetry once per Flask application."""
     if app.extensions.get("app_registry_telemetry_emitted"):
         return
-
     try:
         from app.services.registry import get_service_registry
         from app.telemetry.ttl_emit import emit_schema_trace
 
         discovered_services = get_service_registry()
-
         emit_schema_trace(
             domain="registry",
             event="service_registry",
@@ -389,12 +350,10 @@ def _emit_registry_telemetry(app: Any) -> None:
                 "services": [service.name for service in discovered_services],
             },
         )
-
     except Exception:
         app.logger.exception(
             "[TELEMETRY] Failed to emit service registry trace"
         )
-
     finally:
         app.extensions["app_registry_telemetry_emitted"] = True
 
@@ -402,15 +361,12 @@ def _emit_registry_telemetry(app: Any) -> None:
 # =============================================================================
 # Extension initialization
 # =============================================================================
-
-
 def init_extensions(app: Any) -> None:
     """Initialize and bind core extensions to the Flask application."""
     if not isinstance(getattr(app, "extensions", None), dict):
         raise RuntimeError(
             "app.extensions corrupted; cannot initialize safely."
         )
-
     app.logger.debug(
         "[EXTENSIONS] Existing extension keys: %s",
         sorted(app.extensions.keys()),
@@ -419,7 +375,6 @@ def init_extensions(app: Any) -> None:
     # -------------------------------------------------------------------------
     # Database configuration
     # -------------------------------------------------------------------------
-
     database_uri = (
         app.config.get(
             "SQLALCHEMY_DATABASE_URI",
@@ -427,21 +382,17 @@ def init_extensions(app: Any) -> None:
         )
         or ""
     )
-
     configured_engine_options = app.config.get("SQLALCHEMY_ENGINE_OPTIONS")
-
     if not configured_engine_options or not isinstance(
         configured_engine_options, dict
     ):
         engine_options = _build_engine_options_from_env(app)
     else:
         engine_options = dict(configured_engine_options)
-
     if database_uri.startswith("sqlite"):
         app.logger.info(
             "[DB] SQLite dialect detected; normalizing engine options"
         )
-
         for incompatible_key in (
             "pool_size",
             "max_overflow",
@@ -449,14 +400,11 @@ def init_extensions(app: Any) -> None:
             "pool_recycle",
         ):
             engine_options.pop(incompatible_key, None)
-
         engine_options["poolclass"] = engine_options.get(
             "poolclass",
             StaticPool,
         )
-
         connect_args = engine_options.get("connect_args")
-
         if not isinstance(connect_args, dict):
             engine_options["connect_args"] = {
                 "check_same_thread": False,
@@ -466,34 +414,25 @@ def init_extensions(app: Any) -> None:
                 "check_same_thread",
                 False,
             )
-
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = dict(engine_options)
-
     if not app.extensions.get("app_db_initialized"):
         db.init_app(app)
         migrate.init_app(app, db)
-
         app.extensions["app_db_initialized"] = True
-
         app.logger.info(
-            "[DB] SQLAlchemy and Migrate initialized [PID: %s]",
-            os.getpid(),
+            "[DB] SQLAlchemy and Migrate initialized",
         )
 
     # -------------------------------------------------------------------------
     # JWT
     # -------------------------------------------------------------------------
-
     if not app.extensions.get("app_jwt_initialized"):
         jwt.init_app(app)
         app.extensions["jwt"] = jwt  # Alias for legacy routes and test fixtures
         app.extensions["app_jwt_initialized"] = True
-
         app.logger.info(
-            "[JWT] Initialized [PID: %s]",
-            os.getpid(),
+            "[JWT] Initialized",
         )
-
         try:
             from .models.revoked_token import RevokedToken
 
@@ -508,30 +447,24 @@ def init_extensions(app: Any) -> None:
                 from app.auth_handlers import _resolve_identity
 
                 return _resolve_identity(jwt_data.get("sub"))
-
         except Exception:
             app.logger.exception("[JWT] Handlers setup failed")
 
     # -------------------------------------------------------------------------
     # Standard Flask extensions
     # -------------------------------------------------------------------------
-
     if not app.extensions.get("app_mail_initialized"):
         mail.init_app(app)
         app.extensions["app_mail_initialized"] = True
-
     if not app.extensions.get("app_socketio_initialized"):
         socketio.init_app(app)
         app.extensions["app_socketio_initialized"] = True
-
     if not app.extensions.get("app_login_initialized"):
         login_manager.init_app(app)
         app.extensions["app_login_initialized"] = True
-
     if not app.extensions.get("app_csrf_initialized"):
         csrf.init_app(app)
         app.extensions["app_csrf_initialized"] = True
-
     if not app.extensions.get("app_swagger_initialized"):
         swagger.init_app(app)
         app.extensions["app_swagger_initialized"] = True
@@ -539,14 +472,12 @@ def init_extensions(app: Any) -> None:
     # -------------------------------------------------------------------------
     # Redis
     # -------------------------------------------------------------------------
-
     redis_instance = _initialize_redis(app)
 
     # -------------------------------------------------------------------------
     # Rate limiter
     # -------------------------------------------------------------------------
-
-    _initialize_limiter(
+    initialize_limiter(
         app,
         redis_enabled=bool(redis_instance),
     )
@@ -554,11 +485,8 @@ def init_extensions(app: Any) -> None:
     # -------------------------------------------------------------------------
     # Telemetry
     # -------------------------------------------------------------------------
-
     if redis_instance:
-        _emit_registry_telemetry(app)
-
+        emit_registry_telemetry(app)
     app.logger.info(
-        "[EXTENSIONS] Initialization complete [PID: %s]",
-        os.getpid(),
+        "[EXTENSIONS] Initialization complete",
     )
