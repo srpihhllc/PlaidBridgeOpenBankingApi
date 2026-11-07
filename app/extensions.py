@@ -158,7 +158,6 @@ def _create_limiter(app: Any) -> Limiter:
     return Limiter(
         key_func=get_remote_address,
         default_limits=_get_limiter_defaults(app),
-        storage_uri="memory://",
     )
 
 
@@ -257,7 +256,11 @@ def _configure_limiter(
     try:
         app_limiter.init_app(app)
 
-        backend_type = "Redis" if redis_enabled else "in-memory"
+        if not app_limiter.enabled:
+            app.logger.info("[LIMITER] Disabled by RATELIMIT_ENABLED")
+            return
+
+        backend_type = type(app_limiter.storage).__name__
         app.logger.info(
             "[LIMITER] Initialized with %s backend",
             backend_type,
