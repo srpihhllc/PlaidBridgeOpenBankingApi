@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 from urllib.parse import urlparse
 
 from flasgger import Swagger
@@ -284,16 +284,20 @@ def _configure_limiter(
 def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
     """Initialize or restore the limiter belonging to this Flask application."""
     extensions = app.extensions
-    existing_limiter = extensions.get("limiter")
+    registry = extensions.get("limiter")
 
-    if existing_limiter is not None:
-        app.limiter = existing_limiter
-        extensions["app_limiter_initialized"] = True
-
-        app.logger.warning(
-            "[LIMITER] Already initialized; restored app-specific limiter",
-        )
-        return cast(Limiter, existing_limiter)
+    if registry is not None:
+        if isinstance(registry, Limiter):
+            registry = {registry}
+        if registry:
+            app_limiter = next(iter(registry))
+            extensions["limiter"] = registry
+            app.limiter = app_limiter
+            extensions["app_limiter_initialized"] = True
+            app.logger.warning(
+                "[LIMITER] Already initialized; restored app-specific limiter",
+            )
+            return app_limiter
 
     app_limiter = _create_limiter(app)
 
@@ -309,9 +313,18 @@ def _initialize_limiter(app: Any, redis_enabled: bool) -> Limiter:
         )
         app_limiter.enabled = False
 
-    # The extension is authoritative; app.limiter is a compatibility alias.
+    # The extension registry is authoritative.
+    # app.limiter remains a compatibility alias.
     app.limiter = app_limiter
-    extensions["limiter"] = app_limiter
+
+    registry = extensions.get("limiter")
+    if registry is None:
+        registry = set()
+    elif isinstance(registry, Limiter):
+        registry = {registry}
+
+    registry.add(app_limiter)
+    extensions["limiter"] = registry
     extensions["app_limiter_initialized"] = True
 
     return app_limiter
