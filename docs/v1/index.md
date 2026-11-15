@@ -43,7 +43,7 @@ This site provides complete architecture, onboarding, operational, and API docum
 
 # 📝 Release Management
 
-- [Release Notes](08-release-notes.md)
+- [Release Notes](../08-release-notes.md)
 
 ---
 

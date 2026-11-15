@@ -1,4 +1,4 @@
-YAMLname: Deploy Documentation
+name: Deploy Documentation
 
 permissions:
   contents: read
@@ -11,7 +11,9 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'PlaidBridgeOpenBankingApi/docs/**'
       - 'mkdocs.yml'
+      - 'PlaidBridgeOpenBankingApi/mkdocs.yml'
 
 jobs:
   build-and-deploy-docs:
@@ -30,14 +32,23 @@ jobs:
       - name: Install MkDocs Dependencies
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          if [ -f docs/requirements.txt ]; then
+          if [ -f PlaidBridgeOpenBankingApi/docs/requirements.txt ]; then
+            python -m pip install --no-cache-dir -r PlaidBridgeOpenBankingApi/docs/requirements.txt
+          elif [ -f docs/requirements.txt ]; then
             python -m pip install --no-cache-dir -r docs/requirements.txt
           else
             python -m pip install --no-cache-dir mkdocs mkdocs-material mkdocstrings mkdocstrings-python
           fi
 
       - name: Build MkDocs Site
-        run: mkdocs build
+        run: |
+          if [ -f mkdocs.yml ]; then
+            mkdocs build -d site
+          elif [ -f PlaidBridgeOpenBankingApi/mkdocs.yml ]; then
+            mkdocs build -f PlaidBridgeOpenBankingApi/mkdocs.yml -d site
+          else
+            echo "mkdocs.yml not found!" && exit 1
+          fi
 
       - name: Upload to GitHub Pages Artifact
         uses: actions/upload-pages-artifact@v4

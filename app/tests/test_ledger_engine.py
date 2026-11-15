@@ -1,5 +1,9 @@
-# app/tests/test_ledger_engine.py
+# =============================================================================
+# FILE: app/tests/test_ledger_engine.py
+# DESCRIPTION: Comprehensive test suite for LedgerEngine and double-entry accounting.
+# =============================================================================
 
+from decimal import Decimal
 import pytest
 
 from app.extensions import db
@@ -109,3 +113,33 @@ def test_nonpositive_entry_makes_ledger_unbalanced(
         db.session.commit()
 
         assert LedgerEngine.is_balanced() is False
+
+
+def test_ledger_engine_posting_and_balances(app, db, two_gl_accounts):
+    """Verify successful LedgerEngine posting, account balances, and trial balance calculations."""
+    debit, credit = two_gl_accounts
+
+    with app.app_context():
+        entry = LedgerEngine.post(
+            debit_account_id=debit.id,
+            credit_account_id=credit.id,
+            amount=Decimal("150.00"),
+            currency="USD",
+            reference_id="ref-balance-test",
+            commit=True,
+        )
+
+        assert entry is not None
+        assert entry.amount == Decimal("150.00")
+
+        # Test account balance calculations
+        cash_balance = LedgerEngine.account_balance(debit.id)
+        assert cash_balance == Decimal("150.00")
+
+        ap_balance = LedgerEngine.account_balance(credit.id)
+        assert ap_balance == Decimal("-150.00")
+
+        # Test trial balance aggregation (returns a list of account records/balances)
+        tb = LedgerEngine.trial_balance()
+        assert isinstance(tb, (list, tuple))
+        assert len(tb) > 0

@@ -1,17 +1,8 @@
-# app/workers/sync_worker.py
-
-"""
-Minimal Redis-backed sync worker.
-
-The worker initializes the Flask application, obtains a Redis client, and
-processes JSON job payloads from the Redis list configured by
-WORKER_SYNC_LIST_KEY.
-
-For production, call main() with no arguments.
-
-For tests or controlled execution, pass max_iterations to limit the number
-of polling iterations.
-"""
+# =============================================================================
+# FILE: app/workers/sync_worker.py
+# DESCRIPTION:
+#   Redis-backed worker for Plaid transaction synchronization.
+# =============================================================================
 
 from __future__ import annotations
 
@@ -22,11 +13,14 @@ import time
 from collections.abc import Callable
 from typing import Any, cast
 
+from redis.exceptions import TimeoutError as RedisTimeoutError
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 REDIS_LIST_KEY = os.getenv("WORKER_SYNC_LIST_KEY", "sync:jobs")
 POLL_INTERVAL = float(os.getenv("WORKER_POLL_INTERVAL", "1.0"))
+BLPOP_TIMEOUT = 5
 
 AppFactory = Callable[[], Any]
 
@@ -45,20 +39,51 @@ def _load_app_factory() -> AppFactory | None:
 create_app = _load_app_factory()
 
 
-def process_job(job_payload: dict[str, Any]) -> None:
-    """Process one decoded job payload."""
-    logger.info(
-        "Processing job: id=%s type=%s",
-        job_payload.get("job_id"),
-        job_payload.get("type"),
+def process_job(job_payload: dict[str, Any]) -> int:
+    """Sync Plaid transactions for a stored Plaid item."""
+    from app.models.plaid_item import PlaidItem
+    from app.services.transaction_ingestion import (
+        sync_user_transactions_from_plaid,
+    )
+    from app.utils.plaid_crypto import decrypt_token
+
+    nested_payload = job_payload.get("payload")
+    data = (
+        nested_payload
+        if isinstance(nested_payload, dict)
+        else job_payload
     )
 
-    # TODO: Replace this placeholder with the real synchronization logic:
-    # - validate the payload
-    # - call connector adapters
-    # - persist normalized data
-    # - emit audit logs and metrics
-    time.sleep(0.1)
+    job_type = data.get("type") or job_payload.get("type")
+    user_id = job_payload.get("user_id") or data.get("user_id")
+    plaid_item_id = data.get("plaid_item_id")
+
+    if job_type != "plaid_transactions":
+        raise ValueError("Unsupported sync job type")
+    if not isinstance(user_id, str) or not user_id:
+        raise ValueError("Sync job has no valid user_id")
+    if not isinstance(plaid_item_id, str) or not plaid_item_id:
+        raise ValueError("Sync job has no valid plaid_item_id")
+
+    item = PlaidItem.query.filter_by(
+        user_id=user_id,
+        plaid_item_id=plaid_item_id,
+    ).first()
+    if item is None:
+        raise ValueError("Plaid item not found for this user")
+
+    access_token = decrypt_token(item.plaid_access_token)
+    inserted_count = sync_user_transactions_from_plaid(
+        user_id=user_id,
+        plaid_access_token=access_token,
+    )
+
+    logger.info(
+        "Plaid transaction sync processed: job_id=%s inserted=%d",
+        job_payload.get("job_id"),
+        inserted_count,
+    )
+    return inserted_count
 
 
 def _get_extension(app: Any, name: str) -> Any:
@@ -75,7 +100,7 @@ def _get_extension(app: Any, name: str) -> Any:
 
 
 def _get_redis_client(app: Any) -> Any:
-    """Get Redis from the app, its extensions, or the optional helper."""
+    """Get Redis from the app, its extensions, or the configured helper."""
     redis_client = getattr(app, "redis_client", None)
     if redis_client is not None:
         return redis_client
@@ -97,12 +122,7 @@ def _get_redis_client(app: Any) -> Any:
 
 
 def _decode_job(item: Any) -> dict[str, Any]:
-    """
-    Convert a Redis BLPOP result into a dictionary payload.
-
-    redis-py normally returns (key, value), where values may be bytes.
-    Invalid JSON is preserved under the "raw" key.
-    """
+    """Decode a Redis BLPOP result into a dictionary payload."""
     raw = item[1] if isinstance(item, (list, tuple)) and len(item) == 2 else item
 
     if isinstance(raw, (bytes, bytearray)):
@@ -120,53 +140,43 @@ def _decode_job(item: Any) -> dict[str, Any]:
 
 
 def main(max_iterations: int | None = None) -> None:
-    """
-    Start the worker loop.
-
-    Args:
-        max_iterations: Optional maximum number of polling iterations.
-            None means run indefinitely.
-    """
+    """Run the Redis worker loop."""
     if create_app is None:
         raise RuntimeError(
-            "Application factory not importable; ensure the package is "
-            "on PYTHONPATH and app.create_app exists"
+            "Application factory not importable; ensure app.create_app exists"
         )
 
     app = create_app()
     redis_client = _get_redis_client(app)
 
+    if redis_client is None:
+        raise RuntimeError(
+            "Redis client unavailable; refusing to start a no-op sync worker"
+        )
+
     logger.info(
-        "Starting minimal sync worker: mode=%s redis_available=%s",
+        "Starting Plaid sync worker: mode=%s redis_available=True list=%s",
         os.getenv("MODE", "unknown"),
-        bool(redis_client),
+        REDIS_LIST_KEY,
     )
 
     iterations = 0
-
-    if redis_client is None:
-        logger.warning(
-            "No Redis client available; worker will run a no-op loop. "
-            "Set REDIS_URL or Redis configuration to enable queue processing."
-        )
-
-        try:
-            while max_iterations is None or iterations < max_iterations:
-                iterations += 1
-                time.sleep(POLL_INTERVAL)
-        except KeyboardInterrupt:
-            logger.info("Worker stopped by KeyboardInterrupt")
-        return
 
     try:
         while max_iterations is None or iterations < max_iterations:
             iterations += 1
 
             try:
-                item = redis_client.blpop(REDIS_LIST_KEY, timeout=5)
+                item = redis_client.blpop(
+                    REDIS_LIST_KEY,
+                    timeout=BLPOP_TIMEOUT,
+                )
             except TypeError:
                 # Compatibility with clients that do not accept a timeout.
-                item = None
+                item = redis_client.blpop(REDIS_LIST_KEY)
+            except (RedisTimeoutError, TimeoutError):
+                logger.warning("Redis BLPOP timed out; continuing to poll")
+                continue
 
             if not item:
                 time.sleep(POLL_INTERVAL)
@@ -175,14 +185,16 @@ def main(max_iterations: int | None = None) -> None:
             payload = _decode_job(item)
 
             try:
-                process_job(payload)
+                with app.app_context():
+                    process_job(payload)
             except Exception:
-                logger.exception("Job processing failed")
+                logger.exception(
+                    "Sync job failed: job_id=%s",
+                    payload.get("job_id"),
+                )
 
     except KeyboardInterrupt:
         logger.info("Worker shutdown requested by KeyboardInterrupt")
-    except Exception:
-        logger.exception("Worker terminated unexpectedly")
 
 
 if __name__ == "__main__":

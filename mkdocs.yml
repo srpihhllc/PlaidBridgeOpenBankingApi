@@ -27,10 +27,9 @@ plugins:
       default_handler: python
 
 nav:
-  - Naming Conventions: 02-naming-conventions.md
   - Home: index.md
+  - Naming Conventions: 02-naming-conventions.md
   - System Architecture: 01-system-architecture.md
-  - Platform Overview: 02-platform-overview.md
   - Backend Architecture: 03-backend-architecture.md
   - Database ERD: 04-database-erd.md
   - Developer Onboarding: 05-developer-onboarding.md
@@ -40,5 +39,18 @@ nav:
   - API Reference: 09-api-reference.md
   - OpenAPI Spec: 10-openapi.yaml
   - Architecture Diagram: 11-monorepo-architecture-diagram.md
+  - Mobile Architecture: 12-mobile-architecture.md
+  - Operator Handbook PDF: operator-handbook-pdf.md
   - Contributing: CONTRIBUTING.md
-  - Changelog: CHANGELOG.md
+  - v1:
+      - Overview: v1/index.md
+      - System Architecture: v1/01-system-architecture.md
+      - Backend Architecture: v1/03-backend-architecture.md
+      - Database ERD: v1/04-database-erd.md
+      - Developer Onboarding: v1/05-developer-onboarding.md
+      - CI/CD Pipeline: v1/06-ci-cd-pipeline.md
+      - Operator Handbook: v1/07-operator-handbook.md
+      - API Reference: v1/09-api-reference.md
+      - Architecture Diagram: v1/11-monorepo-architecture-diagram.md
+      - Mobile Architecture: v1/12-mobile-architecture.md
+      - Operator Handbook PDF: v1/operator-handbook-pdf.md

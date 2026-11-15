@@ -116,7 +116,7 @@ USER_FK_TABLES = [
     (
         "transactions",
         "user_id",
-        "INSERT INTO transactions (id, user_id, amount, date) VALUES (:id, :uid, 1.0, CURRENT_TIMESTAMP)",
+        "INSERT INTO transactions (id, user_id, amount, date, is_pending) VALUES (:id, :uid, 1.0, CURRENT_TIMESTAMP, 0)",
         lambda: {"id": str(uuid.uuid4())},
     ),
     (

@@ -9,117 +9,85 @@ from datetime import timezone
 import logging
 
 from flask import Blueprint, current_app, jsonify, render_template
+from flask_login import login_required
+
+from app.decorators import admin_required
 
 logger = logging.getLogger(__name__)
 
-# Create the dedicated debug blueprint with structural namespace anchoring
 debug_bp = Blueprint("debug", __name__, url_prefix="/debug")
 
 
-# =============================================================================
-# CANONICAL DIAGNOSTIC PROBES
-# =============================================================================
+def _utc_timestamp() -> str:
+    return datetime.datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 @debug_bp.route("/test")
+@login_required
+@admin_required
 def debug_test():
-    """Simple test endpoint that doesn't rely on database models."""
+    """Admin-only diagnostic endpoint."""
     now = datetime.datetime.now(timezone.utc)
-    return (
-        jsonify(
-            {
-                "status": "success",
-                "message": "Debug route is working!",
-                "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
-                "utc_now": now.isoformat(),
-            }
-        ),
-        200,
-    )
+    return jsonify({
+        "status": "success",
+        "message": "Debug route is working.",
+        "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
+        "utc_now": _utc_timestamp(),
+    }), 200
 
 
 @debug_bp.route("/config")
+@login_required
+@admin_required
 def debug_config():
-    """Return non-sensitive config status and runtime states."""
-    try:
-        redis_client = getattr(current_app, "redis_client", None)
-        redis_ok = False
-        if redis_client:
-            try:
-                redis_client.ping()
-                redis_ok = True
-            except Exception:
-                redis_ok = False
+    """Return non-sensitive configuration status."""
+    redis_client = getattr(current_app, "redis_client", None)
+    redis_ok = False
 
-        return (
-            jsonify(
-                {
-                    "status": "success",
-                    "message": "Configuration probe",
-                    "environment": current_app.config.get("ENV", "unknown"),
-                    "debug": current_app.config.get("DEBUG", False),
-                    "api_version": "1.0",
-                    "flask_app_name": current_app.name,
-                    "redis_available": redis_ok,
-                    "timestamp": datetime.datetime.now(timezone.utc).strftime(
-                        "%Y-%m-%d %H:%M:%S UTC"
-                    ),
-                }
-            ),
-            200,
-        )
-    except Exception as e:
-        current_app.logger.exception("Debug config probe failed")
-        return jsonify({"status": "error", "details": str(e)}), 500
+    if redis_client is not None:
+        try:
+            redis_client.ping()
+            redis_ok = True
+        except Exception:
+            current_app.logger.exception("Redis check failed in debug config probe")
 
-
-# =============================================================================
-# TEMPLATE AUDIT COMPLIANCE STUBS (NON-DESTRUCTIVE)
-# =============================================================================
+    return jsonify({
+        "status": "success",
+        "message": "Configuration probe",
+        "environment": current_app.config.get("ENV", "unknown"),
+        "debug": bool(current_app.config.get("DEBUG", False)),
+        "api_version": "1.0",
+        "flask_app_name": current_app.name,
+        "redis_available": redis_ok,
+        "timestamp": _utc_timestamp(),
+    }), 200
 
 
 @debug_bp.route("/self_repair")
+@login_required
+@admin_required
 def self_repair():
-    """
-    Lightweight stub for template audit and operator telemetry tooling.
-    Returns a consistent JSON payload so static analysis paths resolve properly.
-    """
-    try:
-        payload = {
-            "status": "stub",
-            "endpoint": "debug.self_repair",
-            "message": "Self repair stub endpoint (no-op).",
-            "timestamp": (
-                datetime.datetime.now(timezone.utc).isoformat() + "Z"
-            ),
-        }
-        return jsonify(payload), 501
-    except Exception as exc:
-        current_app.logger.exception("debug.self_repair failed: %s", exc)
-        return jsonify({"status": "error", "details": str(exc)}), 500
+    """Non-destructive stub for operator tooling."""
+    return jsonify({
+        "status": "stub",
+        "endpoint": "debug.self_repair",
+        "message": "Self-repair stub endpoint (no-op).",
+        "timestamp": _utc_timestamp(),
+    }), 501
 
 
 @debug_bp.route("/cortex_map")
+@login_required
+@admin_required
 def cortex_map():
-    """
-    Template-backed stub for the cortex map architectural layout tile.
-    Renders the target dashboard markup if available; otherwise catches safely
-    and returns a clean JSON structure to prevent layout breaks or 404 errors.
-    """
+    """Render the cortex map, or return a safe stub if unavailable."""
     try:
-        try:
-            return render_template("admin/cortex_map.html")
-        except Exception:
-            # Fallback block to insulate template discovery from breaking endpoint
-            payload = {
-                "status": "stub",
-                "endpoint": "debug.cortex_map",
-                "message": "Cortex map stub (template not available).",
-                "timestamp": (
-                    datetime.datetime.now(timezone.utc).isoformat() + "Z"
-                ),
-            }
-            return jsonify(payload), 501
-    except Exception as exc:
-        current_app.logger.exception("debug.cortex_map failed: %s", exc)
-        return jsonify({"status": "error", "details": str(exc)}), 500
+        return render_template("admin/cortex_map.html")
+    except Exception:
+        current_app.logger.exception("Could not render debug cortex map")
+        return jsonify({
+            "status": "stub",
+            "endpoint": "debug.cortex_map",
+            "message": "Cortex map is unavailable.",
+            "timestamp": _utc_timestamp(),
+        }), 501

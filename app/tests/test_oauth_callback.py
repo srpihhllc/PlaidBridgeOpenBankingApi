@@ -1,8 +1,8 @@
-"""
-Module: app/tests/test_oauth_callback.py
-Description: Functional test suite for unified OAuth authentication workflows
-             (Google, Microsoft, Apple) and Plaid item token exchanges.
-"""
+# =============================================================================
+# FILE: app/tests/test_oauth_callback.py
+# DESCRIPTION: Functional test suite for unified OAuth authentication workflows
+#              (Google, Microsoft, Apple) and Plaid item token exchanges.
+# =============================================================================
 
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +10,7 @@ from cryptography.fernet import Fernet
 
 from app.extensions import db
 from app.models import User
+from app.models.plaid_item import PlaidItem
 from app.models.trace_events import TraceEvent
 
 
@@ -210,11 +211,20 @@ def test_callback_plaid_exchange_success(
     )
 
     assert response.status_code == 200
-    assert response.get_json() == {
-        "success": True,
-        "item_id": "item_id_test_string_123",
-    }
+    data = response.get_json()
+    assert data.get("success") is True
+    assert data.get("item_id") == "item_id_test_string_123"
+    assert data.get("job_id")
+    assert data.get("sync_status") == "enqueued"
 
     mock_plaid_client.Item.public_token_exchange.assert_called_once_with(
         "mock-public-999"
     )
+
+    # Verify database persistence using the correct model attribute name (plaid_item_id)
+    with app.app_context():
+        persisted_item = PlaidItem.query.filter_by(
+            plaid_item_id="item_id_test_string_123"
+        ).first()
+        assert persisted_item is not None
+        assert str(persisted_item.user_id) == str(user_id)

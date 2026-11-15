@@ -117,10 +117,11 @@ def test_exchange_public_token_success(
     )
 
     assert response.status_code == 200
-    assert response.get_json() == {
-        "success": True,
-        "item_id": "item_id_plaid_123",
-    }
+    data = response.get_json()
+    assert data.get("success") is True
+    assert data.get("item_id") == "item_id_plaid_123"
+    assert data.get("job_id")
+    assert data.get("sync_status") == "enqueued"
 
     with app.app_context():
         item = PlaidItem.query.filter_by(

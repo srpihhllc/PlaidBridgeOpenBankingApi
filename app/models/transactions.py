@@ -17,7 +17,14 @@ Model: Any = db.Model
 
 class Transaction(Model):
     __tablename__ = "transactions"
-    __table_args__ = {"extend_existing": True}
+    __table_args__ = (
+        db.UniqueConstraint(
+            "user_id",
+            "plaid_transaction_id",
+            name="uq_transactions_user_plaid_transaction",
+        ),
+        {"extend_existing": True},
+    )
 
     # -------------------------------------------------------------------------
     # Primary Key
@@ -42,15 +49,23 @@ class Transaction(Model):
     # -------------------------------------------------------------------------
     # Core Transaction Fields
     # -------------------------------------------------------------------------
-    plaid_account_id = db.Column(db.String(120))
-    account_id = db.Column(db.String(120))
+    # Plaid transaction IDs are provider identifiers, not application PKs.
+    # Nullable so existing and non-Plaid transactions remain valid.
+    plaid_transaction_id = db.Column(db.String(120), nullable=True)
+
+    # Plaid's account identifier associated with this transaction.
+    plaid_account_id = db.Column(db.String(120), nullable=True)
+
+    # Optional application account identifier.
+    account_id = db.Column(db.String(120), nullable=True)
+
     amount = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(5), default="USD")
     date = db.Column(db.DateTime, nullable=False)
     name = db.Column(db.String(255))
     category = db.Column(db.String(255))
     description = db.Column(db.String(255), nullable=True)
-    is_pending = db.Column(db.Boolean, default=False)
+    is_pending = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc),
