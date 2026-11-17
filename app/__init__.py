@@ -711,6 +711,11 @@ def _setup_logging(flask_app: Flask) -> None:
 # =============================================================================
 # Diagnostics + Dependency Graph
 # =============================================================================
+
+# Initialized once per worker when this module is imported.
+_PROCESS_START_MONOTONIC = time.monotonic()
+
+
 def _gather_diagnostics(flask_app: Flask) -> Dict[str, Any]:
     try:
         diag_mod = importlib.import_module("app.diagnostics")
@@ -748,25 +753,27 @@ def _register_core_routes(flask_app: Flask) -> None:
     """
     try:
         dependency_graph_data = _build_dependency_graph(flask_app)
-    except Exception as exc:
-        _logger.debug("Failed to build dependency graph", exc_info=exc)
-        dependency_graph_data = {"nodes": [], "edges": [], "dot": "digraph {}"}
+    except Exception:
+        _logger.debug(
+            "Dependency graph generation failed",
+            exc_info=True,
+        )
+        dependency_graph_data = {
+            "nodes": [],
+            "edges": [],
+            "dot": "digraph {}",
+        }
 
     try:
-
         def _run_readiness_checks() -> Tuple[Response, int]:
             results = _registry.run_all()
             overall_ok = all(
                 check.get("ok", False) for check in results.values()
             )
-
-            try:
-                start_time = float(
-                    flask_app.config.get("APP_START_TIME", time.time())
-                )
-                uptime = max(0.0, time.time() - start_time)
-            except (TypeError, ValueError):
-                uptime = 0.0
+            uptime = max(
+                0.0,
+                time.monotonic() - _PROCESS_START_MONOTONIC,
+            )
 
             payload: Dict[str, Any] = {
                 "healthy": overall_ok,
@@ -774,7 +781,6 @@ def _register_core_routes(flask_app: Flask) -> None:
                 "uptime": uptime,
                 "checks": results,
             }
-
             return jsonify(payload), 200 if overall_ok else 503
 
         if "readyz" not in flask_app.view_functions:
@@ -819,14 +825,10 @@ def _register_core_routes(flask_app: Flask) -> None:
 
             @flask_app.route("/metrics", methods=["GET"])
             def metrics() -> Tuple[Response, int]:
-                try:
-                    start_time = float(
-                        flask_app.config.get("APP_START_TIME", time.time())
-                    )
-                    uptime_seconds = max(0.0, time.time() - start_time)
-                except (TypeError, ValueError):
-                    uptime_seconds = 0.0
-
+                uptime_seconds = max(
+                    0.0,
+                    time.monotonic() - _PROCESS_START_MONOTONIC,
+                )
                 payload: Dict[str, Any] = {
                     "uptime_seconds": uptime_seconds,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -838,6 +840,7 @@ def _register_core_routes(flask_app: Flask) -> None:
             "_register_core_routes failed",
             exc_info=True,
         )
+
 
 
 # =============================================================================
@@ -1390,6 +1393,11 @@ def create_app(
         # Required Flask session configuration
         # ------------------------------------------------------------------
         secret_key = os.getenv("SECRET_KEY")
+
+        # TestingConfig already supplies a non-production test key.
+        # Keep requiring an environment secret in every other environment.
+        if not secret_key and requested_env == "testing":
+            secret_key = app.config.get("SECRET_KEY")
 
         if not secret_key:
             raise RuntimeError(
