@@ -167,8 +167,8 @@ def _get_limiter_storage_uri(app: Any, redis_enabled: bool) -> str:
         return "memory://"
 
     configured_uri = (
-        os.getenv("REDIS_STORAGE_URI")
-        or os.getenv("REDIS_URL")
+        os.getenv("REDIS_URL")
+        or os.getenv("REDIS_STORAGE_URI")
         or app.config.get("RATELIMIT_STORAGE_URI")
     )
 
@@ -340,12 +340,17 @@ def _initialize_redis(app: Any) -> object | None:
     try:
         client = get_redis_client()
 
+        if client:
+            # Explicitly ping to verify connection before marking as active,
+            # ensuring lazy-connection verification for staging & worker health.
+            client.ping()
+
         app.redis_client = client
         redis_client = client
 
         if client:
-            redis_uri = os.getenv("REDIS_STORAGE_URI", "") or os.getenv(
-                "REDIS_URL", ""
+            redis_uri = os.getenv("REDIS_URL") or os.getenv(
+                "REDIS_STORAGE_URI", ""
             )
 
             parsed = urlparse(redis_uri) if redis_uri else None

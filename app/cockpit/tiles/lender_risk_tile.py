@@ -48,7 +48,7 @@ def load_ai_risk_logs(limit=20):
 # -----------------------------------------------------------------------------
 def load_recent_fraud_cases(limit=20):
     cases = (
-        FraudReport.query.order_by(desc(FraudReport.timestamp))
+        FraudReport.query.order_by(desc(FraudReport.created_at))
         .limit(limit)
         .all()
     )
@@ -57,8 +57,15 @@ def load_recent_fraud_cases(limit=20):
         {
             "id": c.id,
             "transaction_id": c.transaction_id,
-            "reason": c.flagged_reason,
-            "timestamp": c.timestamp.isoformat(),
+            "reason": c.description,
+            "timestamp": (
+                c.created_at.isoformat()
+                if c.created_at
+                else None
+            ),
+            "severity": c.severity,
+            "status": c.status,
+            "category": c.category,
         }
         for c in cases
     ]
@@ -103,11 +110,11 @@ def load_lender_events(limit=20):
 def lender_risk_tile():
     """
     Cockpit tile showing:
-    - Recent lender self-link attempts
-    - AI risk evaluations
-    - Fraud trend indicators
-    - Compliance violations
-    - Telemetry counters
+- Recent lender self-link attempts
+- AI risk evaluations
+- Fraud trend indicators
+- Compliance violations
+- Telemetry counters
     """
 
     # Load telemetry counters from Redis
@@ -147,8 +154,8 @@ def lender_risk_heatmap():
     """
     Render a heatmap visualization of lender risk over time.
     Groups SchemaEvent entries by day and counts:
-    - LENDER_RISK_ALERT events (high‑risk lenders)
-    - LENDER_SELF_LINKED events (successful verifications)
+- LENDER_RISK_ALERT events (high-risk lenders)
+- LENDER_SELF_LINKED events (successful verifications)
     """
 
     # Fetch relevant events
@@ -181,17 +188,17 @@ def lender_risk_heatmap():
 
 
 # -----------------------------------------------------------------------------
-# Drill‑Down: Events for a Specific Day
+# Drill-Down: Events for a Specific Day
 # -----------------------------------------------------------------------------
 @lender_risk_tile_bp.route("/day/<date_str>", methods=["GET"])
 def lender_risk_day_detail(date_str):
     """
-    Drill‑down page showing all lender‑risk activity for a specific day.
+    Drill-down page showing all lender-risk activity for a specific day.
     Includes:
-    - Risk alerts
-    - Self‑link attempts
-    - Fraud cases
-    - AI evaluations (if timestamps match)
+- Risk alerts
+- Self-link attempts
+- Fraud cases
+- AI evaluations (if timestamps match)
     """
 
     try:
@@ -215,9 +222,9 @@ def lender_risk_day_detail(date_str):
 
     # Fraud cases for that day
     fraud_cases = (
-        FraudReport.query.filter(FraudReport.timestamp >= start_dt)
-        .filter(FraudReport.timestamp <= end_dt)
-        .order_by(FraudReport.timestamp.asc())
+        FraudReport.query.filter(FraudReport.created_at >= start_dt)
+        .filter(FraudReport.created_at <= end_dt)
+        .order_by(FraudReport.created_at.asc())
         .all()
     )
 
@@ -247,10 +254,10 @@ def lender_risk_day_detail(date_str):
 def lender_risk_overview():
     """
     Unified operator overview combining:
-    - Recent lender events
-    - Fraud cases
-    - AI evaluations
-    - Heatmap summary (aggregated)
+- Recent lender events
+- Fraud cases
+- AI evaluations
+- Heatmap summary (aggregated)
     """
 
     # Load recent data

@@ -40,6 +40,14 @@ _EXPLICIT_ORDER: Final[tuple[tuple[str, tuple[str, ...]], ...]] = (
         ("drilldown_bp",),
     ),  # Isolated out-of-tree template diagnostics layer
     (
+        "app.cockpit.routes.telemetry_dashboard",
+        ("cockpit_bp",),
+    ),
+    (
+        "app.cockpit.tiles.lender_risk_tile",
+        ("lender_risk_tile_bp",),
+    ),
+    (
         "app.blueprints.polsia_routes",
         ("polsia_bp",),
     ),  # Polsia autonomous agent webhook route handler
