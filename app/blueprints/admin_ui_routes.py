@@ -173,7 +173,7 @@ def ensure_admin_aliases(app) -> list[str]:
                     defaults=rule.defaults,
                     strict_slashes=rule.strict_slashes,
                     subdomain=rule.subdomain,
-                    build_only=getattr(rule, "build_only", False),
+                    build_only=True,
                 )
                 existing_endpoints.add(alias_ep)
 

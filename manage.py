@@ -502,6 +502,8 @@ def verify_routes():
     seen_routes = {}
     duplicates = []
     for rule in current_app.url_map.iter_rules():
+        if getattr(rule, "build_only", False):
+            continue
         key = (rule.rule, tuple(sorted(rule.methods or [])))
         if key in seen_routes:
             duplicates.append((rule.endpoint, seen_routes[key], rule.rule))
