@@ -36,13 +36,13 @@ jobs:
       PLAID_API_BASE_URL: https://sandbox.plaid.com
 
       # CI-only values; never use production credentials here.
-      SECRET_KEY: ${{ secrets.CI_SECRET_KEY }}
-      JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY }}
-      ACH_WEBHOOK_SECRET: ${{ secrets.CI_ACH_WEBHOOK_SECRET }}
-      RECONCILE_WEBHOOK_SECRET: ${{ secrets.CI_RECONCILE_WEBHOOK_SECRET }}
-      PLAID_CLIENT_ID: ${{ secrets.CI_PLAID_CLIENT_ID }}
-      PLAID_SECRET: ${{ secrets.CI_PLAID_SECRET }}
-      POLSIA_WEBHOOK_SECRET: ${{ secrets.CI_POLSIA_WEBHOOK_SECRET }}
+      SECRET_KEY: ${{ secrets.CI_SECRET_KEY || 'ci-test-secret-key-0123456789abcdef' }}
+      JWT_SECRET_KEY: ${{ secrets.CI_JWT_SECRET_KEY || 'ci-jwt-secret-key-0123456789abcdef' }}
+      ACH_WEBHOOK_SECRET: ${{ secrets.CI_ACH_WEBHOOK_SECRET || 'ci-ach-webhook-secret' }}
+      RECONCILE_WEBHOOK_SECRET: ${{ secrets.CI_RECONCILE_WEBHOOK_SECRET || 'ci-reconcile-webhook-secret' }}
+      PLAID_CLIENT_ID: ${{ secrets.CI_PLAID_CLIENT_ID || 'test_plaid_client_id' }}
+      PLAID_SECRET: ${{ secrets.CI_PLAID_SECRET || 'test_plaid_secret' }}
+      POLSIA_WEBHOOK_SECRET: ${{ secrets.CI_POLSIA_WEBHOOK_SECRET || 'ci-polsia-webhook-secret' }}
 
     steps:
       - uses: actions/checkout@v4
