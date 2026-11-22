@@ -54,7 +54,7 @@ def test_backend():
         print(f"   - Flask version: {app.__class__.__module__}")
 
         # Check critical blueprints
-        critical_bps = ['api_v1', 'fintech', 'plaid', 'auth']
+        critical_bps = ['api_v1', 'fintech_bp', 'plaid', 'auth']
         missing = [bp for bp in critical_bps if bp not in app.blueprints]
         if missing:
             print(f"[WARN] Missing blueprints: {missing}")

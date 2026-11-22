@@ -1,5 +1,5 @@
 # =============================================================================
-# FILE: tests/test_init_edge_cases.py
+# FILE: app/tests/test_init_edge_cases.py
 # DESCRIPTION: Aggressive coverage suite targeting app factory fallbacks,
 #              exception handlers, route hygiene, and dynamic configuration.
 # =============================================================================
@@ -12,21 +12,34 @@ from werkzeug.exceptions import BadRequest, InternalServerError
 
 from app import create_app
 from app.__init__ import CorrelationIdFilter, HealthCheckRegistry
+from app.config import BaseConfig
 
 
 # -----------------------------------------------------------------------------
 # Configuration loading edge cases
 # -----------------------------------------------------------------------------
-def test_create_app_string_config_fallback(caplog):
-    """An invalid config import should fall back to the default config."""
+def test_create_app_string_config_fallback(caplog, monkeypatch):
+    """An unsupported dotted config path should warn and fall back to default config resolution."""
+
+    class _NonTestingFallbackConfig(BaseConfig):
+        ENV = "development"
+        DEBUG = False
+        TESTING = False
+        SECRET_KEY = "test-non-testing-secret-key"
+        JWT_SECRET_KEY = "test-non-testing-jwt-key"
+
+    monkeypatch.setattr(
+        "app.get_config_class",
+        lambda env_name=None: _NonTestingFallbackConfig,
+    )
     caplog.set_level(logging.DEBUG)
 
     application = create_app(
         config_class="invalid.module.ConfigClass",
     )
 
+    assert "Unsupported config class path" in caplog.text
     assert application.config["TESTING"] is False
-    assert "Failed to load config class" in caplog.text
 
 
 def test_create_app_env_name_override():
@@ -37,25 +50,23 @@ def test_create_app_env_name_override():
 
 
 def test_create_app_testing_config_failure(caplog):
-    """A testing config failure should use the testing fallback."""
+    """A testing config failure should propagate without falling back to a production app."""
 
     def failing_from_object(config_instance, obj, *args, **kwargs):
-        # Preserve the database setting required by extension initialization.
         config_instance["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
         raise RuntimeError("Simulated Config Crash")
 
     caplog.set_level(logging.DEBUG)
 
-    with patch(
-        "flask.Config.from_object",
-        autospec=True,
-        side_effect=failing_from_object,
+    with (
+        patch(
+            "flask.Config.from_object",
+            autospec=True,
+            side_effect=failing_from_object,
+        ),
+        pytest.raises(RuntimeError, match="Simulated Config Crash"),
     ):
-        application = create_app("testing")
-
-    assert application.config["TESTING"] is True
-    # FIX: Update substring assertion to match actual warning emitted by app/__init__.py
-    assert "Failed to load config class" in caplog.text
+        create_app("testing")
 
 
 # -----------------------------------------------------------------------------

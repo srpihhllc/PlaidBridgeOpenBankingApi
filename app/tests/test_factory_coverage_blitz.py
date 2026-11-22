@@ -1,11 +1,11 @@
 # =============================================================================
 # FILE: app/tests/test_factory_coverage_blitz.py
-# DESCRIPTION: Extended coverage blitz suite targeting residual factory
-#              routing variations, logging filters, and component edge paths.
+# DESCRIPTION: Extended coverage suite for factory routing, logging, and edge paths.
 # =============================================================================
 
 import importlib
 
+import pytest
 from flask import Flask
 from werkzeug.exceptions import BadRequest
 
@@ -14,35 +14,47 @@ from app import CorrelationIdFilter, _registry, create_app
 from app.config import TestingConfig
 
 
-def test_factory_string_config_loading_exception_path(monkeypatch):
-    """Forces internal factory configuration loading exception lines to execute"""
+@pytest.fixture(autouse=True)
+def _use_testing_environment(monkeypatch):
+    """Prevent production values in .env from overriding this test module."""
+    monkeypatch.setenv("ENV_NAME", "testing")
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    monkeypatch.setenv("FLASK_CONFIG", "testing")
+
+
+def test_factory_config_loading_exception_propagates(monkeypatch):
+    """Ensure a config-loading error is raised instead of using a fallback app."""
     original_from_object = Flask.config_class.from_object
 
     def mock_from_object_crash(self, obj):
-        if obj == "TRIGGER_FALLBACK_FLOW":
-            raise ImportError(
-                "Simulated configuration loading exception path."
-            )
+        if obj is TestingConfig:
+            raise ImportError("Simulated configuration loading failure.")
         return original_from_object(self, obj)
 
     monkeypatch.setattr(
-        Flask.config_class, "from_object", mock_from_object_crash
+        Flask.config_class,
+        "from_object",
+        mock_from_object_crash,
     )
-    app = create_app(config_class="TRIGGER_FALLBACK_FLOW")
-    assert app is not None
+
+    with pytest.raises(
+        ImportError,
+        match="Simulated configuration loading failure",
+    ):
+        create_app(config_class=TestingConfig)
 
 
 def test_factory_invalid_module_string_resolution():
-    """Exercises the inner rsplit string parsing exception guards"""
-    app = create_app(config_class="app.config.NonExistentConfigClassXYZ")
-    assert app is not None
+    """Reject an unknown config class instead of selecting a fallback."""
+    with pytest.raises(ValueError, match="Invalid config class"):
+        create_app(config_class="app.config.NonExistentConfigClassXYZ")
 
 
 def test_sqlite_engine_options_sanitized(monkeypatch):
-    """Validates that SQLite engine options contain no forbidden QueuePool keys"""
+    """Ensure SQLite engine options omit incompatible QueuePool settings."""
     monkeypatch.setenv("PYTEST_CURRENT_TEST", "1")
     app = create_app(config_class=TestingConfig)
-    opts = app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {})
+    options = app.config.get("SQLALCHEMY_ENGINE_OPTIONS", {})
 
     for forbidden in (
         "pool_size",
@@ -50,13 +62,14 @@ def test_sqlite_engine_options_sanitized(monkeypatch):
         "pool_timeout",
         "pool_recycle",
     ):
-        assert forbidden not in opts
-    assert opts.get("poolclass") is not None
-    assert opts.get("connect_args", {}).get("check_same_thread") is False
+        assert forbidden not in options
+
+    assert options.get("poolclass") is not None
+    assert options.get("connect_args", {}).get("check_same_thread") is False
 
 
 def test_routing_hygiene_deep_loops_and_sorting():
-    """Targets routing stabilization, rule deduplication, and pruning filters"""
+    """Exercise route stabilization, deduplication, and pruning."""
     app = create_app(TestingConfig)
 
     @app.route(
@@ -94,14 +107,13 @@ def test_routing_hygiene_deep_loops_and_sorting():
 
 
 def test_health_registry_edge_exceptions():
-    """Excercises fallback code paths inside broken healthcheck executions"""
-    # Unregister a non-existent block or assert faulty results execution paths
-    bad_result = _registry.run_check("non_existent_check_module")
-    assert bad_result["ok"] is False
+    """Exercise health-check behavior for an unregistered check."""
+    result = _registry.run_check("non_existent_check_module")
+    assert result["ok"] is False
 
 
 def test_correlation_filter_fallback_boundaries():
-    """Validates application log parsing paths when correlation keys are completely absent"""
+    """Check correlation ID behavior outside request/application contexts."""
     log_filter = CorrelationIdFilter()
 
     class DummyRecord:
@@ -110,26 +122,25 @@ def test_correlation_filter_fallback_boundaries():
             self.correlation_id = None
 
     record = DummyRecord()
-    # Execute filter outside of active application/request context frames
     assert log_filter.filter(record) is True
     assert record.correlation_id is not None
 
 
 def test_application_teardown_context_execution():
-    """Targets context teardown hooks by pushing and popping an application context"""
+    """Exercise application context teardown."""
     app = create_app(TestingConfig)
-    ctx = app.app_context()
-    ctx.push()
-    ctx.pop()
+    context = app.app_context()
+    context.push()
+    context.pop()
 
 
 def test_error_handling_and_status_code_mappers():
-    """Validates custom error transformation hooks and checks edge exception mappings"""
+    """Exercise registered error handlers with representative exceptions."""
     app = create_app(TestingConfig)
 
     with app.test_request_context():
-        handlers_list = app.error_handler_spec.get(None, {}).get(None, [])
-        for handler in handlers_list:
+        handlers = app.error_handler_spec.get(None, {}).get(None, [])
+        for handler in handlers:
             try:
                 handler(BadRequest("Malformed JSON data payload wrapper."))
                 handler(RuntimeError("Operational panic trace testing path."))
@@ -138,24 +149,23 @@ def test_error_handling_and_status_code_mappers():
 
 
 def test_admin_and_conditional_blueprint_registration_gates(monkeypatch):
-    """Targets failure handling gates inside conditional blueprint registration blocks"""
+    """Exercise conditional handling for unavailable admin modules."""
     original_import = importlib.import_module
 
     def mock_import_blocker(name, *args, **kwargs):
         if "admin_routes" in name or "admin_api" in name or "admin_ui" in name:
-            raise ImportError(
-                "Simulated missing admin components deployment fault."
-            )
+            raise ImportError("Simulated missing admin components.")
         return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr(importlib, "import_module", mock_import_blocker)
-    salvaged_app = create_app(TestingConfig)
-    assert salvaged_app.config["TESTING"] is True
+    app = create_app(TestingConfig)
+    assert app.config["TESTING"] is True
 
 
 def test_metrics_correlation_telemetry_fallbacks(monkeypatch):
-    """Targets log formatting and telemetry metrics handling by overriding app timing metadata"""
+    """Exercise metrics handling when app timing metadata is malformed."""
     app = create_app(TestingConfig)
+
     monkeypatch.setattr(
         app.config,
         "get",
@@ -174,7 +184,7 @@ def test_metrics_correlation_telemetry_fallbacks(monkeypatch):
 
 
 def test_route_prune_whitelist_direct_manipulation():
-    """Targets list alterations inside the active routing white-list entries"""
+    """Exercise route-prune whitelist updates."""
     if hasattr(app_module, "add_route_prune_whitelist"):
         updated = app_module.add_route_prune_whitelist(
             "ephemeral_probe_view_override"
@@ -185,7 +195,8 @@ def test_route_prune_whitelist_direct_manipulation():
             "ephemeral_probe_view_override"
         )
         assert (
-            "ephemeral_probe_view_override" in app_module.ROUTE_PRUNE_WHITELIST
+            "ephemeral_probe_view_override"
+            in app_module.ROUTE_PRUNE_WHITELIST
         )
         app_module.ROUTE_PRUNE_WHITELIST.remove(
             "ephemeral_probe_view_override"

@@ -1,7 +1,6 @@
 # =============================================================================
 # FILE: app/tests/test_factory_edge_cases.py
-# DESCRIPTION: Exhaustive target testing of edge case code paths in
-#              app/__init__.py
+# DESCRIPTION: Edge-case tests for app/__init__.py.
 # =============================================================================
 
 import logging
@@ -9,14 +8,24 @@ from unittest.mock import MagicMock, PropertyMock
 
 import pytest
 from flask import Flask, jsonify, request
+from flask.config import Config
 from werkzeug.exceptions import BadRequest, HTTPException
 
 from app import (
     HealthCheckRegistry,
+    CorrelationIdFilter,
     _safe_status_code,
     add_route_prune_whitelist,
     create_app,
 )
+
+
+@pytest.fixture(autouse=True)
+def _use_testing_environment(monkeypatch):
+    """Prevent production values in .env from overriding this test module."""
+    monkeypatch.setenv("ENV_NAME", "testing")
+    monkeypatch.setenv("FLASK_ENV", "testing")
+    monkeypatch.setenv("FLASK_CONFIG", "testing")
 
 
 # =============================================================================
@@ -25,50 +34,32 @@ from app import (
 
 
 def test_factory_string_config_resolution():
-    """Forces the factory string configuration loop to resolve classes via strings."""
+    """Resolve a dotted config class path from app.config."""
     app = create_app(config_class="app.config.TestingConfig")
-
     assert app.config["TESTING"] is True
 
 
-def test_factory_invalid_string_config_fallback(caplog):
-    """Forces a garbage string configuration path to trigger warning fallback."""
-    app = create_app(config_class="app.config.ThisDoesNotExistAtAllXYZ")
-
-    assert app.config["TESTING"] is False
-
-    has_warning = any(
-        "Failed to load config class" in record.getMessage()
-        for record in caplog.records
-    )
-
-    assert has_warning
+def test_factory_invalid_string_config_fails_closed():
+    """Reject an unknown config class instead of selecting a fallback."""
+    with pytest.raises(ValueError, match="Invalid config class"):
+        create_app(config_class="app.config.ThisDoesNotExistAtAllXYZ")
 
 
-def test_factory_config_from_object_exception_fallback(monkeypatch):
-    """
-    Forces an exception inside config.from_object to ensure the testing
-    fallback executes cleanly when application configurations experience
-    initialization errors.
-    """
-    from flask.config import Config
-
+def test_factory_config_from_object_exception_propagates(monkeypatch):
+    """Propagate config-loading errors instead of building a fallback app."""
     original_from_object = Config.from_object
-    calls = {"count": 0}
 
     def side_effect(self, obj):
-        calls["count"] += 1
-        if calls["count"] == 1:
+        if obj.__name__ == "TestingConfig":
             raise RuntimeError(
-                "Authoritative database profile configuration connection drop error sim"
+                "Simulated config loading failure."
             )
         return original_from_object(self, obj)
 
     monkeypatch.setattr(Config, "from_object", side_effect)
 
-    app = create_app(config_class="app.config.TestingConfig")
-
-    assert app.config["TESTING"] is False
+    with pytest.raises(RuntimeError, match="Simulated config loading failure"):
+        create_app(config_class="app.config.TestingConfig")
 
 
 # =============================================================================
@@ -77,26 +68,18 @@ def test_factory_config_from_object_exception_fallback(monkeypatch):
 
 
 def test_safe_status_code_exception():
-    """
-    Forces _safe_status_code to intercept non-integer inputs and
-    HTTPException status codes.
-    """
+    """Check status-code handling for invalid input and HTTP exceptions."""
     assert _safe_status_code("NOT_A_CODE") == 500
 
     http_exc = BadRequest("Invalid payload parameters")
-
     assert isinstance(http_exc, HTTPException)
     assert _safe_status_code(http_exc.code) == 400
 
 
 def test_blueprint_registration_duplicate_skipping(caplog, monkeypatch):
-    """
-    Forces duplicate blueprint registration tracking loop to drop into
-    the debug log branch.
-    """
+    """Exercise the duplicate-blueprint registration guard."""
     app = Flask("test_dup_bp")
     app.config["TESTING"] = True
-
     app.blueprints = {
         "auth_mock_target": MagicMock(),
     }
@@ -112,7 +95,6 @@ def test_blueprint_registration_duplicate_skipping(caplog, monkeypatch):
             flask_app.register_blueprint(mock_bp)
 
         monkeypatch.setattr(app_module, "register_blueprints", mock_register)
-
         _register_blueprints(app)
 
     assert any(
@@ -127,20 +109,14 @@ def test_blueprint_registration_duplicate_skipping(caplog, monkeypatch):
 
 
 def test_diagnostic_crash_handler_execution():
-    """
-    Forces a severe exception inside an active request context to run
-    diagnostic crash logging.
-    """
+    """Exercise diagnostic crash logging for an active request."""
     app = create_app(config_class="app.config.TestingConfig")
 
     @app.route("/force_diagnostic_crash")
     def force_crash():
-        if request and request.path == "/force_diagnostic_crash":
+        if request.path == "/force_diagnostic_crash":
             _ = jsonify({"status": "error_pending"})
-
-        raise RuntimeError(
-            "Deliberate factory diagnostic validation assertion failure"
-        )
+        raise RuntimeError("Deliberate diagnostic validation failure")
 
     with app.test_client() as client:
         response = client.get("/force_diagnostic_crash")
@@ -149,20 +125,13 @@ def test_diagnostic_crash_handler_execution():
 
 
 def test_ignite_cortex_bad_request_passthrough(monkeypatch):
-    """
-    Forces a BadRequest on main.ignite_cortex to bypass conversion to
-    422 format.
-    """
+    """Ensure a BadRequest on main.ignite_cortex remains a 400."""
     app = create_app(config_class="app.config.TestingConfig")
 
     @app.route("/ignite_test")
     def trigger_cortex_err():
         assert request.path == "/ignite_test"
-
-        err = BadRequest("Invalid JSON structure format")
-
-        assert isinstance(err, HTTPException)
-        raise err
+        raise BadRequest("Invalid JSON structure format")
 
     monkeypatch.setattr(
         "flask.Request.endpoint",
@@ -181,10 +150,7 @@ def test_ignite_cortex_bad_request_passthrough(monkeypatch):
 
 
 def test_healthcheck_registry_type_safety():
-    """
-    Exercises HealthCheckRegistry missing entries, invalid types,
-    and exceptions.
-    """
+    """Exercise registry behavior for missing entries and invalid results."""
     registry = HealthCheckRegistry()
 
     with pytest.raises(TypeError):
@@ -192,40 +158,32 @@ def test_healthcheck_registry_type_safety():
 
     registry.unregister("non_existent_check")
 
-    missing_res = registry.run_check("unregistered_component")
-
-    assert missing_res["ok"] is False
-    assert missing_res["error"] == "not_registered"
+    missing_result = registry.run_check("unregistered_component")
+    assert missing_result["ok"] is False
+    assert missing_result["error"] == "not_registered"
 
     registry.register(
         "bad_type_check",
         lambda: ["not", "a", "dictionary"],
     )
-
-    bad_res = registry.run_check("bad_type_check")
-
-    assert bad_res["ok"] is False
-    assert bad_res["error"] == "invalid_result_type"
+    bad_result = registry.run_check("bad_type_check")
+    assert bad_result["ok"] is False
+    assert bad_result["error"] == "invalid_result_type"
 
     def broken_callable():
         raise ValueError("Hardware bus disconnect error sim")
 
     registry.register("broken_check", broken_callable)
-
-    err_res = registry.run_check("broken_check")
-
-    assert err_res["ok"] is False
-    assert "Hardware bus disconnect" in err_res["error"]
+    error_result = registry.run_check("broken_check")
+    assert error_result["ok"] is False
+    assert "Hardware bus disconnect" in error_result["error"]
 
     assert "broken_check" in registry.list_checks()
-
-    all_res = registry.run_all()
-
-    assert "broken_check" in all_res
+    assert "broken_check" in registry.run_all()
 
 
 def test_redis_healthcheck_no_client(monkeypatch):
-    """Exercises Redis health check closure when no client instance exists."""
+    """Exercise the Redis health check when no client exists."""
     app = create_app(config_class="app.config.TestingConfig")
 
     with app.app_context():
@@ -235,8 +193,7 @@ def test_redis_healthcheck_no_client(monkeypatch):
         monkeypatch.setattr(app, "redis_client", None)
         monkeypatch.setattr(app_module, "_maybe_redis_client", None)
 
-        check_fn = _make_redis_check()
-        result = check_fn()
+        result = _make_redis_check()()
 
     assert result["ok"] is False
     assert result["error"] == "no_client"
@@ -248,10 +205,7 @@ def test_redis_healthcheck_no_client(monkeypatch):
 
 
 def test_route_hygiene_and_duplication_handling():
-    """
-    Directly forces duplicate rule handling, pruning loops,
-    and alias fallbacks.
-    """
+    """Exercise duplicate-rule handling, pruning, and aliasing."""
     app = Flask("hygiene_test_app")
     app.config["TESTING"] = True
 
@@ -293,10 +247,7 @@ def test_route_hygiene_and_duplication_handling():
 
 
 def test_cleanup_premature_oauth_registrations():
-    """
-    Forces execution of OAuth view function pop steps when cleaning up
-    detached endpoints.
-    """
+    """Remove detached OAuth endpoints from the view-function map."""
     app = Flask("test_cleanup_isolated_app")
 
     oauth_mock = MagicMock()
@@ -315,13 +266,11 @@ def test_cleanup_premature_oauth_registrations():
 
     fake_oauth_view.__module__ = "app.blueprints.oauth_routes"
     fake_oauth_view.__name__ = "premature_endpoint"
-
     app.view_functions["oauth.premature_endpoint"] = fake_oauth_view
 
     from app import _cleanup_premature_oauth_registrations
 
     _cleanup_premature_oauth_registrations(app)
-
     assert "oauth.premature_endpoint" not in app.view_functions
 
 
@@ -331,46 +280,40 @@ def test_cleanup_premature_oauth_registrations():
 
 
 def test_jwt_user_lookup_operator_intercept():
-    """
-    Tests the SystemOperator GOD-MODE intercept logic inside user lookup
-    loaders.
-    """
+    """Exercise system-operator handling in user lookup callbacks."""
     app = create_app(config_class="app.config.TestingConfig")
 
     with app.app_context():
         from app.auth_handlers import load_user, user_lookup_callback
 
-        jwt_res = user_lookup_callback(
+        jwt_result = user_lookup_callback(
             {},
             {"sub": "TERENCE_CORTEX_PRIME"},
         )
 
-        assert jwt_res is not None
-        assert jwt_res.username == "OPERATOR_ADMIN"
-        assert jwt_res.get_id() == "TERENCE_CORTEX_PRIME"
-        assert getattr(jwt_res, "role", None) == "subscriber"
-        assert jwt_res.is_authenticated is True
+        assert jwt_result is not None
+        assert jwt_result.username == "OPERATOR_ADMIN"
+        assert jwt_result.get_id() == "TERENCE_CORTEX_PRIME"
+        assert getattr(jwt_result, "role", None) == "subscriber"
+        assert jwt_result.is_authenticated is True
 
-        session_res = load_user("TERENCE_CORTEX_PRIME")
-
-        assert session_res is not None
-        assert session_res.username == "OPERATOR_ADMIN"
-        assert session_res.get_id() == "TERENCE_CORTEX_PRIME"
+        session_result = load_user("TERENCE_CORTEX_PRIME")
+        assert session_result is not None
+        assert session_result.username == "OPERATOR_ADMIN"
+        assert session_result.get_id() == "TERENCE_CORTEX_PRIME"
 
 
 # =============================================================================
-# 7. SHIMS & EMERGENCY SENTINEL CRASH FALLBACKS
+# 7. STARTUP FAILURE HANDLING
 # =============================================================================
 
 
-def test_production_sentinel_emergency_fallback(
+def test_production_startup_failure_is_logged_and_reraised(
     monkeypatch,
     caplog,
 ):
-    """
-    Simulates a production initialization crash to verify that the factory logs
-    a critical fatal boot error and re-raises the original exception.
-    """
+    """Verify production startup failures are logged and propagated."""
+
     def exploding_flask(*args, **kwargs):
         raise RuntimeError("Production hardware crash sim")
 
@@ -392,4 +335,4 @@ def test_production_sentinel_emergency_fallback(
         record.levelno >= logging.CRITICAL
         and "FATAL BOOT ERROR" in record.getMessage()
         for record in caplog.records
-    ), "Production initialization failure did not write FATAL BOOT ERROR to logs."
+    ), "Production initialization failure did not log FATAL BOOT ERROR."

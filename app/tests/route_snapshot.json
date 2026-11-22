@@ -1395,6 +1395,41 @@
     "endpoint": "drilldown.drilldown_view"
   },
   {
+    "rule": "/cockpit/telemetry",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "cockpit_bp.telemetry_dashboard"
+  },
+  {
+    "rule": "/cockpit/tiles/lender_risk/",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "lender_risk_tile_bp.lender_risk_tile"
+  },
+  {
+    "rule": "/cockpit/tiles/lender_risk/day/<date_str>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "lender_risk_tile_bp.lender_risk_day_detail"
+  },
+  {
+    "rule": "/cockpit/tiles/lender_risk/heatmap",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "lender_risk_tile_bp.lender_risk_heatmap"
+  },
+  {
+    "rule": "/cockpit/tiles/lender_risk/overview",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "lender_risk_tile_bp.lender_risk_overview"
+  },
+  {
     "rule": "/create_link_token",
     "methods": [
       "POST"

@@ -7,20 +7,25 @@
 from __future__ import annotations
 
 import json
+import logging
+import re
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, cast
 
 from flask_login import UserMixin
+from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..extensions import db
 
+logger = logging.getLogger(__name__)
 Model: Any = db.Model
 
 
 # ---------------------------------------------------------------------------
-# Utility Generators
+# Utility Generators & Helpers
 # ---------------------------------------------------------------------------
 
 
@@ -36,6 +41,27 @@ def _get_naive_utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
+def _normalize_username_candidate(raw_name: str | None, email: str) -> str:
+    base_source = (raw_name or email.split("@", 1)[0] or "user").strip().lower()
+    cleaned = re.sub(r"[^a-z0-9._-]+", "_", base_source).strip("._-")
+    if not cleaned:
+        cleaned = "user"
+    return cleaned[:48]
+
+
+def _generate_unique_username(
+    user_cls: type[User],
+    raw_name: str | None,
+    email: str,
+) -> str:
+    base = _normalize_username_candidate(raw_name, email)
+    candidate = base
+    while user_cls.query.filter_by(username=candidate).first() is not None:
+        suffix = uuid.uuid4().hex[:6]
+        candidate = f"{base[:41]}_{suffix}"
+    return candidate
+
+
 # ---------------------------------------------------------------------------
 # User Model
 # ---------------------------------------------------------------------------
@@ -49,7 +75,9 @@ class User(UserMixin, Model):
     # Core Identity
     # -----------------------------------------------------------------------
     id = db.Column(
-        db.String(36), primary_key=True, default=_generate_uuid_string
+        db.String(36),
+        primary_key=True,
+        default=_generate_uuid_string,
     )
     uuid = db.Column(
         db.String(36),
@@ -61,7 +89,9 @@ class User(UserMixin, Model):
     username = db.Column(db.String(64), index=True, unique=True)
     email = db.Column(db.String(120), index=True, unique=True, nullable=False)
     password_hash = db.Column(
-        db.String(256), nullable=False, default=_generate_secure_fallback_hash
+        db.String(256),
+        nullable=False,
+        default=_generate_secure_fallback_hash,
     )
 
     role = db.Column(db.String(64))
@@ -76,10 +106,16 @@ class User(UserMixin, Model):
     mfa_secret = db.Column(db.String(64))
     has_mfa = db.Column(db.Boolean, default=False, nullable=False)
     mfa_enabled = db.Column(
-        db.Boolean, default=False, nullable=False, index=True
+        db.Boolean,
+        default=False,
+        nullable=False,
+        index=True,
     )
     mfa_pending_setup = db.Column(
-        db.Boolean, default=False, nullable=False, index=True
+        db.Boolean,
+        default=False,
+        nullable=False,
+        index=True,
     )
     totp_secret = db.Column(db.String(64), index=True)
 
@@ -263,32 +299,68 @@ class User(UserMixin, Model):
     # Computed Metrics
     # -----------------------------------------------------------------------
     @property
+    def total_balance_decimal(self) -> Decimal:
+        """Return exact Decimal sum of linked bank account balances."""
+        total = Decimal("0")
+        for account in self.bank_accounts.all():
+            balance = getattr(account, "balance", None)
+            if balance is None:
+                continue
+            try:
+                total += Decimal(str(balance))
+            except (TypeError, ValueError, ArithmeticError) as exc:
+                logger.warning(
+                    "Skipping invalid bank account balance for user_id=%s account_id=%s: %s",
+                    self.id,
+                    getattr(account, "id", None),
+                    exc,
+                )
+        return total
+
+    @property
     def total_balance(self) -> float:
         """
         Dynamically calculate the total balance across all linked bank accounts.
-        Gracefully defaults to 0.0 if an anomaly occurs during summation.
+        Avoids swallowing unexpected DB/ORM errors while normalizing numeric values.
         """
         try:
-            total = 0.0
-            for account in self.bank_accounts.all():
-                balance = account.balance
-                if balance is not None:
-                    total += cast(float, balance)
-            return total
-        except Exception:
+            return float(self.total_balance_decimal)
+        except (TypeError, ValueError, ArithmeticError) as exc:
+            logger.warning(
+                "Failed converting total_balance to float for user_id=%s: %s",
+                self.id,
+                exc,
+            )
             return 0.0
 
     # -----------------------------------------------------------------------
-    # Password Hashing
+    # Password Hashing & Auth Guards
     # -----------------------------------------------------------------------
+    def has_password_configured(self) -> bool:
+        """Return True if a non-empty password hash is stored on the account."""
+        return bool(self.password_hash and str(self.password_hash).strip())
+
+    def can_login_with_password(self) -> bool:
+        """Guard helper for password-based sign-in flows."""
+        return bool(
+            not self.is_locked
+            and self.is_approved
+            and self.has_password_configured()
+        )
+
     def set_password(self, password: str) -> None:
         """Hash the provided plaintext password and save it to the database."""
+        if not password:
+            raise ValueError("Password must not be empty")
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
         """Verify a plaintext password against the stored password hash."""
+        if not self.has_password_configured():
+            return False
         return cast(
-            bool, check_password_hash(str(self.password_hash), password)
+            bool,
+            check_password_hash(str(self.password_hash), password),
         )
 
     # -----------------------------------------------------------------------
@@ -296,32 +368,46 @@ class User(UserMixin, Model):
     # -----------------------------------------------------------------------
     @classmethod
     def get_or_create_from_oauth(
-        cls, provider: Any, token_response: Any
-    ) -> Any:
+        cls,
+        provider: Any,
+        token_response: Any,
+    ) -> User:
         """
         Resolve or create a User from an OAuth provider + token response.
-        Emits two TraceEvents: OAUTH_LOGIN_SUCCESS and SESSION_ESTABLISHED.
+        Requires a verified email when `email_verified` is present in profile,
+        generates a collision-free username when creating a new user, and emits
+        OAUTH_LOGIN_SUCCESS and SESSION_ESTABLISHED trace events.
         """
-        from app.extensions import db
         from app.models.trace_events import TraceEvent
         from app.oauth.provider import OAuthProvider
 
         oauth_client = OAuthProvider(provider)
         profile = oauth_client.fetch_profile(token_response)
 
-        email = profile.get("email")
+        raw_email = profile.get("email")
+        email = raw_email.strip().lower() if isinstance(raw_email, str) else None
         sub = profile.get("sub")
-        name = profile.get("name") or (email.split("@")[0] if email else None)
+        name = profile.get("name")
 
         if not email:
             raise ValueError("OAuth profile missing email")
 
-        user = cls.query.filter_by(email=email).first()
+        if "email_verified" in profile and profile.get("email_verified") is not True:
+            raise ValueError("OAuth profile email is not verified")
+
+        user = cls.query.filter(func.lower(cls.email) == email).first()
 
         if user is None:
-            user = cls(email=email, username=name)
+            unique_username = _generate_unique_username(cls, name, email)
+            user = cls(
+                email=email,
+                username=unique_username,
+                password_hash=_generate_secure_fallback_hash(),
+            )
             db.session.add(user)
-            db.session.commit()
+            db.session.flush()
+
+        provider_name = getattr(provider, "value", provider)
 
         def _emit(event_type: str, meta: dict[str, Any]) -> None:
             event = TraceEvent(
@@ -336,11 +422,11 @@ class User(UserMixin, Model):
 
         _emit(
             "OAUTH_LOGIN_SUCCESS",
-            {"provider": provider.value, "sub": sub},
+            {"provider": provider_name, "sub": sub},
         )
         _emit(
             "SESSION_ESTABLISHED",
-            {"provider": provider.value, "sub": sub},
+            {"provider": provider_name, "sub": sub},
         )
 
         db.session.commit()

@@ -90,7 +90,7 @@ def test_callback_google_success(
         ).first()
 
         assert created_user is not None
-        assert created_user.username == "Oauth Subscriber"
+        assert created_user.username == "oauth_subscriber"
 
         success_event = TraceEvent.query.filter_by(
             user_id=created_user.id,
@@ -147,7 +147,6 @@ def test_callback_microsoft_with_id_token_validation(
 
     assert response.status_code == 302
     mock_verify_ms_token.assert_called_once_with("ms-id-jwt-string")
-
 
 # ============================================================================
 # 3. PLAID TOKEN EXCHANGE TESTS

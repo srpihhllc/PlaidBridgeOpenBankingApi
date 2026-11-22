@@ -143,7 +143,8 @@ def lender_risk_tile():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
-    return render_template("cockpit/lender_risk_tile.html", context)
+    return render_template("cockpit/lender_risk_tile.html", **context)
+
 
 
 # -----------------------------------------------------------------------------

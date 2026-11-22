@@ -1,94 +1,148 @@
 # =============================================================================
 # FILE: app/services/pii_manager.py
-# DESCRIPTION: PII management service. Provides encryption/decryption for
-#              sensitive fields. Uses Fernet symmetric crypto with a key
-#              from environment variables. Falls back to stub if misconfigured.
+# DESCRIPTION: Fail-closed PII management service with MultiFernet key rotation.
+#              Never falls back to plaintext or stub markers in any environment.
 # =============================================================================
+
+from __future__ import annotations
 
 import logging
 import os
 
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 
 logger = logging.getLogger(__name__)
 
-# -----------------------------------------------------------------------------
-# Key Management
-# -----------------------------------------------------------------------------
-_FERNET: Fernet | None = None
+
+class PIICryptoError(Exception):
+    """Base exception for PII cryptographic failures."""
 
 
-def _init_fernet() -> Fernet | None:
+class PIIKeyConfigurationError(PIICryptoError):
+    """Raised when PII encryption key configuration is missing or invalid."""
+
+
+class PIIDecryptionError(PIICryptoError):
+    """Raised when PII ciphertext cannot be decrypted or rotated."""
+
+
+def _parse_pii_key_ring() -> list[bytes]:
     """
-    Initialize a Fernet instance from the PII_ENCRYPTION_KEY environment variable.
-    If the key is missing or invalid, return None (stub mode).
+    Build an ordered list of Fernet keys (primary key first for encryption,
+    followed by fallback/previous keys for decryption and rotation).
     """
-    global _FERNET
-    if _FERNET is not None:
-        return _FERNET
+    keys: list[bytes] = []
+    seen: set[bytes] = set()
 
-    key = os.getenv("PII_ENCRYPTION_KEY")
-    if not key:
-        logger.warning(
-            "PII_ENCRYPTION_KEY not set. Falling back to stub mode."
+    primary = (os.getenv("PII_ENCRYPTION_KEY") or "").strip().strip("'\"")
+    if primary:
+        encoded = primary.encode("utf-8")
+        keys.append(encoded)
+        seen.add(encoded)
+
+    for env_var in ("PII_ENCRYPTION_KEYS", "PII_PREVIOUS_KEYS"):
+        raw_ring = os.getenv(env_var) or ""
+        for entry in raw_ring.split(","):
+            candidate = entry.strip().strip("'\"")
+            if not candidate:
+                continue
+            encoded = candidate.encode("utf-8")
+            if encoded not in seen:
+                keys.append(encoded)
+                seen.add(encoded)
+
+    return keys
+
+
+def _get_multi_fernet() -> MultiFernet:
+    """
+    Construct a MultiFernet ring from configured PII keys.
+    Fails closed if keys are missing or invalid in any environment.
+    """
+    raw_keys = _parse_pii_key_ring()
+    if not raw_keys:
+        raise PIIKeyConfigurationError(
+            "PII_ENCRYPTION_KEY (or PII_ENCRYPTION_KEYS) is not configured."
         )
-        return None
 
-    try:
-        _FERNET = Fernet(key.encode("utf-8"))
-        return _FERNET
-    except Exception as e:
-        logger.error(
-            f"Invalid PII_ENCRYPTION_KEY. Falling back to stub mode: {e}"
-        )
-        return None
+    fernets: list[Fernet] = []
+    for raw_key in raw_keys:
+        try:
+            fernets.append(Fernet(raw_key))
+        except Exception as exc:
+            raise PIIKeyConfigurationError(
+                "Invalid PII Fernet key in key ring."
+            ) from exc
+
+    return MultiFernet(fernets)
 
 
-# -----------------------------------------------------------------------------
-# Encryption / Decryption
-# -----------------------------------------------------------------------------
+def validate_pii_keys() -> None:
+    """Validate PII encryption key ring at application startup."""
+    _get_multi_fernet()
+
+
+def _validate_pii_input(value: str, label: str) -> str:
+    if not isinstance(value, str):
+        raise PIICryptoError(f"{label} must be a string.")
+    return value
+
+
 def encrypt_pii(value: str) -> str:
     """
-    Encrypt a PII value using Fernet. If encryption is not configured,
-    return a stubbed marker.
+    Encrypt a PII value using the primary key in the MultiFernet ring.
+    Returns '' for empty string input; fails closed on invalid types or keys.
     """
-    if not value:
+    clean_value = _validate_pii_input(value, "PII plaintext")
+    if clean_value == "":
         return ""
 
-    f = _init_fernet()
-    if not f:
-        # Stub fallback
-        return f"ENCRYPTED::{value}"
-
+    mf = _get_multi_fernet()
     try:
-        token = f.encrypt(value.encode("utf-8"))
-        return token.decode("utf-8")
-    except Exception as e:
-        logger.error(f"Failed to encrypt PII: {e}", exc_info=True)
-        return ""
+        return mf.encrypt(clean_value.encode("utf-8")).decode("utf-8")
+    except PIICryptoError:
+        raise
+    except Exception as exc:
+        logger.error("Failed to encrypt PII value.", exc_info=True)
+        raise PIICryptoError("Failed to encrypt PII value.") from exc
 
 
 def decrypt_pii(value: str) -> str:
     """
-    Decrypt a PII value using Fernet. If decryption is not configured,
-    attempt to strip the stub marker.
+    Decrypt a PII ciphertext value using any active key in the MultiFernet ring.
+    Returns '' for empty string input; fails closed on invalid tokens or keys.
     """
-    if not value:
+    clean_ciphertext = _validate_pii_input(value, "PII ciphertext")
+    if clean_ciphertext == "":
         return ""
 
-    f = _init_fernet()
-    if not f:
-        # Stub fallback
-        if value.startswith("ENCRYPTED::"):
-            return value.replace("ENCRYPTED::", "", 1)
-        return value
-
+    mf = _get_multi_fernet()
     try:
-        plain = f.decrypt(value.encode("utf-8"))
-        return plain.decode("utf-8")
-    except InvalidToken:
-        logger.warning("Invalid token provided for PII decryption.")
+        return mf.decrypt(clean_ciphertext.encode("utf-8")).decode("utf-8")
+    except InvalidToken as exc:
+        logger.warning("Invalid or undecryptable PII ciphertext token.")
+        raise PIIDecryptionError(
+            "Failed to decrypt PII value: invalid ciphertext or key."
+        ) from exc
+    except PIICryptoError:
+        raise
+    except Exception as exc:
+        logger.error("Failed to decrypt PII value.", exc_info=True)
+        raise PIIDecryptionError("Failed to decrypt PII value.") from exc
+
+
+def rotate_pii(value: str) -> str:
+    """
+    Re-encrypt an existing PII ciphertext token under the current primary key.
+    """
+    clean_ciphertext = _validate_pii_input(value, "PII ciphertext")
+    if clean_ciphertext == "":
         return ""
-    except Exception as e:
-        logger.error(f"Failed to decrypt PII: {e}", exc_info=True)
-        return ""
+
+    mf = _get_multi_fernet()
+    try:
+        return mf.rotate(clean_ciphertext.encode("utf-8")).decode("utf-8")
+    except InvalidToken as exc:
+        raise PIIDecryptionError(
+            "Failed to rotate PII value: invalid ciphertext or key."
+        ) from exc

@@ -35,11 +35,10 @@ from app import extensions
 from app.blueprints import register_blueprints, validate_blueprints_graph
 from app.blueprints.admin_ui_routes import ensure_admin_aliases
 from app.cli import register_cli_commands
-from app.config import CONFIG_MAP, get_config_class
+from app.config import get_config_class
 from app.extensions import db, socketio
 from app.routes.treasury_routes import treasury_bp
 from app.tracing import handle_traced_error
-from app.webhooks.views import webhooks
 
 _logger = logging.getLogger(__name__)
 
@@ -1322,108 +1321,153 @@ def create_app(
     env_name: Optional[str] = None,
     **kwargs: Any,
 ) -> Flask:
-    """Unified Flask application factory."""
+    """Create and configure the Flask application."""
 
     requested_env = "production"
+    config_validated = False
+    explicit_testing = False
 
     try:
         app = Flask(__name__)
 
-        if (
-            isinstance(config_class, str)
-            and config_class.lower() in CONFIG_MAP
-            and env_name is None
-        ):
-            env_name = config_class
-            config_class = None
+        # Support legacy environment names and dotted config class paths.
+        if isinstance(config_class, str):
+            config_spec = config_class.strip()
 
-        requested_env = (
-            env_name
-            or os.getenv("ENV_NAME")
-            or os.getenv("FLASK_ENV")
-            or "production"
-        ).lower()
+            if "." in config_spec:
+                module_name, _, class_name = config_spec.rpartition(".")
 
-        if config_class is None:
-            config_class = get_config_class(requested_env)
-
-        try:
-            app.config.from_object(config_class)
-
-        except Exception as config_error:
-            _logger.warning(
-                "Failed to load config class '%s': %s",
-                config_class,
-                config_error,
-                exc_info=True,
-            )
-
-            if requested_env == "testing":
-                app.config["TESTING"] = True
-                app.config.setdefault(
-                    "SQLALCHEMY_DATABASE_URI",
-                    "sqlite:///:memory:",
-                )
-
-            default_config = get_config_class()
-
-            if default_config is not config_class:
-                try:
-                    app.config.from_object(default_config)
-
-                except Exception as fallback_error:
+                if module_name != "app.config" or not class_name:
                     _logger.warning(
-                        "Failed to load fallback config class '%s': %s",
-                        default_config,
-                        fallback_error,
-                        exc_info=True,
+                        "Unsupported config class path %r; using default "
+                        "configuration",
+                        config_spec,
+                    )
+                    config_class = None
+                else:
+                    config_module = importlib.import_module(module_name)
+                    resolved_config = getattr(
+                        config_module,
+                        class_name,
+                        None,
                     )
 
-            if requested_env == "testing":
-                app.config["TESTING"] = True
-                app.config.setdefault(
-                    "SQLALCHEMY_DATABASE_URI",
-                    "sqlite:///:memory:",
+                    if (
+                        not isinstance(resolved_config, type)
+                        or not callable(
+                            getattr(resolved_config, "validate", None)
+                        )
+                    ):
+                        raise ValueError(
+                            f"Invalid config class: {config_spec!r}"
+                        )
+
+                    config_class = resolved_config
+            else:
+                if env_name is None:
+                    env_name = config_spec
+                config_class = None
+
+        indicators = {
+            (os.getenv("ENV_NAME") or "").strip().lower(),
+            (os.getenv("FLASK_ENV") or "").strip().lower(),
+        }
+        authoritative_indicators = indicators & {
+            "production",
+            "prod",
+            "staging",
+        }
+
+        explicit_testing = bool(
+            (config_class is not None and getattr(config_class, "TESTING", False) is True)
+            or (isinstance(env_name, str) and env_name.strip().lower() == "testing")
+        )
+
+        # Production/staging indicators override non-testing caller selections.
+        if authoritative_indicators and not explicit_testing:
+            config_class = get_config_class()
+        elif config_class is None:
+            config_class = get_config_class(env_name)
+
+        requested_env = getattr(
+            config_class,
+            "ENV",
+            "production",
+        ).strip().lower()
+
+        # Validate before loading extensions or registering routes.
+        config_class.validate()
+        config_validated = True
+        app.config.from_object(config_class)
+
+        # Prevent runtime kwargs from overriding security-sensitive settings
+        # in production or staging.
+        protected_production_settings = {
+            "ENV",
+            "DEBUG",
+            "TESTING",
+            "SECRET_KEY",
+            "JWT_SECRET_KEY",
+            "SQLALCHEMY_DATABASE_URI",
+            "REDIS_URL",
+            "REDIS_STORAGE_URI",
+            "CELERY_BROKER_URL",
+            "REDIS_SOCKET_TIMEOUT",
+            "BLPOP_TIMEOUT",
+            "PLAID_CLIENT_ID",
+            "PLAID_SECRET",
+            "PLAID_API_BASE_URL",
+            "PLAID_ENCRYPTION_KEY",
+            "PLAID_ENCRYPTION_KEYS",
+            "PLAID_PREVIOUS_KEYS",
+            "PII_ENCRYPTION_KEY",
+            "PII_ENCRYPTION_KEYS",
+            "PII_PREVIOUS_KEYS",
+            "ACH_WEBHOOK_SECRET",
+            "RECONCILE_WEBHOOK_SECRET",
+        }
+
+        if requested_env in {"production", "prod", "staging"}:
+            forbidden = protected_production_settings.intersection(kwargs)
+            if forbidden:
+                raise RuntimeError(
+                    "Cannot override protected production/staging settings "
+                    "through create_app kwargs: "
+                    + ", ".join(sorted(forbidden))
                 )
 
         for key, value in kwargs.items():
             app.config[key] = value
 
-        # ------------------------------------------------------------------
-        # Required Flask session configuration
-        # ------------------------------------------------------------------
-        secret_key = os.getenv("SECRET_KEY")
-
-        # TestingConfig already supplies a non-production test key.
-        # Keep requiring an environment secret in every other environment.
-        if not secret_key and requested_env == "testing":
-            secret_key = app.config.get("SECRET_KEY")
-
+        secret_key = app.config.get("SECRET_KEY")
         if not secret_key:
-            raise RuntimeError(
-                "SECRET_KEY environment variable is not configured."
-            )
+            raise RuntimeError("SECRET_KEY is not configured.")
 
-        app.config["SECRET_KEY"] = secret_key
+        default_session_days = (
+            "7" if requested_env in {"production", "prod", "staging"} else "30"
+        )
+        raw_session_days = (
+            app.config.get("SESSION_LIFETIME_DAYS")
+            or os.getenv("SESSION_LIFETIME_DAYS")
+            or default_session_days
+        )
+        session_days = int(raw_session_days)
+        if session_days < 1:
+            raise ValueError(f"SESSION_LIFETIME_DAYS must be >= 1, got {session_days!r}")
+
+        app.config["SESSION_LIFETIME_DAYS"] = session_days
         app.config["SESSION_PERMANENT"] = True
-        app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+        app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=session_days)
 
         from app.filters.datetime_filters import register_datetime_filters
 
         register_datetime_filters(app)
         _setup_logging(app)
 
-        config_name = getattr(
-            config_class,
-            "__name__",
-            str(config_class),
-        )
-
         app.logger.info(
             "Loaded configuration class: %s",
-            config_name,
+            getattr(config_class, "__name__", str(config_class)),
         )
-
         app.logger.info(
             "Session configuration loaded: permanent=%s lifetime=%s",
             app.config["SESSION_PERMANENT"],
@@ -1435,10 +1479,9 @@ def create_app(
         extensions.init_extensions(app)
         _ = socketio
 
-        # Single guarded blueprint registration pass
+        # Register blueprints through the guarded registration pass.
         _register_blueprints(app)
 
-        # Register treasury and webhooks blueprints if not auto-discovered
         if "treasury_bp" not in app.blueprints:
             app.register_blueprint(
                 treasury_bp,
@@ -1446,17 +1489,17 @@ def create_app(
             )
 
         if "webhooks" not in app.blueprints:
+            from app.webhooks.views import webhooks as webhooks_bp
+
             app.register_blueprint(
-                webhooks,
+                webhooks_bp,
                 url_prefix="/webhooks",
             )
 
-        # Standardized blueprint diagnostics
         for variable_name, blueprint in app.blueprints.items():
             app.logger.info(
                 "Operational blueprint link bound: "
-                "variable=%s name=%s -> %s "
-                "(Prefix mapping: %s)",
+                "variable=%s name=%s -> %s (Prefix mapping: %s)",
                 variable_name,
                 blueprint.name,
                 blueprint.import_name,
@@ -1473,7 +1516,6 @@ def create_app(
         _register_jwt_loaders(app)
 
         _ensure_db_tables(app)
-
         _register_core_routes(app)
 
         _ensure_admin_index_registered(app)
@@ -1481,23 +1523,9 @@ def create_app(
         _cleanup_premature_oauth_registrations(app)
         _reconcile_oauth_callback_aliases(app)
 
-        _apply_alias_fallbacks(
-            app,
-            "admin_bp.",
-            "admin_ui.",
-        )
-
-        _apply_alias_fallbacks(
-            app,
-            "admin.",
-            "admin_ui.",
-        )
-
-        _apply_alias_fallbacks(
-            app,
-            "main_bp.",
-            "main.",
-        )
+        _apply_alias_fallbacks(app, "admin_bp.", "admin_ui.")
+        _apply_alias_fallbacks(app, "admin.", "admin_ui.")
+        _apply_alias_fallbacks(app, "main_bp.", "main.")
 
         _enforce_route_uniqueness(app)
         _dedupe_rules(app)
@@ -1512,10 +1540,25 @@ def create_app(
             exc_info=True,
         )
 
-        if requested_env == "production":
-            return _create_fallback_app(exc)
+        production_or_staging = requested_env in {"production", "prod", "staging"} or (
+            not explicit_testing
+            and bool(
+                {
+                    (os.getenv("ENV_NAME") or "").strip().lower(),
+                    (os.getenv("FLASK_ENV") or "").strip().lower(),
+                }
+                & {"production", "prod", "staging"}
+            )
+        )
+
+        if config_validated and production_or_staging:
+            fallback = _create_fallback_app(exc)
+            fallback.config["BOOT_FAILED"] = True
+            fallback.config["BOOT_ERROR"] = str(exc)
+            return fallback
 
         raise
+
 
 
 # =============================================================================
@@ -1531,16 +1574,13 @@ def _get_legacy_app() -> Flask:
     global _cached_app
     with _cache_lock:
         if _cached_app is None:
-            try:
-                _cached_app = create_app()
-            except Exception:
-                _cached_app = _create_fallback_app()
+            _cached_app = create_app()
         return _cached_app
 
 
 def __getattr__(name: str) -> Any:
-    # Keeps `from app import app` / `app.application` working without
-    # booting a Flask app at import time.
+    # Keep `from app import app` and `app.application` working without
+    # initializing Flask at import time.
     if name in ("app", "application"):
         return _get_legacy_app()
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -1552,6 +1592,7 @@ __all__ = [
     "socketio",
     "scheduler",
 ]
+
 
 # =============================================================================
 # Direct Execution Entrypoint
