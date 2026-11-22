@@ -13,6 +13,7 @@ from google.genai import types
 
 from app.agents.banking_tools import FINANCIAL_CORTEX_TOOLS
 from app.services.bank_simulator import BankSimulator
+from app.services.polsia_memory import PolsiaMemoryStore
 from app.utils.redis_utils import get_redis_client
 
 
@@ -32,6 +33,7 @@ class SymphonyAI:
 
         self.simulator = BankSimulator()
         self.redis = get_redis_client()
+        self.polsia_memory = PolsiaMemoryStore()
 
     def execute_instruction(
         self,
@@ -46,7 +48,7 @@ class SymphonyAI:
 
         try:
             config = types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
+                system_instruction=SYSTEM_INSTRUCTION + self.polsia_memory.format_prompt_context(),
                 tools=FINANCIAL_CORTEX_TOOLS,
                 temperature=0.1,
             )

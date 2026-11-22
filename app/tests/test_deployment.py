@@ -75,7 +75,7 @@ def test_mobile():
     print("MOBILE APP DEPLOYMENT TEST")
     print("=" * 60)
 
-    mobile_path = Path(__file__).parent / "mobile-app"
+    mobile_path = Path(__file__).resolve().parents[2] / "mobile-app"
 
     if not (mobile_path / "package.json").exists():
         print("[FAIL] Mobile app not found")

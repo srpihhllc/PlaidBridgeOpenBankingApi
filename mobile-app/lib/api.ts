@@ -118,7 +118,7 @@ export async function exchangeOAuthCode(
 
 // Logout
 export async function logout(): Promise<void> {
-  await apiCall<void>("/api/auth/logout", {
+  await apiCall<void>("/auth/api/logout", {
     method: "POST",
   });
 }
@@ -133,7 +133,7 @@ export async function getMe(): Promise<{
   lastSignedIn: string;
 } | null> {
   try {
-    const result = await apiCall<{ user: any }>("/api/auth/me");
+    const result = await apiCall<{ user: any }>("/auth/me");
     return result.user || null;
   } catch (error) {
     console.error("[API] getMe failed:", error);
@@ -170,3 +170,111 @@ export async function establishSession(token: string): Promise<boolean> {
     return false;
   }
 }
+
+
+// Flask JWT Login (/auth/api/token)
+
+export async function loginWithPassword(
+
+  email: string,
+
+  password: string,
+
+): Promise<{ access_token: string; refresh_token?: string; user?: any }> {
+
+  const result = await apiCall<{ access_token: string; refresh_token?: string; user?: any }>(
+
+    "/auth/api/token",
+
+    {
+
+      method: "POST",
+
+      body: JSON.stringify({ email, password }),
+
+    },
+
+  );
+
+  if (result.access_token) {
+
+    await Auth.setSessionToken(result.access_token);
+
+  }
+
+  if (result.user) {
+
+    await Auth.setUserInfo(result.user);
+
+  }
+
+  return result;
+
+}
+
+
+
+// Flask Plaid Link Token (/create_link_token)
+
+export async function createPlaidLinkToken(): Promise<{ link_token: string }> {
+
+  return apiCall<{ link_token: string }>("/create_link_token", {
+
+    method: "POST",
+
+  });
+
+}
+
+
+
+// Flask Plaid Public Token Exchange (/exchange_public_token)
+
+export async function exchangePlaidPublicToken(
+
+  publicToken: string,
+
+  metadata?: Record<string, unknown>,
+
+): Promise<Record<string, unknown>> {
+
+  return apiCall<Record<string, unknown>>("/exchange_public_token", {
+
+    method: "POST",
+
+    body: JSON.stringify({ public_token: publicToken, metadata }),
+
+  });
+
+}
+
+
+
+// Flask Plaid Transactions (/transactions)
+
+export async function fetchPlaidTransactions(
+
+  payload: Record<string, unknown> = {},
+
+): Promise<Record<string, unknown>> {
+
+  return apiCall<Record<string, unknown>>("/transactions", {
+
+    method: "POST",
+
+    body: JSON.stringify(payload),
+
+  });
+
+}
+
+
+
+// Flask Fintech Account Snapshot (/api/v1/fintech/sandbox/account_snapshot)
+
+export async function fetchAccountSnapshot(): Promise<Record<string, unknown>> {
+
+  return apiCall<Record<string, unknown>>("/api/v1/fintech/sandbox/account_snapshot");
+
+}
+

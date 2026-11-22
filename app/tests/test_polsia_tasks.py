@@ -33,13 +33,21 @@ def test_run_nightly_polsia_cycle_success():
         response = run_nightly_polsia_cycle.run(company_id="company-123")
 
     assert response == {"status": "ok"}
-    mock_runner.trigger_night_task.assert_awaited_once_with(
-        company_id="company-123",
-        plaid_financial_summary={
-            "status": "active",
-            "trigger": "scheduled_night_beat",
-        },
-    )
+    mock_runner.trigger_night_task.assert_awaited_once()
+
+    call_kwargs = mock_runner.trigger_night_task.await_args.kwargs
+
+    assert call_kwargs["company_id"] == "company-123"
+
+    summary = call_kwargs["plaid_financial_summary"]
+
+    assert summary["status"] == "active"
+
+    assert summary["trigger"] == "scheduled_night_beat"
+
+    assert "prior_learnings" in summary
+
+    assert "metrics" in summary
     mock_client.close.assert_awaited_once()
 
 
