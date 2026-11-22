@@ -1206,6 +1206,13 @@
     "endpoint": "auth.api_logout"
   },
   {
+    "rule": "/auth/api/me",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "auth.api_me"
+  },
+  {
     "rule": "/auth/api/refresh",
     "methods": [
       "POST"
