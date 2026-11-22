@@ -27,8 +27,9 @@ from plaid.model.transactions_get_request import TransactionsGetRequest
 # -----------------------------------------------------------------------------
 # Environment & Client Initialization
 # -----------------------------------------------------------------------------
-PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID")
-PLAID_SECRET = os.getenv("PLAID_SECRET")
+_IS_TESTING = os.getenv("TESTING", "").lower() in ("1", "true", "yes") or os.getenv("FLASK_ENV", "").lower() == "testing" or os.getenv("FLASK_CONFIG", "").lower() == "testing"
+PLAID_CLIENT_ID = os.getenv("PLAID_CLIENT_ID") or ("test_plaid_client_id" if _IS_TESTING else None)
+PLAID_SECRET = os.getenv("PLAID_SECRET") or ("test_plaid_secret" if _IS_TESTING else None)
 PLAID_ENV = os.getenv("PLAID_ENV", "sandbox").lower()
 
 if not PLAID_CLIENT_ID or not PLAID_SECRET:
