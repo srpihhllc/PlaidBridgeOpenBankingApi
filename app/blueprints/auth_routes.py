@@ -1164,6 +1164,40 @@ def me_dashboard_static():
     return me_dashboard()
 
 
+@auth_bp.route("/api/me", methods=["GET"])
+
+@jwt_required()
+
+def api_me():
+
+    uid = get_jwt_identity()
+
+    user = User.query.get(int(uid)) if uid is not None else None
+
+    if not user:
+
+        return jsonify(error="User not found"), 404
+
+    return jsonify(
+
+        user={
+
+            "id": user.id,
+
+            "email": user.email,
+
+            "username": getattr(user, "username", None),
+
+            "role": user.role,
+
+        }
+
+    ), 200
+
+
+
+
+
 @auth_bp.route("/me", methods=["GET"])
 @login_required
 def me_dashboard():
@@ -1281,8 +1315,8 @@ def api_token():
                 user_agent=user_agent,
             )
             return jsonify(error="MFA required; use session flow"), 403
-        access_token = create_access_token(identity=user.id, fresh=True)
-        refresh_token = create_refresh_token(identity=user.id)
+        access_token = create_access_token(identity=str(user.id), fresh=True)
+        refresh_token = create_refresh_token(identity=str(user.id))
         log_identity_event(
             user.id, "API_TOKEN_GRANTED", ip=ip, user_agent=user_agent
         )
@@ -1326,7 +1360,7 @@ def api_refresh():
         return jsonify(error="Refresh token has been revoked."), 401
 
     new_access_token = create_access_token(
-        identity=current_user_id, fresh=False
+        identity=str(current_user_id), fresh=False
     )
     log_identity_event(
         current_user_id, "API_TOKEN_REFRESH", ip=ip, user_agent=user_agent

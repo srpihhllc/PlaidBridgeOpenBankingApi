@@ -14,7 +14,9 @@ from typing import Any
 from uuid import uuid4
 
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import current_user, login_required
+from flask_login import current_user
+from app.extensions import csrf
+from app.decorators.jwt import session_or_jwt_required
 
 from app.extensions import db
 from app.models.plaid_item import PlaidItem
@@ -81,7 +83,8 @@ def _enqueue_plaid_sync(user_id: str, plaid_item_id: str) -> tuple[str | None, s
 
 
 @plaid_bp.route("/exchange_public_token", methods=["POST"])
-@login_required
+@csrf.exempt
+@session_or_jwt_required
 def exchange_public_token_route():
     """Exchange a Plaid public token, store its encrypted access token, and enqueue sync."""
     payload = _json_object()
@@ -140,7 +143,8 @@ def exchange_public_token_route():
 
 
 @plaid_bp.route("/create_link_token", methods=["POST"])
-@login_required
+@csrf.exempt
+@session_or_jwt_required
 def create_link_token_route():
     """Generate a Plaid Link token."""
     plaid_client = _get_plaid_client_and_log_error()
@@ -178,7 +182,8 @@ def create_link_token_route():
 
 
 @plaid_bp.route("/transactions", methods=["POST"])
-@login_required
+@csrf.exempt
+@session_or_jwt_required
 def get_transactions_route():
     """Retrieve transactions for one of the authenticated user's stored Plaid items."""
     payload = _json_object()

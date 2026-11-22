@@ -133,7 +133,7 @@ export async function getMe(): Promise<{
   lastSignedIn: string;
 } | null> {
   try {
-    const result = await apiCall<{ user: any }>("/auth/me");
+    const result = await apiCall<{ user: any }>("/auth/api/me");
     return result.user || null;
   } catch (error) {
     console.error("[API] getMe failed:", error);

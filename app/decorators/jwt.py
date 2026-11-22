@@ -53,3 +53,60 @@ def subscriber_required(fn):
 def super_admin_required(fn):
     """Unified JWT Super Admin check[cite: 1]. Delegates to PolicyEngine via unified_roles_required[cite: 1]."""
     return roles_required("super_admin")(fn)
+
+
+
+
+
+def session_or_jwt_required(fn):
+
+    """Allow either an active Flask-Login session or a valid Bearer JWT."""
+
+    @wraps(fn)
+
+    def wrapper(*args, **kwargs):
+
+        from flask_login import current_user, login_user
+
+        if getattr(current_user, "is_authenticated", False):
+
+            return fn(*args, **kwargs)
+
+
+
+        try:
+
+            verify_jwt_in_request()
+
+            from flask_jwt_extended import get_jwt_identity
+
+            from app.models.user import User
+
+            identity = get_jwt_identity()
+
+            user = User.query.get(int(identity)) if identity is not None else None
+
+            if user is not None:
+
+                login_user(user, remember=False)
+
+                return fn(*args, **kwargs)
+
+        except Exception as exc:
+
+            return jsonify({
+
+                "msg": "Authentication required (valid session or Bearer JWT)",
+
+                "error": str(exc),
+
+            }), 401
+
+
+
+        return jsonify({"msg": "Authenticated user not found"}), 401
+
+
+
+    return wrapper
+
