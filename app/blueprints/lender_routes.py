@@ -66,3 +66,46 @@ def application_snapshots(application_id: int):
         ),
         200,
     )
+
+
+
+from app.services.tradeline_service import get_tradeline_details, update_tradeline
+
+
+
+
+
+@lender_bp.route("/tradelines/<int:tradeline_id>", methods=["GET"])
+
+@login_required
+
+def lender_get_tradeline(tradeline_id: int):
+
+    details = get_tradeline_details(tradeline_id)
+
+    if not details:
+
+        return jsonify({"status": "error", "message": "Tradeline not found."}), 404
+
+    return jsonify({"status": "success", "tradeline": details}), 200
+
+
+
+
+
+@lender_bp.route("/tradelines/<int:tradeline_id>", methods=["PATCH"])
+
+@login_required
+
+def lender_update_tradeline(tradeline_id: int):
+
+    updates = request.get_json(silent=True) or {}
+
+    ok = update_tradeline(tradeline_id, updates)
+
+    if not ok:
+
+        return jsonify({"status": "error", "message": "Tradeline update failed or not found."}), 404
+
+    return jsonify({"status": "success", "tradeline_id": tradeline_id}), 200
+

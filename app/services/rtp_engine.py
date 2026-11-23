@@ -273,6 +273,9 @@ class RTPEngine:
 
     @staticmethod
     def metrics() -> dict:
+        from flask import has_app_context
+        if not has_app_context():
+            return {"rail": "rtp", "total": 0, "settled": 0, "failed": 0}
         """
         Dashboard metrics payload.
 

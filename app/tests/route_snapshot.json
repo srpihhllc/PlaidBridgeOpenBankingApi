@@ -840,6 +840,13 @@
     "endpoint": "grants.compose_grant_endpoint"
   },
   {
+    "rule": "/api/grants/prepare/<grant_type>",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "grants.prepare_grant_endpoint"
+  },
+  {
     "rule": "/api/health",
     "methods": [
       "GET"
@@ -988,11 +995,137 @@
     "endpoint": "api_v1.refresh_token"
   },
   {
+    "rule": "/api/v1/banking/ach/batches",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.build_ach_batch"
+  },
+  {
+    "rule": "/api/v1/banking/ach/transfers",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.create_ach_transfer"
+  },
+  {
+    "rule": "/api/v1/banking/audit-processor",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.audit_payment_processor"
+  },
+  {
+    "rule": "/api/v1/banking/fednow/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "banking.fednow_health"
+  },
+  {
+    "rule": "/api/v1/banking/fednow/transfers",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.create_fednow_transfer"
+  },
+  {
+    "rule": "/api/v1/banking/reconcile",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "banking.reconcile_ledger"
+  },
+  {
+    "rule": "/api/v1/banking/reconcile/discrepancies",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.normalize_statement_discrepancies"
+  },
+  {
+    "rule": "/api/v1/banking/rtp/health",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "banking.rtp_health"
+  },
+  {
+    "rule": "/api/v1/banking/rtp/transfers",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.create_rtp_transfer"
+  },
+  {
+    "rule": "/api/v1/banking/statements/<int:user_id>/latest",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "banking.latest_statement_json"
+  },
+  {
+    "rule": "/api/v1/banking/statements/<int:user_id>/latest.pdf",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "banking.latest_statement_pdf"
+  },
+  {
+    "rule": "/api/v1/banking/statements/parse",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.parse_uploaded_statement_pdf"
+  },
+  {
     "rule": "/api/v1/banking/transfer",
     "methods": [
       "POST"
     ],
     "endpoint": "banking.transfer"
+  },
+  {
+    "rule": "/api/v1/banking/wallets/<int:wallet_id>/balance",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "banking.get_wallet_balance"
+  },
+  {
+    "rule": "/api/v1/banking/wallets/<int:wallet_id>/deposit",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.deposit_wallet"
+  },
+  {
+    "rule": "/api/v1/banking/wallets/<int:wallet_id>/freeze",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.freeze_wallet"
+  },
+  {
+    "rule": "/api/v1/banking/wallets/<int:wallet_id>/unfreeze",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.unfreeze_wallet"
+  },
+  {
+    "rule": "/api/v1/banking/wallets/<int:wallet_id>/withdraw",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.withdraw_wallet"
+  },
+  {
+    "rule": "/api/v1/banking/wallets/transfer",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "banking.transfer_wallets"
   },
   {
     "rule": "/api/v1/core/transactions",
@@ -1669,6 +1802,20 @@
       "GET"
     ],
     "endpoint": "lender.application_snapshots"
+  },
+  {
+    "rule": "/lender/tradelines/<int:tradeline_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "lender.lender_get_tradeline"
+  },
+  {
+    "rule": "/lender/tradelines/<int:tradeline_id>",
+    "methods": [
+      "PATCH"
+    ],
+    "endpoint": "lender.lender_update_tradeline"
   },
   {
     "rule": "/login",
