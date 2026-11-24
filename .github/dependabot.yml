@@ -5,22 +5,34 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      python-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       python-dependencies:
+        applies-to: version-updates
         patterns:
           - "*"
     ignore:
       - dependency-name: "filelock"
         versions: [">= 4.0.0"]
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/mobile-app"
     schedule:
       interval: "weekly"
     groups:
+      mobile-app-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
       mobile-app-dependencies:
+        applies-to: version-updates
         patterns:
           - "*"
     ignore:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
       - dependency-name: "@trpc/*"
+        update-types: ["version-update:semver-major", "version-update:semver-minor", "version-update:semver-patch"]
