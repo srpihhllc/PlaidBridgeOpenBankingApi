@@ -49,6 +49,10 @@ def test_create_app_with_dev_and_prod_configs(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "smoketest-super-secret-key")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("JWT_SECRET_KEY", "smoketest-jwt-secret")
+    monkeypatch.setenv("DB_USER", "smoketest_user")
+    monkeypatch.setenv("DB_PASSWORD", "smoketest_pass")
+    monkeypatch.setenv("DB_HOST", "localhost")
+    monkeypatch.setenv("DB_NAME", "smoketest_db")
 
     dev_app = create_app(config_class=DevelopmentConfig)
     assert dev_app.config.get("TESTING") is False

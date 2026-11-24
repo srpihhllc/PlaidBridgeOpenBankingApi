@@ -1184,6 +1184,41 @@
     "endpoint": "fintech_bp.sandbox_statement_pdf"
   },
   {
+    "rule": "/api/v1/fintech/shield/agreement/audit",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_bp.shield_audit_loan_agreement"
+  },
+  {
+    "rule": "/api/v1/fintech/shield/disclosure/sign",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_bp.shield_sign_disclosure"
+  },
+  {
+    "rule": "/api/v1/fintech/shield/escrow/disburse",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_bp.shield_disburse_escrow"
+  },
+  {
+    "rule": "/api/v1/fintech/shield/kyc/verify",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_bp.shield_verify_lender_kyc"
+  },
+  {
+    "rule": "/api/v1/fintech/shield/proxy/snapshot",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_bp.shield_scoped_proxy_snapshot"
+  },
+  {
     "rule": "/api/v1/fintech/transactions",
     "methods": [
       "POST"

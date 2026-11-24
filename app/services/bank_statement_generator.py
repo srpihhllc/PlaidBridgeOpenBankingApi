@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import logging
 from collections.abc import Mapping
 from datetime import datetime
@@ -156,6 +157,8 @@ def render_branded_bank_statement_pdf(
     account_number: str,
     transactions: list[dict[str, Any]],
     static_folder: str | None = None,
+    lender_id: int | str | None = None,
+    watermark_text: str | None = None,
 ) -> bytes:
     """Generate a PDF bank statement for the given bank, account, and transactions."""
     pdf = FPDF()
@@ -218,6 +221,14 @@ def render_branded_bank_statement_pdf(
             border=1,
             ln=True,
         )
+
+    pdf.ln(8)
+    pdf.set_font("Arial", "I", 8)
+    digest_seed = f"{bank_name}|{account_number}|{len(transactions)}|{lender_id or 'INTERNAL'}"
+    stmt_hash = hashlib.sha256(digest_seed.encode("utf-8")).hexdigest()[:16].upper()
+    recipient_tag = f"Lender ID: {lender_id}" if lender_id is not None else "Direct Subscriber Copy"
+    wm = _safe_text(watermark_text or f"PlaidBridge BaaS Verified Statement | {recipient_tag} | Trace Hash: {stmt_hash}")
+    pdf.cell(0, 8, wm, ln=True, align="C")
 
     try:
         output = pdf.output(dest="S")

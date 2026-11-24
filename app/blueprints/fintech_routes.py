@@ -812,3 +812,185 @@ def create_transaction():
         return _envelope_error(
             "Internal Server Error during transaction creation.", code=500
         )
+
+
+
+
+# =============================================================================
+
+# 4. ZERO-TRUST MOCK SHIELD ENDPOINTS (KYC, PROXY, AI AUDIT, ESCROW, DEFAULT)
+
+# =============================================================================
+
+from app.services.mock_shield_service import MockShieldService, ShieldSecurityError
+
+
+
+
+
+@fintech_bp.route("/shield/kyc/verify", methods=["POST"])
+
+@jwt_required()
+
+@csrf.exempt
+
+def shield_verify_lender_kyc():
+
+    data = _json()
+
+    try:
+
+        lender = MockShieldService.verify_lender_kyc(
+
+            lender_user_id=get_jwt_identity(),
+
+            photo_id_verified=bool(data.get("photo_id_verified")),
+
+            phone_verified=bool(data.get("phone_verified")),
+
+            bank_linked=bool(data.get("bank_linked", True)),
+
+        )
+
+        return jsonify({"status": "success", "lender": lender.to_dict()}), 200
+
+    except ShieldSecurityError as exc:
+
+        return _envelope_error(exc.message, code=exc.status_code)
+
+
+
+
+
+@fintech_bp.route("/shield/proxy/snapshot", methods=["POST"])
+
+@jwt_required()
+
+@csrf.exempt
+
+def shield_scoped_proxy_snapshot():
+
+    data = _json()
+
+    try:
+
+        res = MockShieldService.issue_scoped_proxy_snapshot(
+
+            lender_user_id=get_jwt_identity(),
+
+            application_id=int(data["application_id"]),
+
+            requested_fields=data.get("requested_fields"),
+
+        )
+
+        return jsonify({"status": "success", "data": res}), 200
+
+    except ShieldSecurityError as exc:
+
+        return _envelope_error(exc.message, code=exc.status_code)
+
+
+
+
+
+@fintech_bp.route("/shield/agreement/audit", methods=["POST"])
+
+@jwt_required()
+
+@csrf.exempt
+
+def shield_audit_loan_agreement():
+
+    data = _json()
+
+    try:
+
+        ag = MockShieldService.evaluate_loan_agreement(
+
+            lender_user_id=get_jwt_identity(),
+
+            borrower_id=str(data["borrower_id"]),
+
+            terms=str(data.get("terms", "")),
+
+            apr_percent=float(data.get("apr_percent", 0.0)),
+
+            origination_fee_percent=float(data.get("origination_fee_percent", 0.0)),
+
+            unilateral_sweep=bool(data.get("unilateral_sweep", False)),
+
+        )
+
+        return jsonify({"status": "success", "agreement_id": ag.id, "agreement_status": ag.status}), 201
+
+    except ShieldSecurityError as exc:
+
+        return _envelope_error(exc.message, code=exc.status_code)
+
+
+
+
+
+@fintech_bp.route("/shield/disclosure/sign", methods=["POST"])
+
+@jwt_required()
+
+@csrf.exempt
+
+def shield_sign_disclosure():
+
+    data = _json()
+
+    try:
+
+        ag = MockShieldService.sign_borrower_disclosure(
+
+            borrower_id=get_jwt_identity(),
+
+            agreement_id=int(data["agreement_id"]),
+
+            acknowledged_rules=bool(data.get("acknowledged_rules")),
+
+            signature_text=str(data.get("signature_text", "")),
+
+        )
+
+        return jsonify({"status": "success", "agreement_id": ag.id, "agreement_status": ag.status}), 200
+
+    except ShieldSecurityError as exc:
+
+        return _envelope_error(exc.message, code=exc.status_code)
+
+
+
+
+
+@fintech_bp.route("/shield/escrow/disburse", methods=["POST"])
+
+@jwt_required()
+
+@csrf.exempt
+
+def shield_disburse_escrow():
+
+    data = _json()
+
+    try:
+
+        res = MockShieldService.disburse_escrowed_loan(
+
+            lender_user_id=get_jwt_identity(),
+
+            agreement_id=int(data["agreement_id"]),
+
+            principal_amount=data["principal_amount"],
+
+        )
+
+        return jsonify({"status": "success", "data": res}), 200
+
+    except ShieldSecurityError as exc:
+
+        return _envelope_error(exc.message, code=exc.status_code)
+

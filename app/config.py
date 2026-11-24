@@ -187,16 +187,22 @@ class BaseConfig:
         if cls.ENV not in {"production", "staging"}:
             return
 
-        if not all([_DB_USER, _DB_PASSWORD, _DB_HOST, _DB_NAME]):
+        db_user = _DB_USER or _clean_env_string("DB_USER")
+        db_pass = _DB_PASSWORD or _clean_env_string("DB_PASSWORD")
+        db_host = _DB_HOST or _clean_env_string("DB_HOST")
+        db_name = _DB_NAME or _clean_env_string("DB_NAME")
+        if not all([db_user, db_pass, db_host, db_name]):
             raise RuntimeError(
                 f"{cls.ENV} relational database configuration is incomplete."
             )
 
+        secret_key = _clean_env_string("SECRET_KEY") or cls.SECRET_KEY
+        jwt_secret = _clean_env_string("JWT_SECRET_KEY") or cls.JWT_SECRET_KEY
         if (
-            not cls.SECRET_KEY
-            or cls.SECRET_KEY.startswith("DEV_")
-            or not cls.JWT_SECRET_KEY
-            or cls.JWT_SECRET_KEY.startswith("DEV_")
+            not secret_key
+            or secret_key.startswith("DEV_")
+            or not jwt_secret
+            or jwt_secret.startswith("DEV_")
         ):
             raise RuntimeError(
                 f"{cls.ENV} requires non-development SECRET_KEY "
