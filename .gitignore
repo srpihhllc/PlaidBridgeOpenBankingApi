@@ -105,3 +105,6 @@ storage/manifest/
 
 
 .env
+node_modules/
+source/
+mobile-app/package-lock.json
