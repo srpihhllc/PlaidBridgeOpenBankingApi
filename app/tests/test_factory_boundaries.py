@@ -8,6 +8,13 @@ def test_app_factory_production_config(monkeypatch):
     """
     monkeypatch.setenv("FLASK_ENV", "production")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
+    monkeypatch.setenv("DB_USER", "test_user")
+    monkeypatch.setenv("DB_PASSWORD", "test_pass")
+    monkeypatch.setenv("DB_HOST", "localhost")
+    monkeypatch.setenv("DB_NAME", "test_db")
+    from cryptography.fernet import Fernet
+    monkeypatch.setenv("PII_ENCRYPTION_KEY", Fernet.generate_key().decode())
+    monkeypatch.setenv("PLAID_ENCRYPTION_KEY", Fernet.generate_key().decode())
 
     prod_app = create_app()
     # Verify that testing flags are off when evaluating standard config loads
