@@ -1,178 +1,150 @@
-import { Platform } from "react-native";
-import { getApiBaseUrl } from "@/constants/oauth";
+import { getApiBaseUrl, PLATFORM_CONFIG } from "@/constants/oauth";
+
 import * as Auth from "@/lib/auth";
 
-type ApiResponse<T> = {
-  data?: T;
-  error?: string;
-};
+
+
+export interface FintechAccount {
+
+  id: number;
+
+  accountName: string;
+
+  accountType: string;
+
+  accountNumber: string;
+
+  balance: string;
+
+  currency: string;
+
+  status: "active" | "frozen" | "closed";
+
+}
+
+
+
+export interface FintechCard {
+
+  id: number;
+
+  cardBrand: string;
+
+  cardNumber: string;
+
+  holderName: string;
+
+  expiryDate: string;
+
+  status: "active" | "blocked" | "expired";
+
+}
+
+
+
+export interface FintechTransaction {
+
+  id: number;
+
+  transactionType: "transfer" | "deposit" | "withdrawal" | "payment" | "recharge";
+
+  amount: string;
+
+  recipientName?: string;
+
+  description?: string;
+
+  status: "pending" | "completed" | "failed" | "cancelled";
+
+  createdAt: string;
+
+}
+
+
 
 export async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+
   const headers: Record<string, string> = {
+
     "Content-Type": "application/json",
+
     ...((options.headers as Record<string, string>) || {}),
+
   };
 
-  // Determine the auth method:
-  // - Native platform: use stored session token as Bearer auth
-  // - Web (including iframe): use cookie-based auth (browser handles automatically)
-  //   Cookie is set on backend domain via POST /api/auth/session after receiving token via postMessage
-  if (Platform.OS !== "web") {
-    const sessionToken = await Auth.getSessionToken();
-    console.log("[API] apiCall:", {
-      endpoint,
-      hasToken: !!sessionToken,
-      method: options.method || "GET",
-    });
-    if (sessionToken) {
-      headers["Authorization"] = `Bearer ${sessionToken}`;
-      console.log("[API] Authorization header added");
-    }
-  } else {
-    console.log("[API] apiCall:", { endpoint, platform: "web", method: options.method || "GET" });
+
+
+  const sessionToken = await Auth.getSessionToken();
+
+  if (sessionToken) {
+
+    headers["Authorization"] = `Bearer ${sessionToken}`;
+
   }
+
+
 
   const baseUrl = getApiBaseUrl();
-  // Ensure no double slashes between baseUrl and endpoint
-  const cleanBaseUrl = baseUrl.endsWith("/") ? baseUrl.slice(0, -1) : baseUrl;
+
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  const url = baseUrl ? `${cleanBaseUrl}${cleanEndpoint}` : endpoint;
-  console.log("[API] Full URL:", url);
 
-  try {
-    console.log("[API] Making request...");
-    const response = await fetch(url, {
-      ...options,
-      headers,
-      credentials: "include",
-    });
+  const url = baseUrl ? `${baseUrl}${cleanEndpoint}` : cleanEndpoint;
 
-    console.log("[API] Response status:", response.status, response.statusText);
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-    console.log("[API] Response headers:", responseHeaders);
 
-    // Check if Set-Cookie header is present (cookies are automatically handled in React Native)
-    const setCookie = response.headers.get("Set-Cookie");
-    if (setCookie) {
-      console.log("[API] Set-Cookie header received:", setCookie);
-    }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[API] Error response:", errorText);
-      let errorMessage = errorText;
-      try {
-        const errorJson = JSON.parse(errorText);
-        errorMessage = errorJson.error || errorJson.message || errorText;
-      } catch {
-        // Not JSON, use text as is
-      }
-      throw new Error(errorMessage || `API call failed: ${response.statusText}`);
-    }
+  const response = await fetch(url, {
 
-    const contentType = response.headers.get("content-type");
-    if (contentType && contentType.includes("application/json")) {
-      const data = await response.json();
-      console.log("[API] JSON response received");
-      return data as T;
-    }
+    ...options,
 
-    const text = await response.text();
-    console.log("[API] Text response received");
-    return (text ? JSON.parse(text) : {}) as T;
-  } catch (error) {
-    console.error("[API] Request failed:", error);
-    if (error instanceof Error) {
-      throw error;
-    }
-    throw new Error("Unknown error occurred");
-  }
-}
+    headers,
 
-// OAuth callback handler - exchange code for session token
-// Calls /api/oauth/mobile endpoint which returns JSON with app_session_id and user
-export async function exchangeOAuthCode(
-  code: string,
-  state: string,
-): Promise<{ sessionToken: string; user: any }> {
-  console.log("[API] exchangeOAuthCode called");
-  // Use GET with query params
-  const params = new URLSearchParams({ code, state });
-  const endpoint = `/api/oauth/mobile?${params.toString()}`;
-  console.log("[API] Calling OAuth mobile endpoint:", endpoint);
-  const result = await apiCall<{ app_session_id: string; user: any }>(endpoint);
+    credentials: "include",
 
-  // Convert app_session_id to sessionToken for compatibility
-  const sessionToken = result.app_session_id;
-  console.log("[API] OAuth exchange result:", {
-    hasSessionToken: !!sessionToken,
-    hasUser: !!result.user,
-    sessionToken: sessionToken ? `${sessionToken.substring(0, 50)}...` : null,
   });
 
-  return {
-    sessionToken,
-    user: result.user,
-  };
-}
 
-// Logout
-export async function logout(): Promise<void> {
-  await apiCall<void>("/auth/api/logout", {
-    method: "POST",
-  });
-}
 
-// Get current authenticated user (web uses cookie-based auth)
-export async function getMe(): Promise<{
-  id: number;
-  openId: string;
-  name: string | null;
-  email: string | null;
-  loginMethod: string | null;
-  lastSignedIn: string;
-} | null> {
-  try {
-    const result = await apiCall<{ user: any }>("/auth/api/me");
-    return result.user || null;
-  } catch (error) {
-    console.error("[API] getMe failed:", error);
-    return null;
-  }
-}
+  if (!response.ok) {
 
-// Establish session cookie on the backend (3000-xxx domain)
-// Called after receiving token via postMessage to get a proper Set-Cookie from the backend
-export async function establishSession(token: string): Promise<boolean> {
-  try {
-    console.log("[API] establishSession: setting cookie on backend...");
-    const baseUrl = getApiBaseUrl();
-    const url = `${baseUrl}/api/auth/session`;
+    const errorText = await response.text();
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      credentials: "include", // Important: allows Set-Cookie to be stored
-    });
+    let errorMessage = errorText;
 
-    if (!response.ok) {
-      console.error("[API] establishSession failed:", response.status);
-      return false;
+    try {
+
+      const errorJson = JSON.parse(errorText);
+
+      errorMessage = errorJson.error || errorJson.message || errorJson.msg || errorText;
+
+    } catch {
+
+      // keep raw text
+
     }
 
-    console.log("[API] establishSession: cookie set successfully");
-    return true;
-  } catch (error) {
-    console.error("[API] establishSession error:", error);
-    return false;
+    throw new Error(errorMessage || `API call failed: ${response.statusText}`);
+
   }
+
+
+
+  const contentType = response.headers.get("content-type");
+
+  if (contentType && contentType.includes("application/json")) {
+
+    return (await response.json()) as T;
+
+  }
+
+
+
+  const text = await response.text();
+
+  return (text ? JSON.parse(text) : {}) as T;
+
 }
 
 
-// Flask JWT Login (/auth/api/token)
 
 export async function loginWithPassword(
 
@@ -184,7 +156,7 @@ export async function loginWithPassword(
 
   const result = await apiCall<{ access_token: string; refresh_token?: string; user?: any }>(
 
-    "/auth/api/token",
+    PLATFORM_CONFIG.endpoints.auth.login,
 
     {
 
@@ -214,11 +186,195 @@ export async function loginWithPassword(
 
 
 
-// Flask Plaid Link Token (/create_link_token)
+export async function logout(): Promise<void> {
+
+  try {
+
+    await apiCall<void>(PLATFORM_CONFIG.endpoints.auth.logout, { method: "POST" });
+
+  } finally {
+
+    await Auth.removeSessionToken();
+
+    await Auth.clearUserInfo();
+
+  }
+
+}
+
+
+
+export async function getMe(): Promise<{
+
+  id: number;
+
+  openId: string;
+
+  name: string | null;
+
+  email: string | null;
+
+  loginMethod: string | null;
+
+  lastSignedIn: string;
+
+} | null> {
+
+  try {
+
+    const result = await apiCall<{ user?: any; data?: any }>(PLATFORM_CONFIG.endpoints.auth.me);
+
+    const u = result.user || result.data || result;
+
+    if (!u || !u.id) return null;
+
+    return {
+
+      id: Number(u.id),
+
+      openId: String(u.id),
+
+      name: u.username || u.name || u.email || null,
+
+      email: u.email || null,
+
+      loginMethod: "jwt",
+
+      lastSignedIn: new Date().toISOString(),
+
+    };
+
+  } catch {
+
+    return null;
+
+  }
+
+}
+
+
+
+export async function fetchAccounts(): Promise<FintechAccount[]> {
+
+  const res = await apiCall<{ accounts?: FintechAccount[] }>(
+
+    PLATFORM_CONFIG.endpoints.banking.accounts,
+
+  );
+
+  return res.accounts ?? [];
+
+}
+
+
+
+export async function fetchCards(): Promise<FintechCard[]> {
+
+  const res = await apiCall<{ cards?: FintechCard[] }>(
+
+    PLATFORM_CONFIG.endpoints.banking.cards,
+
+  );
+
+  return res.cards ?? [];
+
+}
+
+
+
+export async function fetchTransactions(limit = 50): Promise<FintechTransaction[]> {
+
+  const res = await apiCall<{ transactions?: FintechTransaction[] }>(
+
+    `${PLATFORM_CONFIG.endpoints.banking.transactions}?limit=${limit}`,
+
+  );
+
+  return res.transactions ?? [];
+
+}
+
+
+
+export async function createTransfer(payload: {
+
+  accountId?: number;
+
+  recipientName: string;
+
+  recipientAccount: string;
+
+  amount: string;
+
+  description?: string;
+
+}): Promise<FintechTransaction> {
+
+  const res = await apiCall<{ transaction: FintechTransaction }>(
+
+    PLATFORM_CONFIG.endpoints.banking.transfers,
+
+    {
+
+      method: "POST",
+
+      body: JSON.stringify(payload),
+
+    },
+
+  );
+
+  return res.transaction;
+
+}
+
+
+
+export async function signShieldDisclosure(payload: {
+
+  agreement_id: number;
+
+  signature: string;
+
+  accepted_rules?: boolean;
+
+}): Promise<Record<string, unknown>> {
+
+  return apiCall<Record<string, unknown>>(PLATFORM_CONFIG.endpoints.shield.signDisclosure, {
+
+    method: "POST",
+
+    body: JSON.stringify({ accepted_rules: true, ...payload }),
+
+  });
+
+}
+
+
+
+export async function fetchScopedProxySnapshot(
+
+  lenderId: number,
+
+  borrowerId: string,
+
+): Promise<Record<string, unknown>> {
+
+  return apiCall<Record<string, unknown>>(PLATFORM_CONFIG.endpoints.shield.scopedProxySnapshot, {
+
+    method: "POST",
+
+    body: JSON.stringify({ lender_id: lenderId, borrower_id: borrowerId }),
+
+  });
+
+}
+
+
 
 export async function createPlaidLinkToken(): Promise<{ link_token: string }> {
 
-  return apiCall<{ link_token: string }>("/create_link_token", {
+  return apiCall<{ link_token: string }>(PLATFORM_CONFIG.endpoints.plaid.createLinkToken, {
 
     method: "POST",
 
@@ -228,8 +384,6 @@ export async function createPlaidLinkToken(): Promise<{ link_token: string }> {
 
 
 
-// Flask Plaid Public Token Exchange (/exchange_public_token)
-
 export async function exchangePlaidPublicToken(
 
   publicToken: string,
@@ -238,7 +392,7 @@ export async function exchangePlaidPublicToken(
 
 ): Promise<Record<string, unknown>> {
 
-  return apiCall<Record<string, unknown>>("/exchange_public_token", {
+  return apiCall<Record<string, unknown>>(PLATFORM_CONFIG.endpoints.plaid.exchangePublicToken, {
 
     method: "POST",
 
@@ -250,31 +404,155 @@ export async function exchangePlaidPublicToken(
 
 
 
-// Flask Plaid Transactions (/transactions)
+export async function fetchAccountSnapshot(): Promise<Record<string, unknown>> {
 
-export async function fetchPlaidTransactions(
-
-  payload: Record<string, unknown> = {},
-
-): Promise<Record<string, unknown>> {
-
-  return apiCall<Record<string, unknown>>("/transactions", {
-
-    method: "POST",
-
-    body: JSON.stringify(payload),
-
-  });
+  return apiCall<Record<string, unknown>>(PLATFORM_CONFIG.endpoints.banking.accountSnapshot);
 
 }
 
 
 
-// Flask Fintech Account Snapshot (/api/v1/fintech/sandbox/account_snapshot)
+export async function exchangeOAuthCode(
 
-export async function fetchAccountSnapshot(): Promise<Record<string, unknown>> {
+  code: string,
 
-  return apiCall<Record<string, unknown>>("/api/v1/fintech/sandbox/account_snapshot");
+  state: string,
+
+): Promise<{ sessionToken: string; user: any }> {
+
+  const params = new URLSearchParams({ code, state });
+
+  const result = await apiCall<{ app_session_id: string; user: any }>(
+
+    `/api/oauth/mobile?${params.toString()}`,
+
+  );
+
+  return { sessionToken: result.app_session_id, user: result.user };
+
+}
+
+
+
+export async function establishSession(token: string): Promise<boolean> {
+
+  await Auth.setSessionToken(token);
+
+  return true;
+
+}
+
+
+
+
+
+export interface FintechBeneficiary {
+
+  id: number;
+
+  beneficiaryName: string;
+
+  accountNumber: string;
+
+  bankName: string;
+
+  isFrequent?: boolean;
+
+}
+
+
+
+export interface FintechPreferences {
+
+  theme: "light" | "dark" | "auto";
+
+  language: string;
+
+  notificationsEnabled: boolean;
+
+  biometricEnabled: boolean;
+
+  twoFactorEnabled: boolean;
+
+}
+
+
+
+export async function fetchTransactionById(id: number): Promise<FintechTransaction> {
+
+  const res = await apiCall<{ transaction: FintechTransaction }>(
+
+    `${PLATFORM_CONFIG.endpoints.banking.transactions}/${id}`,
+
+  );
+
+  return res.transaction;
+
+}
+
+
+
+export async function fetchBeneficiaries(): Promise<FintechBeneficiary[]> {
+
+  const res = await apiCall<{ beneficiaries?: FintechBeneficiary[] }>(
+
+    "/api/v1/fintech/beneficiaries",
+
+  );
+
+  return res.beneficiaries ?? [];
+
+}
+
+
+
+export async function createBeneficiary(payload: {
+
+  beneficiaryName: string;
+
+  accountNumber: string;
+
+  bankName: string;
+
+}): Promise<FintechBeneficiary> {
+
+  const res = await apiCall<{ beneficiary: FintechBeneficiary }>(
+
+    "/api/v1/fintech/beneficiaries",
+
+    {
+
+      method: "POST",
+
+      body: JSON.stringify(payload),
+
+    },
+
+  );
+
+  return res.beneficiary;
+
+}
+
+
+
+export async function deleteBeneficiary(id: number): Promise<void> {
+
+  await apiCall(`/api/v1/fintech/beneficiaries/${id}`, { method: "DELETE" });
+
+}
+
+
+
+export async function fetchPreferences(): Promise<FintechPreferences> {
+
+  const res = await apiCall<{ preferences: FintechPreferences }>(
+
+    "/api/v1/fintech/preferences",
+
+  );
+
+  return res.preferences;
 
 }
 

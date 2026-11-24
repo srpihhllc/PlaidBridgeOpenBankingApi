@@ -14,7 +14,7 @@ import { useState } from "react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { trpc } from "@/lib/trpc";
+import { useCreateBeneficiary } from "@/hooks/use-fintech-api";
 
 export default function AddBeneficiaryScreen() {
   const insets = useSafeAreaInsets();
@@ -26,7 +26,7 @@ export default function AddBeneficiaryScreen() {
   const [accountNumber, setAccountNumber] = useState("");
   const [bankName, setBankName] = useState("");
 
-  const createMutation = trpc.beneficiaries.create.useMutation({
+  const createMutation = useCreateBeneficiary({
     onSuccess: () => {
       Alert.alert("Success", "Beneficiary added successfully");
       router.back();

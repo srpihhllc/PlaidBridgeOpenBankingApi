@@ -1,3 +1,4 @@
+import json
 # =============================================================================
 # FILE: /home/srpihhllc/PlaidBridgeOpenBankingApi/app/blueprints/
 #       fintech_routes.py
@@ -20,6 +21,14 @@ from app.api.validation import validate_json_schema
 from app.extensions import csrf, db
 from app.models import Transaction
 from app.models.bank_account import BankAccount
+from app.models.bank_transaction import BankTransaction
+from app.models.borrower_card import BorrowerCard
+from app.models.customer_wallet import CustomerWallet
+from app.models.vault_transaction import VaultTransaction
+from app.services.mock_shield_service import (
+    MockShieldService,
+    ShieldSecurityError,
+)
 from app.models.lender import Lender
 from app.models.mfa_code import MFACode
 from app.models.plaid_item import PlaidItem
@@ -32,11 +41,9 @@ from app.utils.telemetry import increment_counter
 logger = logging.getLogger(__name__)
 _logger = logger
 
-
 # --------------------------------------------------------------------------
 # Rate Limiting
 # --------------------------------------------------------------------------
-
 
 def _rate_limit(limit_str: str):
     """
@@ -71,29 +78,24 @@ def _rate_limit(limit_str: str):
 
     return decorator
 
-
 # -----------------------------------------------------------------------------
 # Blueprint definition
 # -----------------------------------------------------------------------------
 fintech_bp = Blueprint("fintech_bp", __name__, url_prefix="/api/v1/fintech")
 csrf.exempt(fintech_bp)
 
-
 # -----------------------------------------------------------------------------
 # Error handlers
 # -----------------------------------------------------------------------------
-
 
 @fintech_bp.errorhandler(BadRequest)
 def handle_bad_request(e):
     """Override default 400 for invalid/missing JSON with 422."""
     return jsonify({"error": "Request must be JSON"}), 422
 
-
 # -----------------------------------------------------------------------------
 # Utility helpers
 # -----------------------------------------------------------------------------
-
 
 def _parse_json(
     required_fields: dict[str, str] | None = None,
@@ -119,7 +121,6 @@ def _parse_json(
 
     return payload
 
-
 def _json():
     """Simpler JSON helper for lender/link flows."""
     data = request.get_json(silent=True)
@@ -127,11 +128,9 @@ def _json():
         raise BadRequest("Invalid JSON payload.")
     return data
 
-
 def _envelope_success(data: dict[str, Any]) -> tuple:
     """Wrap response data in success envelope."""
     return jsonify({"status": "success", "data": data}), 200
-
 
 def _envelope_error(
     message: str, vendor: str | None = None, code: int | None = None
@@ -153,7 +152,6 @@ def _envelope_error(
         code or (400 if vendor else 422),
     )
 
-
 def _assert_lender_verified(lender: Lender):
     """Verify lender is authenticated and verified before allowing access."""
     if not lender or not lender.is_verified:
@@ -161,7 +159,6 @@ def _assert_lender_verified(lender: Lender):
         raise Forbidden(
             "Lender must be verified and linked before requesting access."
         )
-
 
 def _emit_event(
     user_id: int, event_type: str, detail: str, origin: str = "api"
@@ -177,11 +174,9 @@ def _emit_event(
         )
     )
 
-
 # =============================================================================
 # 1. FINTECH VERIFICATION ROUTES
 # =============================================================================
-
 
 @fintech_bp.route("/health", methods=["GET"])
 def health():
@@ -194,7 +189,6 @@ def health():
         if "/fintech" in r.rule
     )
     return jsonify({"status": "ok", "routes": routes}), 200
-
 
 @fintech_bp.route("/verify/truelayer", methods=["POST"])
 @csrf.exempt
@@ -214,7 +208,6 @@ def verify_truelayer():
         result if isinstance(result, dict) else {"result": result}
     )
 
-
 @fintech_bp.route("/verify/tink", methods=["POST"])
 @csrf.exempt
 def verify_tink():
@@ -233,11 +226,9 @@ def verify_tink():
         result if isinstance(result, dict) else {"result": result}
     )
 
-
 # =============================================================================
 # 2. LENDER SELF-LINKING (TRUST GATE) + MANUAL LINK FLOWS
 # =============================================================================
-
 
 @fintech_bp.route("/lenders/link", methods=["POST"])
 @jwt_required()
@@ -361,7 +352,6 @@ def lender_self_link():
             500,
         )
 
-
 @fintech_bp.route("/link/manual/request", methods=["POST"])
 @jwt_required()
 @_rate_limit("60/hour")
@@ -420,7 +410,6 @@ def request_manual_link():
             ),
             500,
         )
-
 
 @fintech_bp.route("/link/manual/approve", methods=["POST"])
 @jwt_required()
@@ -487,7 +476,6 @@ def approve_manual_link():
             ),
             500,
         )
-
 
 @fintech_bp.route("/link/manual/redeem", methods=["POST"])
 @jwt_required()
@@ -563,11 +551,9 @@ def redeem_manual_link():
             500,
         )
 
-
 # =============================================================================
 # 2B. LENDER SANDBOX MOCK DATA ENDPOINTS
 # =============================================================================
-
 
 @fintech_bp.route("/sandbox/account_snapshot", methods=["GET"])
 @jwt_required()
@@ -597,7 +583,6 @@ def sandbox_account_snapshot():
         ),
         200,
     )
-
 
 @fintech_bp.route("/sandbox/statement/pdf", methods=["GET"])
 @jwt_required()
@@ -629,7 +614,6 @@ def sandbox_statement_pdf():
         200,
     )
 
-
 # =============================================================================
 # 3. TRANSACTION ROUTES
 # =============================================================================
@@ -648,7 +632,6 @@ TRANSACTION_CREATE_SCHEMA = {
     "required": ["amount", "date", "name"],
     "additionalProperties": False,
 }
-
 
 # NOTE: no jwt_required decorator on this function — we verify inside to
 # control behavior deterministically for TESTING vs production.
@@ -813,27 +796,16 @@ def create_transaction():
             "Internal Server Error during transaction creation.", code=500
         )
 
-
-
-
 # =============================================================================
 
 # 4. ZERO-TRUST MOCK SHIELD ENDPOINTS (KYC, PROXY, AI AUDIT, ESCROW, DEFAULT)
 
 # =============================================================================
 
-from app.services.mock_shield_service import MockShieldService, ShieldSecurityError
-
-
-
-
 
 @fintech_bp.route("/shield/kyc/verify", methods=["POST"])
-
 @jwt_required()
-
 @csrf.exempt
-
 def shield_verify_lender_kyc():
 
     data = _json()
@@ -858,16 +830,9 @@ def shield_verify_lender_kyc():
 
         return _envelope_error(exc.message, code=exc.status_code)
 
-
-
-
-
 @fintech_bp.route("/shield/proxy/snapshot", methods=["POST"])
-
 @jwt_required()
-
 @csrf.exempt
-
 def shield_scoped_proxy_snapshot():
 
     data = _json()
@@ -890,16 +855,9 @@ def shield_scoped_proxy_snapshot():
 
         return _envelope_error(exc.message, code=exc.status_code)
 
-
-
-
-
 @fintech_bp.route("/shield/agreement/audit", methods=["POST"])
-
 @jwt_required()
-
 @csrf.exempt
-
 def shield_audit_loan_agreement():
 
     data = _json()
@@ -928,16 +886,9 @@ def shield_audit_loan_agreement():
 
         return _envelope_error(exc.message, code=exc.status_code)
 
-
-
-
-
 @fintech_bp.route("/shield/disclosure/sign", methods=["POST"])
-
 @jwt_required()
-
 @csrf.exempt
-
 def shield_sign_disclosure():
 
     data = _json()
@@ -962,16 +913,9 @@ def shield_sign_disclosure():
 
         return _envelope_error(exc.message, code=exc.status_code)
 
-
-
-
-
 @fintech_bp.route("/shield/escrow/disburse", methods=["POST"])
-
 @jwt_required()
-
 @csrf.exempt
-
 def shield_disburse_escrow():
 
     data = _json()
@@ -994,3 +938,399 @@ def shield_disburse_escrow():
 
         return _envelope_error(exc.message, code=exc.status_code)
 
+# =============================================================================
+
+# 5. MOBILE APP UNIFIED BANKING ENDPOINTS (ACCOUNTS, CARDS, TXNS, TRANSFERS)
+
+# =============================================================================
+
+
+
+
+
+
+
+@fintech_bp.route("/accounts", methods=["GET"])
+@jwt_required()
+def mobile_list_accounts():
+
+    uid = str(get_jwt_identity())
+
+    accts = BankAccount.query.filter_by(user_id=uid).all()
+
+    items = []
+
+    for a in accts:
+
+        items.append({
+
+            "id": a.id,
+
+            "accountName": a.account_name or a.institution_name or "Primary Checking",
+
+            "accountType": (a.account_type or "checking").lower(),
+
+            "accountNumber": a.account_number or f"0000{a.id:04d}",
+
+            "balance": f"{float(a.balance or 0):.2f}",
+
+            "currency": "USD",
+
+            "status": "frozen" if getattr(a, "trace_status", "") == "frozen_default" else "active",
+
+        })
+
+    if not items:
+
+        wallet = CustomerWallet.query.filter_by(user_id=uid).first()
+
+        bal = float(wallet.balance) if wallet and wallet.balance is not None else 0.0
+
+        items.append({
+
+            "id": wallet.id if wallet else 1,
+
+            "accountName": "Shield Escrow Wallet",
+
+            "accountType": "checking",
+
+            "accountNumber": f"SHLD{uid[:6].upper()}",
+
+            "balance": f"{bal:.2f}",
+
+            "currency": "USD",
+
+            "status": "frozen" if (wallet and wallet.is_frozen) else "active",
+
+        })
+
+    return jsonify({"status": "success", "accounts": items}), 200
+
+@fintech_bp.route("/cards", methods=["GET"])
+@jwt_required()
+def mobile_list_cards():
+
+    uid = str(get_jwt_identity())
+
+    user = db.session.get(User, uid)
+
+    holder = (getattr(user, "username", None) or "CARDHOLDER").upper()
+
+    cards = BorrowerCard.query.filter_by(user_id=uid).all()
+
+    items = [
+
+        {
+
+            "id": c.id,
+
+            "cardBrand": "VISA",
+
+            "cardNumber": c.card_number,
+
+            "holderName": holder,
+
+            "expiryDate": c.expiration_date,
+
+            "status": "blocked" if c.revoked else "active",
+
+        }
+
+        for c in cards
+
+    ]
+
+    return jsonify({"status": "success", "cards": items}), 200
+
+@fintech_bp.route("/transactions", methods=["GET"])
+@jwt_required()
+def mobile_list_transactions():
+
+    uid = str(get_jwt_identity())
+
+    limit = min(int(request.args.get("limit", 50)), 200)
+
+    txns = (
+
+        BankTransaction.query.filter_by(user_id=uid)
+
+        .order_by(BankTransaction.id.desc())
+
+        .limit(limit)
+
+        .all()
+
+    )
+
+    items = []
+
+    for t in txns:
+
+        amt = float(t.amount or 0)
+
+        items.append({
+
+            "id": t.id,
+
+            "transactionType": "deposit" if amt > 0 else "payment",
+
+            "amount": f"{abs(amt):.2f}",
+
+            "recipientName": t.merchant_name or t.description or "Merchant",
+
+            "description": t.description or t.merchant_name or "",
+
+            "status": "completed",
+
+            "createdAt": t.date.isoformat() if getattr(t, "date", None) else datetime.now(timezone.utc).isoformat(),
+
+        })
+
+    return jsonify({"status": "success", "transactions": items}), 200
+
+@fintech_bp.route("/transfers", methods=["POST"])
+@jwt_required()
+@csrf.exempt
+def mobile_create_transfer():
+
+    uid = str(get_jwt_identity())
+
+    data = _json()
+
+    try:
+
+        amt = float(data.get("amount", 0))
+
+    except (TypeError, ValueError):
+
+        return _envelope_error("Invalid transfer amount.", code=400)
+
+    if amt <= 0:
+
+        return _envelope_error("Transfer amount must be positive.", code=400)
+
+    vtx = VaultTransaction(
+
+        user_id=uid,
+
+        amount=amt,
+
+        transaction_type="transfer",
+
+        status="completed",
+
+        description=f"Transfer to {data.get('recipientName', 'Recipient')}: {data.get('description', '')}",
+
+    )
+
+    db.session.add(vtx)
+
+    db.session.commit()
+
+    return jsonify({
+
+        "status": "success",
+
+        "transaction": {
+
+            "id": vtx.id,
+
+            "transactionType": "transfer",
+
+            "amount": f"{amt:.2f}",
+
+            "recipientName": data.get("recipientName", "Recipient"),
+
+            "description": data.get("description", ""),
+
+            "status": "completed",
+
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+
+        },
+
+    }), 201
+
+@fintech_bp.route("/transactions/<int:txn_id>", methods=["GET"])
+@jwt_required()
+def mobile_get_transaction(txn_id: int):
+
+    uid = str(get_jwt_identity())
+
+    t = BankTransaction.query.filter_by(id=txn_id, user_id=uid).first()
+
+    if not t:
+
+        return _envelope_error("Transaction not found.", code=404)
+
+    amt = float(t.amount or 0)
+
+    return jsonify({
+
+        "status": "success",
+
+        "transaction": {
+
+            "id": t.id,
+
+            "transactionType": "deposit" if amt > 0 else "payment",
+
+            "amount": f"{abs(amt):.2f}",
+
+            "recipientName": t.merchant_name or t.description or "Merchant",
+
+            "description": t.description or t.merchant_name or "",
+
+            "status": "completed",
+
+            "createdAt": t.date.isoformat() if getattr(t, "date", None) else datetime.now(timezone.utc).isoformat(),
+
+        },
+
+    }), 200
+
+@fintech_bp.route("/beneficiaries", methods=["GET", "POST"])
+@jwt_required()
+@csrf.exempt
+def mobile_beneficiaries():
+
+    from app.models.registry import Registry
+
+    uid = str(get_jwt_identity())
+
+    if request.method == "POST":
+
+        data = _json()
+
+        name = str(data.get("beneficiaryName") or "").strip()
+
+        acct = str(data.get("accountNumber") or "").strip()
+
+        bank = str(data.get("bankName") or "").strip()
+
+        if not name or not acct or not bank:
+
+            return _envelope_error("beneficiaryName, accountNumber, and bankName are required.", code=400)
+
+        entry = Registry(
+
+            user_id=uid,
+
+            name=f"beneficiary:{name}",
+
+            config_blob=json.dumps({
+
+                "beneficiaryName": name,
+
+                "accountNumber": acct,
+
+                "bankName": bank,
+
+                "isFrequent": False,
+
+            }),
+
+        )
+
+        db.session.add(entry)
+
+        db.session.commit()
+
+        return jsonify({
+
+            "status": "success",
+
+            "beneficiary": {
+
+                "id": entry.id,
+
+                "beneficiaryName": name,
+
+                "accountNumber": acct,
+
+                "bankName": bank,
+
+                "isFrequent": False,
+
+            },
+
+        }), 201
+
+    rows = Registry.query.filter(
+
+        Registry.user_id == uid,
+
+        Registry.name.like("beneficiary:%"),
+
+    ).all()
+
+    items = []
+
+    for r in rows:
+
+        cfg = json.loads(r.config_blob) if isinstance(r.config_blob, str) else (r.config_blob or {})
+
+        items.append({
+
+            "id": r.id,
+
+            "beneficiaryName": cfg.get("beneficiaryName", r.name.replace("beneficiary:", "")),
+
+            "accountNumber": cfg.get("accountNumber", "0000"),
+
+            "bankName": cfg.get("bankName", "External Bank"),
+
+            "isFrequent": bool(cfg.get("isFrequent", False)),
+
+        })
+
+    return jsonify({"status": "success", "beneficiaries": items}), 200
+
+@fintech_bp.route("/beneficiaries/<int:ben_id>", methods=["DELETE"])
+@jwt_required()
+@csrf.exempt
+def mobile_delete_beneficiary(ben_id: int):
+
+    from app.models.registry import Registry
+
+    uid = str(get_jwt_identity())
+
+    entry = Registry.query.filter_by(id=ben_id, user_id=uid).first()
+
+    if not entry:
+
+        return _envelope_error("Beneficiary not found.", code=404)
+
+    db.session.delete(entry)
+
+    db.session.commit()
+
+    return jsonify({"status": "success", "deleted": ben_id}), 200
+
+@fintech_bp.route("/preferences", methods=["GET"])
+@jwt_required()
+def mobile_get_preferences():
+
+    uid = str(get_jwt_identity())
+
+    user = db.session.get(User, uid)
+
+    return jsonify({
+
+        "status": "success",
+
+        "preferences": {
+
+            "theme": "dark",
+
+            "language": "en",
+
+            "notificationsEnabled": True,
+
+            "biometricEnabled": True,
+
+            "twoFactorEnabled": bool(getattr(user, "mfa_enabled", False)),
+
+        },
+
+    }), 200

@@ -18,7 +18,7 @@ import { TransactionItem } from "@/components/transaction-item";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/hooks/use-auth";
 import { useTransactionFilter } from "@/hooks/use-transaction-filter";
-import { trpc } from "@/lib/trpc";
+import { useTransactions } from "@/hooks/use-fintech-api";
 
 export default function TransactionsScreen() {
   const insets = useSafeAreaInsets();
@@ -31,10 +31,7 @@ export default function TransactionsScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch transactions
-  const { data: transactions = [], isLoading, refetch } = trpc.transactions.list.useQuery(
-    { limit: 100, offset: 0 },
-    { enabled: isAuthenticated }
-  );
+  const { data: transactions = [], isLoading, refetch } = useTransactions(100, isAuthenticated);
 
   // Use filter hook
   const {

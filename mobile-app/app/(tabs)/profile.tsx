@@ -5,17 +5,14 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
+import { usePreferences } from "@/hooks/use-fintech-api";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
 
-  const { data: preferences } = trpc.preferences.get.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: preferences } = usePreferences(isAuthenticated);
 
   const textColor = useThemeColor({}, "text");
   const cardBgColor = useThemeColor({}, "cardBackground");

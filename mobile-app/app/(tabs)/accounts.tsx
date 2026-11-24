@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
+import { useAccounts } from "@/hooks/use-fintech-api";
 import { useState } from "react";
 
 export default function AccountsScreen() {
@@ -12,10 +12,7 @@ export default function AccountsScreen() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
 
-  const { data: accounts = [], isLoading, error } = trpc.accounts.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: accounts = [], isLoading, error } = useAccounts(isAuthenticated);
 
   const textColor = useThemeColor({}, "text");
   const cardBgColor = useThemeColor({}, "cardBackground");

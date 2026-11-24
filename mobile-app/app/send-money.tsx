@@ -8,7 +8,7 @@ import { BiometricConfirmation } from "@/components/biometric-confirmation";
 import { BeneficiarySelector, type BeneficiaryOption } from "@/components/beneficiary-selector";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
+import { useAccounts, useCreateTransfer } from "@/hooks/use-fintech-api";
 
 export default function SendMoneyScreen() {
   const insets = useSafeAreaInsets();
@@ -22,20 +22,15 @@ export default function SendMoneyScreen() {
   const [step, setStep] = useState<"form" | "review">("form");
   const [showBeneficiarySelector, setShowBeneficiarySelector] = useState(false);
 
-  const { data: accounts = [] } = trpc.accounts.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: accounts = [] } = useAccounts(isAuthenticated);
 
   const [selectedAccountId, setSelectedAccountId] = useState<number | null>(
     accounts.length > 0 ? accounts[0].id : null
   );
   const [showBiometricConfirm, setShowBiometricConfirm] = useState(false);
 
-  const createTransactionMutation = trpc.transactions.create.useMutation({
-    onSuccess: () => {
-      router.back();
-    },
+  const createTransactionMutation = useCreateTransfer(() => {
+    router.back();
   });
 
   const textColor = useThemeColor({}, "text");

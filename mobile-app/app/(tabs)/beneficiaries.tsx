@@ -14,7 +14,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
+import { useBeneficiaries, useDeleteBeneficiary } from "@/hooks/use-fintech-api";
 
 export default function BeneficiariesScreen() {
   const insets = useSafeAreaInsets();
@@ -26,13 +26,9 @@ export default function BeneficiariesScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   // Fetch beneficiaries
-  const { data: beneficiaries = [], isLoading, refetch } = trpc.beneficiaries.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: beneficiaries = [], isLoading, refetch } = useBeneficiaries(isAuthenticated);
 
-  // Delete beneficiary mutation
-  const deleteMutation = trpc.beneficiaries.delete.useMutation({
+  const deleteMutation = useDeleteBeneficiary({
     onSuccess: () => {
       refetch();
     },

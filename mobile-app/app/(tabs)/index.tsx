@@ -14,22 +14,15 @@ import { BiometricLoginButton } from "@/components/biometric-login-button";
 import { getLoginUrl } from "@/constants/oauth";
 import { useAuth } from "@/hooks/use-auth";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { trpc } from "@/lib/trpc";
+import { useAccounts, useTransactions } from "@/hooks/use-fintech-api";
 
 export default function HomeScreen() {
   const { user, loading, isAuthenticated, logout } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const router = useRouter();
 
-  const { data: accounts = [] } = trpc.accounts.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
-
-  const { data: transactions = [] } = trpc.transactions.list.useQuery(
-    { limit: 5, offset: 0 },
-    { enabled: isAuthenticated }
-  );
+  const { data: accounts = [] } = useAccounts(isAuthenticated);
+  const { data: transactions = [] } = useTransactions(5, isAuthenticated);
 
   const textColor = useThemeColor({}, "text");
   const cardBgColor = useThemeColor({}, "cardBackground");

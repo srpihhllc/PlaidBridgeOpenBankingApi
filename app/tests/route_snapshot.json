@@ -1135,6 +1135,35 @@
     "endpoint": "api_v1.create_transaction"
   },
   {
+    "rule": "/api/v1/fintech/accounts",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_bp.mobile_list_accounts"
+  },
+  {
+    "rule": "/api/v1/fintech/beneficiaries",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "endpoint": "fintech_bp.mobile_beneficiaries"
+  },
+  {
+    "rule": "/api/v1/fintech/beneficiaries/<int:ben_id>",
+    "methods": [
+      "DELETE"
+    ],
+    "endpoint": "fintech_bp.mobile_delete_beneficiary"
+  },
+  {
+    "rule": "/api/v1/fintech/cards",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_bp.mobile_list_cards"
+  },
+  {
     "rule": "/api/v1/fintech/health",
     "methods": [
       "GET"
@@ -1168,6 +1197,13 @@
       "POST"
     ],
     "endpoint": "fintech_bp.request_manual_link"
+  },
+  {
+    "rule": "/api/v1/fintech/preferences",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_bp.mobile_get_preferences"
   },
   {
     "rule": "/api/v1/fintech/sandbox/account_snapshot",
@@ -1224,6 +1260,27 @@
       "POST"
     ],
     "endpoint": "fintech_bp.create_transaction"
+  },
+  {
+    "rule": "/api/v1/fintech/transactions",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_bp.mobile_list_transactions"
+  },
+  {
+    "rule": "/api/v1/fintech/transactions/<int:txn_id>",
+    "methods": [
+      "GET"
+    ],
+    "endpoint": "fintech_bp.mobile_get_transaction"
+  },
+  {
+    "rule": "/api/v1/fintech/transfers",
+    "methods": [
+      "POST"
+    ],
+    "endpoint": "fintech_bp.mobile_create_transfer"
   },
   {
     "rule": "/api/v1/fintech/verify/tink",

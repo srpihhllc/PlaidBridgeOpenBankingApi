@@ -4,16 +4,13 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useAuth } from "@/hooks/use-auth";
-import { trpc } from "@/lib/trpc";
+import { useCards } from "@/hooks/use-fintech-api";
 
 export default function CardsScreen() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, loading: authLoading } = useAuth();
 
-  const { data: cards = [], isLoading, error } = trpc.cards.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const { data: cards = [], isLoading, error } = useCards(isAuthenticated);
 
   const textColor = useThemeColor({}, "text");
   const cardBgColor = useThemeColor({}, "cardBackground");

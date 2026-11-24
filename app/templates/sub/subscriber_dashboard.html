@@ -1,436 +1,1328 @@
 {% extends "sub/base_sub.html" %}
 
+
+
 {% block title %}
-  Dashboard | {{ current_user.username }} — PlaidBridgeOpenBankingApi
+
+  Command Cockpit | {{ current_user.username }} — PlaidBridge Shield
+
 {% endblock %}
 
+
+
+{% block styles %}
+
+{{ super() }}
+
+<style>
+
+  .shield-shell {
+
+    background: #0b1120;
+
+    min-height: calc(100vh - 90px);
+
+  }
+
+  .cockpit-hero {
+
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+
+    border: 1px solid #334155;
+
+    border-radius: 12px;
+
+    padding: 1.5rem;
+
+  }
+
+  .shield-tile {
+
+    background: #1e293b;
+
+    border: 1px solid #334155;
+
+    border-radius: 10px;
+
+    padding: 1.25rem;
+
+    height: 100%;
+
+    transition: border-color 0.2s ease;
+
+  }
+
+  .shield-tile:hover {
+
+    border-color: #38bdf8;
+
+  }
+
+  .shield-metric {
+
+    font-size: 1.75rem;
+
+    font-weight: 700;
+
+    color: #f8fafc;
+
+    letter-spacing: -0.02em;
+
+  }
+
+  .shield-eyebrow {
+
+    font-size: 0.72rem;
+
+    font-weight: 700;
+
+    letter-spacing: 0.12em;
+
+    text-transform: uppercase;
+
+    color: #38bdf8;
+
+  }
+
+  .shield-badge-live {
+
+    background: rgba(16, 185, 129, 0.15);
+
+    color: #34d399;
+
+    border: 1px solid rgba(52, 211, 153, 0.35);
+
+  }
+
+  .shield-badge-warn {
+
+    background: rgba(245, 158, 11, 0.15);
+
+    color: #fbbf24;
+
+    border: 1px solid rgba(251, 191, 36, 0.35);
+
+  }
+
+  .table-shield {
+
+    --bs-table-bg: #1e293b;
+
+    --bs-table-border-color: #334155;
+
+    color: #e2e8f0;
+
+  }
+
+  .form-control-shield, .form-select-shield {
+
+    background-color: #0f172a;
+
+    border: 1px solid #334155;
+
+    color: #f8fafc;
+
+  }
+
+  .form-control-shield:focus, .form-select-shield:focus {
+
+    background-color: #0f172a;
+
+    border-color: #38bdf8;
+
+    color: #f8fafc;
+
+    box-shadow: 0 0 0 0.2rem rgba(56, 189, 248, 0.2);
+
+  }
+
+</style>
+
+{% endblock styles %}
+
+
+
 {% block content %}
+
 {% set urls = service_urls|default({}) %}
 
-<main class="subscriber-dashboard">
-  <header class="dashboard-header">
-    <div>
-      <p class="eyebrow">Cockpit</p>
-      <h1>Dashboard</h1>
-      <p>Welcome back, {{ current_user.username|e }}.</p>
-      <p>Finances, tasks, services, and identity in one place.</p>
-    </div>
 
-    <button type="button" id="theme-toggle" class="button button-secondary">
-      Toggle theme
-    </button>
-  </header>
 
-  <nav class="dashboard-nav" aria-label="Dashboard sections">
-    <a href="#financial-overview">Financial Overview</a>
-    <a href="#tasks">Tasks &amp; Productivity</a>
-    <a href="#services">Services &amp; Tools</a>
-    <a href="#identity">Identity &amp; Profile</a>
-    <a href="{{ urls.logout|default('/logout') }}">Logout</a>
-  </nav>
+<div class="row g-0 shield-shell rounded-3 overflow-hidden border border-secondary">
 
-  {% if is_operator|default(false) %}
-    <aside class="notice" role="status">Operator mode active.</aside>
-  {% endif %}
+  <aside class="col-md-3 col-lg-2">
 
-  {# Optional system tiles; remove these includes if the tiles are admin-only. #}
-  {% include "components/ttl_pulse.html" ignore missing %}
-  {% include "partials/_blueprint_audit_tile.html" ignore missing %}
-  {% include "partials/_redis_health_tile.html" ignore missing %}
+    {% include "sub/_sub_sidebar.html" ignore missing %}
 
-  <section id="financial-overview" class="dashboard-section">
-    <h2>Financial Overview</h2>
+  </aside>
 
-    <div class="card-grid">
-      <article class="dashboard-card">
-        <h3>Total balance</h3>
-        <p class="metric">
-          ${{ "%.2f"|format(current_user.total_balance|default(0, true)) }}
+
+
+  <div class="col-md-9 col-lg-10 p-3 p-lg-4 subscriber-dashboard">
+
+    <header class="cockpit-hero mb-4 d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+
+      <div>
+
+        <div class="d-flex align-items-center gap-2 mb-1">
+
+          <span class="shield-eyebrow">PlaidBridge Zero-Trust Cockpit</span>
+
+          <span class="badge shield-badge-live">ANTI-SWEEP GUARD ACTIVE</span>
+
+          {% if is_operator|default(false) %}
+
+            <span class="badge bg-warning text-dark">Operator Mode</span>
+
+          {% endif %}
+
+        </div>
+
+        <h1 class="h3 mb-1 text-white fw-bold">Welcome back, {{ current_user.username|e }}</h1>
+
+        <p class="text-secondary small mb-0">
+
+          Escrow-protected liquidity, scoped lender proxy consents, watermarked BaaS statements, and real-time ledger telemetry.
+
         </p>
-      </article>
 
-      <article class="dashboard-card">
-        <h3>Accounts linked</h3>
-        <p class="metric">{{ current_user.num_accounts|default(0, true) }}</p>
-      </article>
+      </div>
 
-      <article class="dashboard-card">
-        <h3>Statements</h3>
-        <p class="metric">{{ current_user.num_statements|default(0, true) }}</p>
-      </article>
 
-      <article class="dashboard-card">
-        <h3>Fraud summary</h3>
-        {% if fraud_summary %}
-          <p>{{ fraud_summary.flagged_count|default(0) }} flagged</p>
-          <p>Risk score: {{ fraud_summary.risk_score|default("—") }}</p>
-          <a href="{{ urls.fraud_drilldown|default('/subscriber/fraud') }}">
-            View fraud details
-          </a>
-        {% else %}
-          <p>No fraud analytics available yet.</p>
-        {% endif %}
-      </article>
-    </div>
 
-    <article class="dashboard-card">
-      <h3>Recent transactions</h3>
+      <div class="d-flex flex-wrap gap-2">
 
-      {% if transactions %}
-        <div class="table-scroll">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col">Account</th>
-                <th scope="col">Description</th>
-                <th scope="col">Category</th>
-                <th scope="col">Amount</th>
-                <th scope="col">Status</th>
-                <th scope="col">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for txn in transactions %}
-                <tr>
-                  <td>{{ txn.date[:10] if txn.date else "—" }}</td>
-                  <td>{{ txn.account|default("—", true)|e }}</td>
-                  <td>{{ txn.description|default("—", true)|e }}</td>
-                  <td>{{ txn.category|default("—", true)|e }}</td>
-                  <td>${{ "%.2f"|format(txn.amount|default(0, true)) }}</td>
-                  <td>{{ txn.verification_status|default("Unreviewed", true)|e }}</td>
-                  <td>
-                    <button
-                      type="button"
-                      class="button button-small dispute-button"
-                      data-transaction-id="{{ txn.id|default('')|e }}"
-                      data-description="{{ txn.description|default('', true)|e }}"
-                    >
-                      Dispute
-                    </button>
-                  </td>
+        <a href="#financial-overview" class="btn btn-sm btn-outline-info">Ledger</a>
+
+        <a href="#shield-vault" class="btn btn-sm btn-outline-warning">Mock Shield</a>
+
+        <a href="#services" class="btn btn-sm btn-outline-light">Tools</a>
+
+        <a href="#identity" class="btn btn-sm btn-outline-secondary">Identity</a>
+
+        <a href="{{ urls.logout|default('/logout') }}" class="btn btn-sm btn-outline-danger">Logout</a>
+
+      </div>
+
+    </header>
+
+
+
+    {% if is_operator|default(false) %}
+
+      <div class="mb-3">
+
+        {% include "components/ttl_pulse.html" ignore missing %}
+
+        {% include "partials/_blueprint_audit_tile.html" ignore missing %}
+
+        {% include "partials/_redis_health_tile.html" ignore missing %}
+
+      </div>
+
+    {% endif %}
+
+
+
+    <section id="financial-overview" class="mb-4">
+
+      <div class="row g-3 mb-4">
+
+        <div class="col-sm-6 col-xl-3">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">Total Liquidity</div>
+
+            <div class="shield-metric">${{ "%.2f"|format(current_user.total_balance|default(0, true)) }}</div>
+
+            <div class="small text-secondary mt-1">Escrow-shielded balance</div>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-sm-6 col-xl-3">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">Linked Institutions</div>
+
+            <div class="shield-metric">{{ current_user.num_accounts|default(0, true) }}</div>
+
+            <div class="small text-secondary mt-1">Plaid / Manual verified links</div>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-sm-6 col-xl-3">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">BaaS Statements</div>
+
+            <div class="shield-metric">{{ current_user.num_statements|default(0, true) }}</div>
+
+            <div class="small text-secondary mt-1">Cryptographically watermarked</div>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-sm-6 col-xl-3">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">Fraud &amp; Sweep Risk</div>
+
+            {% if fraud_summary %}
+
+              <div class="shield-metric">{{ fraud_summary.flagged_count|default(0) }} <span class="fs-6 text-warning">flagged</span></div>
+
+              <div class="small text-secondary mt-1">
+
+                Risk score: <strong class="text-light">{{ fraud_summary.risk_score|default("—") }}</strong> ·
+
+                <a href="{{ urls.fraud_drilldown|default('/subscriber/fraud') }}" class="text-info text-decoration-none">Drilldown →</a>
+
+              </div>
+
+            {% else %}
+
+              <div class="shield-metric text-success">0 <span class="fs-6">alerts</span></div>
+
+              <div class="small text-secondary mt-1">Zero unauthorized sweep attempts</div>
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="row g-3 mb-4">
+
+        <div class="col-lg-8">
+
+          <div class="shield-tile">
+
+            <div class="d-flex justify-content-between align-items-center mb-3">
+
+              <div>
+
+                <div class="shield-eyebrow">Cash-Flow Telemetry</div>
+
+                <h2 class="h5 text-white mb-0">Timeline Analytics</h2>
+
+              </div>
+
+              <span class="badge bg-dark border border-secondary text-info">Live Ledger Feed</span>
+
+            </div>
+
+            {% if timeline and timeline.points %}
+
+              <div style="height: 220px;">
+
+                <canvas id="cashflowTimelineChart"></canvas>
+
+              </div>
+
+            {% else %}
+
+              <div class="text-center py-5 text-secondary border border-secondary border-dashed rounded">
+
+                No timeline points recorded yet. Link an account or run a sandbox snapshot to populate telemetry.
+
+              </div>
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-lg-4">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow">Period Rollup</div>
+
+            <h2 class="h5 text-white mb-3">Transaction Summary</h2>
+
+            {% if transaction_summary %}
+
+              <ul class="list-group list-group-flush bg-transparent">
+
+                <li class="list-group-item bg-transparent text-light border-secondary d-flex justify-content-between px-0">
+
+                  <span class="text-secondary">Total Volume</span>
+
+                  <strong>${{ "%.2f"|format(transaction_summary.total_amount|default(0, true)) }}</strong>
+
+                </li>
+
+                <li class="list-group-item bg-transparent text-light border-secondary d-flex justify-content-between px-0">
+
+                  <span class="text-secondary">Verified Inflows</span>
+
+                  <strong class="text-success">+${{ "%.2f"|format(transaction_summary.income|default(0, true)) }}</strong>
+
+                </li>
+
+                <li class="list-group-item bg-transparent text-light border-secondary d-flex justify-content-between px-0">
+
+                  <span class="text-secondary">Authorized Outflows</span>
+
+                  <strong class="text-warning">-${{ "%.2f"|format(transaction_summary.expenses|default(0, true)) }}</strong>
+
+                </li>
+
+                <li class="list-group-item bg-transparent text-light border-0 d-flex justify-content-between px-0 pt-3">
+
+                  <span class="fw-semibold">Net Cash Flow</span>
+
+                  <span class="badge bg-info text-dark fs-6">${{ "%.2f"|format(transaction_summary.net_cash_flow|default(0, true)) }}</span>
+
+                </li>
+
+              </ul>
+
+            {% else %}
+
+              <p class="text-secondary small mb-0">No summary data available for the current window.</p>
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="shield-tile">
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+
+          <div>
+
+            <div class="shield-eyebrow">Audit Trail</div>
+
+            <h2 class="h5 text-white mb-0">Recent Transactions</h2>
+
+          </div>
+
+          <span class="small text-secondary">Click Dispute to file an FCRA bureau challenge</span>
+
+        </div>
+
+
+
+        {% if transactions %}
+
+          <div class="table-responsive">
+
+            <table class="table table-shield table-hover align-middle mb-0">
+
+              <thead>
+
+                <tr class="text-secondary small text-uppercase">
+
+                  <th scope="col">Date</th>
+
+                  <th scope="col">Account</th>
+
+                  <th scope="col">Description</th>
+
+                  <th scope="col">Category</th>
+
+                  <th scope="col">Amount</th>
+
+                  <th scope="col">Status</th>
+
+                  <th scope="col" class="text-end">Action</th>
+
                 </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <p>No recent transactions found.</p>
-      {% endif %}
-    </article>
 
-    <article class="dashboard-card">
-      <h3>Transaction summary</h3>
-      {% if transaction_summary %}
-        <dl class="summary-list">
-          <div><dt>Total volume</dt><dd>${{ "%.2f"|format(transaction_summary.total_amount|default(0, true)) }}</dd></div>
-          <div><dt>Income</dt><dd>${{ "%.2f"|format(transaction_summary.income|default(0, true)) }}</dd></div>
-          <div><dt>Expenses</dt><dd>${{ "%.2f"|format(transaction_summary.expenses|default(0, true)) }}</dd></div>
-          <div><dt>Net cash flow</dt><dd>${{ "%.2f"|format(transaction_summary.net_cash_flow|default(0, true)) }}</dd></div>
-        </dl>
-      {% else %}
-        <p>No summary data available.</p>
-      {% endif %}
-    </article>
+              </thead>
 
-    <article class="dashboard-card">
-      <h3>Timeline analytics</h3>
-      {% if timeline and timeline.points %}
-        <ul>
-          {% for point in timeline.points %}
-            <li>{{ point.date|e }} — ${{ "%.2f"|format(point.amount|default(0, true)) }}</li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p>No timeline data available.</p>
-      {% endif %}
-    </article>
-  </section>
+              <tbody>
 
-  <section id="tasks" class="dashboard-section">
-    <h2>Tasks &amp; Productivity</h2>
+                {% for txn in transactions %}
 
-    <div class="card-grid">
-      <article class="dashboard-card">
-        <h3>Today's tasks</h3>
-        {% if pending_todos %}
-          <ul>
-            {% for task in pending_todos %}
-              <li>{{ task.title|e }} <span class="status-pending">Pending</span></li>
-            {% endfor %}
-          </ul>
+                  <tr>
+
+                    <td class="text-nowrap small">{{ txn.date[:10] if txn.date else "—" }}</td>
+
+                    <td class="small">{{ txn.account|default("—", true)|e }}</td>
+
+                    <td class="fw-medium">{{ txn.description|default("—", true)|e }}</td>
+
+                    <td><span class="badge bg-dark border border-secondary text-light">{{ txn.category|default("General", true)|e }}</span></td>
+
+                    <td class="fw-semibold">${{ "%.2f"|format(txn.amount|default(0, true)) }}</td>
+
+                    <td>
+
+                      {% set vstatus = txn.verification_status|default("Unreviewed", true) %}
+
+                      <span class="badge {% if vstatus == 'Verified' %}shield-badge-live{% else %}shield-badge-warn{% endif %}">
+
+                        {{ vstatus|e }}
+
+                      </span>
+
+                    </td>
+
+                    <td class="text-end">
+
+                      <button
+
+                        type="button"
+
+                        class="btn btn-sm btn-outline-warning dispute-button"
+
+                        data-transaction-id="{{ txn.id|default('')|e }}"
+
+                        data-description="{{ txn.description|default('', true)|e }}"
+
+                      >
+
+                        Dispute
+
+                      </button>
+
+                    </td>
+
+                  </tr>
+
+                {% endfor %}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
         {% else %}
-          <p>No pending tasks.</p>
-        {% endif %}
-        <a href="{{ urls.todos|default('/subscriber/todos') }}">View all tasks</a>
-      </article>
 
-      <article class="dashboard-card">
-        <h3>Completed tasks</h3>
-        {% if completed_todos %}
-          <ul>
-            {% for task in completed_todos %}
-              <li>{{ task.title|e }} <span class="status-complete">Done</span></li>
+          <p class="text-secondary small mb-0">No recent transactions found.</p>
+
+        {% endif %}
+
+      </div>
+
+    </section>
+
+
+
+    <section id="shield-vault" class="mb-4">
+
+      <div class="shield-tile border-info">
+
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+
+          <div>
+
+            <div class="shield-eyebrow">Zero-Trust Lending Firewall</div>
+
+            <h2 class="h5 text-white mb-0">Mock Shield Borrower Controls &amp; Disclosure Signing</h2>
+
+          </div>
+
+          <span class="badge shield-badge-live">RAW CREDENTIALS NEVER SHARED</span>
+
+        </div>
+
+
+
+        <div class="row g-3">
+
+          <div class="col-md-6">
+
+            <div class="p-3 rounded bg-dark border border-secondary h-100">
+
+              <h3 class="h6 text-info">Rules &amp; Regulations E-Signature</h3>
+
+              <p class="small text-secondary">
+
+                Sign an AI-audited loan disclosure to authorize escrow-locked disbursement and monthly payment caps.
+
+              </p>
+
+              <form id="shield-disclosure-form" class="row g-2">
+
+                <div class="col-sm-4">
+
+                  <input type="number" min="1" name="agreement_id" class="form-control form-control-sm form-control-shield" placeholder="Agreement ID" required>
+
+                </div>
+
+                <div class="col-sm-5">
+
+                  <input type="text" name="signature" class="form-control form-control-sm form-control-shield" placeholder="Type full legal name" required>
+
+                </div>
+
+                <div class="col-sm-3 d-grid">
+
+                  <button type="submit" class="btn btn-sm btn-info fw-semibold">Sign</button>
+
+                </div>
+
+              </form>
+
+              <div id="shield-disclosure-result" class="small mt-2 text-info" aria-live="polite"></div>
+
+            </div>
+
+          </div>
+
+
+
+          <div class="col-md-6">
+
+            <div class="p-3 rounded bg-dark border border-secondary h-100">
+
+              <h3 class="h6 text-warning">Watermarked BaaS Statement &amp; Proxy Guard</h3>
+
+              <p class="small text-secondary mb-2">
+
+                Lenders only receive time-bound, cryptographically watermarked financial snapshots—never direct ACH pull credentials.
+
+              </p>
+
+              <div class="d-flex flex-wrap gap-2">
+
+                <a href="{{ urls.contracts|default('/subscriber/contracts') }}" class="btn btn-sm btn-outline-warning">
+
+                  Manage Agreements
+
+                </a>
+
+                <a href="{{ url_for('sub_ui.vault_dashboard') }}" class="btn btn-sm btn-outline-light">
+
+                  Inspect Escrow Vaults
+
+                </a>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <section id="tasks" class="mb-4">
+
+      <div class="row g-3">
+
+        <div class="col-md-6">
+
+          <div class="shield-tile">
+
+            <div class="d-flex justify-content-between align-items-center mb-2">
+
+              <h2 class="h6 text-white mb-0">Today's Compliance &amp; Financial Tasks</h2>
+
+              <a href="{{ urls.todos|default('/subscriber/todos') }}" class="small text-info text-decoration-none">View all →</a>
+
+            </div>
+
+            {% if pending_todos %}
+
+              <ul class="list-group list-group-flush">
+
+                {% for task in pending_todos %}
+
+                  <li class="list-group-item bg-transparent text-light border-secondary d-flex justify-content-between align-items-center px-0">
+
+                    <span>{{ task.title|e }}</span>
+
+                    <span class="badge shield-badge-warn">Pending</span>
+
+                  </li>
+
+                {% endfor %}
+
+              </ul>
+
+            {% else %}
+
+              <p class="text-secondary small mb-0">No pending tasks.</p>
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-md-6">
+
+          <div class="shield-tile">
+
+            <h2 class="h6 text-white mb-2">Completed Tasks</h2>
+
+            {% if completed_todos %}
+
+              <ul class="list-group list-group-flush">
+
+                {% for task in completed_todos %}
+
+                  <li class="list-group-item bg-transparent text-secondary border-secondary d-flex justify-content-between align-items-center px-0">
+
+                    <span>{{ task.title|e }}</span>
+
+                    <span class="badge shield-badge-live">Done</span>
+
+                  </li>
+
+                {% endfor %}
+
+              </ul>
+
+            {% else %}
+
+              <p class="text-secondary small mb-0">No completed tasks yet.</p>
+
+            {% endif %}
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+
+    <section id="services" class="mb-4">
+
+      <div class="row g-3 mb-3">
+
+        <div class="col-md-4">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">PDF Generator</div>
+
+            <h3 class="h6 text-white">Bank Statements</h3>
+
+            <p class="small text-secondary">Generate a watermarked PDF statement from your verified ledger.</p>
+
+            <form method="post" action="{{ urls.generate_statement|default('/subscriber/statements/generate') }}">
+
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+              <div class="mb-2">
+
+                <label for="statement-month" class="form-label small text-secondary">Statement month</label>
+
+                <input id="statement-month" name="month" type="month" class="form-control form-control-sm form-control-shield" required>
+
+              </div>
+
+              <button class="btn btn-sm btn-primary w-100" type="submit">Generate statement</button>
+
+            </form>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-md-4">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">FX Desk</div>
+
+            <h3 class="h6 text-white">Multi-Currency Conversion</h3>
+
+            <form id="currency-form" data-endpoint="{{ urls.currency_convert|default('/api/subscriber/currency/convert') }}">
+
+              <div class="row g-2 mb-2">
+
+                <div class="col-12">
+
+                  <label for="convert-amount" class="form-label small text-secondary mb-1">Amount</label>
+
+                  <input id="convert-amount" name="amount" type="number" min="0" step="0.01" class="form-control form-control-sm form-control-shield" required>
+
+                </div>
+
+                <div class="col-6">
+
+                  <label for="currency-from" class="form-label small text-secondary mb-1">From</label>
+
+                  <input id="currency-from" name="from" type="text" value="USD" maxlength="3" class="form-control form-control-sm form-control-shield" required>
+
+                </div>
+
+                <div class="col-6">
+
+                  <label for="currency-to" class="form-label small text-secondary mb-1">To</label>
+
+                  <input id="currency-to" name="to" type="text" value="EUR" maxlength="3" class="form-control form-control-sm form-control-shield" required>
+
+                </div>
+
+              </div>
+
+              <button class="btn btn-sm btn-outline-info w-100" type="submit">Convert currency</button>
+
+              <p id="currency-result" class="small text-info mt-2 mb-0" aria-live="polite"></p>
+
+            </form>
+
+          </div>
+
+        </div>
+
+
+
+        <div class="col-md-4">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">FinBrain AI</div>
+
+            <h3 class="h6 text-white">Gemini-Powered Insights</h3>
+
+            <form id="insights-form" data-endpoint="{{ urls.transaction_summary_api|default('/api/gemini/transaction-summary') }}" class="mb-2">
+
+              <div class="d-grid gap-2">
+
+                <button class="btn btn-sm btn-info fw-semibold" type="submit">Generate transaction summary</button>
+
+                <button class="btn btn-sm btn-outline-secondary" type="button" id="read-summary">Read summary aloud</button>
+
+              </div>
+
+            </form>
+
+            <p id="insights-result" class="small text-light mb-0" aria-live="polite">
+
+              {{ generated_summary|default("No generated summary yet.", true)|e }}
+
+            </p>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+
+      <div class="shield-tile">
+
+        <div class="shield-eyebrow mb-1">Connected Modules</div>
+
+        <h3 class="h6 text-white mb-3">Available Services</h3>
+
+        {% if service_registry %}
+
+          <div class="row g-2">
+
+            {% for svc in service_registry %}
+
+              <div class="col-md-4">
+
+                <div class="p-2 rounded bg-dark border border-secondary h-100">
+
+                  <div class="d-flex justify-content-between align-items-center">
+
+                    <strong class="text-white small">{{ svc.name|default("Service", true)|e }}</strong>
+
+                    <span class="badge bg-secondary">{{ svc.category|default("System", true)|e }}</span>
+
+                  </div>
+
+                  <p class="small text-secondary mb-1 mt-1">{{ svc.description|default("Integration available in your subscriber workspace.", true)|e }}</p>
+
+                  {% if svc.url %}
+
+                    <a href="{{ svc.url|e }}" class="small text-info text-decoration-none">Open workspace →</a>
+
+                  {% endif %}
+
+                </div>
+
+              </div>
+
             {% endfor %}
-          </ul>
+
+          </div>
+
         {% else %}
-          <p>No completed tasks yet.</p>
+
+          <p class="text-secondary small mb-0">No active integration components are available.</p>
+
         {% endif %}
-      </article>
-    </div>
-  </section>
 
-  <section id="services" class="dashboard-section">
-    <h2>Services &amp; Tools</h2>
+      </div>
 
-    <div class="card-grid">
-      <article class="dashboard-card">
-        <h3>Bank statements</h3>
-        <p>Generate a PDF statement from your transaction history.</p>
-        <form method="post" action="{{ urls.generate_statement|default('/subscriber/statements/generate') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <label for="statement-month">Statement month</label>
-          <input id="statement-month" name="month" type="month" required>
-          <button class="button" type="submit">Generate statement</button>
-        </form>
-      </article>
+    </section>
 
-      <article class="dashboard-card">
-        <h3>Multi-currency conversion</h3>
-        <form id="currency-form" data-endpoint="{{ urls.currency_convert|default('/api/subscriber/currency/convert') }}">
-          <label for="convert-amount">Amount</label>
-          <input id="convert-amount" name="amount" type="number" min="0" step="0.01" required>
 
-          <label for="currency-from">From</label>
-          <input id="currency-from" name="from" type="text" value="USD" maxlength="3" required>
 
-          <label for="currency-to">To</label>
-          <input id="currency-to" name="to" type="text" value="EUR" maxlength="3" required>
+    <section id="identity">
 
-          <button class="button" type="submit">Convert currency</button>
-          <p id="currency-result" aria-live="polite"></p>
-        </form>
-      </article>
+      <div class="row g-3">
 
-      <article class="dashboard-card">
-        <h3>Fraud &amp; compliance insights</h3>
-        <p>Review available transaction alerts and risk indicators.</p>
-        <a class="button" href="{{ urls.fraud_drilldown|default('/subscriber/fraud') }}">
-          View fraud drilldown
-        </a>
-      </article>
+        <div class="col-md-4">
 
-      <article class="dashboard-card">
-        <h3>Smart contract management</h3>
-        <p>Review and manage available agreement compliance tools.</p>
-        <a class="button" href="{{ urls.contracts|default('/subscriber/contracts') }}">
-          Open contract management
-        </a>
-      </article>
+          <div class="shield-tile">
 
-      <article class="dashboard-card">
-        <h3>Gemini-powered insights</h3>
-        <form id="insights-form" data-endpoint="{{ urls.transaction_summary_api|default('/api/gemini/transaction-summary') }}">
-          <button class="button" type="submit">Generate transaction summary</button>
-          <button class="button button-secondary" type="button" id="read-summary">
-            Read summary aloud
-          </button>
-        </form>
-        <p id="insights-result" aria-live="polite">
-          {{ generated_summary|default("No generated summary yet.", true)|e }}
-        </p>
-      </article>
-    </div>
+            <div class="shield-eyebrow mb-1">Subscriber Identity</div>
 
-    <article class="dashboard-card">
-      <h3>Available services</h3>
-      {% if service_registry %}
-        <ul class="service-list">
-          {% for svc in service_registry %}
-            <li>
-              <strong>{{ svc.name|default("Service", true)|e }}</strong>
-              <span>{{ svc.category|default("System", true)|e }}</span>
-              <p>{{ svc.description|default("Integration available in your subscriber workspace.", true)|e }}</p>
-              {% if svc.url %}
-                <a href="{{ svc.url|e }}">Open workspace</a>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p>No active integration components are available.</p>
-      {% endif %}
-    </article>
-  </section>
+            <h3 class="h6 text-white">Profile &amp; Security</h3>
 
-  <section id="identity" class="dashboard-section">
-    <h2>Identity &amp; Profile</h2>
+            <p class="small mb-1 text-secondary">Username: <strong class="text-light">{{ profile.username|default(current_user.username, true)|e }}</strong></p>
 
-    <div class="card-grid">
-      <article class="dashboard-card">
-        <h3>Profile</h3>
-        <p>Username: {{ profile.username|default(current_user.username, true)|e }}</p>
-        <p>Full name: {{ profile.full_name|default("Not provided", true)|e }}</p>
-        <a href="{{ urls.profile|default('/subscriber/settings') }}">Edit profile</a>
-      </article>
+            <p class="small mb-3 text-secondary">Full name: <strong class="text-light">{{ profile.full_name|default("Not provided", true)|e }}</strong></p>
 
-      <article class="dashboard-card">
-        <h3>Security</h3>
-        <p>Manage your account security settings.</p>
-        <a href="{{ urls.security|default('/subscriber/settings/security') }}">Manage security</a>
-      </article>
+            <div class="d-flex flex-wrap gap-2 mb-3">
 
-      <article class="dashboard-card">
-        <h3>API key</h3>
-        <p>Your API key is stored securely. Never share it.</p>
-        <form method="post" action="{{ urls.regenerate_api_key|default('/subscriber/api-key/regenerate') }}">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="button button-secondary" type="submit">Regenerate key</button>
-        </form>
-      </article>
+              <a href="{{ urls.profile|default('/subscriber/settings') }}" class="btn btn-sm btn-outline-light">Edit profile</a>
 
-      <article class="dashboard-card">
-        <h3>Access token pulse</h3>
-        <div id="token-pulse" data-endpoint="{{ urls.token_pulse|default('/api/subscriber/token-pulse') }}">
-          Loading token data…
+              <a href="{{ urls.security|default('/subscriber/settings/security') }}" class="btn btn-sm btn-outline-info">Security</a>
+
+            </div>
+
+            <form method="post" action="{{ urls.regenerate_api_key|default('/subscriber/api-key/regenerate') }}">
+
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+              <button class="btn btn-sm btn-outline-warning w-100" type="submit">Regenerate API key</button>
+
+            </form>
+
+          </div>
+
         </div>
-      </article>
 
-      <article class="dashboard-card">
-        <h3>Vault activity</h3>
-        <div id="vault-activity" data-endpoint="{{ urls.vault_activity|default('/api/subscriber/vault-activity') }}">
-          Loading vault activity…
+
+
+        <div class="col-md-4">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">Plaid OAuth Telemetry</div>
+
+            <h3 class="h6 text-white">Access Token Pulse</h3>
+
+            <div id="token-pulse" class="small text-secondary" data-endpoint="{{ urls.token_pulse|default('/api/subscriber/token-pulse') }}">
+
+              Checking Plaid token heartbeat…
+
+            </div>
+
+          </div>
+
         </div>
-      </article>
-    </div>
-  </section>
-</main>
 
-<dialog id="dispute-dialog">
+
+
+        <div class="col-md-4">
+
+          <div class="shield-tile">
+
+            <div class="shield-eyebrow mb-1">Escrow Ledger Stream</div>
+
+            <h3 class="h6 text-white">Vault Activity</h3>
+
+            <div id="vault-activity" class="small text-secondary" data-endpoint="{{ urls.vault_activity|default('/api/subscriber/vault-activity') }}">
+
+              Loading recent vault events…
+
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+  </div>
+
+</div>
+
+
+
+<dialog id="dispute-dialog" class="bg-dark text-light border border-secondary rounded-3 p-4" style="max-width: 480px; width: 92%;">
+
   <form id="dispute-form" method="post" action="{{ urls.submit_dispute|default('/subscriber/disputes') }}">
-    <h2>Dispute transaction</h2>
-    <button type="button" id="close-dispute" aria-label="Close">×</button>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+      <h2 class="h5 mb-0 text-white">Dispute Transaction</h2>
+
+      <button type="button" id="close-dispute" class="btn-close btn-close-white" aria-label="Close"></button>
+
+    </div>
+
+
 
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
     <input type="hidden" name="transaction_id" id="dispute-transaction-id">
 
-    <label for="dispute-transaction-description">Transaction</label>
-    <p id="dispute-transaction-description"></p>
 
-    <label for="bureau">Bureau</label>
-    <select id="bureau" name="bureau" required>
-      <option value="">Select bureau</option>
-      <option value="experian">Experian</option>
-      <option value="equifax">Equifax</option>
-      <option value="transunion">TransUnion</option>
-    </select>
 
-    <label for="dispute-reason">Reason for dispute</label>
-    <textarea id="dispute-reason" name="reason" rows="4" required></textarea>
+    <p id="dispute-transaction-description" class="small text-info fw-semibold mb-3"></p>
 
-    <button class="button" type="submit">Submit dispute</button>
+
+
+    <div class="mb-3">
+
+      <label for="bureau" class="form-label small text-secondary">Credit Bureau</label>
+
+      <select id="bureau" name="bureau" class="form-select form-select-sm form-select-shield" required>
+
+        <option value="">Select bureau</option>
+
+        <option value="experian">Experian</option>
+
+        <option value="equifax">Equifax</option>
+
+        <option value="transunion">TransUnion</option>
+
+      </select>
+
+    </div>
+
+
+
+    <div class="mb-3">
+
+      <label for="dispute-reason" class="form-label small text-secondary">Reason for dispute</label>
+
+      <textarea id="dispute-reason" name="reason" rows="3" class="form-control form-control-sm form-control-shield" required></textarea>
+
+    </div>
+
+
+
+    <div class="d-flex justify-content-end gap-2">
+
+      <button class="btn btn-sm btn-warning fw-semibold" type="submit">Submit dispute</button>
+
+    </div>
+
   </form>
+
 </dialog>
 
+
+
 <script>
+
   (() => {
+
     const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || "";
 
-    document.getElementById("theme-toggle")?.addEventListener("click", () => {
-      document.documentElement.classList.toggle("dark-mode");
-      localStorage.setItem(
-        "subscriber-dashboard-dark",
-        document.documentElement.classList.contains("dark-mode") ? "1" : "0"
-      );
-    });
 
-    if (localStorage.getItem("subscriber-dashboard-dark") === "1") {
-      document.documentElement.classList.add("dark-mode");
+
+    const chartCanvas = document.getElementById("cashflowTimelineChart");
+
+    if (chartCanvas && typeof Chart !== "undefined") {
+
+      const labels = [{% if timeline and timeline.points %}{% for p in timeline.points %}"{{ p.date|e }}",{% endfor %}{% endif %}];
+
+      const values = [{% if timeline and timeline.points %}{% for p in timeline.points %}{{ p.amount|default(0, true) }},{% endfor %}{% endif %}];
+
+      new Chart(chartCanvas, {
+
+        type: "line",
+
+        data: {
+
+          labels,
+
+          datasets: [{
+
+            label: "Cash Flow ($)",
+
+            data: values,
+
+            borderColor: "#38bdf8",
+
+            backgroundColor: "rgba(56, 189, 248, 0.15)",
+
+            fill: true,
+
+            tension: 0.35,
+
+            pointRadius: 3
+
+          }]
+
+        },
+
+        options: {
+
+          responsive: true,
+
+          maintainAspectRatio: false,
+
+          plugins: { legend: { display: false } },
+
+          scales: {
+
+            x: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } },
+
+            y: { ticks: { color: "#94a3b8" }, grid: { color: "rgba(148,163,184,0.1)" } }
+
+          }
+
+        }
+
+      });
+
     }
 
+
+
     const dialog = document.getElementById("dispute-dialog");
+
     document.querySelectorAll(".dispute-button").forEach((button) => {
+
       button.addEventListener("click", () => {
-        document.getElementById("dispute-transaction-id").value =
-          button.dataset.transactionId || "";
+
+        document.getElementById("dispute-transaction-id").value = button.dataset.transactionId || "";
+
         document.getElementById("dispute-transaction-description").textContent =
+
           button.dataset.description || "Selected transaction";
+
         dialog?.showModal();
+
       });
+
     });
+
+
 
     document.getElementById("close-dispute")?.addEventListener("click", () => dialog?.close());
 
-    document.getElementById("currency-form")?.addEventListener("submit", async (event) => {
+
+
+    document.getElementById("shield-disclosure-form")?.addEventListener("submit", async (event) => {
+
       event.preventDefault();
+
       const form = event.currentTarget;
+
+      const out = document.getElementById("shield-disclosure-result");
+
+      const fd = new FormData(form);
+
+      out.textContent = "Recording cryptographic signature…";
+
+      try {
+
+        const res = await fetch("/api/v1/fintech/shield/disclosure/sign", {
+
+          method: "POST",
+
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+
+          body: JSON.stringify({
+
+            agreement_id: Number(fd.get("agreement_id")),
+
+            signature: String(fd.get("signature") || "").trim(),
+
+            accepted_rules: true
+
+          })
+
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) throw new Error(data.error || data.msg || "Signature rejected.");
+
+        out.textContent = "✓ Disclosure signed — agreement ready for escrow disbursement.";
+
+        form.reset();
+
+      } catch (err) {
+
+        out.textContent = err.message;
+
+      }
+
+    });
+
+
+
+    document.getElementById("currency-form")?.addEventListener("submit", async (event) => {
+
+      event.preventDefault();
+
+      const form = event.currentTarget;
+
       const output = document.getElementById("currency-result");
+
       output.textContent = "Converting…";
 
       try {
+
         const response = await fetch(form.dataset.endpoint, {
+
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken
-          },
+
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+
           body: JSON.stringify(Object.fromEntries(new FormData(form)))
+
         });
+
         const data = await response.json();
+
         if (!response.ok) throw new Error(data.error || "Conversion failed.");
-        output.textContent = data.result || data.converted_amount || JSON.stringify(data);
+
+        output.textContent = data.result || data.converted_amount || "Conversion complete.";
+
       } catch (error) {
+
         output.textContent = error.message;
+
       }
+
     });
 
+
+
     document.getElementById("insights-form")?.addEventListener("submit", async (event) => {
+
       event.preventDefault();
+
       const form = event.currentTarget;
+
       const output = document.getElementById("insights-result");
+
       output.textContent = "Generating summary…";
 
       try {
+
         const response = await fetch(form.dataset.endpoint, {
+
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken
-          },
+
+          headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+
           body: JSON.stringify({})
+
         });
+
         const data = await response.json();
+
         if (!response.ok) throw new Error(data.error || "Could not generate summary.");
-        output.textContent = data.summary || "Summary generated, but no text was returned.";
+
+        output.textContent = data.summary || "Summary generated.";
+
       } catch (error) {
+
         output.textContent = error.message;
+
       }
+
     });
+
+
 
     document.getElementById("read-summary")?.addEventListener("click", () => {
+
       const text = document.getElementById("insights-result")?.textContent?.trim();
+
       if (text && "speechSynthesis" in window) {
+
         window.speechSynthesis.cancel();
+
         window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+
       }
+
     });
 
-    async function loadTile(element) {
+
+
+    async function loadFormattedTile(element, kind) {
+
       if (!element?.dataset.endpoint) return;
+
       try {
-        const response = await fetch(element.dataset.endpoint, {
-          headers: { "Accept": "application/json" }
-        });
+
+        const response = await fetch(element.dataset.endpoint, { headers: { "Accept": "application/json" } });
+
         const data = await response.json();
+
         if (!response.ok) throw new Error(data.error || "Unable to load.");
-        element.textContent = data.message || JSON.stringify(data);
+
+        if (kind === "token") {
+
+          const status = data.status || (data.has_token ? "Active" : "Unlinked");
+
+          const updated = data.last_updated ? new Date(data.last_updated).toLocaleString() : "Just now";
+
+          element.innerHTML = `<span class="badge shield-badge-live mb-2">${status}</span><div>Last pulse: <span class="text-light">${updated}</span></div>`;
+
+        } else {
+
+          const count = Array.isArray(data.activities) ? data.activities.length : (data.count ?? 0);
+
+          element.innerHTML = `<div class="text-light fw-semibold mb-1">${count} recent vault events</div><div>${data.message || "Escrow ledger synchronized."}</div>`;
+
+        }
+
       } catch (error) {
+
         element.textContent = error.message;
+
       }
+
     }
 
-    loadTile(document.getElementById("token-pulse"));
-    loadTile(document.getElementById("vault-activity"));
+
+
+    loadFormattedTile(document.getElementById("token-pulse"), "token");
+
+    loadFormattedTile(document.getElementById("vault-activity"), "vault");
+
   })();
+
 </script>
+
 {% endblock %}
+

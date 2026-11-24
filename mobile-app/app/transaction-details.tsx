@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { trpc } from "@/lib/trpc";
+import { useTransactionDetail } from "@/hooks/use-fintech-api";
 
 export default function TransactionDetailsScreen() {
   const insets = useSafeAreaInsets();
@@ -12,10 +12,7 @@ export default function TransactionDetailsScreen() {
   const { id } = useLocalSearchParams();
   const transactionId = typeof id === "string" ? parseInt(id) : null;
 
-  const { data: transaction, isLoading, error } = trpc.transactions.get.useQuery(
-    { id: transactionId || 0 },
-    { enabled: !!transactionId }
-  );
+  const { data: transaction, isLoading, error } = useTransactionDetail(transactionId, !!transactionId);
 
   const textColor = useThemeColor({}, "text");
   const cardBgColor = useThemeColor({}, "cardBackground");

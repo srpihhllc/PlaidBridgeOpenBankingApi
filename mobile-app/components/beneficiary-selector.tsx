@@ -11,7 +11,7 @@ import { useState, useMemo } from "react";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { trpc } from "@/lib/trpc";
+import { useBeneficiaries } from "@/hooks/use-fintech-api";
 
 export interface BeneficiaryOption {
   id: number;
@@ -34,7 +34,7 @@ export function BeneficiarySelector({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch beneficiaries
-  const { data: beneficiaries = [], isLoading } = trpc.beneficiaries.list.useQuery();
+  const { data: beneficiaries = [], isLoading } = useBeneficiaries(true);
 
   // Filter beneficiaries based on search query
   const filteredBeneficiaries = useMemo(() => {

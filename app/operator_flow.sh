@@ -1,3 +1,4 @@
+#/home/srpihhllc/PlaidBridgeOpenBankingApi/app/operator_flow.sh
 #!/bin/bash
 # Operator lifecycle test: login → generate → consume → invalidate
 
