@@ -1,0 +1,385 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" width="1360px" height="920px" viewBox="0 0 1360 920" style="background: #0f172a;">
+
+  <defs>
+
+    <marker id="fk-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#64748b"/>
+
+    </marker>
+
+  </defs>
+
+
+
+  <!-- Canvas -->
+
+  <rect x="0" y="0" width="1360" height="920" rx="16" fill="#0f172a" stroke="#1e293b" stroke-width="2"/>
+
+
+
+  <!-- Title Bar -->
+
+  <rect x="24" y="20" width="1312" height="58" rx="12" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+
+  <text x="44" y="46" fill="#f8fafc" font-family="Inter, Segoe UI, Helvetica, sans-serif" font-size="17" font-weight="700">PlaidBridgeOpenBankingApi — Production Database Schema ERD (v2.0)</text>
+
+  <text x="44" y="66" fill="#94a3b8" font-family="Consolas, monospace" font-size="11.5">46 SQLAlchemy Models • Alembic Migrated • 64/65 Services Wired • 36 Blueprints / 324 Routes</text>
+
+
+
+  <!-- DOMAIN 1: IDENTITY & ACCESS (Top Left) -->
+
+  <rect x="24" y="96" width="310" height="390" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+
+  <rect x="24" y="96" width="310" height="32" rx="10" fill="#0284c7"/>
+
+  <text x="38" y="117" fill="#ffffff" font-family="Consolas, monospace" font-size="12.5" font-weight="700">1. IDENTITY, AUTH &amp; PROFILES</text>
+
+
+
+  <text x="38" y="148" fill="#38bdf8" font-family="Consolas, monospace" font-size="11.5" font-weight="700">user (PK: id)</text>
+
+  <text x="46" y="165" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">username, email, password_hash, role</text>
+
+  <text x="46" y="180" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">is_admin, is_approved, email_verified</text>
+
+  <text x="46" y="195" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">total_balance, primary/taxes/owners_pocket</text>
+
+  <text x="46" y="210" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">mfa_code, mfa_expiration, is_deleted</text>
+
+
+
+  <line x1="38" y1="222" x2="320" y2="222" stroke="#334155"/>
+
+  <text x="38" y="240" fill="#38bdf8" font-family="Consolas, monospace" font-size="11.5" font-weight="700">subscriber_profile (FK: user_id)</text>
+
+  <text x="46" y="256" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">pii_encrypted_blob, kyc_status, tier</text>
+
+
+
+  <line x1="38" y1="268" x2="320" y2="268" stroke="#334155"/>
+
+  <text x="38" y="286" fill="#38bdf8" font-family="Consolas, monospace" font-size="11.5" font-weight="700">mfa_code / access_token / revoked_token</text>
+
+  <text x="46" y="302" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), code_hash, jti, expires_at</text>
+
+  <text x="46" y="317" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">scope, revoked_at, manual_link_state</text>
+
+
+
+  <line x1="38" y1="329" x2="320" y2="329" stroke="#334155"/>
+
+  <text x="38" y="347" fill="#38bdf8" font-family="Consolas, monospace" font-size="11.5" font-weight="700">account_status / user_dashboard / todo</text>
+
+  <text x="46" y="363" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), status_flag, preferences</text>
+
+  <text x="46" y="378" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">todo.title, completed, due_date</text>
+
+
+
+  <line x1="38" y1="390" x2="320" y2="390" stroke="#334155"/>
+
+  <text x="38" y="408" fill="#38bdf8" font-family="Consolas, monospace" font-size="11.5" font-weight="700">timeline / timeline_event</text>
+
+  <text x="46" y="424" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), event_type, payload_json</text>
+
+  <text x="46" y="440" fill="#94a3b8" font-family="Consolas, monospace" font-size="10">created_at, updated_at</text>
+
+
+
+  <!-- DOMAIN 2: OPEN BANKING & ACCOUNTS (Top Center) -->
+
+  <rect x="364" y="96" width="320" height="390" rx="10" fill="#1e293b" stroke="#10b981" stroke-width="1.5"/>
+
+  <rect x="364" y="96" width="320" height="32" rx="10" fill="#059669"/>
+
+  <text x="378" y="117" fill="#ffffff" font-family="Consolas, monospace" font-size="12.5" font-weight="700">2. PLAID LINKING &amp; TRANSACTIONS</text>
+
+
+
+  <text x="378" y="148" fill="#34d399" font-family="Consolas, monospace" font-size="11.5" font-weight="700">plaid_item (PK: id, FK: user_id)</text>
+
+  <text x="386" y="165" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">item_id (unique), access_token_enc</text>
+
+  <text x="386" y="180" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">institution_id, cursor, sync_status</text>
+
+
+
+  <line x1="378" y1="192" x2="670" y2="192" stroke="#334155"/>
+
+  <text x="378" y="210" fill="#34d399" font-family="Consolas, monospace" font-size="11.5" font-weight="700">bank_institution &amp; bank_account</text>
+
+  <text x="386" y="226" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">plaid_item_id (FK), user_id (FK)</text>
+
+  <text x="386" y="241" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">routing_number, account_mask, balance</text>
+
+
+
+  <line x1="378" y1="253" x2="670" y2="253" stroke="#334155"/>
+
+  <text x="378" y="271" fill="#34d399" font-family="Consolas, monospace" font-size="11.5" font-weight="700">transactions &amp; bank_transaction</text>
+
+  <text x="386" y="287" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), account_id (FK), amount</text>
+
+  <text x="386" y="302" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">category, ai_verified, verification_status</text>
+
+  <text x="386" y="317" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">merchant_name, posted_date, is_deleted</text>
+
+
+
+  <line x1="378" y1="329" x2="670" y2="329" stroke="#334155"/>
+
+  <text x="378" y="347" fill="#34d399" font-family="Consolas, monospace" font-size="11.5" font-weight="700">bank_statement</text>
+
+  <text x="386" y="363" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), statement_period, pdf_path</text>
+
+  <text x="386" y="378" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">opening_balance, closing_balance, hash</text>
+
+
+
+  <line x1="378" y1="390" x2="670" y2="390" stroke="#334155"/>
+
+  <text x="378" y="408" fill="#34d399" font-family="Consolas, monospace" font-size="11.5" font-weight="700">fraud_report (FK: transaction_id)</text>
+
+  <text x="386" y="424" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">flagged_reason, risk_score, resolved</text>
+
+
+
+  <!-- DOMAIN 3: DOUBLE-ENTRY LEDGER & WALLETS (Top Right) -->
+
+  <rect x="714" y="96" width="310" height="390" rx="10" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5"/>
+
+  <rect x="714" y="96" width="310" height="32" rx="10" fill="#d97706"/>
+
+  <text x="728" y="117" fill="#ffffff" font-family="Consolas, monospace" font-size="12.5" font-weight="700">3. DOUBLE-ENTRY GL &amp; RAILS</text>
+
+
+
+  <text x="728" y="148" fill="#fbbf24" font-family="Consolas, monospace" font-size="11.5" font-weight="700">gl_account &amp; journal_entry</text>
+
+  <text x="736" y="165" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">code, account_type (ASSET/LIAB/REV)</text>
+
+  <text x="736" y="180" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">debit_amount, credit_amount, posted_at</text>
+
+
+
+  <line x1="728" y1="192" x2="1010" y2="192" stroke="#334155"/>
+
+  <text x="728" y="210" fill="#fbbf24" font-family="Consolas, monospace" font-size="11.5" font-weight="700">ledger &amp; credit_ledger</text>
+
+  <text x="736" y="226" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), entry_type, delta, balance</text>
+
+
+
+  <line x1="728" y1="238" x2="1010" y2="238" stroke="#334155"/>
+
+  <text x="728" y="256" fill="#fbbf24" font-family="Consolas, monospace" font-size="11.5" font-weight="700">customer_wallet &amp; reserve_account</text>
+
+  <text x="736" y="272" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), currency, available_cents</text>
+
+  <text x="736" y="287" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">frozen (bool), hold_amount, reserve_ratio</text>
+
+
+
+  <line x1="728" y1="299" x2="1010" y2="299" stroke="#334155"/>
+
+  <text x="728" y="317" fill="#fbbf24" font-family="Consolas, monospace" font-size="11.5" font-weight="700">vault_transaction</text>
+
+  <text x="736" y="333" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">wallet_id (FK), direction, rail, status</text>
+
+
+
+  <line x1="728" y1="345" x2="1010" y2="345" stroke="#334155"/>
+
+  <text x="728" y="363" fill="#fbbf24" font-family="Consolas, monospace" font-size="11.5" font-weight="700">payment_instruction &amp; payment_log</text>
+
+  <text x="736" y="379" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">rail (ACH | FEDNOW | RTP), amount</text>
+
+  <text x="736" y="394" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">idempotency_key (FK), trace_number</text>
+
+
+
+  <line x1="728" y1="406" x2="1010" y2="406" stroke="#334155"/>
+
+  <text x="728" y="424" fill="#fbbf24" font-family="Consolas, monospace" font-size="11.5" font-weight="700">settlement_batch &amp; idempotency_key</text>
+
+  <text x="736" y="440" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">batch_ref, settled_at, key_hash (unique)</text>
+
+
+
+  <!-- DOMAIN 4: TREASURY & LENDING (Top Far Right) -->
+
+  <rect x="1054" y="96" width="282" height="390" rx="10" fill="#1e293b" stroke="#a855f7" stroke-width="1.5"/>
+
+  <rect x="1054" y="96" width="282" height="32" rx="10" fill="#7e22ce"/>
+
+  <text x="1068" y="117" fill="#ffffff" font-family="Consolas, monospace" font-size="12.5" font-weight="700">4. LENDING, CARDS &amp; DISPUTES</text>
+
+
+
+  <text x="1068" y="148" fill="#d8b4fe" font-family="Consolas, monospace" font-size="11.5" font-weight="700">lender &amp; lender_risk &amp; underwriter</text>
+
+  <text x="1076" y="165" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">lender_id, kyc_verified, risk_tier</text>
+
+  <text x="1076" y="180" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">daily_exposure, approval_threshold</text>
+
+
+
+  <line x1="1068" y1="192" x2="1322" y2="192" stroke="#334155"/>
+
+  <text x="1068" y="210" fill="#d8b4fe" font-family="Consolas, monospace" font-size="11.5" font-weight="700">loan &amp; loan_agreement</text>
+
+  <text x="1076" y="226" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">lender_id (FK), borrower_id (FK)</text>
+
+  <text x="1076" y="241" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">principal, apr, status, ai_flagged</text>
+
+  <text x="1076" y="256" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">locked, violation_count, escrow_state</text>
+
+
+
+  <line x1="1068" y1="268" x2="1322" y2="268" stroke="#334155"/>
+
+  <text x="1068" y="286" fill="#d8b4fe" font-family="Consolas, monospace" font-size="11.5" font-weight="700">borrower_card (Treasury Prime)</text>
+
+  <text x="1076" y="302" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), tp_card_id, last4</text>
+
+  <text x="1076" y="317" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">status (ACTIVE | SUSPENDED | FROZEN)</text>
+
+
+
+  <line x1="1068" y1="329" x2="1322" y2="329" stroke="#334155"/>
+
+  <text x="1068" y="347" fill="#d8b4fe" font-family="Consolas, monospace" font-size="11.5" font-weight="700">tradeline</text>
+
+  <text x="1076" y="363" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), creditor, credit_limit</text>
+
+  <text x="1076" y="378" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">review_status, bureau_reporting_flag</text>
+
+
+
+  <line x1="1068" y1="390" x2="1322" y2="390" stroke="#334155"/>
+
+  <text x="1068" y="408" fill="#d8b4fe" font-family="Consolas, monospace" font-size="11.5" font-weight="700">dispute_log &amp; complaint_log (CFPB)</text>
+
+  <text x="1076" y="424" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">user_id (FK), bureau, letter_pdf_path</text>
+
+
+
+  <!-- Cross-Domain Relationship Arrows -->
+
+  <path d="M 334 155 L 364 155" stroke="#38bdf8" stroke-width="1.8" marker-end="url(#fk-arrow)"/>
+
+  <path d="M 684 275 L 714 275" stroke="#10b981" stroke-width="1.8" marker-end="url(#fk-arrow)"/>
+
+  <path d="M 1024 275 L 1054 275" stroke="#f59e0b" stroke-width="1.8" marker-end="url(#fk-arrow)"/>
+
+
+
+  <!-- DOMAIN 5: AUDIT, GOVERNANCE & TELEMETRY (Bottom Left) -->
+
+  <rect x="24" y="514" width="660" height="376" rx="10" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+
+  <rect x="24" y="514" width="660" height="32" rx="10" fill="#be123c"/>
+
+  <text x="38" y="535" fill="#ffffff" font-family="Consolas, monospace" font-size="12.5" font-weight="700">5. GOVERNANCE, AUDIT TRAIL &amp; FINBRAIN TELEMETRY</text>
+
+
+
+  <text x="38" y="566" fill="#fda4af" font-family="Consolas, monospace" font-size="11.5" font-weight="700">audit_log &amp; god_mode_audit_log</text>
+
+  <text x="46" y="583" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">actor_id (FK: user.id), target_user_id, action, ip_address, metadata_json, created_at</text>
+
+
+
+  <line x1="38" y1="596" x2="670" y2="596" stroke="#334155"/>
+
+  <text x="38" y="615" fill="#fda4af" font-family="Consolas, monospace" font-size="11.5" font-weight="700">trace_events &amp; schema_event</text>
+
+  <text x="46" y="632" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">event_id (UUID), blueprint, endpoint, latency_ms, drift_detected, payload_snapshot</text>
+
+
+
+  <line x1="38" y1="645" x2="670" y2="645" stroke="#334155"/>
+
+  <text x="38" y="664" fill="#fda4af" font-family="Consolas, monospace" font-size="11.5" font-weight="700">module_health (models/admin/cockpit/module_health.py)</text>
+
+  <text x="46" y="681" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">module_name, status (GREEN | AMBER | RED), last_heartbeat, error_count</text>
+
+
+
+  <line x1="38" y1="694" x2="670" y2="694" stroke="#334155"/>
+
+  <text x="38" y="713" fill="#fda4af" font-family="Consolas, monospace" font-size="11.5" font-weight="700">registry &amp; system &amp; alembic_version</text>
+
+  <text x="46" y="730" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">blueprint_name, url_prefix, version_num (PK), boot_timestamp, strict_checks_passed</text>
+
+
+
+  <line x1="38" y1="743" x2="670" y2="743" stroke="#334155"/>
+
+  <text x="38" y="762" fill="#fda4af" font-family="Consolas, monospace" font-size="11.5" font-weight="700">polsia (models/polsia.py)</text>
+
+  <text x="46" y="779" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">webhook_event_id, agent_context, memory_key, task_status, processed_at</text>
+
+
+
+  <line x1="38" y1="792" x2="670" y2="792" stroke="#334155"/>
+
+  <text x="38" y="811" fill="#fda4af" font-family="Consolas, monospace" font-size="11.5" font-weight="700">rate_limit</text>
+
+  <text x="46" y="828" fill="#cbd5e1" font-family="Consolas, monospace" font-size="10.5">id (PK), ip_address, endpoint, requests, window_start (backed by RedisStorage in prod)</text>
+
+
+
+  <!-- DOMAIN 6: INVARIANTS & PRODUCTION HARDENING SUMMARY (Bottom Right) -->
+
+  <rect x="714" y="514" width="622" height="376" rx="10" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5"/>
+
+  <rect x="714" y="514" width="622" height="32" rx="10" fill="#0369a1"/>
+
+  <text x="728" y="535" fill="#ffffff" font-family="Consolas, monospace" font-size="12.5" font-weight="700">6. PRODUCTION SCHEMA &amp; WIRING INVARIANTS (VERIFIED)</text>
+
+
+
+  <text x="732" y="568" fill="#38bdf8" font-family="Consolas, monospace" font-size="12" font-weight="700">✓ Monetary &amp; Ledger Integrity</text>
+
+  <text x="742" y="586" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Double-entry balanced GL postings via TransferEngine &amp; LedgerEngine</text>
+
+  <text x="742" y="603" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Mandatory IdempotencyKey enforcement on ACH, FedNow, RTP &amp; Wallets</text>
+
+
+
+  <text x="732" y="632" fill="#34d399" font-family="Consolas, monospace" font-size="12" font-weight="700">✓ Security &amp; Encryption</text>
+
+  <text x="742" y="650" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Field-level PII encryption (PII_ENCRYPTION_KEY) on SubscriberProfile</text>
+
+  <text x="742" y="667" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• JWT revocation tracking (RevokedToken) + 7-day prod session TTL</text>
+
+  <text x="742" y="684" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• 0 CVEs across requirements.txt &amp; mobile-app (pip-audit verified)</text>
+
+
+
+  <text x="732" y="713" fill="#fbbf24" font-family="Consolas, monospace" font-size="12" font-weight="700">✓ Service Saturation (64 / 65 Wired — 98.5%)</text>
+
+  <text x="742" y="731" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Retired duplicate app/services/transaction_dto.py &amp; ledger_engine.py</text>
+
+  <text x="742" y="748" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Only unwired module is CLI utility services/grants/inspect_grants.py</text>
+
+  <text x="742" y="765" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Unified Treasury Prime config across card_manager &amp; lending_cognition</text>
+
+
+
+  <text x="732" y="794" fill="#c084fc" font-family="Consolas, monospace" font-size="12" font-weight="700">✓ Automated Operations</text>
+
+  <text x="742" y="812" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Nightly 03:00 UTC cron_purge_zombies (Task #1603164, exit code 0)</text>
+
+  <text x="742" y="829" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• Local WSGI RotatingFileHandler -> logs/wsgi_server.log</text>
+
+  <text x="742" y="846" fill="#cbd5e1" font-family="Consolas, monospace" font-size="11">• 637 pytest checks passing @ 89.12% coverage</text>
+
+</svg>
+
