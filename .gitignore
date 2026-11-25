@@ -108,3 +108,4 @@ storage/manifest/
 node_modules/
 source/
 mobile-app/package-lock.json
+logs/
