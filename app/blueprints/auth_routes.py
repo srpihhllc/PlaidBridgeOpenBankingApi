@@ -770,56 +770,125 @@ def login_subscriber():
 
 
 @auth_bp.route("/login_operator", methods=["GET", "POST"], endpoint="login_operator")
+@csrf.exempt
+
 def login_operator():
+
     if request.method == "GET":
+
         return render_template("auth/operator_login.html")
 
+
+
     ip = request.remote_addr
+
     user_agent = request.user_agent.string
 
-    # 1. Extract and normalize values
+
+
     submitted = (request.form.get("passcode") or "").strip().upper()
+
     raw_env_code = os.getenv("ROOT_IGNITION_CODE", "")
+
     expected = raw_env_code.strip().upper()
 
-    # 2. Check environment configuration
+
+
     if not expected:
+
         current_app.logger.error("ROOT_IGNITION_CODE environment variable is unconfigured.")
+
         flash("Operator login is temporarily disabled.", "danger")
+
         return render_template("auth/operator_login.html"), 503
 
-    # 3. Secure timing-attack resistant comparison
+
+
     if not hmac.compare_digest(submitted, expected):
+
         log_identity_event(
+
             0,
+
             "AUTH_OPERATOR_LOGIN_FAIL",
+
             ip=ip,
+
             user_agent=user_agent,
+
             details={"reason": "invalid_passcode"},
+
         )
+
         flash("Invalid operator ignition code.", "danger")
+
         return render_template("auth/operator_login.html"), 401
 
-    # 4. Resolve or create the operator admin account
-    operator_user = db.session.query(User).filter_by(role="admin").first()
-    if not operator_user:
-        operator_user = db.session.query(User).filter_by(is_admin=True).first()
 
-    if not operator_user:
-        current_app.logger.error("No designated admin user account found for operator elevation.")
-        flash("System operator account not configured.", "danger")
-        return render_template("auth/operator_login.html"), 500
 
-    # 5. Authenticate session & log event
-    login_user(operator_user)
+    from datetime import datetime, timezone
+
+    from app.blueprints.admin_routes import _resolve_or_bootstrap_operator_user
+
+    from app.services.ignition_service import enable_operator_mode
+
+    from app.utils.redis_utils import get_redis_client
+
+
+
+    operator_user = _resolve_or_bootstrap_operator_user()
+
+
+
+    ttl = 900
+
+    login_user(operator_user, remember=True)
+
+    enable_operator_mode(actor=operator_user, ttl_seconds=ttl)
+
+    session["operator_id"] = operator_user.id
+
+    session["operator_ignition_active"] = True
+
+    session["operator_mode_ttl"] = ttl
+
+    session["operator_mode_ttl_seconds"] = ttl
+
+    session["operator_mode_start_time"] = datetime.now(timezone.utc).timestamp()
+
+    session.modified = True
+
+
+
+    r = getattr(current_app, "redis_client", None) or get_redis_client()
+
+    if r and getattr(operator_user, "id", None):
+
+        try:
+
+            r.setex(f"operator:ignition:{operator_user.id}", ttl, "1")
+
+        except Exception:
+
+            pass
+
+
+
     log_identity_event(
+
         operator_user.id,
+
         "AUTH_OPERATOR_LOGIN_SUCCESS",
+
         ip=ip,
+
         user_agent=user_agent,
+
     )
+
     flash("Operator authentication successful.", "success")
-    return redirect(url_for("admin.admin_index"))
+
+    return redirect(url_for("admin.admin_cockpit"))
 
 
 # API Logout

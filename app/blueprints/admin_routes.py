@@ -26,7 +26,7 @@ from flask import (
     url_for,
 )
 from flask_jwt_extended import get_jwt, jwt_required
-from flask_login import current_user, login_required
+from flask_login import current_user, login_required, login_user
 
 from app.decorators import admin_required, roles_required
 from app.extensions import csrf
@@ -34,6 +34,7 @@ from app.extensions import db as real_db
 from app.models.plaid_item import PlaidItem
 from app.models.user import User as RealUserModel
 from app.utils.rate_limit_guard import rate_limit_if_enabled
+from app.services.ignition_service import enable_operator_mode
 from app.utils.redis_utils import get_redis_client
 from app.utils.security_utils import success_response
 from app.utils.telemetry import log_identity_event
@@ -407,24 +408,248 @@ def operator_code_invalidate():
         return jsonify({"status": "error", "message": "server_error"}), 500
 
 
+def _resolve_or_bootstrap_operator_user():
+
+    """Resolve an existing admin user or bootstrap one from ADMIN_EMAIL."""
+
+    user = (
+
+        real_db.session.query(RealUserModel)
+
+        .filter((RealUserModel.role == "admin") | (RealUserModel.is_admin == True))  # noqa: E712
+
+        .first()
+
+    )
+
+    if user:
+
+        if getattr(user, "role", None) != "admin":
+
+            user.role = "admin"
+
+        if not getattr(user, "is_admin", False):
+
+            user.is_admin = True
+
+        if hasattr(user, "is_approved") and not getattr(user, "is_approved", False):
+
+            user.is_approved = True
+
+        real_db.session.commit()
+
+        return user
+
+
+
+    from werkzeug.security import generate_password_hash
+
+
+
+    admin_email = (os.getenv("ADMIN_EMAIL") or "operator@plaidbridge.local").strip().lower()
+
+    existing = real_db.session.query(RealUserModel).filter_by(email=admin_email).first()
+
+    if existing:
+
+        existing.role = "admin"
+
+        existing.is_admin = True
+
+        if hasattr(existing, "is_super_admin"):
+
+            existing.is_super_admin = True
+
+        if hasattr(existing, "is_approved"):
+
+            existing.is_approved = True
+
+        real_db.session.commit()
+
+        return existing
+
+
+
+    username_base = admin_email.split("@")[0] or "operator"
+
+    user = RealUserModel(
+
+        username=f"{username_base}_{secrets.token_hex(3)}",
+
+        email=admin_email,
+
+        password_hash=generate_password_hash(secrets.token_urlsafe(32)),
+
+        role="admin",
+
+        is_admin=True,
+
+    )
+
+    if hasattr(user, "is_super_admin"):
+
+        user.is_super_admin = True
+
+    if hasattr(user, "is_approved"):
+
+        user.is_approved = True
+
+    real_db.session.add(user)
+
+    real_db.session.commit()
+
+    return user
+
+
+
+
+
 @admin_api_bp.route("/operator_entry", methods=["POST"])
+
 @rate_limit_if_enabled("5/minute")
+
 @csrf.exempt
+
 def operator_entry():
-    # 1. Properly extract from the HTML Form POST
+
+    import hmac
+
+
+
     code = request.form.get("passcode", "").strip().upper()
 
-    # (Fallback just in case you ever hit this from an API client)
     if not code and request.is_json:
-        data = request.get_json(silent=True) or {}
-        code = data.get("passcode", "").strip().upper()
 
-    # 2. Validate against your Regex
-    if not code or not OPERATOR_CODE_REGEX.match(code):
+        data = request.get_json(silent=True) or {}
+
+        code = (data.get("passcode") or data.get("code") or "").strip().upper()
+
+
+
+    root_code = (os.getenv("ROOT_IGNITION_CODE") or "").strip().upper()
+
+    is_root_match = bool(root_code and code and hmac.compare_digest(code, root_code))
+
+
+
+    if not code or (not is_root_match and not OPERATOR_CODE_REGEX.match(code)):
+
         flash(
+
             "Invalid operator ignition format. Please check your code.",
+
             "danger",
+
         )
+
+        return redirect(url_for("admin.operator_login"))
+
+
+
+    key = _make_operator_key(code)
+
+
+
+    try:
+
+        r = get_redis_client()
+
+        ttl = 900
+
+        if not is_root_match:
+
+            if not r:
+
+                flash("Service unavailable: Redis offline.", "danger")
+
+                return redirect(url_for("admin.operator_login"))
+
+
+
+            raw = r.eval(LUA_GETDEL, 1, key)
+
+            if raw is None:
+
+                flash("Ignition code expired or invalid.", "danger")
+
+                return redirect(url_for("admin.operator_login"))
+
+
+
+            meta = (
+
+                json.loads(raw.decode("utf-8"))
+
+                if isinstance(raw, bytes)
+
+                else json.loads(raw)
+
+            )
+
+            ttl = int(meta.get("ttl", 600))
+
+
+
+        operator_user = _resolve_or_bootstrap_operator_user()
+
+        login_user(operator_user, remember=True)
+
+
+
+        enable_operator_mode(actor=operator_user, ttl_seconds=ttl)
+
+        session["operator_id"] = operator_user.id
+
+        session["operator_ignition_active"] = True
+
+        session["operator_mode_ttl"] = ttl
+
+        session[OPERATOR_MODE_TTL_SECONDS_KEY] = ttl
+
+        session[OPERATOR_MODE_START_TIME_KEY] = datetime.now(
+
+            timezone.utc
+
+        ).timestamp()
+
+        session.modified = True
+
+
+
+        if r and getattr(operator_user, "id", None):
+
+            try:
+
+                r.setex(f"operator:ignition:{operator_user.id}", ttl, "1")
+
+            except Exception as redis_err:
+
+                logger.warning(f"Failed to set operator ignition Redis TTL: {redis_err}")
+
+
+
+        _audit_emit(
+
+            "OPERATOR_CODE_CONSUMED",
+
+            {"code_prefix": code[:4], "ttl": ttl, "operator_id": operator_user.id},
+
+        )
+
+
+
+        flash("Cortex Operator Mode Active. Welcome.", "success")
+
+        return redirect(url_for("admin.admin_cockpit"))
+
+
+
+    except Exception as e:
+
+        logger.error(f"Operator entry crash: {e}")
+
+        flash("Internal error processing ignition code.", "danger")
+
         return redirect(url_for("admin.operator_login"))
 
     # 3. Check Redis for the Operator Key

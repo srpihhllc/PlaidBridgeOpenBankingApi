@@ -224,7 +224,8 @@ def operator_login():
 @login_required
 @admin_required
 def admin_cockpit():
-    return render_template("cockpit/cockpit_dashboard.html")
+    page = max(1, request.args.get("page", 1, type=int) or 1)
+    return render_template("cockpit/cockpit_dashboard.html", page=page, total_pages=1)
 
 
 @admin_bp.route("/cockpit/lender_risk_day_detail")
