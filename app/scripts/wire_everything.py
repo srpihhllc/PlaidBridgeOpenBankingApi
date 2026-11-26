@@ -28,7 +28,7 @@ missing_templates = [
     "login_trace_monitor.html",
     "mutation_submit_tile.html",
     "fallback_tile.html",
-    "me.html",
+    "auth/me.html",
     "system_health.html",
 ]
 

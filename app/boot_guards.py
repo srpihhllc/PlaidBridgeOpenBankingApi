@@ -10,7 +10,7 @@ REQUIRED_TEMPLATES = [
     "register_subscriber.html",
     "forgot_password.html",
     "reset_password.html",
-    "me.html",
+    "auth/me.html",
 ]
 
 
