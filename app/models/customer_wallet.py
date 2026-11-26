@@ -26,7 +26,7 @@ class CustomerWallet(db.Model):
     )
 
     user_id = db.Column(
-        db.Integer,
+        db.String(36),
         nullable=False,
         index=True,
     )
