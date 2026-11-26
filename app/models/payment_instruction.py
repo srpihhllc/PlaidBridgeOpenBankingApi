@@ -43,7 +43,7 @@ class PaymentInstruction(db.Model):
     __tablename__ = "payment_instructions"
 
     id = db.Column(
-        db.BigInteger,
+        db.BigInteger().with_variant(db.Integer, "sqlite"),
         primary_key=True,
     )
 

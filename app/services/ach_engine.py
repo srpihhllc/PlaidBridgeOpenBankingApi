@@ -106,6 +106,7 @@ class ACHEngine:
         )
 
         db.session.add(payment)
+        db.session.commit()
 
         return payment
 

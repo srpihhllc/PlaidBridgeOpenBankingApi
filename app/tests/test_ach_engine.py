@@ -28,3 +28,20 @@ def test_invalid_amount_rejected():
 
     except Exception:
         assert True
+
+def test_create_transfer_persists_and_replays_idempotently(app):
+    with app.app_context():
+        first = ACHEngine.create_transfer(
+            debit_wallet_id=1,
+            credit_wallet_id=2,
+            amount=Decimal("25.00"),
+            idempotency_key="test-ach-idem-001",
+        )
+        replay = ACHEngine.create_transfer(
+            debit_wallet_id=1,
+            credit_wallet_id=2,
+            amount=Decimal("25.00"),
+            idempotency_key="test-ach-idem-001",
+        )
+        assert first.id is not None
+        assert replay.id == first.id
