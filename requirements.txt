@@ -107,7 +107,7 @@ openapi-schema-validator
 openapi-spec-validator
 ordered-set==4.1.0
 packageurl-python==0.17.6
-packaging==26.3
+packaging==26.4
 pandas-stubs==3.1.0.261029
 pandas==3.1.1
 pathable
@@ -147,8 +147,8 @@ pytest-asyncio==1.5.0
 pytest-cov==7.1.0
 pytest-factoryboy==2.8.1
 pytest==9.2.0
-python-dateutil==2.9.0.post0
-python-discovery==1.9.6
+python-dateutil==4.0.0
+python-discovery==1.9.7
 python-dotenv==1.2.4
 python-engineio==4.15.1
 python-http-client==3.3.7
@@ -159,7 +159,7 @@ PyYAML==6.0.4
 qrcode==8.2
 redis==8.2.0
 referencing==0.37.0
-regex==2026.11.19
+regex==2026.11.23
 reportlab==5.1.0
 requests-oauthlib==2.0.0
 requests==2.34.2
@@ -181,7 +181,7 @@ starkbank-ecdsa==2.3.1
 starlette==1.10.0
 stevedore==5.10.0
 tabulate==0.10.0
-tenacity>=8.2.3,<9.0.0
+tenacity>=9.2.1,<10.0.0
 tomli==2.5.0
 tomli_w==1.2.0
 tomlkit==0.15.2
@@ -211,7 +211,7 @@ typing_extensions==4.16.0
 tzdata==2026.6
 urllib3==2.8.0
 vine==5.1.0
-virtualenv==21.15.12
+virtualenv==21.15.13
 Wand==0.7.2
 wcwidth==0.9.5
 websockets==17.4
